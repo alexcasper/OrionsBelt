@@ -29,6 +29,10 @@
 void gdn_cumdecay_f32(const float *, float *, size_t, size_t);
 void gdn_gated_scan_f32(const float *, const float *, float *, float *, size_t, size_t);
 void gdn_causal_dwconv1d_f32(const float *, const float *, float *, float *, size_t, size_t);
+void gdn_cumdecay_bf16(const float *, uint16_t *, size_t, size_t);
+void gdn_gated_scan_bf16(const float *, const float *, float *, uint16_t *, size_t, size_t);
+void gdn_cumdecay_f16(const float *, uint16_t *, size_t, size_t);
+void gdn_gated_scan_f16(const float *, const float *, float *, uint16_t *, size_t, size_t);
 
 /* Which path did the compiler actually select in gdn_sve.c? Mirrors its guard order exactly. */
 #if defined(__ARM_FEATURE_SVE)
@@ -80,13 +84,21 @@ static stats_t summarize(double *samples, int n) {
     return s;
 }
 
-typedef enum { K_DECAY, K_SCAN, K_CONV } kernel_id;
+typedef enum { K_DECAY, K_SCAN, K_CONV,
+               K_DECAY_BF16, K_SCAN_BF16,
+               K_DECAY_F16, K_SCAN_F16,
+               K_MAX } kernel_id;
 
 static const char *kernel_name(kernel_id k) {
     switch (k) {
-        case K_DECAY: return "gdn_cumdecay";
-        case K_SCAN: return "gdn_gated_scan";
-        case K_CONV: return "gdn_causal_dwconv1d";
+        case K_DECAY:      return "gdn_cumdecay";
+        case K_SCAN:       return "gdn_gated_scan";
+        case K_CONV:       return "gdn_causal_dwconv1d";
+        case K_DECAY_BF16: return "gdn_cumdecay_bf16";
+        case K_SCAN_BF16:  return "gdn_gated_scan_bf16";
+        case K_DECAY_F16:  return "gdn_cumdecay_f16";
+        case K_SCAN_F16:   return "gdn_gated_scan_f16";
+        case K_MAX:        return "?";
     }
     return "?";
 }
@@ -95,14 +107,25 @@ static const char *kernel_name(kernel_id k) {
  * bandwidth-bound argument in docs/METRICS.md is built on, so the accounting is explicit
  * rather than folded into a constant. */
 static double bytes_per_call(kernel_id k, size_t seq, size_t ch) {
-    double e = (double)sizeof(float);
+    double e = (double)sizeof(float);   /* 4 bytes (fp32) */
+    double h = (double)sizeof(uint16_t); /* 2 bytes (bf16/fp16) */
+    double s = (double)seq, c = (double)ch;
     switch (k) {
-        /* read a[], write decay[] */
-        case K_DECAY: return e * 2.0 * (double)seq * (double)ch;
-        /* read g[], read x[], write s[], plus state read+write */
-        case K_SCAN: return e * (3.0 * (double)seq * (double)ch + 2.0 * (double)ch);
+        /* read a[], write decay[] — both fp32 */
+        case K_DECAY:      return e * 2.0 * s * c;
+        /* read g[], read x[], write s[], plus state read+write — all fp32 */
+        case K_SCAN:       return e * (3.0 * s * c + 2.0 * c);
         /* read in[], write out[], weights + history are small and resident */
-        case K_CONV: return e * (2.0 * (double)seq * (double)ch + 7.0 * (double)ch);
+        case K_CONV:       return e * (2.0 * s * c + 7.0 * c);
+        /* read a[fp32], write decay[bf16] — saves 25% output traffic */
+        case K_DECAY_BF16: return e * s * c + h * s * c;
+        /* read g+x[fp32], write s[fp32], read+write state[bf16] — saves state I/O */
+        case K_SCAN_BF16:  return e * 3.0 * s * c + h * 2.0 * c;
+        /* read a[fp32], write decay[fp16] — same traffic as bf16 variant */
+        case K_DECAY_F16:  return e * s * c + h * s * c;
+        /* read g+x[fp32], write s[fp32], read+write state[fp16] */
+        case K_SCAN_F16:   return e * 3.0 * s * c + h * 2.0 * c;
+        case K_MAX:        return 0.0;
     }
     return 0.0;
 }
@@ -110,9 +133,15 @@ static double bytes_per_call(kernel_id k, size_t seq, size_t ch) {
 static double flops_per_call(kernel_id k, size_t seq, size_t ch) {
     double n = (double)seq * (double)ch;
     switch (k) {
-        case K_DECAY: return n;             /* one multiply per element */
-        case K_SCAN: return 2.0 * n;        /* one FMA per element */
-        case K_CONV: return 8.0 * n;        /* 4 taps, mul + 3 FMA */
+        case K_DECAY:      return n;             /* one multiply per element */
+        case K_SCAN:       return 2.0 * n;       /* one FMA per element */
+        case K_CONV:       return 8.0 * n;       /* 4 taps, mul + 3 FMA */
+        /* Narrow-format variants do the same FLOPs — only I/O width changes */
+        case K_DECAY_BF16: return n;
+        case K_SCAN_BF16:  return 2.0 * n;
+        case K_DECAY_F16:  return n;
+        case K_SCAN_F16:   return 2.0 * n;
+        case K_MAX:        return 0.0;
     }
     return 0.0;
 }
@@ -160,7 +189,10 @@ int main(int argc, char **argv) {
         float *state = malloc(ch * sizeof(float));
         float *w = malloc(4 * ch * sizeof(float));
         float *hist = malloc(3 * ch * sizeof(float));
-        if (!a || !out || !g || !x || !state || !w || !hist) {
+        uint16_t *decay_narrow = malloc(n * sizeof(uint16_t));
+        uint16_t *state_narrow = malloc(ch * sizeof(uint16_t));
+        if (!a || !out || !g || !x || !state || !w || !hist ||
+            !decay_narrow || !state_narrow) {
             fprintf(stderr, "allocation failed for %s (needs ~%.0f MiB)\n", cfgs[c].model,
                     (double)(4 * n + 8 * ch) * sizeof(float) / 1048576.0);
             return 1;
@@ -173,6 +205,7 @@ int main(int argc, char **argv) {
             x[i] = (float)((i * 69069u) % 2000) / 1000.0f - 1.0f;
         }
         for (size_t i = 0; i < ch; ++i) state[i] = 0.0f;
+        for (size_t i = 0; i < ch; ++i) state_narrow[i] = 0;
         for (size_t i = 0; i < 4 * ch; ++i) w[i] = 0.1f;
         for (size_t i = 0; i < 3 * ch; ++i) hist[i] = 0.0f;
 
@@ -180,14 +213,19 @@ int main(int argc, char **argv) {
             printf("%s  (seq=%zu, channels=%zu, %zu GDN layers)\n", cfgs[c].model, seq, ch,
                    cfgs[c].gdn_layers);
 
-        for (kernel_id k = K_DECAY; k <= K_CONV; ++k) {
+        for (kernel_id k = K_DECAY; k < K_MAX; ++k) {
             double samples[MAX_REPEATS];
             for (int r = 0; r < WARMUPS + repeats; ++r) {
                 double t0 = now_s();
                 switch (k) {
-                    case K_DECAY: gdn_cumdecay_f32(a, out, seq, ch); break;
-                    case K_SCAN: gdn_gated_scan_f32(g, x, out, state, seq, ch); break;
-                    case K_CONV: gdn_causal_dwconv1d_f32(x, w, out, hist, seq, ch); break;
+                    case K_DECAY:      gdn_cumdecay_f32(a, out, seq, ch); break;
+                    case K_SCAN:       gdn_gated_scan_f32(g, x, out, state, seq, ch); break;
+                    case K_CONV:       gdn_causal_dwconv1d_f32(x, w, out, hist, seq, ch); break;
+                    case K_DECAY_BF16: gdn_cumdecay_bf16(a, decay_narrow, seq, ch); break;
+                    case K_SCAN_BF16:  gdn_gated_scan_bf16(g, x, out, state_narrow, seq, ch); break;
+                    case K_DECAY_F16:  gdn_cumdecay_f16(a, decay_narrow, seq, ch); break;
+                    case K_SCAN_F16:   gdn_gated_scan_f16(g, x, out, state_narrow, seq, ch); break;
+                    case K_MAX:        break;
                 }
                 double dt = now_s() - t0;
                 if (r >= WARMUPS) samples[r - WARMUPS] = dt;
@@ -215,6 +253,7 @@ int main(int argc, char **argv) {
             printf("\n");
         }
         free(a); free(out); free(g); free(x); free(state); free(w); free(hist);
+        free(decay_narrow); free(state_narrow);
     }
 
     if (!csv) {
