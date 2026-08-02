@@ -29,5 +29,6 @@ parallel agents don't collide. Assigned so far:
 | 0003 | Primary and fallback Qwen3.5 checkpoint | `ob-eae` |
 | 0004 | Descope ladder and trigger dates | `ob-atp` |
 | 0005 | Device fleet as Edge AI hedge target; bandwidth-scaling study | `ob-zh4` follow-on |
+| 0006 | Quantize weights to INT4, carve out recurrent state and gates | `ob-qpa` |
 
 The template is [`template.md`](./template.md).
