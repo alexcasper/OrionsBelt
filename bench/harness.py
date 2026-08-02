@@ -238,27 +238,12 @@ class SyntheticBackend(Backend):
         return (token_id + 1) % self.config.vocab_size
 
     def memory_bytes(self) -> dict[str, int]:
-        cfg = self.config
-        weights = cfg.num_params * cfg.weight_dtype_bytes
-        kv_cache = (
-            cfg.num_full_attention_layers
-            * 2  # K and V
-            * self._seq_len
-            * cfg.fa_n_kv_heads
-            * cfg.fa_head_dim
-            * cfg.cache_dtype_bytes
-        )
-        recurrent_state = (
-            cfg.num_gdn_layers
-            * cfg.linear_num_value_heads
-            * cfg.linear_key_head_dim
-            * cfg.linear_value_head_dim
-            * cfg.state_dtype_bytes
-        )
+        from bench.memory import kv_cache_bytes, recurrent_state_bytes, weights_bytes
+
         return {
-            "weights": weights,
-            "kv_cache": kv_cache,
-            "recurrent_state": recurrent_state,
+            "weights": weights_bytes(self.config),
+            "kv_cache": kv_cache_bytes(self.config, self._seq_len),
+            "recurrent_state": recurrent_state_bytes(self.config),
         }
 
     def reset(self) -> None:
