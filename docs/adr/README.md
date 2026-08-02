@@ -26,5 +26,7 @@ parallel agents don't collide. Assigned so far:
 |---|---|---|
 | 0001 | GDN-2 decoupled erase/write gating hypothesis | `ob-8m7` |
 | 0002 | Portable aarch64 hedge target | `ob-zh4` |
+| 0003 | Primary and fallback Qwen3.5 checkpoint | `ob-eae` |
+| 0004 | Descope ladder and trigger dates | `ob-atp` |
 
 The template is [`template.md`](./template.md).
