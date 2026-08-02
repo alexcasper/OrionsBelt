@@ -1,0 +1,21 @@
+{
+  "type": "ruler_multi_key",
+  "target_tokens": 262144,
+  "actual_tokens_approx": 261843,
+  "num_keys": 20,
+  "queried_keys": [
+    "GPP-1496",
+    "KMU-7069",
+    "VYF-7873",
+    "MNN-8312",
+    "CWB-1698"
+  ],
+  "expected_answers": {
+    "GPP-1496": "WUS-8913",
+    "KMU-7069": "WVS-7260",
+    "VYF-7873": "WUX-1501",
+    "MNN-8312": "RVY-0406",
+    "CWB-1698": "QYV-3918"
+  },
+  "seed": 20260802
+}
