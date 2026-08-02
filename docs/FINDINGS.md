@@ -392,3 +392,53 @@ Also still open: these are fp32. The i8mm/dotprod paths for the delta-rule matmu
 (`ob-8qt.2`, reusing KleidiAI's 109 A720-usable matmul micro-kernels rather than reimplementing),
 and a bf16/fp16 state variant is worth measuring since it halves state traffic — the dominant cost
 in GDN decode.
+
+
+---
+
+## 5. Device microbenchmark: ready to run, awaiting real silicon (2026-08-02)
+
+**Bead `ob-8ms.2`.** The maintainer has Armv8 devices available, which unblocks real Arm
+measurements without the Orion O6. This section records the apparatus; **it contains no
+performance results yet**, deliberately.
+
+### What exists
+
+[`src/orionsbelt/engines/cpu/kernels/bench_gdn.c`](../src/orionsbelt/engines/cpu/kernels/bench_gdn.c)
+is a dependency-free microbenchmark that links statically, so one binary copies to any aarch64
+device and runs with no toolchain, no Python, and no shared libraries on the target. Built by
+[`scripts/build_device_bench.sh`](../scripts/build_device_bench.sh) into four ISA variants
+(`armv8a`, `armv8.2dot`, `armv8.6i8mm`, `armv9sve2`) because Arm devices vary enormously.
+
+It times all three GDN kernels at verified Qwen3.5-4B and 0.8B shapes, follows
+[`METRICS.md`](./METRICS.md)'s protocol (3 discarded warmups, N timed repeats, p50/p95, never a
+single best run, refuses N<5), reports the **dispatch path the compiler actually selected**, and
+emits CSV matching [`RESULTS_SCHEMA.md`](./RESULTS_SCHEMA.md). It also derives achieved GiB/s from
+an explicit traffic accounting (`bytes_per_call` in the source) so the bandwidth-bound thesis can
+be **tested against a device's spec bandwidth rather than assumed**.
+
+Verified: the `armv9sve2` build reports `sve` and the `armv8a` build reports `neon`, so the
+dispatch is genuinely selected rather than silently collapsing to one path.
+
+### ⚠ QEMU timings are not measurements
+
+The benchmark runs correctly under QEMU, and QEMU numbers were used only to prove the harness
+works. **They are performance-meaningless** — QEMU emulates instruction by instruction, so the
+~1.5 GiB/s and up-to-97% run-to-run spreads observed there are emulation artefacts. No QEMU
+timing should ever appear in a result table. QEMU's legitimate role in this project is
+*correctness* (`scripts/verify_cpu_kernels.sh`), not speed.
+
+### What Armv8 devices can and cannot tell us
+
+| Measurable on Armv8-A | Not measurable without newer/other hardware |
+|---|---|
+| **NEON kernel throughput** — the path most deployed Arm devices actually run | SVE/SVE2 throughput (absent on most Armv8; needs Armv9 or an SVE-capable Armv8) |
+| **Achieved memory bandwidth** vs device spec — the bandwidth-bound thesis | i8mm int8 matmul (Armv8.6-A and later only) |
+| **The memory decomposition** — KV cache vs recurrent state, which is architecture-independent and is the project's central claim | CIX NPU operator execution, Immortalis GPU compute |
+| **Prefill vs decode asymmetry** | Engine-boundary dispatch latency (`ob-t3b.3`) |
+| **big.LITTLE affinity effects**, where the device has asymmetric clusters | Arm Performix standardised reporting on the O6 |
+
+The middle row is the important one: the KV-cache-versus-recurrent-state result does not depend on
+the NPU, the GPU, or Armv9 at all. It is a property of the architecture, so **an Armv8 device can
+demonstrate the project's central claim end to end** — which is what moves the Edge AI track from a
+credible plan to a credible result.
