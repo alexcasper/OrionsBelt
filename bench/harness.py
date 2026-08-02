@@ -545,28 +545,34 @@ def run_sweep(backend: Backend, config: SweepConfig) -> list[ResultRow]:
     all_rows: list[ResultRow] = []
 
     for ctx_len in config.context_lengths:
-        if config.prompt_type in ("needle", "ruler"):
-            prompt_text = load_corpus_prompt(config.prompt_type, ctx_len, config.prompt_dir)
-        else:
-            prompt_text = generate_prompt(ctx_len)
+        try:
+            if config.prompt_type in ("needle", "ruler"):
+                prompt_text = load_corpus_prompt(config.prompt_type, ctx_len, config.prompt_dir)
+            else:
+                prompt_text = generate_prompt(ctx_len)
 
-        # Warmup repeats: full protocol, discarded, never written (METRICS.md section 7)
-        for _ in range(config.warmup_count):
-            run_one_repeat(backend, prompt_text, config.decode_length)
+            # Warmup repeats: full protocol, discarded, never written (METRICS.md section 7)
+            for _ in range(config.warmup_count):
+                run_one_repeat(backend, prompt_text, config.decode_length)
 
-        # Measured repeats
-        for repeat_idx in range(config.repeat_count):
-            timing = run_one_repeat(backend, prompt_text, config.decode_length)
-            rows = _rows_from_timing(
-                timing,
-                run_id=run_id,
-                git_sha=git_sha,
-                manifest_ref_str=mref,
-                config=config,
-                context_length=ctx_len,
-                repeat_idx=repeat_idx,
+            # Measured repeats
+            for repeat_idx in range(config.repeat_count):
+                timing = run_one_repeat(backend, prompt_text, config.decode_length)
+                rows = _rows_from_timing(
+                    timing,
+                    run_id=run_id,
+                    git_sha=git_sha,
+                    manifest_ref_str=mref,
+                    config=config,
+                    context_length=ctx_len,
+                    repeat_idx=repeat_idx,
+                )
+                all_rows.extend(rows)
+        except Exception as exc:
+            print(
+                f"  WARNING: context_length={ctx_len} failed ({exc}); continuing to next point",
+                file=sys.stderr,
             )
-            all_rows.extend(rows)
 
     # Validate every row before returning (RESULTS_SCHEMA.md contract)
     if all_rows:
