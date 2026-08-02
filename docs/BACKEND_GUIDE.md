@@ -34,12 +34,13 @@ Harness timing protocol (METRICS.md):
 ```python
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
+
 def load(self):
     self.tokenizer = AutoTokenizer.from_pretrained(self.config.name)
     self.model = AutoModelForCausalLM.from_pretrained(
         self.config.name,
-        torch_dtype=torch.float16,   # or bfloat16
-        device_map="auto",           # or .cuda() / .to("npu")
+        torch_dtype=torch.float16,  # or bfloat16
+        device_map="auto",  # or .cuda() / .to("npu")
     )
     self.model.eval()
     # Quantize weights per QUANTIZATION_POLICY.md if needed:
@@ -69,11 +70,11 @@ def prefill(self, input_ids: list[int]) -> Any:
     with torch.inference_mode():
         outputs = self.model(
             input_tensor,
-            use_cache=True,          # populate KV cache + recurrent state
+            use_cache=True,  # populate KV cache + recurrent state
             output_hidden_states=False,
         )
     self._past_key_values = outputs.past_key_values
-    return outputs.logits            # passed to sample()
+    return outputs.logits  # passed to sample()
 ```
 
 For Qwen3.5, `past_key_values` is a `Qwen3_5Cache` object holding:
@@ -119,6 +120,7 @@ runs exactly `decode_length - 1` steps regardless.
 
 ```python
 from bench.memory import weights_bytes, kv_cache_bytes, recurrent_state_bytes, cross_check
+
 
 def memory_bytes(self) -> dict[str, int]:
     # Analytic formulas (bench/memory.py, verified against ADR 0003):

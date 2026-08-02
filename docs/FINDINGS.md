@@ -457,9 +457,7 @@ confirmed at the `torch.zeros(...)` call in both scan paths:
 
 ```python
 # modeling_qwen3_5.py, line ~316 (chunk path) and ~363 (recurrent path)
-last_recurrent_state = torch.zeros(
-    batch_size, num_heads, k_head_dim, v_head_dim, ...
-)
+last_recurrent_state = torch.zeros(batch_size, num_heads, k_head_dim, v_head_dim, ...)
 ```
 
 For Qwen3.5-4B: `(1, 32, 128, 128)` = **524,288 elements per layer**, fp32
