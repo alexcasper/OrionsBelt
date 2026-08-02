@@ -10,9 +10,6 @@ from pathlib import Path
 
 import pytest
 
-# Make bench importable
-import sys
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from plots import (
     MICROBENCH_COLUMNS,
     DEVICE_SPEC_BANDWIDTH,

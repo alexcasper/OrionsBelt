@@ -7,13 +7,9 @@ These run in CI on Python 3.10/3.13 — no model weights or GPU required.
 
 import math
 import os
-import sys
 import tempfile
 
 import pytest
-
-# Make bench/ importable when running from repo root.
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from schema import ResultRow, validate_row, validate_rows, write_csv, read_csv
 from harness import (
