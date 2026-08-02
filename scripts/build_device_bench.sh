@@ -37,10 +37,21 @@ build() {
 }
 
 echo "Building static aarch64 benchmarks with $CC:"
+# Generic ISA-level builds
 build armv8a      "-march=armv8-a"
 build armv8.2dot  "-march=armv8.2-a+dotprod"
 build armv8.6i8mm "-march=armv8.2-a+i8mm"
 build armv9sve2   "-march=armv9-a+sve2+i8mm+bf16"
+
+# Core-tuned builds for the actual device fleet (ADR 0005). Verified feature sets:
+#   Cortex-A57  Armv8.0-A, NO dotprod, no fp16 vector  -> Jetson Nano
+#   Cortex-A76  Armv8.2-A, dotprod, fp16, no i8mm/SVE  -> Raspberry Pi 5, RK3588 big cluster
+#   Cortex-A55  Armv8.2-A, dotprod, fp16, no i8mm/SVE  -> RK3588 little cluster
+# None of these has SVE, so all take the NEON path -- which is why that path matters.
+build jetson_a57  "-mcpu=cortex-a57"
+build pi5_a76     "-mcpu=cortex-a76"
+build rk3588_a76  "-mcpu=cortex-a76"
+build rk3588_a55  "-mcpu=cortex-a55"
 
 cat <<'NOTE'
 
@@ -49,7 +60,14 @@ Pick the most specific binary your device supports, then:
     ./bench_gdn_<variant> --repeats 30            # human-readable
     ./bench_gdn_<variant> --repeats 30 --csv      # schema-conforming CSV
 
-To find out what a device supports:
+For the known fleet, use the core-tuned build:
+
+    Raspberry Pi 5    -> bench_gdn_pi5_a76
+    RK3588 big cores  -> bench_gdn_rk3588_a76   (pin with taskset -c 4-7 on most RK3588 boards)
+    RK3588 little     -> bench_gdn_rk3588_a55   (taskset -c 0-3)
+    Jetson Nano       -> bench_gdn_jetson_a57
+
+To find out what an unknown device supports:
 
     uname -m                      # expect aarch64
     grep -m1 Features /proc/cpuinfo
