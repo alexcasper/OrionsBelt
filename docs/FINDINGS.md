@@ -504,3 +504,32 @@ This is the expected result for actively-cooled hardware. The more interesting
 characterization will come from passively-cooled devices (e.g. Pi 5) where sustained
 load may trigger frequency reduction. The `--sustained` flag is portable — every
 device in the fleet can produce its own decay curve.
+
+## Native NEON kernel correctness verification (ob-mrd.3)
+
+The existing `verify_cpu_kernels.sh` cross-compiles for SVE and verifies under QEMU.
+However, **no device in the current fleet has SVE** — Jetson A57, Pi 5 A76, and
+RK3588 A76/A55 all dispatch through the NEON path. The new
+`scripts/verify_kernels_native.sh` builds and runs the C kernel tests natively on
+each device using its real ISA, validating the actual dispatch path.
+
+**Jetson-J1 (Cortex-A57, Armv8.0-A, NEON) — all tests pass on real silicon:**
+
+| Kernel | vs scalar ref (float) | vs scalar ref (double) | Bit-identical |
+|--------|----------------------|----------------------|---------------|
+| `gdn_gated_scan_f32` | max_abs=0.000 | max_abs=1.19e-7 | YES |
+| `gdn_cumdecay_f32` | max_abs=0.000 | max_abs=5.96e-8 | YES |
+| `gdn_causal_dwconv1d_f32` | max_abs=5.96e-8 | — | ~1 ULP |
+
+The 1-ULP deviation in `causal_dwconv1d` vs the float reference comes from NEON FMA
+contraction (`vfmaq_n_f32` fuses multiply-add), while the scalar reference uses
+separate multiply and add. This is expected and benign — the fused result is actually
+*more* accurate than the unfused one.
+
+Mixed-precision bf16/fp16 variants also pass all bounds on NEON:
+cumdecay bf16 ≤0.4%, fp16 ≤0.05%; gated_scan bf16 ≤0.4%, fp16 ≤0.05%.
+Determinism verified (bit-identical across repeated runs).
+
+**New coverage added**: `test_gdn_sve.c` previously tested only `gated_scan` and
+`causal_dwconv1d`; `cumdecay` was declared but never exercised. Added scalar
+references (float and double) and comparison reporting for `cumdecay`.

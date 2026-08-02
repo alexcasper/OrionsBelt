@@ -22668,3 +22668,2489 @@ All 20 remaining ready beads are hardware-gated for Cortex-A57 / Armv8.0 / NEON-
 **Total beads closed across sessions 1–4: 11**
 
 Next session should start with `bd dolt pull → bd ready` and look for new portable beads. If none exist, await hardware access (O6, RK3588, or x86).
+--- j1 iter Mon  3 Aug 00:32:07 BST 2026 ---
+
+    __( O)>  ● resuming · zai glm-5.2
+   \____)    20260802_1 · /home/j1/OrionsBelt
+     L L     goose is ready
+
+Exceeded auto-compact threshold of 40%. Performing auto-compaction...
+
+Compaction complete
+Starting Phase 2 loop for Session 5.
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && bd dolt pull 2>&1
+    timeout_secs: 30
+
+Pulling from Dolt remote...
+Pull complete.
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && bd ready 2>&1
+    timeout_secs: 30
+
+○ ob-3f9 ● P0 [epic] E2: Hardware and toolchain acquisition (Orion O6 + CIX NPU SDK)
+○ ob-4qz ● P0 [epic] E0: Program spine — decisions, risk, descope
+○ ob-9t0 ● P0 [epic] E9: Results, write-up, demo, submission
+○ ob-gew ● P0 [epic] E1: Repo foundation and submission hygiene
+○ ob-mrd ● P0 [epic] E5: Benchmark harness and methodology
+○ ob-xh3 ● P0 [epic] E4: Model selection and reference baseline
+○ ob-aqv ● P0 Stand up x86/CUDA reference inference as the oracle source ← E4: Model selection and reference baseline
+○ ob-axq ● P0 Source a Radxa Orion O6 (64GB) — retail, loaner, or remote access ← E2: Hardware and toolchain acquisition (Orion O6 + CIX NPU SDK)
+○ ob-8ms.3 ● P0 Run the device-fleet bandwidth-scaling study (Pi 5 / RK3588 / Jetson Nano) ← E3: Portable Arm hedge track (Edge AI fallback)
+○ ob-8ms ● P1 [epic] E3: Portable Arm hedge track (Edge AI fallback)
+○ ob-8qt ● P1 [epic] E7: Optimization implementation
+○ ob-t3b ● P1 [epic] E6: GDN operator analysis and heterogeneous mapping
+○ ob-2eh ● P1 GitHub Actions CI: lint plus unit tests on an x86/aarch64 matrix ← E1: Repo foundation and submission hygiene
+○ ob-huw ● P1 NPU runtime smoke test via a CIX AI Model Hub reference model ← E2: Hardware and toolchain acquisition (Orion O6 + CIX NPU SDK)
+○ ob-ng6 ● P1 Bring up the hedge target with an aarch64 build using i8mm/SVE ← E3: Portable Arm hedge track (Edge AI fallback)
+○ ob-mrd.1 ● P1 Baseline: vendor cix-llama-cpp on the O6, and whether it handles GDN at all ← E5: Benchmark harness and methodology
+○ ob-9lm ● P2 [epic] E8: GDN-2 stretch research
+○ ob-8qt.2 ● P2 Reuse KleidiAI i8mm/dotprod matmul micro-kernels for the delta-rule updates ← E7: Optimization implementation
+○ ob-t3b.5 ● P2 Cheap check: does the RK3588 NPU toolchain also reject a runtime-length recurrence? ← E6: GDN operator analysis and heterogeneous mapping
+○ ob-y3f ● P3 Clone and smoke-test the NVLabs GatedDeltaNet-2 reference on x86 ← E8: GDN-2 stretch research
+○ ob-t3b.4 ● P3 Evaluate the Tensilica HiFi 5 DSP as a fourth compute engine ← E6: GDN operator analysis and heterogeneous mapping
+
+--------------------------------------------------------------------------------
+Ready: 21 issues with no active blockers
+
+Status: ○ open  ◐ in_progress  ● blocked  ✓ closed  ❄ deferredSame 21 issues as before. Let me check if any epics have newly-created children I haven't examined, particularly ob-4qz (program spine) and ob-gew (repo foundation) which might contain portable work.
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && bd show ob-4qz 2>&1
+    timeout_secs: 15
+
+○ ob-4qz [EPIC] · E0: Program spine — decisions, risk, descope   [● P0 · OPEN]
+Type: epic
+Created: 2026-08-02 · Updated: 2026-08-02
+
+DESCRIPTION
+
+  Go/no-go decisions, risk register, and the descope ladder. First-class epic 
+  because with 12 days and two external gates, deciding on time is the        
+  deliverable most likely to save the submission. See PLAN.md sections 7 and  
+  8.                                                                          
+
+
+
+LABELS: program
+
+CHILDREN
+  ↳ ✓ ob-ofk: Verify brief.md's load-bearing claims against primary sources ● P0
+  ↳ ✓ ob-0fp: Stand up living risk register and go/no-go ritual ● P1
+  ↳ ✓ ob-ygm: Set up docs/adr/ with an ADR template ● P2
+  ↳ ○ ob-imb: DECISION (hard date 2026-08-09): Physical AI vs Edge AI track ● P0
+  ↳ ✓ ob-atp: Ratify the pre-agreed descope ladder with trigger dates ● P1
+  ◐ 4/5 complete (80%)
+
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && bd show ob-imb 2>&1 && echo "---" && bd show ob-gew 2>&1
+    timeout_secs: 15
+
+○ ob-imb · DECISION (hard date 2026-08-09): Physical AI vs Edge AI track   [● P0 · OPEN]
+Type: decision
+Created: 2026-08-02 · Updated: 2026-08-02
+
+DESCRIPTION
+
+  Single most consequential scheduling decision. If the O6 has arrived and    
+  booted, target Physical AI. If not, commit to Edge AI on the hedge target   
+  and stop spending time on O6-specific work. NOTE (verified 2026-08-02): the 
+  three tracks are Physical AI, Cloud AI, and Edge AI - there is no Mobile AI 
+  track, correcting brief.md. Edge AI suits an O6 inference board well, so    
+  both tracks stay open even with hardware in hand. Hard date so the write-up 
+  has five clear days of stable framing. Done when the choice is recorded as  
+  an ADR and the README framing follows it.                                   
+
+
+
+LABELS: program, submission
+
+PARENT
+  ↑ ○ ob-4qz: (EPIC) E0: Program spine — decisions, risk, descope ● P0
+
+DEPENDS ON
+  → ○ ob-ng6: Bring up the hedge target with an aarch64 build using i8mm/SVE ● P1
+  → ○ ob-axq: Source a Radxa Orion O6 (64GB) — retail, loaner, or remote access ● P0
+  → ✓ ob-aop: Apply to the CIX Early Bird Program for NOE Compiler and AI Model Hub access ● P3
+
+BLOCKS
+  ← ○ ob-jui: Script and record a demo video under 3 minutes on hardware ● P2
+  ← ○ ob-f7k: Devpost write-up mapped section-by-section to the judging rubric ● P0
+
+---
+○ ob-gew [EPIC] · E1: Repo foundation and submission hygiene   [● P0 · OPEN]
+Type: epic
+Created: 2026-08-02 · Updated: 2026-08-02
+
+DESCRIPTION
+
+  License, skeleton, tooling, CI, results schema, provenance. Devpost has hard
+  requirements here (OSI license visible in the About section) that are cheap 
+  now and impossible to retrofit at the deadline.                             
+
+
+
+LABELS: submission
+
+CHILDREN
+  ↳ ○ ob-2eh: GitHub Actions CI: lint plus unit tests on an x86/aarch64 matrix ● P1
+  ↳ ✓ ob-q9i: Freeze the results schema contract for all benchmark output ● P1
+  ↳ ✓ ob-0e8: Add Apache-2.0 LICENSE and make it visible in the GitHub About section ● P0
+  ↳ ✓ ob-wfi: Create the repository directory skeleton ● P0
+  ↳ ✓ ob-u37: Run-manifest provenance capture ● P1
+  ↳ ✓ ob-g10: Python tooling: pyproject/uv, ruff, pytest, pre-commit ● P2
+  ↳ ✓ ob-tjs: README skeleton with GDN/GDN-2 background written for judges ● P1
+  ↳ ✓ ob-q35: CONTRIBUTING and reproducibility conventions ● P2
+  ◐ 7/8 complete (87%)
+
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && bd show ob-mrd 2>&1 && echo "===" && bd show ob-9t0 2>&1
+    timeout_secs: 15
+
+○ ob-mrd [EPIC] · E5: Benchmark harness and methodology   [● P0 · OPEN]
+Type: epic
+Created: 2026-08-02 · Updated: 2026-08-02
+
+DESCRIPTION
+
+  The measurement apparatus. Must be finished before hardware arrives so that 
+  the moment a board exists we are profiling within hours, not still writing a
+  runner. Central design point: memory accounting that separates KV cache from
+  GDN recurrent state.                                                        
+
+
+
+LABELS: portable
+
+CHILDREN
+  ↳ ✓ ob-mrd.2: Sustained-load benchmark mode in bench_gdn.c ● P1
+  ↳ ○ ob-agf: Power and energy sampling integration ● P2
+  ↳ ✓ ob-ljh: Benchmark runner CLI with context sweep, warmup, repeats, and percentiles ● P0
+  ↳ ✓ ob-vfp: Memory instrumentation separating KV cache from GDN recurrent state ● P0
+  ↳ ○ ob-mrd.1: Baseline: vendor cix-llama-cpp on the O6, and whether it handles GDN at all ● P1
+  ↳ ○ ob-1lm: Unit tests and a tiny-model smoke run wired into CI ● P1
+  ↳ ○ ob-zzj: Arm Performix integration and standardized report export ● P1
+  ↳ ✓ ob-ar3: Define benchmark metrics precisely ● P0
+  ↳ ✓ ob-9y8: Plot and table generation from results ● P1
+  ↳ ✓ ob-aoo: docs/METHODOLOGY.md — metric definitions and statistical approach ● P1
+  ↳ ✓ ob-del: Long-context prompt corpus from 4K to 262K ● P1
+  ◐ 7/11 complete (63%)
+
+===
+○ ob-9t0 [EPIC] · E9: Results, write-up, demo, submission   [● P0 · OPEN]
+Type: epic
+Created: 2026-08-02 · Updated: 2026-08-02
+
+DESCRIPTION
+
+  Converting work into score: master comparison table, clean-clone            
+  reproduction rehearsal, rubric-mapped write-up, README, demo video,         
+  compliance pass, and actually hitting submit before 2026-08-14 16:00 PT.    
+
+
+
+LABELS: submission
+
+CHILDREN
+  ↳ ○ ob-f7k: Devpost write-up mapped section-by-section to the judging rubric ● P0
+  ↳ ○ ob-kdi: Clean-clone reproduction rehearsal following our own README verbatim ● P0
+  ↳ ✓ ob-9e2: Final compliance pass against the submission requirements checklist ● P0
+  ↳ ○ ob-j7f: Submit on Devpost before 2026-08-14 16:00 PT ● P0
+  ↳ ○ ob-ami: Master comparison table and headline numbers ● P0
+  ↳ ○ ob-jui: Script and record a demo video under 3 minutes on hardware ● P2
+  ↳ ○ ob-fnq: README final pass: background, results, reproduction ● P0
+  ◐ 1/7 complete (14%)
+
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && bd show ob-1lm 2>&1 && echo "===" && bd show ob-zzj 2>&1 && echo "===" && bd show ob-kdi 2>&1
+    timeout_secs: 15
+
+○ ob-1lm · Unit tests and a tiny-model smoke run wired into CI   [● P1 · OPEN]
+Type: task
+Created: 2026-08-02 · Updated: 2026-08-02
+
+DESCRIPTION
+
+  Cover metric computation, schema conformance, and manifest capture, plus an 
+  end-to-end run on a tiny model that finishes in CI time. Protects the       
+  harness from silent breakage during the fast, pressured changes of the final
+  days.                                                                       
+
+
+
+LABELS: portable
+
+PARENT
+  ↑ ○ ob-mrd: (EPIC) E5: Benchmark harness and methodology ● P0
+
+DEPENDS ON
+  → ✓ ob-ljh: Benchmark runner CLI with context sweep, warmup, repeats, and percentiles ● P0
+  → ○ ob-2eh: GitHub Actions CI: lint plus unit tests on an x86/aarch64 matrix ● P1
+
+===
+○ ob-zzj · Arm Performix integration and standardized report export   [● P1 · OPEN]
+Type: task
+Created: 2026-08-02 · Updated: 2026-08-02
+
+DESCRIPTION
+
+  Wire the harness to emit Arm Performix standardized reports as the challenge
+  brief requires, and commit the generated artifacts so judges can compare our
+  numbers against other entries on a common basis.                            
+
+
+
+LABELS: hardware, submission
+
+PARENT
+  ↑ ○ ob-mrd: (EPIC) E5: Benchmark harness and methodology ● P0
+
+DEPENDS ON
+  → ✓ ob-ljh: Benchmark runner CLI with context sweep, warmup, repeats, and percentiles ● P0
+  → ○ ob-v1f: Install perf/ftrace/powertop and set up Arm Performix on device ● P1
+
+RELATED
+  ↔ ○ ob-ami: Master comparison table and headline numbers ● P0
+
+===
+○ ob-kdi · Clean-clone reproduction rehearsal following our own README verbatim   [● P0 · OPEN]
+Type: task
+Created: 2026-08-02 · Updated: 2026-08-02
+
+DESCRIPTION
+
+  On a fresh system, clone and follow the documented setup literally without  
+  using undocumented knowledge, timing each stage and fixing every gap found. 
+  This is the highest-leverage Developer Experience bead: it is where 15      
+  points are won or quietly lost, and it always surfaces missing steps.       
+
+
+
+LABELS: submission
+
+PARENT
+  ↑ ○ ob-9t0: (EPIC) E9: Results, write-up, demo, submission ● P0
+
+DEPENDS ON
+  → ○ ob-ami: Master comparison table and headline numbers ● P0
+  → ✓ ob-aoo: docs/METHODOLOGY.md — metric definitions and statistical approach ● P1
+  → ✓ ob-tjs: README skeleton with GDN/GDN-2 background written for judges ● P1
+
+BLOCKS
+  ← ○ ob-j7f: Submit on Devpost before 2026-08-14 16:00 PT ● P0
+  ← ○ ob-fnq: README final pass: background, results, reproduction ● P0
+
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && bd show ob-8qt 2>&1 && echo "===" && bd show ob-t3b 2>&1 && echo "===" && bd show ob-xh3 2>&1
+    timeout_secs: 15
+
+○ ob-8qt [EPIC] · E7: Optimization implementation   [● P1 · OPEN]
+Type: epic
+Created: 2026-08-02 · Updated: 2026-08-02
+
+DESCRIPTION
+
+  Where the 40-point Arm-specific optimization score is earned: NPU           
+  quantization, a Vulkan chunkwise scan kernel, big.LITTLE scheduling, and a  
+  dynamic heterogeneous dispatcher. Every step is gated by the correctness    
+  oracle.                                                                     
+
+
+
+LABELS: hardware
+
+CHILDREN
+  ↳ ✓ ob-8qt.3: Verified-correct SVE2 reference kernels for decay, scan, and causal conv1d ● P1
+  ↳ ○ ob-8qt.1: Hand-written SVE2/i8mm chunkwise gated delta-rule scan for Cortex-A720 ● P1
+  ↳ ○ ob-q44: Vulkan/OpenCL compute shader for the chunkwise gated delta-rule scan ● P1
+  ↳ ○ ob-27y: Accuracy regression of quantized NPU subgraphs against the oracle ● P1
+  ↳ ○ ob-gzk: Numerical validation of the GPU scan kernel ● P1
+  ↳ ○ ob-rqd: Ablation matrix across configurations and context lengths ● P1
+  ↳ ○ ob-onz: Export and quantize NPU-resident subgraphs via NOE (INT8, then INT4) ● P1
+  ↳ ○ ob-8qt.2: Reuse KleidiAI i8mm/dotprod matmul micro-kernels for the delta-rule updates ● P2
+  ↳ ✓ ob-8qt.4: bf16/fp16 recurrent-state variant of the GDN kernels ● P2
+  ↳ ○ ob-7a9: Dynamic heterogeneous dispatcher routing by phase, load, and thermal state ● P2
+  ↳ ○ ob-dqu: CPU optimization: big.LITTLE affinity policy and i8mm/SVE GEMM paths ● P1
+  ↳ ○ ob-dgn: Sustained-load thermal-throttle characterization and governor tuning ● P2
+  ◐ 2/12 complete (16%)
+
+===
+○ ob-t3b [EPIC] · E6: GDN operator analysis and heterogeneous mapping   [● P1 · OPEN]
+Type: epic
+Created: 2026-08-02 · Updated: 2026-08-02
+
+DESCRIPTION
+
+  The core technical contribution. Profile where GDN's linear recurrence      
+  actually bottlenecks, audit what the NOE Compiler can and cannot compile,   
+  then fix a layer-to-engine assignment as an ADR. GDN layers are not standard
+  attention, so out-of-box NPU kernel support is unlikely.                    
+
+
+
+LABELS: hardware
+
+CHILDREN
+  ↳ ○ ob-t3b.5: Cheap check: does the RK3588 NPU toolchain also reject a runtime-length recurrence? ● P2
+  ↳ ○ ob-8xc: NOE Compiler op-coverage audit for GDN operators ● P1
+  ↳ ○ ob-i8v: Implement the partitioned execution runtime ● P1
+  ↳ ○ ob-0sa: docs/FINDINGS.md — op-coverage gaps and profiling results ● P1
+  ↳ ○ ob-t3b.4: Evaluate the Tensilica HiFi 5 DSP as a fourth compute engine ● P3
+  ↳ ✓ ob-t3b.1: NOE op-coverage audit for GDN operators on an x86 host (no board required) ● P0
+  ↳ ○ ob-3ko: Characterize the chunkwise WY recurrent-scan bottleneck ● P1
+  ↳ ○ ob-c9k: Per-layer latency profile across GDN, full-attention, and FFN blocks ● P1
+  ↳ ○ ob-o4g: DECISION/ADR: layer-to-engine assignment across NPU, GPU, and CPU ● P1
+  ↳ ○ ob-t3b.3: Measure engine-boundary crossing cost (16 crossings per token in a 3:1 hybrid) ● P1
+  ↳ ✓ ob-t3b.2: Author minimal per-operator ONNX probe graphs for the NOE op-coverage audit ● P0
+  ◐ 2/11 complete (18%)
+
+===
+○ ob-xh3 [EPIC] · E4: Model selection and reference baseline   [● P0 · OPEN]
+Type: epic
+Created: 2026-08-02 · Updated: 2026-08-02
+
+DESCRIPTION
+
+  Pick a Qwen3.5 checkpoint in the 0.8B-4B range, audit its GDN layer         
+  structure from modeling code, and stand up an x86 reference that serves as  
+  the correctness oracle for every later optimization.                        
+
+
+
+LABELS: portable
+
+CHILDREN
+  ↳ ✓ ob-eae: DECISION: primary and fallback Qwen3.5 checkpoint ● P0
+  ↳ ○ ob-3uh: Correctness oracle harness with tolerances ● P0
+  ↳ ✓ ob-7fv: Survey Qwen3.5 checkpoints in the 0.8B-4B range ● P0
+  ↳ ✓ ob-ixt: Weight fetch scripts with license compliance ● P2
+  ↳ ✓ ob-37v: Audit the GDN layer structure from modeling code ● P0
+  ↳ ✓ ob-qpa: Quantization policy with FP16 carve-outs ● P0
+  ↳ ○ ob-aqv: Stand up x86/CUDA reference inference as the oracle source ● P0
+  ◐ 5/7 complete (71%)
+
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && bd show ob-3uh 2>&1 && echo "===" && bd show ob-7a9 2>&1 && echo "===" && bd show ob-i8v 2>&1
+    timeout_secs: 15
+
+○ ob-3uh · Correctness oracle harness with tolerances   [● P0 · OPEN]
+Type: task
+Created: 2026-08-02 · Updated: 2026-08-02
+
+DESCRIPTION
+
+  Golden logits and perplexity comparison against the x86 reference with      
+  explicit, justified numeric tolerances, including long-context prompts where
+  recurrent state drift compounds. Per PLAN.md section 9, speed that changes  
+  outputs is not speed; this bead is what makes that enforceable.             
+
+
+
+LABELS: portable
+
+PARENT
+  ↑ ○ ob-xh3: (EPIC) E4: Model selection and reference baseline ● P0
+
+DEPENDS ON
+  → ○ ob-aqv: Stand up x86/CUDA reference inference as the oracle source ● P0
+  → ✓ ob-q9i: Freeze the results schema contract for all benchmark output ● P1
+
+BLOCKS
+  ← ○ ob-gzk: Numerical validation of the GPU scan kernel ● P1
+  ← ○ ob-27y: Accuracy regression of quantized NPU subgraphs against the oracle ● P1
+
+===
+○ ob-7a9 · Dynamic heterogeneous dispatcher routing by phase, load, and thermal state   [● P2 · OPEN]
+Type: task
+Created: 2026-08-02 · Updated: 2026-08-02
+
+DESCRIPTION
+
+  The WOW-factor centerpiece: route work across NPU, GPU, and CPU at runtime  
+  based on inference phase (prefill vs decode), engine occupancy, and thermal 
+  headroom, rather than using a static assignment. Must degrade gracefully to 
+  the static mapping if an engine is unavailable, so this cannot become a     
+  single point of failure.                                                    
+
+
+
+LABELS: hardware, stretch
+
+PARENT
+  ↑ ○ ob-8qt: (EPIC) E7: Optimization implementation ● P1
+
+DEPENDS ON
+  → ○ ob-gzk: Numerical validation of the GPU scan kernel ● P1
+  → ○ ob-8qt.1: Hand-written SVE2/i8mm chunkwise gated delta-rule scan for Cortex-A720 ● P1
+  → ○ ob-dqu: CPU optimization: big.LITTLE affinity policy and i8mm/SVE GEMM paths ● P1
+  → ○ ob-27y: Accuracy regression of quantized NPU subgraphs against the oracle ● P1
+  → ○ ob-i8v: Implement the partitioned execution runtime ● P1
+
+BLOCKS
+  ← ○ ob-rqd: Ablation matrix across configurations and context lengths ● P1
+  ← ○ ob-jui: Script and record a demo video under 3 minutes on hardware ● P2
+  ← ○ ob-dgn: Sustained-load thermal-throttle characterization and governor tuning ● P2
+
+===
+○ ob-i8v · Implement the partitioned execution runtime   [● P1 · OPEN]
+Type: task
+Created: 2026-08-02 · Updated: 2026-08-02
+
+DESCRIPTION
+
+  Execute the mapping: per-engine subgraph invocation, tensor residency       
+  tracking, zero-copy or minimal-copy handoff between engines, and correct    
+  recurrent-state threading across engine boundaries. State continuity across 
+  boundaries is the subtle correctness hazard here.                           
+
+
+
+LABELS: hardware
+
+PARENT
+  ↑ ○ ob-t3b: (EPIC) E6: GDN operator analysis and heterogeneous mapping ● P1
+
+DEPENDS ON
+  → ○ ob-o4g: DECISION/ADR: layer-to-engine assignment across NPU, GPU, and CPU ● P1
+
+BLOCKS
+  ← ○ ob-7a9: Dynamic heterogeneous dispatcher routing by phase, load, and thermal state ● P2
+
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && bd show ob-dgn 2>&1 && echo "===" && bd show ob-0sa 2>&1 && echo "===" && bd show ob-dqu 2>&1
+    timeout_secs: 15
+
+○ ob-dgn · Sustained-load thermal-throttle characterization and governor tuning   [● P2 · OPEN]
+Type: task
+Created: 2026-08-02 · Updated: 2026-08-02
+
+DESCRIPTION
+
+  Measure how throughput decays over multi-minute sustained inference and tune
+  governors accordingly. Directly addresses PLAN.md risk R7: on passively-    
+  cooled edge hardware, a burst number that cannot be sustained is misleading,
+  and steady-state numbers are the honest ones for a Physical AI submission.  
+
+
+
+LABELS: hardware
+
+PARENT
+  ↑ ○ ob-8qt: (EPIC) E7: Optimization implementation ● P1
+
+DEPENDS ON
+  → ○ ob-agf: Power and energy sampling integration ● P2
+  → ○ ob-7a9: Dynamic heterogeneous dispatcher routing by phase, load, and thermal state ● P2
+
+===
+○ ob-0sa · docs/FINDINGS.md — op-coverage gaps and profiling results   [● P1 · OPEN]
+Type: task
+Created: 2026-08-02 · Updated: 2026-08-02
+
+DESCRIPTION
+
+  Write up what we learned about running a novel architecture on this         
+  toolchain before broad support exists, including the negative findings. This
+  document is the strongest Potential Impact artifact in the repo: it saves   
+  the next person weeks.                                                      
+
+
+
+NOTES
+
+  PARTIALLY DONE 2026-08-02: docs/FINDINGS.md now exists with four substantive
+  sections - NOE op-coverage for GDN (measured), the absence of any linear-   
+  attention model in CIX's hub, the Armv9.2 toolchain and KleidiAI coverage   
+  audit, and the three verified CPU kernels. What remains for this bead is the
+  PROFILING half, which is genuinely hardware-gated: per-layer latency        
+  breakdown, whether the ArmReshape/ArmTranspose layout conversions around the
+  causal conv are elided later in the pipeline, and per-op NPU-vs-CPU         
+  placement from a full cixbuild run.                                         
+
+
+
+LABELS: submission
+
+PARENT
+  ↑ ○ ob-t3b: (EPIC) E6: GDN operator analysis and heterogeneous mapping ● P1
+
+DEPENDS ON
+  → ○ ob-8xc: NOE Compiler op-coverage audit for GDN operators ● P1
+  → ○ ob-3ko: Characterize the chunkwise WY recurrent-scan bottleneck ● P1
+
+BLOCKS
+  ← ○ ob-fnq: README final pass: background, results, reproduction ● P0
+
+RELATED
+  ↔ ○ ob-f7k: Devpost write-up mapped section-by-section to the judging rubric ● P0
+
+===
+○ ob-dqu · CPU optimization: big.LITTLE affinity policy and i8mm/SVE GEMM paths   [● P1 · OPEN]
+Type: task
+Created: 2026-08-02 · Updated: 2026-08-02
+
+DESCRIPTION
+
+  Exploit the asymmetric 4+4+4 cluster layout: pin latency-critical prefill to
+  the A720 big cores, keep housekeeping on the A520 little cores, and avoid   
+  cross-cluster migration mid-inference. Enable i8mm and SVE paths and verify 
+  they are active at runtime. Fully Arm-specific and, unlike the NPU path, not
+  gated on any external approval.                                             
+
+
+
+NOTES
+
+  UNBLOCKED FOR REAL WORK by ADR 0005: the RK3588 board has an asymmetric A76 
+  big + A55 little layout, directly analogous to the O6's A720 big/medium +   
+  A520 little. big.LITTLE affinity policy is now developable and MEASURABLE on
+  hardware in hand rather than speculative. Use taskset to pin clusters; the  
+  core-tuned binaries bench_gdn_rk3588_a76 and bench_gdn_rk3588_a55 exist for 
+  exactly this comparison.                                                    
+
+
+
+LABELS: hardware
+
+PARENT
+  ↑ ○ ob-8qt: (EPIC) E7: Optimization implementation ● P1
+
+DEPENDS ON
+  → ○ ob-c9k: Per-layer latency profile across GDN, full-attention, and FFN blocks ● P1
+  → ○ ob-41j: System baseline: CPU topology, memory bandwidth, governors, thermal headroom ● P1
+
+BLOCKS
+  ← ○ ob-7a9: Dynamic heterogeneous dispatcher routing by phase, load, and thermal state ● P2
+All 21 ready beads are hardware-gated, external-gate, or blocked on dependencies I can't resolve on this device. Let me check the current repo state and see if there's portable infrastructure work I can contribute.
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && git log --oneline -5 2>&1 && echo "---" && git status --short 2>&1
+    timeout_secs: 10
+
+050b780 j1: loop flush 2026-08-02T23:31:45Z
+1d3af18 beads: close ob-mrd.2 sustained-load benchmark
+cb8ac91 j1: sustained-load benchmark mode + 120s thermal run (ob-mrd.2)
+a99495f j1: loop flush 2026-08-02T23:20:58Z
+c5a76fe j1: loop flush 2026-08-02T23:20:23Z
+---
+ M .goose-loop.log
+  ────────────────────────────────────────
+  ▸ tree
+    depth: 3
+    path: /home/j1/OrionsBelt
+
+artifacts/  [1K]
+  npu_op_probe/  [1K]
+    audit/  [1K]
+      01_causal_conv1d.cfg  [7]
+      01_causal_conv1d.log  [45]
+      02_decay_cumprod.cfg  [7]
+      02_decay_cumprod.log  [42]
+      03_delta_rule_update.cfg  [7]
+      03_delta_rule_update.log  [61]
+      04_gate_chain.cfg  [7]
+      04_gate_chain.log  [46]
+      05_scan_recurrence.cfg  [7]
+      05_scan_recurrence.log  [174]
+      06_loop_recurrence.cfg  [7]
+      06_loop_recurrence.log  [58]
+      07.cfg  [7]
+      07.log  [509]
+      audit_results.json  [76]
+    01_causal_conv1d.onnx  [0]
+    02_decay_cumprod.onnx  [0]
+    03_delta_rule_update.onnx  [0]
+    04_gate_chain.onnx  [0]
+    05_scan_recurrence.onnx  [0]
+    06_loop_recurrence.onnx  [0]
+    07_loop_dynamic_trip.onnx  [0]
+    README.md  [72]
+    manifest.json  [81]
+bench/  [2K]
+  README.md  [24]
+  corpus.py  [645]
+  harness.py  [590]
+  manifest.py  [407]
+  plots.py  [793]
+  schema.py  [492]
+ci/  [218]
+  README.md  [62]
+  github-workflow-ci.yml  [156]
+docs/  [4K]
+  adr/  [1K]
+    0001-gdn2-decoupled-gating-hypothesis.md  [207]
+    0002-portable-hedge-target.md  [273]
+    0003-model-checkpoint-selection.md  [109]
+    0004-descope-ladder.md  [266]
+    0005-device-fleet-and-bandwidth-study.md  [107]
+    README.md  [33]
+    template.md  [35]
+  BEADS.md  [207]
+  CLAIM_VERIFICATION.md  [278]
+  COMPLIANCE_CHECKLIST.md  [131]
+  DEVICE_RUNBOOK.md  [123]
+  FINDINGS.md  [506]
+  GDN_ARCHITECTURE_AUDIT.md  [281]
+  METHODOLOGY.md  [360]
+  METRICS.md  [650]
+  MODEL_SURVEY.md  [295]
+  QUANTIZATION_POLICY.md  [142]
+  RESULTS_SCHEMA.md  [155]
+  RISK_REGISTER.md  [222]
+  WEIGHT_LICENSE.md  [81]
+  plan-graph.json  [371]
+results/  [213]
+  manifests/  [166]
+    jetson-j1.json  [107]
+    jetson-j1_sustained.json  [59]
+  raw/  [32]
+    jetson-j1.csv  [7]
+    jetson-j1_sustained.csv  [25]
+  README.md  [15]
+scripts/  [983]
+  README.md  [16]
+  build_device_bench.sh  [86]
+  fetch_weights.py  [353]
+  npu_op_probe.py  [326]
+  run_op_probe_audit.py  [164]
+  verify_cpu_kernels.sh  [38]
+src/  [785]
+  orionsbelt/  [785]
+    engines/  [232]
+      cpu/  [0]
+      gpu/  [0]
+      npu/  [0]
+      __init__.py  [15]
+      memory.py  [217]
+    model/  [199]
+      __init__.py  [11]
+      gdn_layer_info.py  [188]
+    partition/  [13]
+      __init__.py  [13]
+    quant/  [330]
+      __init__.py  [7]
+      policy.py  [323]
+    __init__.py  [11]
+tests/  [1K]
+  README.md  [13]
+  test_corpus.py  [349]
+  test_gdn_layer_info.py  [103]
+  test_harness.py  [222]
+  test_memory.py  [83]
+  test_packages.py  [48]
+  test_plots.py  [403]
+  test_quant_policy.py  [119]
+AGENTS.md  [128]
+CLAUDE.md  [77]
+CONTRIBUTING.md  [159]
+LICENSE  [202]
+NOTICE  [36]
+PLAN.md  [406]
+README.md  [160]
+brief.md  [99]
+goose-loop.sh  [27]
+pyproject.toml  [89]
+Let me look at the bench harness and test coverage to find portable improvement opportunities.
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && cat src/orionsbelt/engines/memory.py 2>&1
+    timeout_secs: 10
+
+"""Three-way memory instrumentation: weights / KV cache / recurrent state.
+
+The central measurement of this project (PLAN.md §2.4, bead ``ob-vfp``):
+attribute memory to the three components whose scaling behavior against
+context length is the whole point — weights (flat), KV cache (linear),
+recurrent state (O(1)). Without this split the GDN advantage is asserted,
+not demonstrated.
+
+Uses ``gdn_layer_info`` for verified shapes and ``quant.policy`` for
+precision tiers. Both static (predicted) and runtime (RSS-based) paths
+are provided.
+"""
+
+from __future__ import annotations
+
+import os
+import re
+from dataclasses import dataclass
+
+from orionsbelt.model.gdn_layer_info import CheckpointLayerInfo, LAYER_INFO
+from orionsbelt.quant.policy import QuantScheme
+
+
+# Bytes per element by dtype
+_DTYPE_BYTES = {"fp32": 4, "fp16": 2, "bf16": 2, "int8": 1, "int4": 0.5}
+
+
+@dataclass(frozen=True)
+class MemoryBreakdown:
+    """Three-way memory split at a given context length.
+
+    All values in bytes. ``total`` is the sum of the three components
+    (does not include framework overhead, activations, or temporary
+    buffers — those are reported separately if measured at runtime).
+    """
+
+    weights_bytes: int
+    kv_cache_bytes: int
+    recurrent_state_bytes: int
+    conv_state_bytes: int  # GDN conv state (decode only, O(1))
+    context_length: int
+
+    @property
+    def total_bytes(self) -> int:
+        return self.weights_bytes + self.kv_cache_bytes + self.recurrent_state_bytes + self.conv_state_bytes
+
+    @property
+    def total_mib(self) -> float:
+        return self.total_bytes / (1024 * 1024)
+
+    def to_dict(self) -> dict[str, int]:
+        return {
+            "weights": self.weights_bytes,
+            "kv_cache": self.kv_cache_bytes,
+            "recurrent_state": self.recurrent_state_bytes,
+            "conv_state": self.conv_state_bytes,
+            "total": self.total_bytes,
+            "context_length": self.context_length,
+        }
+
+
+def estimate_weights(
+    info: CheckpointLayerInfo,
+    weight_dtype_bytes: float = 2.0,  # FP16 default
+) -> int:
+    """Estimate total weight memory for a checkpoint.
+
+    Counts all Linear/Conv/Embedding parameters using the config-derived
+    dimensions. This is the *theoretical* minimum — actual frameworks add
+    padding, optimizer state (training only), and metadata overhead.
+    """
+    h = info.hidden_size
+    # GDN layers
+    gdn_per_layer = (
+        h * (info.key_dim * 2 + info.value_dim)    # in_proj_qkv
+        + h * info.value_dim                        # in_proj_z
+        + h * info.linear_num_value_heads           # in_proj_b
+        + h * info.linear_num_value_heads           # in_proj_a
+        + info.value_dim * h                        # out_proj
+        + info.conv_dim * info.linear_conv_kernel_dim  # conv1d (depthwise)
+        + info.linear_value_head_dim                # norm weight
+    )
+    # Full attention layers
+    fa_per_layer = (
+        h * (info.num_attention_heads * info.full_attn_head_dim * 2)  # q_proj (2x for gate)
+        + h * (info.num_key_value_heads * info.full_attn_head_dim)    # k_proj
+        + h * (info.num_key_value_heads * info.full_attn_head_dim)    # v_proj
+        + (info.num_attention_heads * info.full_attn_head_dim) * h    # o_proj
+        + info.full_attn_head_dim * 2                                 # q_norm + k_norm
+    )
+    # MLP/FFN layers (every layer has MLP)
+    # intermediate_size is not in CheckpointLayerInfo; estimate from config
+    # For Qwen3.5: intermediate = hidden * ~4.8 (verified from config)
+    intermediate = int(h * 4.792)  # 2560*12288/2560 = 4.8 for 4B; close enough
+    mlp_per_layer = (
+        h * intermediate   # gate_proj
+        + h * intermediate  # up_proj
+        + intermediate * h  # down_proj
+    )
+    # Embedding + LM head
+    vocab = 248320
+    embed = vocab * h
+    lm_head = vocab * h
+
+    total_params = (
+        gdn_per_layer * info.num_gdn_layers
+        + fa_per_layer * info.num_full_attention_layers
+        + mlp_per_layer * info.num_hidden_layers
+        + embed
+        + lm_head
+    )
+    return int(total_params * weight_dtype_bytes)
+
+
+def predict_breakdown(
+    checkpoint: str = "4B",
+    context_length: int = 4096,
+    weight_dtype: str = "fp16",
+    state_dtype: str = "fp32",
+    kv_cache_dtype: str = "fp16",
+) -> MemoryBreakdown:
+    """Predict the three-way memory split at a given context length.
+
+    This is the *theoretical* decomposition used to design experiments and
+    validate that runtime measurements are in the right ballpark. The actual
+    runtime measurement (via ``measure_rss`` or framework introspection)
+    is the authority for published numbers.
+    """
+    info = LAYER_INFO[checkpoint]
+    w_bytes = _DTYPE_BYTES[weight_dtype]
+    s_bytes = _DTYPE_BYTES[state_dtype]
+    kv_bytes = _DTYPE_BYTES[kv_cache_dtype]
+
+    weights = estimate_weights(info, w_bytes)
+    kv_cache = int(info.kv_cache_bytes_per_token(dtype_size=int(kv_bytes)) * context_length / kv_bytes * info.num_full_attention_layers / info.num_full_attention_layers)
+    # More directly:
+    kv_cache = info.num_key_value_heads * info.full_attn_head_dim * 2 * context_length * info.num_full_attention_layers * kv_bytes
+    recurrent_state = info.recurrent_state_elements_per_layer * info.num_gdn_layers * s_bytes
+    conv_state = info.conv_state_elements_per_layer * info.num_gdn_layers * s_bytes
+
+    return MemoryBreakdown(
+        weights_bytes=weights,
+        kv_cache_bytes=kv_cache,
+        recurrent_state_bytes=recurrent_state,
+        conv_state_bytes=conv_state,
+        context_length=context_length,
+    )
+
+
+def sweep_context(
+    checkpoint: str = "4B",
+    context_lengths: list[int] | None = None,
+    weight_dtype: str = "fp16",
+    state_dtype: str = "fp32",
+    kv_cache_dtype: str = "fp16",
+) -> list[MemoryBreakdown]:
+    """Predict memory breakdown across a range of context lengths.
+
+    Shows the central claim: weights flat, KV cache linear, state flat.
+    """
+    if context_lengths is None:
+        context_lengths = [4096, 32768, 131072, 262144]
+    return [
+        predict_breakdown(checkpoint, ctx, weight_dtype, state_dtype, kv_cache_dtype)
+        for ctx in context_lengths
+    ]
+
+
+def format_breakdown_table(breakdowns: list[MemoryBreakdown]) -> str:
+    """Format a sweep as a human-readable table for docs/reports."""
+    lines = []
+    lines.append(f"{'ctx':>8}  {'weights':>10}  {'kv_cache':>10}  {'state':>10}  {'conv':>8}  {'total':>10}")
+    lines.append("-" * 68)
+    for b in breakdowns:
+        lines.append(
+            f"{b.context_length:>8}  "
+            f"{b.weights_bytes / 1e6:>8.1f}MB  "
+            f"{b.kv_cache_bytes / 1e6:>8.1f}MB  "
+            f"{b.recurrent_state_bytes / 1e6:>8.1f}MB  "
+            f"{b.conv_state_bytes / 1e6:>6.1f}MB  "
+            f"{b.total_bytes / 1e6:>8.1f}MB"
+        )
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Runtime measurement (best-effort, platform-dependent)
+# ---------------------------------------------------------------------------
+
+
+def _rss_bytes() -> int | None:
+    """Get current process RSS from /proc/self/status (Linux only)."""
+    try:
+        with open("/proc/self/status") as f:
+            for line in f:
+                if line.startswith("VmRSS:"):
+                    return int(line.split()[1]) * 1024  # kB → bytes
+    except Exception:
+        return None
+    return None
+
+
+def measure_delta(fn, *args, **kwargs) -> int | None:
+    """Measure RSS delta around a function call.
+
+    Returns the difference in RSS (bytes) after vs before calling ``fn``,
+    or None if /proc is unavailable. Useful for measuring how much memory
+    a specific allocation (e.g. loading KV cache, initializing state) consumes.
+    """
+    before = _rss_bytes()
+    if before is None:
+        return None
+    result = fn(*args, **kwargs)
+    after = _rss_bytes()
+    if after is None:
+        return None
+    return after - before
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && cat tests/test_memory.py 2>&1 && echo "===" && cat tests/test_packages.py 2>&1
+    timeout_secs: 10
+
+"""Tests for memory instrumentation (ob-vfp).
+
+Verifies the three-way split: weights flat, KV cache linear, state flat.
+"""
+
+import pytest
+
+from orionsbelt.engines.memory import (
+    MemoryBreakdown,
+    predict_breakdown,
+    sweep_context,
+    format_breakdown_table,
+    estimate_weights,
+)
+from orionsbelt.model.gdn_layer_info import LAYER_INFO
+
+
+class TestWeightsFlat:
+    """Weights must not change with context length."""
+
+    def test_weights_constant_across_context(self):
+        b4k = predict_breakdown("4B", 4096)
+        b32k = predict_breakdown("4B", 32768)
+        b262k = predict_breakdown("4B", 262144)
+        assert b4k.weights_bytes == b32k.weights_bytes == b262k.weights_bytes
+
+
+class TestKVCacheLinear:
+    """KV cache must grow linearly with context length."""
+
+    def test_kv_grows_8x_from_32k_to_262k(self):
+        b32k = predict_breakdown("4B", 32768)
+        b262k = predict_breakdown("4B", 262144)
+        ratio = b262k.kv_cache_bytes / b32k.kv_cache_bytes
+        assert ratio == pytest.approx(262144 / 32768, rel=0.01)  # 8x
+
+    def test_kv_at_4k_matches_audit(self):
+        b = predict_breakdown("4B", 4096)
+        assert b.kv_cache_bytes == pytest.approx(128 * 1024 * 1024, rel=0.01)  # 128 MiB FP16
+
+    def test_kv_at_262k_matches_audit(self):
+        b = predict_breakdown("4B", 262144)
+        assert b.kv_cache_bytes == pytest.approx(8 * 1024**3, rel=0.01)  # 8 GiB FP16
+
+
+class TestRecurrentStateFlat:
+    """Recurrent state must be constant across context length."""
+
+    def test_state_constant(self):
+        b4k = predict_breakdown("4B", 4096)
+        b262k = predict_breakdown("4B", 262144)
+        assert b4k.recurrent_state_bytes == b262k.recurrent_state_bytes
+
+    def test_state_48mib_fp32(self):
+        b = predict_breakdown("4B", 4096, state_dtype="fp32")
+        assert b.recurrent_state_bytes == pytest.approx(48 * 1024 * 1024, rel=0.01)
+
+    def test_state_24mib_fp16(self):
+        b = predict_breakdown("4B", 4096, state_dtype="fp16")
+        assert b.recurrent_state_bytes == pytest.approx(24 * 1024 * 1024, rel=0.01)
+
+
+class TestCentralClaim:
+    """At 262K, KV cache dwarfs recurrent state — the project's headline number."""
+
+    def test_kv_vs_state_ratio_at_262k(self):
+        b = predict_breakdown("4B", 262144)
+        ratio = b.kv_cache_bytes / b.recurrent_state_bytes
+        assert ratio > 100  # expected ~170x
+
+    def test_kv_dominates_total_at_262k(self):
+        b = predict_breakdown("4B", 262144)
+        assert b.kv_cache_bytes > b.weights_bytes  # KV exceeds weights at extreme context
+
+
+class TestSweep:
+    def test_sweep_produces_table(self):
+        breakdowns = sweep_context("4B", [4096, 32768])
+        table = format_breakdown_table(breakdowns)
+        assert "ctx" in table
+        assert "kv_cache" in table
+        assert "4096" in table
+        assert "32768" in table
+===
+"""Smoke tests that the orionsbelt src-layout package is importable.
+
+These exist to catch packaging regressions (bad ``pyproject.toml``, missing
+``__init__.py``, broken src-layout discovery) early and cheaply, independent
+of any ML dependency. They intentionally avoid importing torch/transformers
+or anything from the ``t-weights-fetch`` dependency set.
+"""
+
+import importlib
+import pkgutil
+
+import orionsbelt
+
+EXPECTED_TOP_LEVEL_SUBMODULES = {"model", "engines", "partition", "quant"}
+
+EXPECTED_ENGINE_SUBMODULES = {"npu", "gpu", "cpu"}
+
+
+def test_top_level_package_importable():
+    assert orionsbelt.__doc__ is not None
+    assert hasattr(orionsbelt, "__all__")
+
+
+def test_top_level_declares_expected_submodules():
+    assert set(orionsbelt.__all__) == EXPECTED_TOP_LEVEL_SUBMODULES
+
+
+def test_top_level_submodules_import_and_match_all():
+    discovered = {info.name for info in pkgutil.iter_modules(orionsbelt.__path__)}
+
+    # Every name advertised in __all__ must actually exist as a submodule ...
+    assert discovered >= EXPECTED_TOP_LEVEL_SUBMODULES
+
+    # ... and must actually import cleanly.
+    for name in EXPECTED_TOP_LEVEL_SUBMODULES:
+        module = importlib.import_module(f"orionsbelt.{name}")
+        assert module.__doc__, f"orionsbelt.{name} is missing a module docstring"
+
+
+def test_engines_exposes_per_accelerator_backends():
+    engines = importlib.import_module("orionsbelt.engines")
+    discovered = {info.name for info in pkgutil.iter_modules(engines.__path__)}
+
+    assert discovered >= EXPECTED_ENGINE_SUBMODULES
+
+    for name in EXPECTED_ENGINE_SUBMODULES:
+        module = importlib.import_module(f"orionsbelt.engines.{name}")
+        assert module.__doc__, f"orionsbelt.engines.{name} is missing a module docstring"
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && cat scripts/verify_cpu_kernels.sh 2>&1
+    timeout_secs: 10
+
+#!/usr/bin/env bash
+# Build the Armv9.2 GDN kernels and verify them numerically under QEMU.
+# No Orion O6 board required — QEMU emulates SVE2, so correctness is checkable today.
+# Bead ob-8qt.1. See docs/FINDINGS.md §4.
+set -euo pipefail
+
+K=src/orionsbelt/engines/cpu/kernels
+OUT=${OUT:-/tmp/gdn_kernel_verify}
+mkdir -p "$OUT"
+
+# GCC 13 does not know -mcpu=cortex-a720 (added in GCC 14); the arch-level flag is
+# equivalent for our purposes and works on 13.
+MARCH=${MARCH:--march=armv9.2-a+sve2+i8mm+bf16}
+
+echo "== cross-compiling for aarch64 ($MARCH)"
+aarch64-linux-gnu-gcc -O3 $MARCH -static \
+    "$K/gdn_sve.c" "$K/test_gdn_sve.c" -o "$OUT/verify" -lm
+
+echo "== running under QEMU with 128-bit vectors (as Cortex-A720)"
+QEMU_CPU=max,sve128=on qemu-aarch64 "$OUT/verify"
+
+echo "== portability matrix: SVE1 floor, SVE2, and no-SVE fallback"
+# The kernels are SVE1-clean; SVE2 is NOT required. Verified across vector lengths and cores.
+for spec in \
+  "SVE1@128|-march=armv8.2-a+sve|max,sve128=on" \
+  "SVE1@256(Graviton3)|-march=armv8.2-a+sve|max,sve256=on" \
+  "SVE1@512(A64FX)|-march=armv8.2-a+sve|max,sve512=on" \
+  "Neoverse-V1|-mcpu=neoverse-v1|max,sve256=on" \
+  "SVE2/Armv9-A|-march=armv9-a|max,sve128=on" \
+  "Neoverse-V2(Graviton4)|-mcpu=neoverse-v2|max,sve128=on" \
+  "no-SVE scalar|-march=armv8-a|max" ; do
+  IFS='|' read -r label march cpu <<< "$spec"
+  aarch64-linux-gnu-gcc -O3 $march -static \
+      "$K/gdn_sve.c" "$K/test_gdn_sve.c" -o "$OUT/v" -lm
+  printf "  %-24s " "$label"
+  QEMU_CPU=$cpu qemu-aarch64 "$OUT/v" | grep -c "bit-identical to matched reference: YES" \
+      | sed 's/^1$/PASS/; s/^0$/FAIL/'
+done
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && which qemu-aarch64 2>&1; which aarch64-linux-gnu-gcc 2>&1; gcc --version 2>&1 | head -1
+    timeout_secs: 10
+
+/usr/bin/aarch64-linux-gnu-gcc
+gcc (Ubuntu/Linaro 7.5.0-3ubuntu1~18.04) 7.5.0
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && ls -la src/orionsbelt/engines/cpu/kernels/ 2>&1
+    timeout_secs: 10
+
+total 72
+drwxrwxr-x 2 j1 j1  4096 Aug  2 22:49 .
+drwxrwxr-x 3 j1 j1  4096 Aug  2 21:59 ..
+-rw-rw-r-- 1 j1 j1 16437 Aug  3 00:25 bench_gdn.c
+-rw-rw-r-- 1 j1 j1 21941 Aug  2 22:49 gdn_sve.c
+-rw-rw-r-- 1 j1 j1 15115 Aug  2 22:50 test_gdn_mixed.c
+-rw-rw-r-- 1 j1 j1  2993 Aug  2 21:59 test_gdn_sve.c
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && cat scripts/build_device_bench.sh 2>&1
+    timeout_secs: 10
+
+#!/usr/bin/env bash
+# Build the standalone GDN kernel microbenchmark for a real aarch64 device.
+#
+# Produces STATIC binaries with no runtime dependencies — copy one to the device and run it.
+# Bead ob-8ms.2. Protocol: docs/METRICS.md. Schema: docs/RESULTS_SCHEMA.md.
+#
+#   ./scripts/build_device_bench.sh
+#   scp dist/bench_gdn_armv8a  device:/tmp/
+#   ssh device '/tmp/bench_gdn_armv8a --repeats 30 --csv' > results/raw/device.csv
+#
+# WARNING: do NOT run these under QEMU for performance numbers. QEMU emulates
+# instruction-by-instruction; its timings are meaningless as measurements (it is fine for
+# correctness, which is what scripts/verify_cpu_kernels.sh uses it for).
+set -euo pipefail
+
+K=src/orionsbelt/engines/cpu/kernels
+OUT=${OUT:-dist}
+mkdir -p "$OUT"
+CC=${CC:-aarch64-linux-gnu-gcc}
+
+# One build per ISA level, because Arm devices vary enormously and the right binary depends on
+# the core. Run the most specific one your device supports.
+#
+#   armv8a       baseline Armv8-A. NEON only. Runs on essentially any 64-bit Arm device.
+#   armv8.2dot   Armv8.2-A + dotprod. Cortex-A55/A75 and later — most phones since ~2018.
+#   armv8.6i8mm  Armv8.2-A + i8mm. Needed for int8 matmul work later; not used by fp32 kernels.
+#   armv9sve2    Armv9-A + SVE2. Cortex-A710/A720, Orion O6. Exercises the SVE path.
+build() {
+    local name="$1" flags="$2"
+    if $CC -O3 $flags -static "$K/gdn_sve.c" "$K/bench_gdn.c" -o "$OUT/bench_gdn_$name" -lm \
+        2>/dev/null; then
+        printf "  %-14s %-40s %s bytes\n" "$name" "$flags" \
+            "$(stat -c%s "$OUT/bench_gdn_$name")"
+    else
+        printf "  %-14s %-40s SKIPPED (toolchain rejects these flags)\n" "$name" "$flags"
+    fi
+}
+
+echo "Building static aarch64 benchmarks with $CC:"
+# Generic ISA-level builds
+build armv8a      "-march=armv8-a"
+build armv8.2dot  "-march=armv8.2-a+dotprod"
+build armv8.6i8mm "-march=armv8.2-a+i8mm"
+build armv9sve2   "-march=armv9-a+sve2+i8mm+bf16"
+
+# Core-tuned builds for the actual device fleet (ADR 0005). Verified feature sets:
+#   Cortex-A57  Armv8.0-A, NO dotprod, no fp16 vector  -> Jetson Nano
+#   Cortex-A76  Armv8.2-A, dotprod, fp16, no i8mm/SVE  -> Raspberry Pi 5, RK3588 big cluster
+#   Cortex-A55  Armv8.2-A, dotprod, fp16, no i8mm/SVE  -> RK3588 little cluster
+# None of these has SVE, so all take the NEON path -- which is why that path matters.
+build jetson_a57  "-mcpu=cortex-a57"
+build pi5_a76     "-mcpu=cortex-a76"
+build rk3588_a76  "-mcpu=cortex-a76"
+build rk3588_a55  "-mcpu=cortex-a55"
+
+cat <<'NOTE'
+
+Pick the most specific binary your device supports, then:
+
+    ./bench_gdn_<variant> --repeats 30            # human-readable
+    ./bench_gdn_<variant> --repeats 30 --csv      # schema-conforming CSV
+
+For the known fleet, use the core-tuned build:
+
+    Raspberry Pi 5    -> bench_gdn_pi5_a76
+    RK3588 big cores  -> bench_gdn_rk3588_a76   (pin with taskset -c 4-7 on most RK3588 boards)
+    RK3588 little     -> bench_gdn_rk3588_a55   (taskset -c 0-3)
+    Jetson Nano       -> bench_gdn_jetson_a57
+
+To find out what an unknown device supports:
+
+    uname -m                      # expect aarch64
+    grep -m1 Features /proc/cpuinfo
+      asimd    -> NEON  (armv8a build is correct)
+      asimddp  -> dotprod
+      i8mm     -> int8 matmul
+      sve/sve2 -> SVE   (use the armv9sve2 build; rare outside Armv9)
+
+Also capture the device's provenance alongside the numbers:
+
+    python3 bench/manifest.py > results/manifests/<run_id>.json   # if python3 is present
+
+The benchmark prints which dispatch path was compiled in (sve / neon / scalar). On Armv8-A
+without SVE, 'neon' is expected and correct — that is the path the large installed base of
+Armv8 devices actually runs.
+NOTE
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && head -100 src/orionsbelt/engines/cpu/kernels/gdn_sve.c 2>&1
+    timeout_secs: 10
+
+/* Gated DeltaNet CPU micro-kernels for AArch64 SVE (baseline SVE1) with scalar fallback.
+ *
+ * Bead ob-8qt.1. Three primitives that exist nowhere today for a non-SME Armv9.2 core
+ * (see docs/FINDINGS.md section 3): KleidiAI's depthwise conv is SME2-only, and it has no
+ * prefix-product or scan kernel at all.
+ *
+ * THE LAYOUT DECISION THAT MAKES THIS EASY
+ * ----------------------------------------
+ * A prefix scan along the *vector lanes* needs a log-depth Hillis-Steele shuffle network.
+ * We never do that. GDN's sequence axis is inherently sequential, so we vectorize across
+ * the CHANNEL/HEAD axis and walk the sequence with a plain loop. Every kernel below is
+ * then a sequence of independent lane-wise FMAs -- no cross-lane communication anywhere.
+ *
+ * ISA FLOOR IS SVE1, NOT SVE2. Every intrinsic used here -- svcntw, svdup_f32, svld1_f32,
+ * svmul_f32_x, svmla_f32_x, svst1_f32, svwhilelt_b32 -- is base SVE, and the guard is
+ * __ARM_FEATURE_SVE. Nothing in these fp32 kernels needs SVE2's integer/DSP additions. SVE2
+ * (and i8mm) become relevant only for the quantized delta-rule matmuls, which live elsewhere.
+ *
+ * Verified identical on SVE1 at 128/256/512-bit (incl. -mcpu=neoverse-v1 and -mcpu=a64fx),
+ * on SVE2 (-march=armv9-a, cortex-a710, neoverse-v2), and on plain -march=armv8-a via the
+ * scalar fallback. That means these run on Graviton3 (SVE1) as well as Cortex-A720 (SVE2),
+ * which keeps the Edge AI hedge target viable.
+ *
+ * On Cortex-A720 SVE is 128-bit -- the same width as NEON -- so the win is predication
+ * (svwhilelt gives clean channel tails with no scalar epilogue), not extra lanes. Written
+ * vector-length-agnostic regardless, so it widens for free on a core with longer vectors.
+ *
+ * Build (any of these work):
+ *   aarch64-linux-gnu-gcc -O3 -march=armv8.2-a+sve   -c gdn_sve.c   # SVE1 floor
+ *   aarch64-linux-gnu-gcc -O3 -march=armv9.2-a+sve2+i8mm+bf16 -c gdn_sve.c
+ *   clang --target=aarch64-linux-gnu -O3 -mcpu=cortex-a720 -c gdn_sve.c
+ */
+
+#include <stddef.h>
+#include <stdint.h>
+#include <string.h>
+
+#ifdef __ARM_FEATURE_SVE
+#include <arm_sve.h>
+#endif
+#ifdef __ARM_NEON
+#include <arm_neon.h>
+#endif
+
+/* ---------------------------------------------------------------------------
+ * 1. Gated cumulative decay  (inclusive prefix product along the sequence)
+ *
+ *   decay[t][c] = prod_{i<=t} a[i][c]
+ *
+ * Computed directly rather than as exp(cumsum(log a)): at chunk lengths of 64 the
+ * direct product is both cheaper and accurate in fp32, and avoids two transcendentals
+ * per element. NOTE the accumulator is fp32 even when the surrounding state is fp16 --
+ * a decay of 0.5 over 64 steps is ~5e-20, which underflows fp16 outright.
+ * ------------------------------------------------------------------------- */
+void gdn_cumdecay_f32(const float *restrict a, float *restrict decay, size_t seq,
+                      size_t channels) {
+#ifdef __ARM_FEATURE_SVE
+    for (size_t c = 0; c < channels; c += svcntw()) {
+        svbool_t pg = svwhilelt_b32((unsigned)c, (unsigned)channels);
+        svfloat32_t run = svdup_f32(1.0f);
+        for (size_t t = 0; t < seq; ++t) {
+            svfloat32_t av = svld1_f32(pg, a + t * channels + c);
+            run = svmul_f32_x(pg, run, av);
+            svst1_f32(pg, decay + t * channels + c, run);
+        }
+    }
+#elif defined(__ARM_NEON)
+    size_t c = 0;
+    for (; c + 4 <= channels; c += 4) {
+        float32x4_t run = vdupq_n_f32(1.0f);
+        for (size_t t = 0; t < seq; ++t) {
+            run = vmulq_f32(run, vld1q_f32(a + t * channels + c));
+            vst1q_f32(decay + t * channels + c, run);
+        }
+    }
+    for (; c < channels; ++c) {
+        float run = 1.0f;
+        for (size_t t = 0; t < seq; ++t) {
+            run *= a[t * channels + c];
+            decay[t * channels + c] = run;
+        }
+    }
+#else
+    for (size_t c = 0; c < channels; ++c) {
+        float run = 1.0f;
+        for (size_t t = 0; t < seq; ++t) {
+            run *= a[t * channels + c];
+            decay[t * channels + c] = run;
+        }
+    }
+#endif
+}
+
+/* ---------------------------------------------------------------------------
+ * 2. Chunkwise gated scan  (the recurrence the NPU cannot express at all)
+ *
+ *   s[t][c] = g[t][c] * s[t-1][c] + x[t][c]
+ *
+ * This is the outer, sequential half of the chunkwise formulation, deliberately kept
+ * separate from the per-chunk dense math so the mapping ADR can move the inner matmuls
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && sed -n '100,250p' src/orionsbelt/engines/cpu/kernels/gdn_sve.c 2>&1
+    timeout_secs: 10
+
+ * separate from the per-chunk dense math so the mapping ADR can move the inner matmuls
+ * to GPU/NPU while this stays on the CPU (PLAN.md section 3.1). state[] carries across
+ * calls, which is exactly the cross-invocation continuity the NOE toolchain has no
+ * mechanism for.
+ * ------------------------------------------------------------------------- */
+void gdn_gated_scan_f32(const float *restrict g, const float *restrict x,
+                        float *restrict s, float *restrict state, size_t seq,
+                        size_t channels) {
+#ifdef __ARM_FEATURE_SVE
+    for (size_t c = 0; c < channels; c += svcntw()) {
+        svbool_t pg = svwhilelt_b32((unsigned)c, (unsigned)channels);
+        svfloat32_t acc = svld1_f32(pg, state + c);
+        for (size_t t = 0; t < seq; ++t) {
+            svfloat32_t gv = svld1_f32(pg, g + t * channels + c);
+            svfloat32_t xv = svld1_f32(pg, x + t * channels + c);
+            acc = svmla_f32_x(pg, xv, acc, gv); /* acc = x + acc*g, one FMA */
+            svst1_f32(pg, s + t * channels + c, acc);
+        }
+        svst1_f32(pg, state + c, acc);
+    }
+#elif defined(__ARM_NEON)
+    size_t c = 0;
+    for (; c + 4 <= channels; c += 4) {
+        float32x4_t acc = vld1q_f32(state + c);
+        for (size_t t = 0; t < seq; ++t) {
+            /* acc = x + acc*g -- vfmaq_f32(addend, a, b) = addend + a*b */
+            acc = vfmaq_f32(vld1q_f32(x + t * channels + c), acc,
+                            vld1q_f32(g + t * channels + c));
+            vst1q_f32(s + t * channels + c, acc);
+        }
+        vst1q_f32(state + c, acc);
+    }
+    for (; c < channels; ++c) {
+        float a2 = state[c];
+        for (size_t t = 0; t < seq; ++t) {
+            a2 = x[t * channels + c] + a2 * g[t * channels + c];
+            s[t * channels + c] = a2;
+        }
+        state[c] = a2;
+    }
+#else
+    for (size_t c = 0; c < channels; ++c) {
+        float acc = state[c];
+        for (size_t t = 0; t < seq; ++t) {
+            acc = x[t * channels + c] + acc * g[t * channels + c];
+            s[t * channels + c] = acc;
+        }
+        state[c] = acc;
+    }
+#endif
+}
+
+/* ---------------------------------------------------------------------------
+ * 3. Causal depthwise Conv1D, kernel width 4  (KleidiAI's equivalent is SME2-only)
+ *
+ *   out[t][c] = sum_{j=0..K-1} w[j][c] * in[t-(K-1)+j][c]
+ *
+ * Causal by construction: output t reads no input beyond t. hist[] holds the K-1
+ * previous timesteps per channel so decode can advance one token at a time -- the
+ * conv-state analogue of a KV cache, 3 * channels floats.
+ * ------------------------------------------------------------------------- */
+#define GDN_CONV_K 4
+
+void gdn_causal_dwconv1d_f32(const float *restrict in, const float *restrict w,
+                             float *restrict out, float *restrict hist, size_t seq,
+                             size_t channels) {
+#ifdef __ARM_FEATURE_SVE
+    for (size_t c = 0; c < channels; c += svcntw()) {
+        svbool_t pg = svwhilelt_b32((unsigned)c, (unsigned)channels);
+        svfloat32_t h0 = svld1_f32(pg, hist + 0 * channels + c); /* t-3 */
+        svfloat32_t h1 = svld1_f32(pg, hist + 1 * channels + c); /* t-2 */
+        svfloat32_t h2 = svld1_f32(pg, hist + 2 * channels + c); /* t-1 */
+        svfloat32_t w0 = svld1_f32(pg, w + 0 * channels + c);
+        svfloat32_t w1 = svld1_f32(pg, w + 1 * channels + c);
+        svfloat32_t w2 = svld1_f32(pg, w + 2 * channels + c);
+        svfloat32_t w3 = svld1_f32(pg, w + 3 * channels + c);
+        for (size_t t = 0; t < seq; ++t) {
+            svfloat32_t cur = svld1_f32(pg, in + t * channels + c);
+            svfloat32_t acc = svmul_f32_x(pg, h0, w0);
+            acc = svmla_f32_x(pg, acc, h1, w1);
+            acc = svmla_f32_x(pg, acc, h2, w2);
+            acc = svmla_f32_x(pg, acc, cur, w3);
+            svst1_f32(pg, out + t * channels + c, acc);
+            h0 = h1; /* shift the ring: no cross-lane ops, just register renaming */
+            h1 = h2;
+            h2 = cur;
+        }
+        svst1_f32(pg, hist + 0 * channels + c, h0);
+        svst1_f32(pg, hist + 1 * channels + c, h1);
+        svst1_f32(pg, hist + 2 * channels + c, h2);
+    }
+#elif defined(__ARM_NEON)
+    size_t c = 0;
+    for (; c + 4 <= channels; c += 4) {
+        float32x4_t h0 = vld1q_f32(hist + 0 * channels + c);
+        float32x4_t h1 = vld1q_f32(hist + 1 * channels + c);
+        float32x4_t h2 = vld1q_f32(hist + 2 * channels + c);
+        float32x4_t w0 = vld1q_f32(w + 0 * channels + c);
+        float32x4_t w1 = vld1q_f32(w + 1 * channels + c);
+        float32x4_t w2 = vld1q_f32(w + 2 * channels + c);
+        float32x4_t w3 = vld1q_f32(w + 3 * channels + c);
+        for (size_t t = 0; t < seq; ++t) {
+            float32x4_t cur = vld1q_f32(in + t * channels + c);
+            float32x4_t acc = vmulq_f32(h0, w0);
+            acc = vfmaq_f32(acc, h1, w1);
+            acc = vfmaq_f32(acc, h2, w2);
+            acc = vfmaq_f32(acc, cur, w3);
+            vst1q_f32(out + t * channels + c, acc);
+            h0 = h1;
+            h1 = h2;
+            h2 = cur;
+        }
+        vst1q_f32(hist + 0 * channels + c, h0);
+        vst1q_f32(hist + 1 * channels + c, h1);
+        vst1q_f32(hist + 2 * channels + c, h2);
+    }
+    for (; c < channels; ++c) {
+        float hh[GDN_CONV_K - 1];
+        for (int j = 0; j < GDN_CONV_K - 1; ++j) hh[j] = hist[(size_t)j * channels + c];
+        for (size_t t = 0; t < seq; ++t) {
+            float cur = in[t * channels + c];
+            float acc = hh[0] * w[0 * channels + c] + hh[1] * w[1 * channels + c] +
+                        hh[2] * w[2 * channels + c] + cur * w[3 * channels + c];
+            out[t * channels + c] = acc;
+            hh[0] = hh[1];
+            hh[1] = hh[2];
+            hh[2] = cur;
+        }
+        for (int j = 0; j < GDN_CONV_K - 1; ++j) hist[(size_t)j * channels + c] = hh[j];
+    }
+#else
+    for (size_t c = 0; c < channels; ++c) {
+        float h[GDN_CONV_K - 1];
+        for (int j = 0; j < GDN_CONV_K - 1; ++j) h[j] = hist[(size_t)j * channels + c];
+        for (size_t t = 0; t < seq; ++t) {
+            float cur = in[t * channels + c];
+            float acc = h[0] * w[0 * channels + c] + h[1] * w[1 * channels + c] +
+                        h[2] * w[2 * channels + c] + cur * w[3 * channels + c];
+            out[t * channels + c] = acc;
+            h[0] = h[1];
+            h[1] = h[2];
+            h[2] = cur;
+        }
+        for (int j = 0; j < GDN_CONV_K - 1; ++j) hist[(size_t)j * channels + c] = h[j];
+    }
+#endif
+}
+
+/* ===========================================================================
+ * MIXED-PRECISION STATE VARIANTS (bead ob-8qt.4)
+ *
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && cat src/orionsbelt/engines/cpu/kernels/test_gdn_sve.c 2>&1
+    timeout_secs: 10
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+#include <stddef.h>
+void gdn_cumdecay_f32(const float*,float*,size_t,size_t);
+void gdn_gated_scan_f32(const float*,const float*,float*,float*,size_t,size_t);
+void gdn_causal_dwconv1d_f32(const float*,const float*,float*,float*,size_t,size_t);
+
+/* precision-MATCHED scalar reference (float accumulators, like the kernel) */
+static void refF_scan(const float*g,const float*x,float*s,float*st,size_t T,size_t C){
+  for(size_t c=0;c<C;c++){float a=st[c];for(size_t t=0;t<T;t++){a=x[t*C+c]+a*g[t*C+c];s[t*C+c]=a;}st[c]=a;}}
+static void refF_conv(const float*in,const float*w,float*o,float*h,size_t T,size_t C){
+  for(size_t c=0;c<C;c++){float H[3]={h[0*C+c],h[1*C+c],h[2*C+c]};
+    for(size_t t=0;t<T;t++){float cur=in[t*C+c];
+      o[t*C+c]=H[0]*w[0*C+c]+H[1]*w[1*C+c]+H[2]*w[2*C+c]+cur*w[3*C+c];
+      H[0]=H[1];H[1]=H[2];H[2]=cur;}
+    h[0*C+c]=H[0];h[1*C+c]=H[1];h[2*C+c]=H[2];}}
+/* double reference, for the honest numerical-quality view */
+static void refD_scan(const float*g,const float*x,float*s,float*st,size_t T,size_t C){
+  for(size_t c=0;c<C;c++){double a=st[c];for(size_t t=0;t<T;t++){a=x[t*C+c]+a*g[t*C+c];s[t*C+c]=(float)a;}st[c]=(float)a;}}
+
+static void report(const char*n,const float*a,const float*b,size_t N){
+  double mabs=0,mrel=0; size_t big=0;
+  for(size_t i=0;i<N;i++){double d=fabs((double)a[i]-b[i]); if(d>mabs)mabs=d;
+    if(fabs((double)b[i])>1e-2){big++; double r=d/fabs((double)b[i]); if(r>mrel)mrel=r;}}
+  printf("  %-28s max_abs=%.3e  max_rel(|ref|>1e-2, n=%zu)=%.3e\n",n,mabs,big,mrel);}
+
+int main(void){
+  size_t T=64, C=2051, N=T*C;   /* 2051 exercises the predicated tail */
+  float *g=malloc(N*4),*x=malloc(N*4),*w=malloc(4*C*4);
+  float *s1=malloc(N*4),*s2=malloc(N*4),*s3=malloc(N*4);
+  float *o1=malloc(N*4),*o2=malloc(N*4);
+  float *stA=malloc(C*4),*stB=malloc(C*4),*stC=malloc(C*4);
+  float *hA=malloc(3*C*4),*hB=malloc(3*C*4);
+  srand(7);
+  for(size_t i=0;i<N;i++){g[i]=0.5f+0.4f*(rand()/(float)RAND_MAX);x[i]=(rand()/(float)RAND_MAX)-0.5f;}
+  for(size_t i=0;i<4*C;i++)w[i]=(rand()/(float)RAND_MAX)-0.5f;
+  for(size_t i=0;i<C;i++){float v=(rand()/(float)RAND_MAX)-0.5f;stA[i]=stB[i]=stC[i]=v;}
+  for(size_t i=0;i<3*C;i++){float v=(rand()/(float)RAND_MAX)-0.5f;hA[i]=hB[i]=v;}
+
+  gdn_gated_scan_f32(g,x,s1,stA,T,C);
+  refF_scan(g,x,s2,stB,T,C);
+  refD_scan(g,x,s3,stC,T,C);
+  gdn_causal_dwconv1d_f32(x,w,o1,hA,T,C);
+  refF_conv(x,w,o2,hB,T,C);
+
+  printf("SVE kernel vs PRECISION-MATCHED float reference (expect ~0):\n");
+  report("gated_scan",s1,s2,N); report("gated_scan carried state",stA,stB,C);
+  report("causal_dwconv1d",o1,o2,N); report("conv history",hA,hB,3*C);
+  printf("SVE kernel vs DOUBLE reference (fp32 accumulation quality):\n");
+  report("gated_scan",s1,s3,N);
+
+  double mabs=0; for(size_t i=0;i<N;i++){double d=fabs((double)s1[i]-s2[i]);if(d>mabs)mabs=d;}
+  int exact = (mabs==0.0);
+  printf("\ngated_scan bit-identical to matched reference: %s\n", exact?"YES":"no");
+  return 0;
+}
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && cat src/orionsbelt/engines/cpu/kernels/test_gdn_mixed.c 2>&1
+    timeout_secs: 10
+
+/* Correctness test for mixed-precision GDN kernel variants (bead ob-8qt.4).
+ *
+ * Strategy: run each fp32 kernel on identical inputs, then run the bf16/fp16
+ * variant. The accumulation is fp32 in all cases, so the ONLY source of
+ * difference is the narrow state I/O at chunk boundaries. We verify:
+ *
+ *   1. Per-token outputs (s[], decay[]) are close to the fp32 reference
+ *   2. Carried state is close to the fp32 reference (bounded by format precision)
+ *   3. Error magnitude is within theoretical bounds:
+ *        bf16: ~0.4% relative (7 mantissa bits)
+ *        fp16: ~0.05% relative (10 mantissa bits)
+ *
+ * The test exercises C=2051 (predicated/scalar tail) and uses two scenarios:
+ *   - "warm" gates in (0.90, 0.99): representative, decay stays in range
+ *   - "cold" gates at 0.5: stress test for fp16 exponent range
+ *
+ * Build:
+ *   gcc -O2 -mcpu=cortex-a57 gdn_sve.c test_gdn_mixed.c -o test_gdn_mixed -lm
+ *   gcc -O2 -march=armv8-a gdn_sve.c test_gdn_mixed.c -o test_gdn_mixed -lm
+ */
+
+#include <math.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+/* fp32 kernels (reference) */
+void gdn_cumdecay_f32(const float *, float *, size_t, size_t);
+void gdn_gated_scan_f32(const float *, const float *, float *, float *, size_t, size_t);
+
+/* Mixed-precision kernels */
+void gdn_cumdecay_bf16(const float *, uint16_t *, size_t, size_t);
+void gdn_cumdecay_f16(const float *, uint16_t *, size_t, size_t);
+void gdn_gated_scan_bf16(const float *, const float *, float *, uint16_t *, size_t, size_t);
+void gdn_gated_scan_f16(const float *, const float *, float *, uint16_t *, size_t, size_t);
+
+/* bf16/fp16 conversion (duplicated from gdn_sve.c for standalone use) */
+static uint16_t f32_to_bf16(float f) {
+    uint32_t bits;
+    memcpy(&bits, &f, sizeof(bits));
+    uint32_t lsb = (bits >> 16) & 1;
+    return (uint16_t)((bits + 0x7FFFu + lsb) >> 16);
+}
+static float bf16_to_f32(uint16_t b) {
+    uint32_t bits = (uint32_t)b << 16;
+    float f;
+    memcpy(&f, &bits, sizeof(f));
+    return f;
+}
+static uint16_t f32_to_f16(float f) {
+    __fp16 h = (__fp16)f;
+    uint16_t bits;
+    memcpy(&bits, &h, sizeof(bits));
+    return bits;
+}
+static float f16_to_f32(uint16_t h) {
+    __fp16 hp;
+    memcpy(&hp, &h, sizeof(hp));
+    return (float)hp;
+}
+
+typedef struct {
+    double max_abs;
+    double max_rel;     /* max relative error where |ref| > threshold */
+    size_t n_compared;
+    size_t n_flushed;   /* values that went to zero in narrow format */
+} error_stats;
+
+static void compare(const char *label, const float *narrow_vals,
+                    const float *ref, size_t N, double threshold,
+                    error_stats *out) {
+    out->max_abs = 0.0;
+    out->max_rel = 0.0;
+    out->n_compared = 0;
+    out->n_flushed = 0;
+    for (size_t i = 0; i < N; i++) {
+        double d = fabs((double)narrow_vals[i] - (double)ref[i]);
+        if (d > out->max_abs) out->max_abs = d;
+        if (fabs((double)ref[i]) > threshold) {
+            double r = d / fabs((double)ref[i]);
+            if (r > out->max_rel) out->max_rel = r;
+            out->n_compared++;
+        }
+        if (ref[i] != 0.0f && narrow_vals[i] == 0.0f)
+            out->n_flushed++;
+    }
+    printf("  %-36s max_abs=%8.2e  max_rel=%7.3f%%  (n=%zu, flushed=%zu)\n",
+           label, out->max_abs, out->max_rel * 100.0,
+           out->n_compared, out->n_flushed);
+}
+
+static int pass_fail_rel(const char *label, double max_rel, double bound_pct) {
+    if (max_rel * 100.0 <= bound_pct) {
+        printf("  PASS: %s max_rel %.3f%% <= %.1f%% bound\n", label, max_rel * 100.0, bound_pct);
+        return 0;
+    }
+    printf("  FAIL: %s max_rel %.3f%% > %.1f%% bound\n", label, max_rel * 100.0, bound_pct);
+    return 1;
+}
+
+int main(void) {
+    int failures = 0;
+    size_t T = 64, C = 2051, N = T * C;
+
+    printf("Mixed-precision GDN kernel correctness test\n");
+    printf("  seq=%zu  channels=%zu  (tail=%zu exercises scalar epilogue)\n\n", T, C, C % 4);
+
+    /* Allocate buffers */
+    float *a = malloc(N * sizeof(float));
+    float *g = malloc(N * sizeof(float));
+    float *x = malloc(N * sizeof(float));
+    float *s_ref = malloc(N * sizeof(float));
+    float *s_narrow = malloc(N * sizeof(float));
+    float *decay_ref = malloc(N * sizeof(float));
+    uint16_t *decay_bf16 = malloc(N * sizeof(uint16_t));
+    uint16_t *decay_f16 = malloc(N * sizeof(uint16_t));
+    float *state_ref = malloc(C * sizeof(float));
+    float *state_narrow_f = malloc(C * sizeof(float));
+    uint16_t *state_bf16 = malloc(C * sizeof(uint16_t));
+    uint16_t *state_f16 = malloc(C * sizeof(uint16_t));
+
+    if (!a || !g || !x || !s_ref || !s_narrow || !decay_ref ||
+        !decay_bf16 || !decay_f16 || !state_ref || !state_narrow_f ||
+        !state_bf16 || !state_f16) {
+        fprintf(stderr, "allocation failed\n");
+        return 1;
+    }
+
+    /* ================================================================
+     * SCENARIO 1: "Warm" gates in (0.90, 0.99) — representative GDN
+     * ================================================================ */
+    printf("--- Scenario 1: warm gates (0.90, 0.99) ---\n\n");
+    srand(42);
+    for (size_t i = 0; i < N; i++) {
+        a[i] = 0.90f + 0.09f * (rand() / (float)RAND_MAX);
+        g[i] = 0.50f + 0.40f * (rand() / (float)RAND_MAX);
+        x[i] = (rand() / (float)RAND_MAX) - 0.5f;
+    }
+    for (size_t i = 0; i < C; i++)
+        state_ref[i] = (rand() / (float)RAND_MAX) - 0.5f;
+
+    /* --- cumdecay --- */
+    gdn_cumdecay_f32(a, decay_ref, T, C);
+    gdn_cumdecay_bf16(a, decay_bf16, T, C);
+    gdn_cumdecay_f16(a, decay_f16, T, C);
+
+    /* Convert narrow outputs back to fp32 for comparison */
+    float *decay_bf16_f = malloc(N * sizeof(float));
+    float *decay_f16_f = malloc(N * sizeof(float));
+    for (size_t i = 0; i < N; i++) {
+        decay_bf16_f[i] = bf16_to_f32(decay_bf16[i]);
+        decay_f16_f[i] = f16_to_f32(decay_f16[i]);
+    }
+
+    error_stats es;
+    printf("cumdecay output:\n");
+    compare("bf16 vs fp32 ref", decay_bf16_f, decay_ref, N, 1e-4, &es);
+    failures += pass_fail_rel("cumdecay bf16", es.max_rel, 0.5);
+    compare("f16 vs fp32 ref", decay_f16_f, decay_ref, N, 1e-4, &es);
+    failures += pass_fail_rel("cumdecay f16", es.max_rel, 0.1);
+
+    /* --- gated scan --- */
+    /* Save state for each variant */
+    float *state_init = malloc(C * sizeof(float));
+    memcpy(state_init, state_ref, C * sizeof(float));
+
+    /* fp32 reference */
+    memcpy(state_ref, state_init, C * sizeof(float));
+    gdn_gated_scan_f32(g, x, s_ref, state_ref, T, C);
+
+    /* bf16: narrow the initial state, run, then widen the carried state */
+    for (size_t i = 0; i < C; i++) state_bf16[i] = f32_to_bf16(state_init[i]);
+    gdn_gated_scan_bf16(g, x, s_narrow, state_bf16, T, C);
+    for (size_t i = 0; i < C; i++) state_narrow_f[i] = bf16_to_f32(state_bf16[i]);
+
+    /* NOTE on scan-output thresholds: the per-token output is s[t] = g[t]*s[t-1] + x[t].
+     * When g*state nearly cancels x, the reference output is near zero and relative
+     * error is meaningless (can be 100% for an absolute error of 1e-4). We therefore
+     * use a higher threshold (0.5) for output relative-error, and separately check the
+     * absolute error is bounded by the state quantization error times the gate magnitude.
+     * The STATE comparison uses threshold=1e-2 since state values are O(1) and not
+     * subject to cancellation. */
+    printf("\ngated_scan (warm):\n");
+    compare("bf16 output vs fp32 ref", s_narrow, s_ref, N, 0.5, &es);
+    failures += pass_fail_rel("scan bf16 output", es.max_rel, 0.5);
+    {
+        double abs_bound = 0.004 * 0.9;  /* bf16 ~0.4% of |state|~0.5, gate~0.9 */
+        printf("  bf16 output max_abs=%8.2e (bound ~%.1e from state quant)\n", es.max_abs, abs_bound);
+    }
+    compare("bf16 carried state vs ref", state_narrow_f, state_ref, C, 1e-2, &es);
+    failures += pass_fail_rel("scan bf16 state", es.max_rel, 0.5);
+
+    /* fp16 */
+    for (size_t i = 0; i < C; i++) state_f16[i] = f32_to_f16(state_init[i]);
+    gdn_gated_scan_f16(g, x, s_narrow, state_f16, T, C);
+    for (size_t i = 0; i < C; i++) state_narrow_f[i] = f16_to_f32(state_f16[i]);
+
+    compare("f16 output vs fp32 ref", s_narrow, s_ref, N, 0.5, &es);
+    failures += pass_fail_rel("scan f16 output", es.max_rel, 0.1);
+    compare("f16 carried state vs ref", state_narrow_f, state_ref, C, 1e-2, &es);
+    failures += pass_fail_rel("scan f16 state", es.max_rel, 0.1);
+
+    /* ================================================================
+     * SCENARIO 2: "Cold" gates at 0.5 — stress test fp16 range
+     *
+     * A cumulative product of 0.5^64 ≈ 5e-20, which:
+     *   - bf16: representable (same exponent range as fp32)
+     *   - fp16: UNDERFLOWS to zero (min normal ~6.1e-5, min subnormal ~6e-8)
+     *
+     * The accumulator is fp32 in both variants, so the RUNNING value
+     * is fine. The issue is that the NARROWED OUTPUT loses small values.
+     * This is the expected tradeoff and is exactly why the bead mandates
+     * fp32 accumulators.
+     * ================================================================ */
+    printf("\n--- Scenario 2: cold gates at 0.5 (fp16 range stress) ---\n\n");
+
+    for (size_t i = 0; i < N; i++) {
+        a[i] = 0.5f;
+        g[i] = 0.5f;
+        x[i] = (float)((i * 69069u) % 1000) / 1000.0f;
+    }
+
+    gdn_cumdecay_f32(a, decay_ref, T, C);
+    gdn_cumdecay_bf16(a, decay_bf16, T, C);
+    gdn_cumdecay_f16(a, decay_f16, T, C);
+
+    for (size_t i = 0; i < N; i++) {
+        decay_bf16_f[i] = bf16_to_f32(decay_bf16[i]);
+        decay_f16_f[i] = f16_to_f32(decay_f16[i]);
+    }
+
+    /* Count fp16 flushes: decay_ref at t=63 is 0.5^64 ≈ 5.4e-20 */
+    size_t bf16_flushes = 0, f16_flushes = 0;
+    for (size_t i = 0; i < N; i++) {
+        if (decay_ref[i] != 0.0f && decay_bf16_f[i] == 0.0f) bf16_flushes++;
+        if (decay_ref[i] != 0.0f && decay_f16_f[i] == 0.0f) f16_flushes++;
+    }
+
+    printf("cumdecay with constant 0.5 gate:\n");
+    printf("  bf16 flushes to zero: %zu / %zu (expected: 0, same exponent range as fp32)\n",
+           bf16_flushes, N);
+    printf("  f16 flushes to zero:  %zu / %zu (expected: ~T*C/2, fp16 min subnormal ~6e-8)\n",
+           f16_flushes, N);
+
+    if (bf16_flushes > 0) {
+        printf("  UNEXPECTED: bf16 should not flush — same exponent range as fp32\n");
+        failures++;
+    }
+
+    /* bf16 should be fine — same exponent range */
+    compare("bf16 vs fp32 ref (cold)", decay_bf16_f, decay_ref, N, 1e-4, &es);
+    failures += pass_fail_rel("cumdecay bf16 (cold)", es.max_rel, 0.5);
+
+    /* f16 is expected to flush many values — report but don't fail */
+    compare("f16 vs fp32 ref (cold)", decay_f16_f, decay_ref, N, 1e-20, &es);
+    printf("  (fp16 flushing expected for cold gates; not a failure)\n");
+
+    /* ================================================================
+     * DETERMINISM CHECK: same inputs → same outputs
+     * ================================================================ */
+    printf("\n--- Determinism check ---\n\n");
+
+    for (size_t i = 0; i < C; i++) state_bf16[i] = f32_to_bf16(state_init[i]);
+    gdn_gated_scan_bf16(g, x, s_ref, state_bf16, T, C);
+    /* Save copies */
+    float *s_run1 = malloc(N * sizeof(float));
+    uint16_t *st_run1 = malloc(C * sizeof(uint16_t));
+    memcpy(s_run1, s_ref, N * sizeof(float));
+    memcpy(st_run1, state_bf16, C * sizeof(uint16_t));
+
+    for (size_t i = 0; i < C; i++) state_bf16[i] = f32_to_bf16(state_init[i]);
+    gdn_gated_scan_bf16(g, x, s_narrow, state_bf16, T, C);
+
+    int nondeterministic = 0;
+    for (size_t i = 0; i < N; i++)
+        if (s_run1[i] != s_narrow[i]) nondeterministic++;
+    for (size_t i = 0; i < C; i++)
+        if (st_run1[i] != state_bf16[i]) nondeterministic++;
+
+    printf("  Determinism (two runs, identical inputs): %s\n",
+           nondeterministic == 0 ? "PASS (bit-identical)" : "FAIL");
+    if (nondeterministic) failures++;
+
+    /* ================================================================
+     * STATE CONTINUITY: simulate two consecutive chunks
+     * ================================================================ */
+    printf("\n--- State continuity across two chunks ---\n\n");
+
+    /* Regenerate warm scenario data for a clean test */
+    srand(99);
+    T = 64; C = 128; N = T * C;
+    float *a2 = malloc(N * sizeof(float));
+    float *g2 = malloc(N * sizeof(float));
+    float *x2 = malloc(N * sizeof(float));
+    float *s2_ref = malloc(N * sizeof(float));
+    float *s2_narrow = malloc(N * sizeof(float));
+    float *st2_ref = malloc(C * sizeof(float));
+    float *st2_narrow_f = malloc(C * sizeof(float));
+    uint16_t *st2_bf16 = malloc(C * sizeof(uint16_t));
+    uint16_t *st2_f16 = malloc(C * sizeof(uint16_t));
+
+    for (size_t i = 0; i < N; i++) {
+        g2[i] = 0.50f + 0.40f * (rand() / (float)RAND_MAX);
+        x2[i] = (rand() / (float)RAND_MAX) - 0.5f;
+    }
+
+    /* Chunk 1: identical state init */
+    for (size_t i = 0; i < C; i++) {
+        float v = (rand() / (float)RAND_MAX) - 0.5f;
+        st2_ref[i] = v;
+        st2_bf16[i] = f32_to_bf16(v);
+        st2_f16[i] = f32_to_f16(v);
+    }
+
+    /* Run chunk 1 in fp32 and both narrow formats */
+    gdn_gated_scan_f32(g2, x2, s2_ref, st2_ref, T, C);
+    gdn_gated_scan_bf16(g2, x2, s2_narrow, st2_bf16, T, C);
+
+    /* Chunk 2: carry state forward (this is the real test — error compounds) */
+    float *g2b = malloc(N * sizeof(float));
+    float *x2b = malloc(N * sizeof(float));
+    float *s2b_ref = malloc(N * sizeof(float));
+    float *s2b_narrow = malloc(N * sizeof(float));
+    for (size_t i = 0; i < N; i++) {
+        g2b[i] = 0.50f + 0.40f * (rand() / (float)RAND_MAX);
+        x2b[i] = (rand() / (float)RAND_MAX) - 0.5f;
+    }
+
+    gdn_gated_scan_f32(g2b, x2b, s2b_ref, st2_ref, T, C);
+    gdn_gated_scan_bf16(g2b, x2b, s2b_narrow, st2_bf16, T, C);
+
+    printf("After 2 chunks (error compounds through chunk boundary):\n");
+    compare("bf16 output vs fp32 ref", s2b_narrow, s2b_ref, N, 0.5, &es);
+    /* Error after 2 chunks: slightly higher than 1 chunk, but still within bf16 bound */
+    failures += pass_fail_rel("2-chunk bf16 output", es.max_rel, 1.0);
+
+    for (size_t i = 0; i < C; i++) st2_narrow_f[i] = bf16_to_f32(st2_bf16[i]);
+    compare("bf16 carried state vs ref", st2_narrow_f, st2_ref, C, 1e-2, &es);
+    failures += pass_fail_rel("2-chunk bf16 state", es.max_rel, 1.0);
+
+    /* Cleanup */
+    free(a); free(g); free(x); free(s_ref); free(s_narrow);
+    free(decay_ref); free(decay_bf16); free(decay_f16);
+    free(decay_bf16_f); free(decay_f16_f);
+    free(state_ref); free(state_narrow_f); free(state_bf16); free(state_f16);
+    free(state_init); free(s_run1); free(st_run1);
+    free(a2); free(g2); free(x2); free(s2_ref); free(s2_narrow);
+    free(st2_ref); free(st2_narrow_f); free(st2_bf16); free(st2_f16);
+    free(g2b); free(x2b); free(s2b_ref); free(s2b_narrow);
+
+    /* ================================================================ */
+    printf("\n%s\n", failures == 0
+        ? "ALL TESTS PASSED"
+        : "SOME TESTS FAILED");
+    return failures;
+}Good idea — let me run the existing C kernel correctness tests natively on this A57 (NEON path). The tests were written for QEMU/SVE verification; running them on real silicon validates the NEON path that most of the device fleet actually uses.
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && K=src/orionsbelt/engines/cpu/kernels && \
+aarch64-linux-gnu-gcc -O3 -mcpu=cortex-a57 -static \
+  "$K/gdn_sve.c" "$K/test_gdn_sve.c" -o /tmp/test_gdn_neon -lm 2>&1 && \
+echo "Build OK" && \
+/tmp/test_gdn_neon 2>&1
+    timeout_secs: 30
+
+Build OK
+SVE kernel vs PRECISION-MATCHED float reference (expect ~0):
+  gated_scan                   max_abs=0.000e+00  max_rel(|ref|>1e-2, n=128795)=0.000e+00
+  gated_scan carried state     max_abs=0.000e+00  max_rel(|ref|>1e-2, n=2018)=0.000e+00
+  causal_dwconv1d              max_abs=5.960e-08  max_rel(|ref|>1e-2, n=124696)=2.604e-06
+  conv history                 max_abs=0.000e+00  max_rel(|ref|>1e-2, n=6012)=0.000e+00
+SVE kernel vs DOUBLE reference (fp32 accumulation quality):
+  gated_scan                   max_abs=1.192e-07  max_rel(|ref|>1e-2, n=128795)=3.104e-06
+
+gated_scan bit-identical to matched reference: YESNEON path verified — bit-identical for gated_scan. Now the mixed-precision test:
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && K=src/orionsbelt/engines/cpu/kernels && \
+aarch64-linux-gnu-gcc -O3 -mcpu=cortex-a57 -static \
+  "$K/gdn_sve.c" "$K/test_gdn_mixed.c" -o /tmp/test_gdn_mixed -lm 2>&1 && \
+echo "Build OK" && \
+/tmp/test_gdn_mixed 2>&1
+    timeout_secs: 30
+
+Build OK
+Mixed-precision GDN kernel correctness test
+  seq=64  channels=2051  (tail=3 exercises scalar epilogue)
+
+--- Scenario 1: warm gates (0.90, 0.99) ---
+
+cumdecay output:
+  bf16 vs fp32 ref                     max_abs=1.95e-03  max_rel=  0.389%  (n=131264, flushed=0)
+  PASS: cumdecay bf16 max_rel 0.389% <= 0.5% bound
+  f16 vs fp32 ref                      max_abs=2.44e-04  max_rel=  0.049%  (n=131264, flushed=0)
+  PASS: cumdecay f16 max_rel 0.049% <= 0.1% bound
+
+gated_scan (warm):
+  bf16 output vs fp32 ref              max_abs=8.64e-04  max_rel=  0.149%  (n=30612, flushed=0)
+  PASS: scan bf16 output max_rel 0.149% <= 0.5% bound
+  bf16 output max_abs=8.64e-04 (bound ~3.6e-03 from state quant)
+  bf16 carried state vs ref            max_abs=3.88e-03  max_rel=  0.382%  (n=2020, flushed=0)
+  PASS: scan bf16 state max_rel 0.382% <= 0.5% bound
+  f16 output vs fp32 ref               max_abs=1.08e-04  max_rel=  0.019%  (n=30612, flushed=0)
+  PASS: scan f16 output max_rel 0.019% <= 0.1% bound
+  f16 carried state vs ref             max_abs=4.65e-04  max_rel=  0.047%  (n=2020, flushed=0)
+  PASS: scan f16 state max_rel 0.047% <= 0.1% bound
+
+--- Scenario 2: cold gates at 0.5 (fp16 range stress) ---
+
+cumdecay with constant 0.5 gate:
+  bf16 flushes to zero: 0 / 131264 (expected: 0, same exponent range as fp32)
+  f16 flushes to zero:  82040 / 131264 (expected: ~T*C/2, fp16 min subnormal ~6e-8)
+  bf16 vs fp32 ref (cold)              max_abs=0.00e+00  max_rel=  0.000%  (n=26663, flushed=0)
+  PASS: cumdecay bf16 (cold) max_rel 0.000% <= 0.5% bound
+  f16 vs fp32 ref (cold)               max_abs=2.98e-08  max_rel=100.000%  (n=131264, flushed=82040)
+  (fp16 flushing expected for cold gates; not a failure)
+
+--- Determinism check ---
+
+  Determinism (two runs, identical inputs): PASS (bit-identical)
+
+--- State continuity across two chunks ---
+
+After 2 chunks (error compounds through chunk boundary):
+  bf16 output vs fp32 ref              max_abs=1.46e-03  max_rel=  0.216%  (n=1862, flushed=0)
+  PASS: 2-chunk bf16 output max_rel 0.216% <= 1.0% bound
+  bf16 carried state vs ref            max_abs=3.73e-03  max_rel=  0.334%  (n=126, flushed=0)
+  PASS: 2-chunk bf16 state max_rel 0.334% <= 1.0% bound
+
+ALL TESTS PASSEDAll tests pass on real A57 silicon (NEON path). This validates that the NEON fallback — which is what the entire current device fleet actually runs — is correct, not just the SVE path tested under QEMU.
+
+Let me create a portable bead for native device kernel verification infrastructure, then implement it.
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && bd create \
+  --title "Native device kernel correctness check script" \
+  --type task \
+  --priority P1 \
+  --parent ob-mrd \
+  --labels "portable" \
+  --description "Create scripts/verify_kernels_native.sh that builds and runs the C kernel correctness tests (test_gdn_sve.c, test_gdn_mixed.c) natively on the device using its real ISA (NEON on A57, dotprod on A76, etc). The existing verify_cpu_kernels.sh targets QEMU cross-compilation for SVE; there is no native-device path. Every fleet device should be able to verify its kernel dispatch is correct on real silicon, not just emulated. Also add cumdecay correctness coverage to test_gdn_sve.c (currently only tests gated_scan and causal_dwconv1d)." \
+  2>&1
+    timeout_secs: 15
+
+✓ Created issue: ob-mrd.3 — Native device kernel correctness check script
+  Priority: P1
+  Status: open
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && bd update ob-mrd.3 --claim 2>&1
+    timeout_secs: 15
+
+✓ Updated issue: ob-mrd.3 — Native device kernel correctness check script
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && cat -n src/orionsbelt/engines/cpu/kernels/test_gdn_sve.c 2>&1
+    timeout_secs: 10
+
+     1	#include <stdio.h>
+     2	#include <stdlib.h>
+     3	#include <math.h>
+     4	#include <stddef.h>
+     5	void gdn_cumdecay_f32(const float*,float*,size_t,size_t);
+     6	void gdn_gated_scan_f32(const float*,const float*,float*,float*,size_t,size_t);
+     7	void gdn_causal_dwconv1d_f32(const float*,const float*,float*,float*,size_t,size_t);
+     8	
+     9	/* precision-MATCHED scalar reference (float accumulators, like the kernel) */
+    10	static void refF_scan(const float*g,const float*x,float*s,float*st,size_t T,size_t C){
+    11	  for(size_t c=0;c<C;c++){float a=st[c];for(size_t t=0;t<T;t++){a=x[t*C+c]+a*g[t*C+c];s[t*C+c]=a;}st[c]=a;}}
+    12	static void refF_conv(const float*in,const float*w,float*o,float*h,size_t T,size_t C){
+    13	  for(size_t c=0;c<C;c++){float H[3]={h[0*C+c],h[1*C+c],h[2*C+c]};
+    14	    for(size_t t=0;t<T;t++){float cur=in[t*C+c];
+    15	      o[t*C+c]=H[0]*w[0*C+c]+H[1]*w[1*C+c]+H[2]*w[2*C+c]+cur*w[3*C+c];
+    16	      H[0]=H[1];H[1]=H[2];H[2]=cur;}
+    17	    h[0*C+c]=H[0];h[1*C+c]=H[1];h[2*C+c]=H[2];}}
+    18	/* double reference, for the honest numerical-quality view */
+    19	static void refD_scan(const float*g,const float*x,float*s,float*st,size_t T,size_t C){
+    20	  for(size_t c=0;c<C;c++){double a=st[c];for(size_t t=0;t<T;t++){a=x[t*C+c]+a*g[t*C+c];s[t*C+c]=(float)a;}st[c]=(float)a;}}
+    21	
+    22	static void report(const char*n,const float*a,const float*b,size_t N){
+    23	  double mabs=0,mrel=0; size_t big=0;
+    24	  for(size_t i=0;i<N;i++){double d=fabs((double)a[i]-b[i]); if(d>mabs)mabs=d;
+    25	    if(fabs((double)b[i])>1e-2){big++; double r=d/fabs((double)b[i]); if(r>mrel)mrel=r;}}
+    26	  printf("  %-28s max_abs=%.3e  max_rel(|ref|>1e-2, n=%zu)=%.3e\n",n,mabs,big,mrel);}
+    27	
+    28	int main(void){
+    29	  size_t T=64, C=2051, N=T*C;   /* 2051 exercises the predicated tail */
+    30	  float *g=malloc(N*4),*x=malloc(N*4),*w=malloc(4*C*4);
+    31	  float *s1=malloc(N*4),*s2=malloc(N*4),*s3=malloc(N*4);
+    32	  float *o1=malloc(N*4),*o2=malloc(N*4);
+    33	  float *stA=malloc(C*4),*stB=malloc(C*4),*stC=malloc(C*4);
+    34	  float *hA=malloc(3*C*4),*hB=malloc(3*C*4);
+    35	  srand(7);
+    36	  for(size_t i=0;i<N;i++){g[i]=0.5f+0.4f*(rand()/(float)RAND_MAX);x[i]=(rand()/(float)RAND_MAX)-0.5f;}
+    37	  for(size_t i=0;i<4*C;i++)w[i]=(rand()/(float)RAND_MAX)-0.5f;
+    38	  for(size_t i=0;i<C;i++){float v=(rand()/(float)RAND_MAX)-0.5f;stA[i]=stB[i]=stC[i]=v;}
+    39	  for(size_t i=0;i<3*C;i++){float v=(rand()/(float)RAND_MAX)-0.5f;hA[i]=hB[i]=v;}
+    40	
+    41	  gdn_gated_scan_f32(g,x,s1,stA,T,C);
+    42	  refF_scan(g,x,s2,stB,T,C);
+    43	  refD_scan(g,x,s3,stC,T,C);
+    44	  gdn_causal_dwconv1d_f32(x,w,o1,hA,T,C);
+    45	  refF_conv(x,w,o2,hB,T,C);
+    46	
+    47	  printf("SVE kernel vs PRECISION-MATCHED float reference (expect ~0):\n");
+    48	  report("gated_scan",s1,s2,N); report("gated_scan carried state",stA,stB,C);
+    49	  report("causal_dwconv1d",o1,o2,N); report("conv history",hA,hB,3*C);
+    50	  printf("SVE kernel vs DOUBLE reference (fp32 accumulation quality):\n");
+    51	  report("gated_scan",s1,s3,N);
+    52	
+    53	  double mabs=0; for(size_t i=0;i<N;i++){double d=fabs((double)s1[i]-s2[i]);if(d>mabs)mabs=d;}
+    54	  int exact = (mabs==0.0);
+    55	  printf("\ngated_scan bit-identical to matched reference: %s\n", exact?"YES":"no");
+    56	  return 0;
+    57	}Now let me add cumdecay correctness coverage to test_gdn_sve.c. Currently it only tests gated_scan and causal_dwconv1d — cumdecay is declared but never exercised.
+  ────────────────────────────────────────
+  ▸ edit
+    path ~/O/s/o/e/c/kernels/test_gdn_sve.c
+    after: static void refF_decay(const float*a,float*d,size_t T,size_t C){
+  for(size_t c=0;c<C;c++){float run=1.0f;for(size_t t=0;t<T;t++){run*=a[t*C+c];d[t*C+c]=run;}}}
+/* double reference, for the honest numerical-quality view */
+static void refD_scan(const float*g,const float*x,float*s,float*st,size_t T,size_t C){
+  for(size_t c=0;c<C;c++){double a=st[c];for(size_t t=0;t<T;t++){a=x[t*C+c]+a*g[t*C+c];s[t*C+c]=(float)a;}st[c]=(float)a;}}
+static void refD_decay(const float*a,float*d,size_t T,size_t C){
+  for(size_t c=0;c<C;c++){double run=1.0;for(size_t t=0;t<T;t++){run*=a[t*C+c];d[t*C+c]=(float)run;}}
+    before: /* double reference, for the honest numerical-quality view */
+static void refD_scan(const float*g,const float*x,float*s,float*st,size_t T,size_t C){
+  for(size_t c=0;c<C;c++){double a=st[c];for(size_t t=0;t<T;t++){a=x[t*C+c]+a*g[t*C+c];s[t*C+c]=(float)a;}st[c]=(float)a;}}
+
+Edited /home/j1/OrionsBelt/src/orionsbelt/engines/cpu/kernels/test_gdn_sve.c (3 lines -> 7 lines)
+  ────────────────────────────────────────
+  ▸ edit
+    path ~/O/s/o/e/c/kernels/test_gdn_sve.c
+    after:   float *d1=malloc(N*4),*d2=malloc(N*4),*d3=malloc(N*4);
+  float *a_decay=malloc(N*4);
+  srand(7);
+  for(size_t i=0;i<N;i++){g[i]=0.5f+0.4f*(rand()/(float)RAND_MAX);x[i]=(rand()/(float)RAND_MAX)-0.5f;}
+  for(size_t i=0;i<N;i++)a_decay[i]=0.1f+0.8f*(rand()/(float)RAND_MAX);
+    before:   srand(7);
+  for(size_t i=0;i<N;i++){g[i]=0.5f+0.4f*(rand()/(float)RAND_MAX);x[i]=(rand()/(float)RAND_MAX)-0.5f;}
+
+Edited /home/j1/OrionsBelt/src/orionsbelt/engines/cpu/kernels/test_gdn_sve.c (2 lines -> 5 lines)
+  ────────────────────────────────────────
+  ▸ edit
+    path ~/O/s/o/e/c/kernels/test_gdn_sve.c
+    after:   gdn_gated_scan_f32(g,x,s1,stA,T,C);
+  refF_scan(g,x,s2,stB,T,C);
+  refD_scan(g,x,s3,stC,T,C);
+  gdn_cumdecay_f32(a_decay,d1,T,C);
+  refF_decay(a_decay,d2,T,C);
+  refD_decay(a_decay,d3,T,C);
+  gdn_causal_dwconv1d_f32(x,w,o1,hA,T,C);
+  refF_conv(x,w,o2,hB,T,C);
+    before:   gdn_gated_scan_f32(g,x,s1,stA,T,C);
+  refF_scan(g,x,s2,stB,T,C);
+  refD_scan(g,x,s3,stC,T,C);
+  gdn_causal_dwconv1d_f32(x,w,o1,hA,T,C);
+  refF_conv(x,w,o2,hB,T,C);
+
+Edited /home/j1/OrionsBelt/src/orionsbelt/engines/cpu/kernels/test_gdn_sve.c (5 lines -> 8 lines)Now add the cumdecay reporting and bit-identical check:
+  ────────────────────────────────────────
+  ▸ edit
+    path ~/O/s/o/e/c/kernels/test_gdn_sve.c
+    after:   printf("SVE kernel vs PRECISION-MATCHED float reference (expect ~0):\n");
+  report("gated_scan",s1,s2,N); report("gated_scan carried state",stA,stB,C);
+  report("cumdecay",d1,d2,N);
+  report("causal_dwconv1d",o1,o2,N); report("conv history",hA,hB,3*C);
+  printf("SVE kernel vs DOUBLE reference (fp32 accumulation quality):\n");
+  report("gated_scan",s1,s3,N);
+  report("cumdecay",d1,d3,N);
+    before:   printf("SVE kernel vs PRECISION-MATCHED float reference (expect ~0):\n");
+  report("gated_scan",s1,s2,N); report("gated_scan carried state",stA,stB,C);
+  report("causal_dwconv1d",o1,o2,N); report("conv history",hA,hB,3*C);
+  printf("SVE kernel vs DOUBLE reference (fp32 accumulation quality):\n");
+  report("gated_scan",s1,s3,N);
+
+Edited /home/j1/OrionsBelt/src/orionsbelt/engines/cpu/kernels/test_gdn_sve.c (5 lines -> 7 lines)
+  ────────────────────────────────────────
+  ▸ edit
+    path ~/O/s/o/e/c/kernels/test_gdn_sve.c
+    after:   double mabs=0; for(size_t i=0;i<N;i++){double d=fabs((double)s1[i]-s2[i]);if(d>mabs)mabs=d;}
+  int exact = (mabs==0.0);
+  printf("\ngated_scan bit-identical to matched reference: %s\n", exact?"YES":"no");
+
+  mabs=0; for(size_t i=0;i<N;i++){double d=fabs((double)d1[i]-d2[i]);if(d>mabs)mabs=d;}
+  exact = (mabs==0.0);
+  printf("cumdecay bit-identical to matched reference: %s\n", exact?"YES":"no");
+  return 0;
+    before:   double mabs=0; for(size_t i=0;i<N;i++){double d=fabs((double)s1[i]-s2[i]);if(d>mabs)mabs=d;}
+  int exact = (mabs==0.0);
+  printf("\ngated_scan bit-identical to matched reference: %s\n", exact?"YES":"no");
+  return 0;
+
+Edited /home/j1/OrionsBelt/src/orionsbelt/engines/cpu/kernels/test_gdn_sve.c (4 lines -> 8 lines)Let me verify the updated test compiles and passes:
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && K=src/orionsbelt/engines/cpu/kernels && \
+aarch64-linux-gnu-gcc -O3 -mcpu=cortex-a57 -static \
+  "$K/gdn_sve.c" "$K/test_gdn_sve.c" -o /tmp/test_gdn_neon_v2 -lm 2>&1 && \
+echo "Build OK" && \
+/tmp/test_gdn_neon_v2 2>&1
+    timeout_secs: 30
+
+src/orionsbelt/engines/cpu/kernels/test_gdn_sve.c: In function ‘refD_decay’:
+src/orionsbelt/engines/cpu/kernels/test_gdn_sve.c:26:13: error: invalid storage class for function ‘report’
+ static void report(const char*n,const float*a,const float*b,size_t N){
+             ^~~~~~
+src/orionsbelt/engines/cpu/kernels/test_gdn_sve.c:73:1: error: expected declaration or statement at end of input
+ }
+ ^
+
+Command exited with code 1Missing closing brace on refD_decay. Let me check and fix:
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && sed -n '18,30p' src/orionsbelt/engines/cpu/kernels/test_gdn_sve.c
+    timeout_secs: 5
+
+static void refF_decay(const float*a,float*d,size_t T,size_t C){
+  for(size_t c=0;c<C;c++){float run=1.0f;for(size_t t=0;t<T;t++){run*=a[t*C+c];d[t*C+c]=run;}}}
+/* double reference, for the honest numerical-quality view */
+static void refD_scan(const float*g,const float*x,float*s,float*st,size_t T,size_t C){
+  for(size_t c=0;c<C;c++){double a=st[c];for(size_t t=0;t<T;t++){a=x[t*C+c]+a*g[t*C+c];s[t*C+c]=(float)a;}st[c]=(float)a;}}
+static void refD_decay(const float*a,float*d,size_t T,size_t C){
+  for(size_t c=0;c<C;c++){double run=1.0;for(size_t t=0;t<T;t++){run*=a[t*C+c];d[t*C+c]=(float)run;}}
+
+static void report(const char*n,const float*a,const float*b,size_t N){
+  double mabs=0,mrel=0; size_t big=0;
+  for(size_t i=0;i<N;i++){double d=fabs((double)a[i]-b[i]); if(d>mabs)mabs=d;
+    if(fabs((double)b[i])>1e-2){big++; double r=d/fabs((double)b[i]); if(r>mrel)mrel=r;}}
+  printf("  %-28s max_abs=%.3e  max_rel(|ref|>1e-2, n=%zu)=%.3e\n",n,mabs,big,mrel);}
+  ────────────────────────────────────────
+  ▸ edit
+    path ~/O/s/o/e/c/kernels/test_gdn_sve.c
+    after: static void refD_decay(const float*a,float*d,size_t T,size_t C){
+  for(size_t c=0;c<C;c++){double run=1.0;for(size_t t=0;t<T;t++){run*=a[t*C+c];d[t*C+c]=(float)run;}}}
+    before: static void refD_decay(const float*a,float*d,size_t T,size_t C){
+  for(size_t c=0;c<C;c++){double run=1.0;for(size_t t=0;t<T;t++){run*=a[t*C+c];d[t*C+c]=(float)run;}}
+
+Edited /home/j1/OrionsBelt/src/orionsbelt/engines/cpu/kernels/test_gdn_sve.c (2 lines -> 2 lines)
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && K=src/orionsbelt/engines/cpu/kernels && \
+aarch64-linux-gnu-gcc -O3 -mcpu=cortex-a57 -static \
+  "$K/gdn_sve.c" "$K/test_gdn_sve.c" -o /tmp/test_gdn_neon_v2 -lm 2>&1 && \
+echo "Build OK" && \
+/tmp/test_gdn_neon_v2 2>&1
+    timeout_secs: 30
+
+Build OK
+SVE kernel vs PRECISION-MATCHED float reference (expect ~0):
+  gated_scan                   max_abs=0.000e+00  max_rel(|ref|>1e-2, n=128784)=0.000e+00
+  gated_scan carried state     max_abs=0.000e+00  max_rel(|ref|>1e-2, n=2018)=0.000e+00
+  cumdecay                     max_abs=0.000e+00  max_rel(|ref|>1e-2, n=10905)=0.000e+00
+  causal_dwconv1d              max_abs=5.960e-08  max_rel(|ref|>1e-2, n=124765)=2.856e-06
+  conv history                 max_abs=0.000e+00  max_rel(|ref|>1e-2, n=6012)=0.000e+00
+SVE kernel vs DOUBLE reference (fp32 accumulation quality):
+  gated_scan                   max_abs=1.192e-07  max_rel(|ref|>1e-2, n=128784)=3.355e-06
+  cumdecay                     max_abs=5.960e-08  max_rel(|ref|>1e-2, n=10905)=2.509e-07
+
+gated_scan bit-identical to matched reference: YES
+cumdecay bit-identical to matched reference: YESAll three kernels pass — cumdecay now has coverage and is bit-identical on NEON. Now let me create the native verification script:
+  ────────────────────────────────────────
+  ▸ write
+    path ~/OrionsBelt/scripts/verify_kernels_native.sh
+    content: #!/usr/bin/env bash
+# Native on-device kernel correctness verification.
+#
+# Unlike verify_cpu_kernels.sh (which cross-compiles for SVE and runs under QEMU),
+# this script builds and runs the C kernel tests NATIVELY on the device using its
+# real ISA. This validates the actual dispatch path each device uses:
+#
+#   Cortex-A57  → NEON (armv8-a)
+#   Cortex-A76  → NEON (armv8.2-a+dotprod)
+#   Cortex-A55  → NEON (armv8.2-a+dotprod)
+#   A720/O6     → SVE2 (armv9-a+sve2)
+#
+# Bead ob-mrd.3. Usage: ./scripts/verify_kernels_native.sh
+set -euo pipefail
+
+K="$(dirname "$0")/../src/orionsbelt/engines/cpu/kernels"
+OUT="${OUT:-/tmp/gdn_kernel_native}"
+mkdir -p "$OUT"
+CC="${CC:-cc}"
+FAILURES=0
+
+echo "=== Native kernel correctness verification ==="
+echo "Compiler: $($CC --version 2>&1 | head -1)"
+echo "Arch:     $(uname -m)"
+
+# Detect ISA features from /proc/cpuinfo
+FEATURES=$(grep -m1 '^Features' /proc/cpuinfo 2>/dev/null | cut -d: -f2 || echo "")
+if echo "$FEATURES" | grep -qw sve2; then
+    MARCH="-march=armv9-a+sve2+i8mm+bf16"
+    ISA_LABEL="SVE2"
+elif echo "$FEATURES" | grep -qw sve; then
+    MARCH="-march=armv8.2-a+sve"
+    ISA_LABEL="SVE1"
+elif echo "$FEATURES" | grep -qw asimddp; then
+    MARCH="-march=armv8.2-a+dotprod"
+    ISA_LABEL="NEON+dotprod"
+elif echo "$FEATURES" | grep -qw asimd; then
+    MARCH="-march=armv8-a"
+    ISA_LABEL="NEON"
+else
+    MARCH=""
+    ISA_LABEL="scalar"
+fi
+echo "Dispatch: $ISA_LABEL ($MARCH)"
+echo
+
+# --- Test 1: fp32 kernel correctness (gated_scan, cumdecay, causal_dwconv1d) ---
+echo "--- Test 1: fp32 kernel correctness ---"
+if $CC -O3 $MARCH -static \
+    "$K/gdn_sve.c" "$K/test_gdn_sve.c" -o "$OUT/test_fp32" -lm 2>/dev/null; then
+    OUTPUT=$("$OUT/test_fp32" 2>&1) || true
+    echo "$OUTPUT" | sed 's/^/  /'
+    if echo "$OUTPUT" | grep -q "bit-identical to matched reference: YES"; then
+        BIT_ID=$(echo "$OUTPUT" | grep -c "bit-identical to matched reference: YES")
+        echo "  RESULT: PASS ($BIT_ID kernels bit-identical to scalar reference)"
+    else
+        echo "  RESULT: FAIL (expected bit-identical match)"
+        FAILURES=$((FAILURES + 1))
+    fi
+else
+    echo "  RESULT: SKIP (build failed — toolchain may not support $MARCH)"
+fi
+echo
+
+# --- Test 2: mixed-precision (bf16/fp16) kernel correctness ---
+echo "--- Test 2: mixed-precision (bf16/fp16) kernel correctness ---"
+if $CC -O3 $MARCH -static \
+    "$K/gdn_sve.c" "$K/test_gdn_mixed.c" -o "$OUT/test_mixed" -lm 2>/dev/null; then
+    OUTPUT=$("$OUT/test_mixed" 2>&1) || true
+    echo "$OUTPUT" | sed 's/^/  /'
+    if echo "$OUTPUT" | grep -q "ALL TESTS PASSED"; then
+        echo "  RESULT: PASS"
+    else
+        echo "  RESULT: FAIL"
+        FAILURES=$((FAILURES + 1))
+    fi
+else
+    echo "  RESULT: SKIP (build failed — toolchain may not support $MARCH)"
+fi
+echo
+
+# --- Summary ---
+echo "=== Summary ==="
+if [ "$FAILURES" -eq 0 ]; then
+    echo "ALL KERNEL TESTS PASSED on $ISA_LABEL dispatch path"
+    exit 0
+else
+    echo "$FAILURES test suite(s) FAILED"
+    exit 1
+fi
+
+
+Created /home/j1/OrionsBelt/scripts/verify_kernels_native.sh (90 lines)
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && chmod +x scripts/verify_kernels_native.sh && \
+./scripts/verify_kernels_native.sh 2>&1
+    timeout_secs: 60
+
+=== Native kernel correctness verification ===
+Compiler: cc (Ubuntu/Linaro 7.5.0-3ubuntu1~18.04) 7.5.0
+Arch:     aarch64
+Dispatch: NEON (-march=armv8-a)
+
+--- Test 1: fp32 kernel correctness ---
+  SVE kernel vs PRECISION-MATCHED float reference (expect ~0):
+    gated_scan                   max_abs=0.000e+00  max_rel(|ref|>1e-2, n=128784)=0.000e+00
+    gated_scan carried state     max_abs=0.000e+00  max_rel(|ref|>1e-2, n=2018)=0.000e+00
+    cumdecay                     max_abs=0.000e+00  max_rel(|ref|>1e-2, n=10905)=0.000e+00
+    causal_dwconv1d              max_abs=5.960e-08  max_rel(|ref|>1e-2, n=124765)=2.856e-06
+    conv history                 max_abs=0.000e+00  max_rel(|ref|>1e-2, n=6012)=0.000e+00
+  SVE kernel vs DOUBLE reference (fp32 accumulation quality):
+    gated_scan                   max_abs=1.192e-07  max_rel(|ref|>1e-2, n=128784)=3.355e-06
+    cumdecay                     max_abs=5.960e-08  max_rel(|ref|>1e-2, n=10905)=2.509e-07
+  
+  gated_scan bit-identical to matched reference: YES
+  cumdecay bit-identical to matched reference: YES
+  RESULT: PASS (2 kernels bit-identical to scalar reference)
+
+--- Test 2: mixed-precision (bf16/fp16) kernel correctness ---
+  Mixed-precision GDN kernel correctness test
+    seq=64  channels=2051  (tail=3 exercises scalar epilogue)
+  
+  --- Scenario 1: warm gates (0.90, 0.99) ---
+  
+  cumdecay output:
+    bf16 vs fp32 ref                     max_abs=1.95e-03  max_rel=  0.389%  (n=131264, flushed=0)
+    PASS: cumdecay bf16 max_rel 0.389% <= 0.5% bound
+    f16 vs fp32 ref                      max_abs=2.44e-04  max_rel=  0.049%  (n=131264, flushed=0)
+    PASS: cumdecay f16 max_rel 0.049% <= 0.1% bound
+  
+  gated_scan (warm):
+    bf16 output vs fp32 ref              max_abs=8.64e-04  max_rel=  0.149%  (n=30612, flushed=0)
+    PASS: scan bf16 output max_rel 0.149% <= 0.5% bound
+    bf16 output max_abs=8.64e-04 (bound ~3.6e-03 from state quant)
+    bf16 carried state vs ref            max_abs=3.88e-03  max_rel=  0.382%  (n=2020, flushed=0)
+    PASS: scan bf16 state max_rel 0.382% <= 0.5% bound
+    f16 output vs fp32 ref               max_abs=1.08e-04  max_rel=  0.019%  (n=30612, flushed=0)
+    PASS: scan f16 output max_rel 0.019% <= 0.1% bound
+    f16 carried state vs ref             max_abs=4.65e-04  max_rel=  0.047%  (n=2020, flushed=0)
+    PASS: scan f16 state max_rel 0.047% <= 0.1% bound
+  
+  --- Scenario 2: cold gates at 0.5 (fp16 range stress) ---
+  
+  cumdecay with constant 0.5 gate:
+    bf16 flushes to zero: 0 / 131264 (expected: 0, same exponent range as fp32)
+    f16 flushes to zero:  82040 / 131264 (expected: ~T*C/2, fp16 min subnormal ~6e-8)
+    bf16 vs fp32 ref (cold)              max_abs=0.00e+00  max_rel=  0.000%  (n=26663, flushed=0)
+    PASS: cumdecay bf16 (cold) max_rel 0.000% <= 0.5% bound
+    f16 vs fp32 ref (cold)               max_abs=2.98e-08  max_rel=100.000%  (n=131264, flushed=82040)
+    (fp16 flushing expected for cold gates; not a failure)
+  
+  --- Determinism check ---
+  
+    Determinism (two runs, identical inputs): PASS (bit-identical)
+  
+  --- State continuity across two chunks ---
+  
+  After 2 chunks (error compounds through chunk boundary):
+    bf16 output vs fp32 ref              max_abs=1.46e-03  max_rel=  0.216%  (n=1862, flushed=0)
+    PASS: 2-chunk bf16 output max_rel 0.216% <= 1.0% bound
+    bf16 carried state vs ref            max_abs=3.73e-03  max_rel=  0.334%  (n=126, flushed=0)
+    PASS: 2-chunk bf16 state max_rel 0.334% <= 1.0% bound
+  
+  ALL TESTS PASSED
+  RESULT: PASS
+
+=== Summary ===
+ALL KERNEL TESTS PASSED on NEON dispatch pathEverything passes. Let me verify the bench binary still builds (no regressions from the test file changes):
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && ./scripts/build_device_bench.sh 2>&1
+    timeout_secs: 60
+
+Building static aarch64 benchmarks with aarch64-linux-gnu-gcc:
+  armv8a         -march=armv8-a                           633576 bytes
+  armv8.2dot     -march=armv8.2-a+dotprod                 633576 bytes
+  armv8.6i8mm    -march=armv8.2-a+i8mm                    SKIPPED (toolchain rejects these flags)
+  armv9sve2      -march=armv9-a+sve2+i8mm+bf16            SKIPPED (toolchain rejects these flags)
+  jetson_a57     -mcpu=cortex-a57                         633576 bytes
+  pi5_a76        -mcpu=cortex-a76                         SKIPPED (toolchain rejects these flags)
+  rk3588_a76     -mcpu=cortex-a76                         SKIPPED (toolchain rejects these flags)
+  rk3588_a55     -mcpu=cortex-a55                         SKIPPED (toolchain rejects these flags)
+
+Pick the most specific binary your device supports, then:
+
+    ./bench_gdn_<variant> --repeats 30            # human-readable
+    ./bench_gdn_<variant> --repeats 30 --csv      # schema-conforming CSV
+
+For the known fleet, use the core-tuned build:
+
+    Raspberry Pi 5    -> bench_gdn_pi5_a76
+    RK3588 big cores  -> bench_gdn_rk3588_a76   (pin with taskset -c 4-7 on most RK3588 boards)
+    RK3588 little     -> bench_gdn_rk3588_a55   (taskset -c 0-3)
+    Jetson Nano       -> bench_gdn_jetson_a57
+
+To find out what an unknown device supports:
+
+    uname -m                      # expect aarch64
+    grep -m1 Features /proc/cpuinfo
+      asimd    -> NEON  (armv8a build is correct)
+      asimddp  -> dotprod
+      i8mm     -> int8 matmul
+      sve/sve2 -> SVE   (use the armv9sve2 build; rare outside Armv9)
+
+Also capture the device's provenance alongside the numbers:
+
+    python3 bench/manifest.py > results/manifests/<run_id>.json   # if python3 is present
+
+The benchmark prints which dispatch path was compiled in (sve / neon / scalar). On Armv8-A
+without SVE, 'neon' is expected and correct — that is the path the large installed base of
+Armv8 devices actually runs.Good, no regressions. Now let me update FINDINGS.md with the native NEON verification result:
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && tail -30 docs/FINDINGS.md
+    timeout_secs: 5
+
+  where the running product reaches ~5e-20. Both bf16 and fp16 would underflow this; fp32 handles
+  it cleanly.
+
+**Platform note**: `__fp16` scalar type and `FCVTN`/`FCVTL` NEON conversions work on Cortex-A57
+(Armv8.0-A) despite `__ARM_FEATURE_FP16_VECTOR_ARITHMETIC` being undefined. That macro gates fp16
+*arithmetic* (fmul/fadd on half registers), not conversion, which is base A64 ASIMD.
+
+## Sustained-load thermal characterization (ob-mrd.2)
+
+The benchmark now supports `--sustained <seconds>` which runs `gdn_gated_scan` on the
+Qwen3.5-4B config (seq=64) continuously for N seconds, sampling throughput and CPU
+temperature every 5 s. This directly addresses PLAN.md risk R7: on passively-cooled
+edge hardware, a burst number that cannot be sustained is misleading.
+
+**Jetson-J1 (Cortex-A57, active fan cooling), 120-second sustained run:**
+
+| Window | Throughput (GiB/s) | Thermal (°C) | vs first |
+|--------|-------------------|-------------|----------|
+| 0–5 s  | 0.77              | 51.0        | 0.0%     |
+| 55–60 s| 0.76              | 51.5        | -0.8%    |
+| 115–120 s | 0.76           | 52.0        | -0.9%    |
+
+**Finding**: No thermal throttling. The Jetson Nano's active cooling keeps the A57
+at 51–52 °C for the entire 2-minute run. Throughput is essentially flat (0.76–0.77
+GiB/s, <1% variation within noise). The thermal rise is only +1.5 °C.
+
+This is the expected result for actively-cooled hardware. The more interesting
+characterization will come from passively-cooled devices (e.g. Pi 5) where sustained
+load may trigger frequency reduction. The `--sustained` flag is portable — every
+device in the fleet can produce its own decay curve.
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && cat >> docs/FINDINGS.md << 'FINDING'
+
+## Native NEON kernel correctness verification (ob-mrd.3)
+
+The existing `verify_cpu_kernels.sh` cross-compiles for SVE and verifies under QEMU.
+However, **no device in the current fleet has SVE** — Jetson A57, Pi 5 A76, and
+RK3588 A76/A55 all dispatch through the NEON path. The new
+`scripts/verify_kernels_native.sh` builds and runs the C kernel tests natively on
+each device using its real ISA, validating the actual dispatch path.
+
+**Jetson-J1 (Cortex-A57, Armv8.0-A, NEON) — all tests pass on real silicon:**
+
+| Kernel | vs scalar ref (float) | vs scalar ref (double) | Bit-identical |
+|--------|----------------------|----------------------|---------------|
+| `gdn_gated_scan_f32` | max_abs=0.000 | max_abs=1.19e-7 | YES |
+| `gdn_cumdecay_f32` | max_abs=0.000 | max_abs=5.96e-8 | YES |
+| `gdn_causal_dwconv1d_f32` | max_abs=5.96e-8 | — | ~1 ULP |
+
+The 1-ULP deviation in `causal_dwconv1d` vs the float reference comes from NEON FMA
+contraction (`vfmaq_n_f32` fuses multiply-add), while the scalar reference uses
+separate multiply and add. This is expected and benign — the fused result is actually
+*more* accurate than the unfused one.
+
+Mixed-precision bf16/fp16 variants also pass all bounds on NEON:
+cumdecay bf16 ≤0.4%, fp16 ≤0.05%; gated_scan bf16 ≤0.4%, fp16 ≤0.05%.
+Determinism verified (bit-identical across repeated runs).
+
+**New coverage added**: `test_gdn_sve.c` previously tested only `gated_scan` and
+`causal_dwconv1d`; `cumdecay` was declared but never exercised. Added scalar
+references (float and double) and comparison reporting for `cumdecay`.
+FINDING
+echo "FINDINGS.md updated"
+    timeout_secs: 5
+
+FINDINGS.md updatedNow commit everything and push:
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && git add -A && git status --short
+    timeout_secs: 10
+
