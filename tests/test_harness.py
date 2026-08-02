@@ -26,6 +26,7 @@ from bench.harness import (  # noqa: E402
     _rows_from_timing,
     compute_summaries,
     generate_prompt,
+    load_config_from_dict,
     main,
     run_one_repeat,
     run_sweep,
@@ -504,3 +505,61 @@ class TestCLI:
         with pytest.raises(SystemExit) as exc_info:
             main(["--help"])
         assert exc_info.value.code == 0
+
+
+class TestLoadConfigFromDict:
+    """Tests for load_config_from_dict (ob-xh3.2)."""
+
+    def test_extracts_gdn_and_fa_counts(self):
+        cfg = load_config_from_dict(
+            {
+                "text_config": {"layer_types": ["linear_attention"] * 3 + ["full_attention"]},
+            }
+        )
+        assert cfg.num_gdn_layers == 3
+        assert cfg.num_full_attention_layers == 1
+
+    def test_extracts_linear_dimensions(self):
+        cfg = load_config_from_dict(
+            {
+                "text_config": {
+                    "layer_types": ["linear_attention", "full_attention"],
+                    "linear_num_value_heads": 32,
+                    "linear_key_head_dim": 128,
+                    "linear_value_head_dim": 128,
+                },
+            }
+        )
+        assert cfg.linear_num_value_heads == 32
+        assert cfg.linear_key_head_dim == 128
+
+    def test_extracts_fa_dimensions(self):
+        cfg = load_config_from_dict(
+            {
+                "text_config": {
+                    "layer_types": ["full_attention"],
+                    "num_key_value_heads": 4,
+                    "head_dim": 256,
+                },
+            }
+        )
+        assert cfg.fa_n_kv_heads == 4
+        assert cfg.fa_head_dim == 256
+
+    def test_maps_ssm_dtype(self):
+        cfg = load_config_from_dict(
+            {
+                "text_config": {"layer_types": [], "mamba_ssm_dtype": "float32"},
+            }
+        )
+        assert cfg.state_dtype_bytes == 4
+
+    def test_no_text_config_nest(self):
+        """Config without text_config wrapper should still work."""
+        cfg = load_config_from_dict(
+            {
+                "layer_types": ["linear_attention", "full_attention"],
+            }
+        )
+        assert cfg.num_gdn_layers == 1
+        assert cfg.num_full_attention_layers == 1

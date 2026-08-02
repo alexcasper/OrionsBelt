@@ -110,6 +110,42 @@ _MODEL_PRESETS: dict[str, ModelConfig] = {
     "0.8b": QWEN35_08B,
 }
 
+_DTYPE_BYTES = {"float32": 4, "fp32": 4, "bfloat16": 2, "bf16": 2, "float16": 2, "fp16": 2}
+
+
+def load_config_from_dict(data: dict, name: str = "") -> ModelConfig:
+    """Generate a ModelConfig from a raw Qwen3.5 ``config.json`` dict.
+
+    Reads ``layer_types`` to count GDN vs full-attention layers, extracts
+    the linear and full-attention dimension fields, and maps
+    ``mamba_ssm_dtype`` to ``state_dtype_bytes``. Verified against both
+    Qwen3.5-4B and Qwen3.5-0.8B configs from HuggingFace (ob-37v, ob-xh3.2).
+    """
+    # The real config nests text params under "text_config" for multimodal checkpoints.
+    tc = data.get("text_config", data)
+
+    layer_types: list[str] = tc.get("layer_types", [])
+    num_gdn = layer_types.count("linear_attention")
+    num_fa = layer_types.count("full_attention")
+
+    state_dtype = tc.get("mamba_ssm_dtype", "float32")
+    state_dtype_bytes = _DTYPE_BYTES.get(state_dtype, 4)
+
+    return ModelConfig(
+        name=name or data.get("model_type", "unknown"),
+        num_gdn_layers=num_gdn,
+        num_full_attention_layers=num_fa,
+        linear_num_value_heads=tc.get("linear_num_value_heads", 0),
+        linear_key_head_dim=tc.get("linear_key_head_dim", 0),
+        linear_value_head_dim=tc.get("linear_value_head_dim", 0),
+        fa_n_kv_heads=tc.get("num_key_value_heads", 0),
+        fa_head_dim=tc.get("head_dim", 0),
+        state_dtype_bytes=state_dtype_bytes,
+        cache_dtype_bytes=2,
+        weight_dtype_bytes=2,
+        vocab_size=tc.get("vocab_size", 151936),
+    )
+
 
 # ---------------------------------------------------------------------------
 # Backend protocol
