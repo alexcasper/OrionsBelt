@@ -148,6 +148,57 @@ architecture class itself. Verified via the ModelScope file API — see
 
 > Which layers go on which engine? Do GDN scan layers run on GPU/CPU while the periodic full-attention layers and MoE FFN blocks (dense matmul, NPU-friendly) go to the NPU — and what does the handoff cost?
 
+### 3.1 Working hypothesis: CPU-resident GDN, accelerator-offloaded attention
+
+Adopted 2026-08-02. The mapping ADR (`ob-o4g`) must still confirm it with measurements, but the
+prior is now explicit rather than open:
+
+**Armv9.2 CPU hosts the GDN linear layers. The GPU and/or NPU take the periodic full-attention
+layers and the dense FFN blocks.** Not the other way round.
+
+Three independent arguments converge on this.
+
+**1. It is the Arm-relevant answer, and this is an Arm competition.** On the CIX P1 the Cortex-A720
+/ A520 cores *and* the Immortalis G720 GPU are both Arm IP; the NPU is the only non-Arm engine in
+the SoC. Optimizing the NPU means tuning a third party's accelerator. Hand-writing a gated
+delta-rule scan against **SVE2 and i8mm on Cortex-A720**, plus a Vulkan compute path on
+**Immortalis**, is optimizing Arm's architecture directly — which is what the 40-point
+"Arm-specific optimization" criterion actually rewards.
+
+**2. The workload shape fits.** GDN's chunkwise recurrence is sequential across chunks and, at
+decode, memory-bandwidth-bound (§2.4). Those are precisely the two properties that wide parallel
+accelerators handle worst and a low-latency out-of-order core handles well. The CPU also reaches
+the full LPDDR5 bandwidth with no dispatch or transfer overhead. Conversely the 8 full-attention
+layers do large dense matmuls over a KV cache — the NPU's actual strength.
+
+**3. Recurrent state wants to stay resident.** The GDN state is carried across every token through
+24 layers. Any mapping that moves it between engines per token pays that cost 24 times a step.
+Keeping the state in CPU-visible memory eliminates the problem by construction — and it is the
+subtle correctness hazard too, since nothing in CIX's model hub (§3.1 of the verification doc)
+demonstrates how to thread recurrent state across NOE invocations at all.
+
+**The cost this hypothesis must answer: boundary crossings.** A 3:1 stack alternates 3 GDN → 1
+attention, eight times, so a CPU/accelerator split crosses the engine boundary **16 times per
+token** (8 out, 8 back). The payload is small — roughly 5KB in FP16 at the 4B checkpoint's hidden
+size of 2560 — so the cost is *invocation latency*, not bandwidth. During decode a single NPU
+dispatch may well exceed the cost of the single-token attention matmul it performs.
+
+That points at a **phase-dependent mapping**, which is a sharper and more defensible design than a
+static one:
+
+| Phase | Attention layers | GDN layers | Rationale |
+|---|---|---|---|
+| **Prefill** | NPU (or GPU) | CPU, SVE2/i8mm | Matmuls are large enough to amortize dispatch; this is also where kernel work actually pays (§2.4) |
+| **Decode** | likely CPU/GPU, NPU only if measured to win | CPU, state-resident | 16 dispatches for one token's worth of work is probably a loss; must be measured, not assumed |
+
+This gives `t-dispatcher` a concrete, physically-motivated policy instead of "route by load", and it
+gives us a real number to publish either way: **the measured per-crossing cost is a publishable
+result on its own**, and nobody appears to have reported it for this SoC.
+
+**Robustness bonus.** A CPU-first GDN kernel is testable on any Armv9 device with SVE2, not just
+the O6. So under this hypothesis the project's central contribution degrades gracefully if the
+board never arrives — the Edge AI hedge can carry it.
+
 Answering that with measurements, and documenting the op-coverage gaps we find, is reusable value for anyone porting a GDN-class model to Arm.
 
 ---
