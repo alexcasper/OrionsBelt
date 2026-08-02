@@ -480,3 +480,27 @@ note: state narrowing is a *memory-residency* optimization (halving resident sta
 **Platform note**: `__fp16` scalar type and `FCVTN`/`FCVTL` NEON conversions work on Cortex-A57
 (Armv8.0-A) despite `__ARM_FEATURE_FP16_VECTOR_ARITHMETIC` being undefined. That macro gates fp16
 *arithmetic* (fmul/fadd on half registers), not conversion, which is base A64 ASIMD.
+
+## Sustained-load thermal characterization (ob-mrd.2)
+
+The benchmark now supports `--sustained <seconds>` which runs `gdn_gated_scan` on the
+Qwen3.5-4B config (seq=64) continuously for N seconds, sampling throughput and CPU
+temperature every 5 s. This directly addresses PLAN.md risk R7: on passively-cooled
+edge hardware, a burst number that cannot be sustained is misleading.
+
+**Jetson-J1 (Cortex-A57, active fan cooling), 120-second sustained run:**
+
+| Window | Throughput (GiB/s) | Thermal (°C) | vs first |
+|--------|-------------------|-------------|----------|
+| 0–5 s  | 0.77              | 51.0        | 0.0%     |
+| 55–60 s| 0.76              | 51.5        | -0.8%    |
+| 115–120 s | 0.76           | 52.0        | -0.9%    |
+
+**Finding**: No thermal throttling. The Jetson Nano's active cooling keeps the A57
+at 51–52 °C for the entire 2-minute run. Throughput is essentially flat (0.76–0.77
+GiB/s, <1% variation within noise). The thermal rise is only +1.5 °C.
+
+This is the expected result for actively-cooled hardware. The more interesting
+characterization will come from passively-cooled devices (e.g. Pi 5) where sustained
+load may trigger frequency reduction. The `--sustained` flag is portable — every
+device in the fleet can produce its own decay curve.
