@@ -161,8 +161,8 @@ already contains anything we need for the CPU-hosted GDN scan (`ob-8qt.1`).
 
 ### 3.1 Compiler and target flags
 
-**Clang/LLVM ≥17 or GCC ≥13, with `-mcpu=cortex-a720`.** That single flag is sufficient — verified
-by dumping clang 18's predefined feature macros for that target:
+**Clang/LLVM ≥17 with `-mcpu=cortex-a720`.** That single flag is sufficient — verified by dumping
+clang 18's predefined feature macros for that target:
 
 ```
 __ARM_FEATURE_SVE2 1              __ARM_FEATURE_MATMUL_INT8 1
@@ -174,6 +174,13 @@ __ARM_FEATURE_DOTPROD 1           __ARM_FEATURE_FP16_FML 1
 
 Equivalent explicit form: `-march=armv9.2-a+sve2+i8mm+bf16`. Arm Compiler for Linux (ACfL) is
 Arm's own LLVM-based toolchain and is a defensible choice for an Arm submission.
+
+**GCC caveat (corrected 2026-08-02).** GCC **13 does not know `-mcpu=cortex-a720`** — it was added
+in GCC 14. GCC 13 rejects it outright (`unknown value 'cortex-a720' for '-mcpu'`, suggesting
+`cortex-a72`, which would be badly wrong to accept silently). On GCC 13 use the **arch-level flag**
+`-march=armv9.2-a+sve2+i8mm+bf16`, which is accepted and gives the same ISA. Verified by compiling
+our kernels both ways. So: clang ≥17 or **GCC ≥14** for the CPU-name flag; GCC 13 needs the
+`-march` form.
 
 Cross-compiling from x86 needs an aarch64 sysroot. Note the DSP SDK archive ships
 `ext/mirror/cix_sysroot.tgz`, which is a CIX-matched sysroot and therefore a better match than a
@@ -243,3 +250,85 @@ reusable by anyone running a linear-attention model on any non-SME Armv9 CPU, no
 It also composes with §1: the NPU cannot express the recurrence *and* Arm's kernel library has no
 recurrence primitive, so on this platform the sequential scan has no existing home at all. That is
 the gap.
+
+---
+
+## 4. The three CPU kernels: implemented and numerically verified (2026-08-02)
+
+**Bead `ob-8qt.1`. Written and verified with no Orion O6 board** — QEMU emulates SVE2, so
+correctness is checkable today; only *performance* needs real silicon.
+
+Source: [`src/orionsbelt/engines/cpu/kernels/gdn_sve2.c`](../src/orionsbelt/engines/cpu/kernels/gdn_sve2.c).
+Verify with [`scripts/verify_cpu_kernels.sh`](../scripts/verify_cpu_kernels.sh).
+
+### The layout decision that makes all three easy
+
+A prefix scan across *vector lanes* needs a log-depth Hillis-Steele shuffle network, which is
+where these kernels look intimidating. **We never do that.** GDN's sequence axis is inherently
+sequential, so we vectorize across the **channel/head** axis and walk the sequence with a plain
+scalar loop. Every kernel then reduces to independent lane-wise FMAs with **no cross-lane
+communication anywhere** — and the 2048-channel width of Qwen3.5-4B's linear layers (16 key heads
+× 128) gives far more parallelism than a 4-lane vector can absorb.
+
+This is why "the recurrence is hard for accelerators" and "the recurrence is easy on a CPU" are
+both true. The dependency is along a dimension the CPU was going to iterate anyway.
+
+### The three kernels
+
+| Kernel | Recurrence | Implementation |
+|---|---|---|
+| `gdn_cumdecay_f32` | `decay[t] = decay[t-1] * a[t]` | one predicated `svmul` per step |
+| `gdn_gated_scan_f32` | `s[t] = g[t]*s[t-1] + x[t]` | one predicated `svmla` per step; `state[]` carries across calls |
+| `gdn_causal_dwconv1d_f32` | 4-tap depthwise, causal | 4 FMAs per step; `hist[]` is a 3-timestep ring, the conv-state analogue of a KV cache |
+
+Design notes worth keeping:
+
+- **The decay accumulator is fp32 even when surrounding state is fp16.** A decay of 0.5 compounded
+  over 64 steps is ~5e-20, which underflows fp16 entirely. Computed as a direct product rather
+  than `exp(cumsum(log a))`: at chunk length 64 the direct form is both cheaper and accurate, and
+  avoids two transcendentals per element.
+- **`state[]` and `hist[]` are explicit caller-owned buffers**, which is precisely the
+  cross-invocation state continuity the NOE toolchain has no mechanism for (§1). On the CPU it is
+  just a pointer.
+- The conv ring buffer shifts by **register renaming** (`h0=h1; h1=h2; h2=cur`), so there are no
+  cross-lane or memory ops in the inner loop.
+- Written **vector-length-agnostic**, so they widen for free on a core with longer vectors even
+  though Cortex-A720 is 128-bit.
+- The scan is deliberately the *outer* sequential half only, kept separate from per-chunk dense
+  math so the mapping ADR can offload the inner matmuls without touching this (PLAN.md §3.1).
+
+### Verification results
+
+Checked against an independently written scalar reference at 2048 channels and **2051** (a
+deliberately awkward width that exercises the SVE2 predicated tail):
+
+| Check | Result |
+|---|---|
+| `gated_scan` vs precision-matched reference | **bit-identical** (`max_abs = 0.0`) |
+| `gated_scan` carried state | **bit-identical** |
+| `causal_dwconv1d` vs matched reference | `max_abs = 5.96e-08` — one fp32 ULP, from `svmla` FMA contraction |
+| conv history state | **bit-identical** |
+| `gated_scan` vs double reference | `max_abs = 1.19e-07`, `max_rel = 3.1e-06` — honest fp32 accumulation quality over 64 steps |
+| **Causality** | perturbing the last input changes `t = T-1` and leaks **exactly 0.0** into all earlier outputs |
+| SVE2 @ 256-bit | identical results — confirms genuine vector-length agnosticism |
+| Scalar fallback (`-march=armv8-a`) | bit-identical on every tensor |
+
+> **Method note.** The first test run reported failures at a 1e-5 relative tolerance. That was the
+> *test* being wrong, not the kernels: the reference accumulated in `double` while the kernel used
+> `float`, and both quantities cross zero, so relative error near zero is meaningless. Re-running
+> against a precision-matched reference gave bit-identical results. Worth recording because the
+> naive version of this test would have sent us hunting a nonexistent bug.
+
+### What is verified and what is not
+
+**Verified:** numerical correctness, causality, predicated-tail handling, vector-length
+agnosticism, and scalar-fallback equivalence.
+
+**Not verified:** anything about speed. QEMU emulates the ISA but tells you nothing useful about
+Cortex-A720 cycle counts, cache behaviour, or memory bandwidth. No performance claim can be made
+until the kernels run on real silicon (`ob-41j`, `ob-c9k`).
+
+Also still open: these are fp32. The i8mm/dotprod paths for the delta-rule matmuls are separate
+(`ob-8qt.2`, reusing KleidiAI's 109 A720-usable matmul micro-kernels rather than reimplementing),
+and a bf16/fp16 state variant is worth measuring since it halves state traffic — the dominant cost
+in GDN decode.
