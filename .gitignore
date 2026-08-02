@@ -12,3 +12,6 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 dist/
+
+# Downloaded model weights — never committed (license compliance, repo size)
+weights/
