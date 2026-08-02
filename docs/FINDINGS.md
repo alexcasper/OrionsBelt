@@ -442,3 +442,41 @@ The middle row is the important one: the KV-cache-versus-recurrent-state result 
 the NPU, the GPU, or Armv9 at all. It is a property of the architecture, so **an Armv8 device can
 demonstrate the project's central claim end to end** — which is what moves the Edge AI track from a
 credible plan to a credible result.
+
+### Mixed-precision recurrent-state kernels (ob-8qt.4)
+
+Four narrow-state variants of `gdn_cumdecay` and `gdn_gated_scan` were added (bf16/fp16). All
+accumulate in fp32 — only the storage format narrows. Measured on Jetson A57 (NEON):
+
+| Kernel (4B, seq=64) | Format | p50 (µs) | GiB/s | vs fp32 |
+|---|---|---:|---:|---|
+| cumdecay | fp32 | 1800 | 1.09 | — |
+| cumdecay | bf16 | 1259 | 1.16 | +6% bw, −30% time |
+| cumdecay | f16 | 1006 | 1.46 | +34% bw, −44% time |
+| gated_scan | fp32 | 3925 | 0.75 | — |
+| gated_scan | bf16 | 3987 | 0.74 | ≈ same |
+| gated_scan | f16 | 3948 | 0.75 | ≈ same |
+
+**Cumdecay benefits from narrower output** (less write traffic). Fp16 is fastest because
+`vcvt_f16_f32` maps to the single-cycle `FCVTN` instruction on base A64, while bf16 uses software
+rounding (integer NEON ops).
+
+**Gated_scan shows no measurable difference at seq=64** because state read+write is only ~1% of
+total traffic at prefill chunk size. The benefit concentrates at **decode (seq=1)** where state
+I/O is ~40% of traffic — halving it saves ~20% per token. This confirms the bead's re-scoping
+note: state narrowing is a *memory-residency* optimization (halving resident state from 48 MB to
+24 MB across 24 layers), not a step-change in decode bandwidth.
+
+**Precision findings:**
+- bf16 state: 0.38% max relative error (7 mantissa bits). No values flush to zero — bf16 shares
+  fp32's 8-bit exponent, so even 0.5^64 ≈ 5e-20 is representable.
+- fp16 state: 0.05% max relative error (10 mantissa bits, more precise than bf16). However, fp16's
+  5-bit exponent means small decay products flush to zero: 0.5^20 ≈ 9.5e-7 is near the subnormal
+  floor. For gates in (0.9, 0.99) this is not an issue.
+- **The decay accumulator MUST stay fp32**: confirmed by stress test with constant-0.5 gates,
+  where the running product reaches ~5e-20. Both bf16 and fp16 would underflow this; fp32 handles
+  it cleanly.
+
+**Platform note**: `__fp16` scalar type and `FCVTN`/`FCVTL` NEON conversions work on Cortex-A57
+(Armv8.0-A) despite `__ARM_FEATURE_FP16_VECTOR_ARITHMETIC` being undefined. That macro gates fp16
+*arithmetic* (fmul/fadd on half registers), not conversion, which is base A64 ASIMD.
