@@ -32,6 +32,8 @@
  */
 
 #include <stddef.h>
+#include <string.h>   /* memcpy for bf16 software conversion */
+#include <stdint.h>
 
 #ifdef __ARM_FEATURE_SVE
 #include <arm_sve.h>
@@ -39,6 +41,46 @@
 #ifdef __ARM_NEON
 #include <arm_neon.h>
 #endif
+
+/* ===========================================================================
+ * Mixed-precision state variants (bead ob-8qt.4)
+ *
+ * The persistent GDN recurrent state is the memory we want to halve: 48 MB fp32
+ * → 24 MB fp16/bf16 across 24 layers (Qwen3.5-4B).  The CRITICAL precision
+ * constraint is that the decay accumulator stays fp32 — a gate of 0.5 compounded
+ * over 64 steps is ~5e-20 and underflows fp16 outright.
+ *
+ * Design: narrow storage, wide compute.  State is loaded from fp16/bf16, widened
+ * to fp32 for the inner loop (identical arithmetic to the fp32 kernel), and
+ * narrowed back on store.  The state conversion is O(channels) per chunk —
+ * negligible against the O(channels × seq) inner loop — while the persistent
+ * memory footprint is halved.
+ *
+ * bf16 has 8 exponent bits (same range as fp32) but only 7 mantissa bits.
+ * fp16 has 5 exponent bits (narrower range) but 10 mantissa bits.
+ * For GDN state, bf16 is generally the better choice: recurrent values stay
+ * in [−1, 1] (bounded by gating), so fp16's extra mantissa precision matters
+ * more than bf16's wider range — but we implement both and let the benchmark
+ * decide.
+ * ==========================================================================*/
+
+/* --- Software bf16 conversion (works on any ISA, no hardware bf16 needed) --- */
+
+static inline uint16_t f32_to_bf16_rne(float f) {
+    uint32_t u;
+    memcpy(&u, &f, sizeof(u));
+    /* Round-to-nearest-even: add bias that rounds the truncated bits. */
+    uint32_t lsb = (u >> 16) & 1;
+    uint32_t rounding_bias = 0x7FFFu + lsb;
+    return (uint16_t)((u + rounding_bias) >> 16);
+}
+
+static inline float bf16_to_f32(uint16_t b) {
+    uint32_t u = (uint32_t)b << 16;
+    float f;
+    memcpy(&f, &u, sizeof(f));
+    return f;
+}
 
 /* ---------------------------------------------------------------------------
  * 1. Gated cumulative decay  (inclusive prefix product along the sequence)
@@ -239,6 +281,243 @@ void gdn_causal_dwconv1d_f32(const float *restrict in, const float *restrict w,
             h[2] = cur;
         }
         for (int j = 0; j < GDN_CONV_K - 1; ++j) hist[(size_t)j * channels + c] = h[j];
+    }
+#endif
+}
+
+/* ===========================================================================
+ * 4a. fp16-state gated scan  (mixed precision: fp16 storage, fp32 accumulate)
+ *
+ *   s[t][c] = g[t][c] * s[t-1][c] + x[t][c]
+ *
+ * Identical arithmetic to gdn_gated_scan_f32; only the state load/store is
+ * narrowed to fp16.  The fp32 accumulator runs in registers across the entire
+ * seq loop, so the narrowing cost is O(channels), not O(channels × seq).
+ * ==========================================================================*/
+void gdn_gated_scan_f16(const float *restrict g, const float *restrict x,
+                        float *restrict s, __fp16 *restrict state, size_t seq,
+                        size_t channels) {
+#ifdef __ARM_FEATURE_SVE
+    for (size_t c = 0; c < channels; c += svcntw()) {
+        svbool_t pg = svwhilelt_b32((unsigned)c, (unsigned)channels);
+        /* Widen fp16 state to fp32 via a tiny stack buffer.
+         * SVE fp16→fp32 conversion (svcvt_f32_f16) has 2:1 interleaving
+         * semantics that make a direct vectorised conversion complex; the
+         * O(channels) scalar cost is negligible vs the O(channels×seq) inner
+         * loop.  64 floats covers the largest practical SVE VL (2048-bit). */
+        float tmp[64];
+        unsigned vl = svcntw();
+        for (unsigned j = 0; j < vl && c + j < channels; ++j)
+            tmp[j] = (float)state[c + j];
+        svfloat32_t acc = svld1_f32(pg, tmp);
+        for (size_t t = 0; t < seq; ++t) {
+            svfloat32_t gv = svld1_f32(pg, g + t * channels + c);
+            svfloat32_t xv = svld1_f32(pg, x + t * channels + c);
+            acc = svmla_f32_x(pg, xv, acc, gv);
+            svst1_f32(pg, s + t * channels + c, acc);
+        }
+        svst1_f32(pg, tmp, acc);
+        for (unsigned j = 0; j < vl && c + j < channels; ++j)
+            state[c + j] = (__fp16)tmp[j];
+    }
+#elif defined(__ARM_NEON)
+    size_t c = 0;
+    for (; c + 4 <= channels; c += 4) {
+        float16x4_t s16 = vld1_f16(state + c);
+        float32x4_t acc = vcvt_f32_f16(s16);
+        for (size_t t = 0; t < seq; ++t) {
+            acc = vfmaq_f32(vld1q_f32(x + t * channels + c), acc,
+                            vld1q_f32(g + t * channels + c));
+            vst1q_f32(s + t * channels + c, acc);
+        }
+        vst1_f16(state + c, vcvt_f16_f32(acc));
+    }
+    for (; c < channels; ++c) {
+        float a = (float)state[c];
+        for (size_t t = 0; t < seq; ++t) {
+            a = x[t * channels + c] + a * g[t * channels + c];
+            s[t * channels + c] = a;
+        }
+        state[c] = (__fp16)a;
+    }
+#else
+    for (size_t c = 0; c < channels; ++c) {
+        float acc = (float)state[c];
+        for (size_t t = 0; t < seq; ++t) {
+            acc = x[t * channels + c] + acc * g[t * channels + c];
+            s[t * channels + c] = acc;
+        }
+        state[c] = (__fp16)acc;
+    }
+#endif
+}
+
+/* ===========================================================================
+ * 4b. fp16-output cumulative decay  (mixed precision: fp16 output, fp32 accum)
+ *
+ *   decay[t][c] = prod_{i<=t} a[i][c]
+ *
+ * The running product accumulates in fp32 registers.  Only the STORE to the
+ * decay[] array is narrowed to fp16, halving its memory footprint and the
+ * bandwidth of the subsequent read by the delta-rule consumer.
+ * ==========================================================================*/
+void gdn_cumdecay_f16(const float *restrict a, __fp16 *restrict decay, size_t seq,
+                      size_t channels) {
+#ifdef __ARM_FEATURE_SVE
+    for (size_t c = 0; c < channels; c += svcntw()) {
+        svbool_t pg = svwhilelt_b32((unsigned)c, (unsigned)channels);
+        svfloat32_t run = svdup_f32(1.0f);
+        for (size_t t = 0; t < seq; ++t) {
+            svfloat32_t av = svld1_f32(pg, a + t * channels + c);
+            run = svmul_f32_x(pg, run, av);
+            /* Store fp32 output, then narrow to fp16 separately */
+            float tmp[64];
+            svst1_f32(pg, tmp, run);
+            unsigned vl = svcntw();
+            for (unsigned j = 0; j < vl && c + j < channels; ++j)
+                decay[t * channels + c + j] = (__fp16)tmp[j];
+        }
+    }
+#elif defined(__ARM_NEON)
+    size_t c = 0;
+    for (; c + 4 <= channels; c += 4) {
+        float32x4_t run = vdupq_n_f32(1.0f);
+        for (size_t t = 0; t < seq; ++t) {
+            run = vmulq_f32(run, vld1q_f32(a + t * channels + c));
+            vst1_f16(decay + t * channels + c, vcvt_f16_f32(run));
+        }
+    }
+    for (; c < channels; ++c) {
+        float run = 1.0f;
+        for (size_t t = 0; t < seq; ++t) {
+            run *= a[t * channels + c];
+            decay[t * channels + c] = (__fp16)run;
+        }
+    }
+#else
+    for (size_t c = 0; c < channels; ++c) {
+        float run = 1.0f;
+        for (size_t t = 0; t < seq; ++t) {
+            run *= a[t * channels + c];
+            decay[t * channels + c] = (__fp16)run;
+        }
+    }
+#endif
+}
+
+/* ===========================================================================
+ * 5a. bf16-state gated scan  (mixed precision: bf16 storage, fp32 accumulate)
+ *
+ * Same structure as the fp16 variant, but state is stored as bf16 (uint16_t).
+ * bf16 has the same exponent range as fp32 (8 bits) but only 7 mantissa bits,
+ * so it preserves range at the cost of precision — the opposite trade-off from
+ * fp16 (5 exp / 10 mantissa).  For GDN state in [−1, 1], fp16's extra mantissa
+ * precision is usually preferable, but we implement both and let measurement
+ * decide.
+ *
+ * Uses software bf16 conversion (f32_to_bf16_rne / bf16_to_f32) so it runs on
+ * any Armv8-A core without hardware bf16 support.
+ * ==========================================================================*/
+void gdn_gated_scan_bf16(const float *restrict g, const float *restrict x,
+                         float *restrict s, uint16_t *restrict state, size_t seq,
+                         size_t channels) {
+#ifdef __ARM_FEATURE_SVE
+    for (size_t c = 0; c < channels; c += svcntw()) {
+        svbool_t pg = svwhilelt_b32((unsigned)c, (unsigned)channels);
+        float tmp[64];
+        unsigned vl = svcntw();
+        for (unsigned j = 0; j < vl && c + j < channels; ++j)
+            tmp[j] = bf16_to_f32(state[c + j]);
+        svfloat32_t acc = svld1_f32(pg, tmp);
+        for (size_t t = 0; t < seq; ++t) {
+            svfloat32_t gv = svld1_f32(pg, g + t * channels + c);
+            svfloat32_t xv = svld1_f32(pg, x + t * channels + c);
+            acc = svmla_f32_x(pg, xv, acc, gv);
+            svst1_f32(pg, s + t * channels + c, acc);
+        }
+        svst1_f32(pg, tmp, acc);
+        for (unsigned j = 0; j < vl && c + j < channels; ++j)
+            state[c + j] = f32_to_bf16_rne(tmp[j]);
+    }
+#elif defined(__ARM_NEON)
+    size_t c = 0;
+    for (; c + 4 <= channels; c += 4) {
+        float tmp[4];
+        for (int j = 0; j < 4; ++j) tmp[j] = bf16_to_f32(state[c + j]);
+        float32x4_t acc = vld1q_f32(tmp);
+        for (size_t t = 0; t < seq; ++t) {
+            acc = vfmaq_f32(vld1q_f32(x + t * channels + c), acc,
+                            vld1q_f32(g + t * channels + c));
+            vst1q_f32(s + t * channels + c, acc);
+        }
+        vst1q_f32(tmp, acc);
+        for (int j = 0; j < 4; ++j) state[c + j] = f32_to_bf16_rne(tmp[j]);
+    }
+    for (; c < channels; ++c) {
+        float a = bf16_to_f32(state[c]);
+        for (size_t t = 0; t < seq; ++t) {
+            a = x[t * channels + c] + a * g[t * channels + c];
+            s[t * channels + c] = a;
+        }
+        state[c] = f32_to_bf16_rne(a);
+    }
+#else
+    for (size_t c = 0; c < channels; ++c) {
+        float acc = bf16_to_f32(state[c]);
+        for (size_t t = 0; t < seq; ++t) {
+            acc = x[t * channels + c] + acc * g[t * channels + c];
+            s[t * channels + c] = acc;
+        }
+        state[c] = f32_to_bf16_rne(acc);
+    }
+#endif
+}
+
+/* ===========================================================================
+ * 5b. bf16-output cumulative decay  (mixed precision: bf16 output, fp32 accum)
+ * ==========================================================================*/
+void gdn_cumdecay_bf16(const float *restrict a, uint16_t *restrict decay, size_t seq,
+                       size_t channels) {
+#ifdef __ARM_FEATURE_SVE
+    for (size_t c = 0; c < channels; c += svcntw()) {
+        svbool_t pg = svwhilelt_b32((unsigned)c, (unsigned)channels);
+        svfloat32_t run = svdup_f32(1.0f);
+        for (size_t t = 0; t < seq; ++t) {
+            svfloat32_t av = svld1_f32(pg, a + t * channels + c);
+            run = svmul_f32_x(pg, run, av);
+            float tmp[64];
+            svst1_f32(pg, tmp, run);
+            unsigned vl = svcntw();
+            for (unsigned j = 0; j < vl && c + j < channels; ++j)
+                decay[t * channels + c + j] = f32_to_bf16_rne(tmp[j]);
+        }
+    }
+#elif defined(__ARM_NEON)
+    size_t c = 0;
+    for (; c + 4 <= channels; c += 4) {
+        float32x4_t run = vdupq_n_f32(1.0f);
+        float tmp[4];
+        for (size_t t = 0; t < seq; ++t) {
+            run = vmulq_f32(run, vld1q_f32(a + t * channels + c));
+            vst1q_f32(tmp, run);
+            for (int j = 0; j < 4; ++j)
+                decay[t * channels + c + j] = f32_to_bf16_rne(tmp[j]);
+        }
+    }
+    for (; c < channels; ++c) {
+        float run = 1.0f;
+        for (size_t t = 0; t < seq; ++t) {
+            run *= a[t * channels + c];
+            decay[t * channels + c] = f32_to_bf16_rne(run);
+        }
+    }
+#else
+    for (size_t c = 0; c < channels; ++c) {
+        float run = 1.0f;
+        for (size_t t = 0; t < seq; ++t) {
+            run *= a[t * channels + c];
+            decay[t * channels + c] = f32_to_bf16_rne(run);
+        }
     }
 #endif
 }

@@ -2,9 +2,17 @@
 #include <stdlib.h>
 #include <math.h>
 #include <stddef.h>
+#include <stdint.h>
+#include <string.h>
 void gdn_cumdecay_f32(const float*,float*,size_t,size_t);
 void gdn_gated_scan_f32(const float*,const float*,float*,float*,size_t,size_t);
 void gdn_causal_dwconv1d_f32(const float*,const float*,float*,float*,size_t,size_t);
+
+/* fp16/bf16 state variants (ob-8qt.4) */
+void gdn_gated_scan_f16(const float*,const float*,float*,__fp16*,size_t,size_t);
+void gdn_cumdecay_f16(const float*,__fp16*,size_t,size_t);
+void gdn_gated_scan_bf16(const float*,const float*,float*,uint16_t*,size_t,size_t);
+void gdn_cumdecay_bf16(const float*,uint16_t*,size_t,size_t);
 
 /* precision-MATCHED scalar reference (float accumulators, like the kernel) */
 static void refF_scan(const float*g,const float*x,float*s,float*st,size_t T,size_t C){
@@ -53,5 +61,94 @@ int main(void){
   double mabs=0; for(size_t i=0;i<N;i++){double d=fabs((double)s1[i]-s2[i]);if(d>mabs)mabs=d;}
   int exact = (mabs==0.0);
   printf("\ngated_scan bit-identical to matched reference: %s\n", exact?"YES":"no");
+
+  /* ====================================================================
+   * Mixed-precision state variants (ob-8qt.4)
+   *
+   * fp16/bf16 state should approximate fp32 closely — the state carries a
+   * running value in [−1, 1] (bounded by gating), so narrowing it loses a few
+   * ULPs per step but does not blow up over 64 tokens.
+   *
+   * The test: run fp32, fp16, and bf16 variants on the SAME inputs and initial
+   * state, then compare the narrowed variants against fp32.  Also compare
+   * against the double reference to see how much total error each adds.
+   * ==================================================================== */
+  printf("\nMixed-precision state variants vs fp32 (ob-8qt.4):\n");
+
+  /* --- gated_scan: fp16 state --- */
+  float *sF16=malloc(N*4),*sBF16=malloc(N*4);
+  float *stF32=malloc(C*4),*stBF32=malloc(C*4);
+  __fp16 *stH=malloc(C*sizeof(__fp16));
+  uint16_t *stBraw=malloc(C*sizeof(uint16_t));
+  /* same initial state for all variants */
+  for(size_t i=0;i<C;i++){
+    float v=(rand()/(float)RAND_MAX)-0.5f;
+    stF32[i]=stBF32[i]=v;
+    stH[i]=(__fp16)v;     /* fp16 init */
+  }
+  for(size_t i=0;i<C;i++){
+    /* simulate bf16 init: convert to bf16 and back */
+    uint32_t u; float fv=stF32[i]; memcpy(&u,&fv,4);
+    uint32_t lsb=(u>>16)&1, bias=0x7FFF+lsb;
+    uint16_t bf=(uint16_t)((u+bias)>>16);
+    uint32_t u2=(uint32_t)bf<<16; float fb; memcpy(&fb,&u2,4);
+    stBF32[i]=fb;
+    stBraw[i]=bf;
+  }
+
+  /* fp32 baseline (re-run with matching initial state) */
+  float *sRef=malloc(N*4);
+  gdn_gated_scan_f32(g,x,sRef,stF32,T,C);
+
+  /* fp16 state */
+  gdn_gated_scan_f16(g,x,sF16,stH,T,C);
+  printf("  fp16-state gated_scan:\n");
+  report("    vs fp32",sF16,sRef,N);
+
+  /* bf16 state */
+  gdn_gated_scan_bf16(g,x,sBF16,stBraw,T,C);
+  printf("  bf16-state gated_scan:\n");
+  report("    vs fp32",sBF16,sRef,N);
+
+  /* --- cumulative decay: fp16 and bf16 output --- */
+  __fp16 *dH=malloc(N*sizeof(__fp16));
+  uint16_t *dB=malloc(N*sizeof(uint16_t));
+  float *dF=malloc(N*4),*dFfromH=malloc(N*4),*dFfromB=malloc(N*4);
+  /* decay input: values in (0.90, 0.99) so the cumulative product stays in fp32 range */
+  float *aDecay=malloc(N*sizeof(float));
+  for(size_t i=0;i<N;i++) aDecay[i]=0.90f+0.09f*(float)((i*2654435761u)%1000)/1000.0f;
+  gdn_cumdecay_f32(aDecay,dF,T,C);
+  gdn_cumdecay_f16(aDecay,dH,T,C);
+  gdn_cumdecay_bf16(aDecay,dB,T,C);
+  for(size_t i=0;i<N;i++){dFfromH[i]=(float)dH[i];}
+  for(size_t i=0;i<N;i++){
+    uint32_t u=(uint32_t)dB[i]<<16; memcpy(&dFfromB[i],&u,4);
+  }
+  printf("  fp16-output cumdecay:\n");
+  report("    vs fp32",dFfromH,dF,N);
+  printf("  bf16-output cumdecay:\n");
+  report("    vs fp32",dFfromB,dF,N);
+
+  /* --- drift over repeated chunks (simulate multi-chunk decode) --- */
+  /* Reset state and run 8 chunks back-to-back to see if narrowing error
+   * compounds catastrophically. Each chunk reuses the same g,x patterns. */
+  printf("\nMulti-chunk drift (8 chunks, same data per chunk):\n");
+  for(size_t i=0;i<C;i++){
+    float v=(rand()/(float)RAND_MAX)-0.5f;
+    stF32[i]=v; stH[i]=(__fp16)v;
+  }
+  float drift_scan=0;
+  for(int chunk=0;chunk<8;chunk++){
+    gdn_gated_scan_f32(g,x,sRef,stF32,T,C);
+    gdn_gated_scan_f16(g,x,sF16,stH,T,C);
+    double m=0; for(size_t i=0;i<N;i++){double d=fabs((double)sRef[i]-sF16[i]);if(d>m)m=d;}
+    printf("  chunk %d: fp16 vs fp32 max_abs=%.3e\n",chunk+1,m);
+    if(m>drift_scan)drift_scan=m;
+  }
+  printf("  worst over 8 chunks: %.3e %s\n",(double)drift_scan,
+         drift_scan<1e-3?"(acceptable)":"(CHECK)");
+
+  free(sF16);free(sBF16);free(stF32);free(stBF32);free(stH);free(stBraw);
+  free(sRef);free(dH);free(dB);free(dF);free(dFfromH);free(dFfromB);free(aDecay);
   return 0;
 }

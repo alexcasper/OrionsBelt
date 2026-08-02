@@ -30,6 +30,12 @@ void gdn_cumdecay_f32(const float *, float *, size_t, size_t);
 void gdn_gated_scan_f32(const float *, const float *, float *, float *, size_t, size_t);
 void gdn_causal_dwconv1d_f32(const float *, const float *, float *, float *, size_t, size_t);
 
+/* fp16/bf16 state variants (ob-8qt.4): mixed precision, fp32 accumulation */
+void gdn_cumdecay_f16(const float *, __fp16 *, size_t, size_t);
+void gdn_gated_scan_f16(const float *, const float *, float *, __fp16 *, size_t, size_t);
+void gdn_cumdecay_bf16(const float *, uint16_t *, size_t, size_t);
+void gdn_gated_scan_bf16(const float *, const float *, float *, uint16_t *, size_t, size_t);
+
 /* Which path did the compiler actually select in gdn_sve.c? Mirrors its guard order exactly. */
 #if defined(__ARM_FEATURE_SVE)
 #define DISPATCH_PATH "sve"
@@ -80,13 +86,19 @@ static stats_t summarize(double *samples, int n) {
     return s;
 }
 
-typedef enum { K_DECAY, K_SCAN, K_CONV } kernel_id;
+typedef enum { K_DECAY, K_SCAN, K_CONV,
+               K_DECAY_F16, K_SCAN_F16, K_DECAY_BF16, K_SCAN_BF16, K_LAST } kernel_id;
 
 static const char *kernel_name(kernel_id k) {
     switch (k) {
-        case K_DECAY: return "gdn_cumdecay";
-        case K_SCAN: return "gdn_gated_scan";
-        case K_CONV: return "gdn_causal_dwconv1d";
+        case K_DECAY:      return "gdn_cumdecay";
+        case K_SCAN:       return "gdn_gated_scan";
+        case K_CONV:       return "gdn_causal_dwconv1d";
+        case K_DECAY_F16:  return "gdn_cumdecay_f16";
+        case K_SCAN_F16:   return "gdn_gated_scan_f16";
+        case K_DECAY_BF16: return "gdn_cumdecay_bf16";
+        case K_SCAN_BF16:  return "gdn_gated_scan_bf16";
+        case K_LAST:       break;
     }
     return "?";
 }
@@ -103,6 +115,15 @@ static double bytes_per_call(kernel_id k, size_t seq, size_t ch) {
         case K_SCAN: return e * (3.0 * (double)seq * (double)ch + 2.0 * (double)ch);
         /* read in[], write out[], weights + history are small and resident */
         case K_CONV: return e * (2.0 * (double)seq * (double)ch + 7.0 * (double)ch);
+        /* fp16/bf16 variants: state/output is 2 bytes instead of 4.
+         * The arithmetic stays fp32; only the persistent storage is narrowed. */
+        case K_DECAY_F16:  /* read a[] (fp32) + write decay[] (fp16) */
+            return e * (double)seq * (double)ch + 2.0 * (double)seq * (double)ch;
+        case K_DECAY_BF16: return e * (double)seq * (double)ch + 2.0 * (double)seq * (double)ch;
+        case K_SCAN_F16:   /* read g[], x[] (fp32) + write s[] (fp32) + state (fp16) */
+            return e * 3.0 * (double)seq * (double)ch + 2.0 * 2.0 * (double)ch;
+        case K_SCAN_BF16:  return e * 3.0 * (double)seq * (double)ch + 2.0 * 2.0 * (double)ch;
+        case K_LAST: break;
     }
     return 0.0;
 }
@@ -113,6 +134,10 @@ static double flops_per_call(kernel_id k, size_t seq, size_t ch) {
         case K_DECAY: return n;             /* one multiply per element */
         case K_SCAN: return 2.0 * n;        /* one FMA per element */
         case K_CONV: return 8.0 * n;        /* 4 taps, mul + 3 FMA */
+        /* fp16/bf16 variants: identical arithmetic to fp32 (mixed precision) */
+        case K_DECAY_F16:  case K_DECAY_BF16: return n;
+        case K_SCAN_F16:   case K_SCAN_BF16:  return 2.0 * n;
+        case K_LAST: break;
     }
     return 0.0;
 }
@@ -160,7 +185,12 @@ int main(int argc, char **argv) {
         float *state = malloc(ch * sizeof(float));
         float *w = malloc(4 * ch * sizeof(float));
         float *hist = malloc(3 * ch * sizeof(float));
-        if (!a || !out || !g || !x || !state || !w || !hist) {
+        __fp16 *state_f16 = malloc(ch * sizeof(__fp16));
+        uint16_t *state_bf16 = malloc(ch * sizeof(uint16_t));
+        __fp16 *decay_f16 = malloc(n * sizeof(__fp16));
+        uint16_t *decay_bf16 = malloc(n * sizeof(uint16_t));
+        if (!a || !out || !g || !x || !state || !w || !hist ||
+            !state_f16 || !state_bf16 || !decay_f16 || !decay_bf16) {
             fprintf(stderr, "allocation failed for %s (needs ~%.0f MiB)\n", cfgs[c].model,
                     (double)(4 * n + 8 * ch) * sizeof(float) / 1048576.0);
             return 1;
@@ -175,19 +205,26 @@ int main(int argc, char **argv) {
         for (size_t i = 0; i < ch; ++i) state[i] = 0.0f;
         for (size_t i = 0; i < 4 * ch; ++i) w[i] = 0.1f;
         for (size_t i = 0; i < 3 * ch; ++i) hist[i] = 0.0f;
+        for (size_t i = 0; i < ch; ++i) state_f16[i] = 0.0f;
+        for (size_t i = 0; i < ch; ++i) state_bf16[i] = 0;
 
         if (!csv)
             printf("%s  (seq=%zu, channels=%zu, %zu GDN layers)\n", cfgs[c].model, seq, ch,
                    cfgs[c].gdn_layers);
 
-        for (kernel_id k = K_DECAY; k <= K_CONV; ++k) {
+        for (kernel_id k = K_DECAY; k < K_LAST; ++k) {
             double samples[MAX_REPEATS];
             for (int r = 0; r < WARMUPS + repeats; ++r) {
                 double t0 = now_s();
                 switch (k) {
-                    case K_DECAY: gdn_cumdecay_f32(a, out, seq, ch); break;
-                    case K_SCAN: gdn_gated_scan_f32(g, x, out, state, seq, ch); break;
-                    case K_CONV: gdn_causal_dwconv1d_f32(x, w, out, hist, seq, ch); break;
+                    case K_DECAY:      gdn_cumdecay_f32(a, out, seq, ch); break;
+                    case K_SCAN:       gdn_gated_scan_f32(g, x, out, state, seq, ch); break;
+                    case K_CONV:       gdn_causal_dwconv1d_f32(x, w, out, hist, seq, ch); break;
+                    case K_DECAY_F16:  gdn_cumdecay_f16(a, decay_f16, seq, ch); break;
+                    case K_SCAN_F16:   gdn_gated_scan_f16(g, x, out, state_f16, seq, ch); break;
+                    case K_DECAY_BF16: gdn_cumdecay_bf16(a, decay_bf16, seq, ch); break;
+                    case K_SCAN_BF16:  gdn_gated_scan_bf16(g, x, out, state_bf16, seq, ch); break;
+                    case K_LAST: break;
                 }
                 double dt = now_s() - t0;
                 if (r >= WARMUPS) samples[r - WARMUPS] = dt;
@@ -215,6 +252,7 @@ int main(int argc, char **argv) {
             printf("\n");
         }
         free(a); free(out); free(g); free(x); free(state); free(w); free(hist);
+        free(state_f16); free(state_bf16); free(decay_f16); free(decay_bf16);
     }
 
     if (!csv) {
