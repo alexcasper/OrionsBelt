@@ -515,11 +515,13 @@ back-of-envelope roofline-style model, not a live measurement — the assumption
 stated so the calculation can be checked and does not need to be taken on faith.
 
 **Assumptions:**
-- Recurrent state per GDN layer: `H × d_k × d_v = 262,144` elements (the verified figure
+- Recurrent state per GDN layer: `n_value_heads × d_k × d_v` elements. **For the selected primary
+  checkpoint Qwen3.5-4B that is `32 × 128 × 128 = 524,288`** (ADR 0003, read from `config.json`).
+  The fallback 0.8B has 16 value heads → 262,144. (Superseded figure
   for the checkpoint configuration this project targets — PLAN.md's verified facts,
   corroborated independently in `docs/FINDINGS.md` §3 / ADR 0001, `H·d_k·d_v =
-  16·128·128 = 262,144`).
-- State stored in fp32 (4 bytes/element) → `262,144 × 4 = 1,048,576` bytes = 1 MiB per
+  16·128·128 = 262,144`, which matches the 0.8B and the GDN-2 paper's 1.3B config, **not** the 4B.)
+- State stored in fp32 (4 bytes/element) → `524,288 × 4 = 2,097,152` bytes = 2 MiB per
   layer, matching the verified "~24MB across 24 GDN layers" figure (`24 × 1 MiB ≈
   24 MiB`).
 - One multiply-accumulate (MAC) per state element per token for the dominant
@@ -531,13 +533,13 @@ stated so the calculation can be checked and does not need to be taken on faith.
 
 | Quantity | Value |
 |---|---:|
-| State elements | 262,144 |
-| MACs (gated-decay update) | ≈ 262,144 |
-| FLOPs (2 × MACs) | ≈ 524,288 |
+| State elements | 524,288 |
+| MACs (gated-decay update) | ≈ 524,288 |
+| FLOPs (2 × MACs) | ≈ 1,048,576 |
 | Bytes read (old state `S_{t-1}`) | 1,048,576 (1 MiB) |
 | Bytes written (new state `S_t`) | 1,048,576 (1 MiB) |
-| **Total bytes moved** | **2,097,152 (2 MiB)** |
-| **Arithmetic intensity** | **524,288 / 2,097,152 ≈ 0.25 FLOP/byte** |
+| **Total bytes moved** | **4,194,304 (4 MiB)** |
+| **Arithmetic intensity** | **1,048,576 / 4,194,304 ≈ 0.25 FLOP/byte** |
 
 (Key/value/gate vectors touched in the same step are `O(d_k + d_v) ≈ 256` floats ≈ 1 KiB
 — roughly three orders of magnitude smaller than the 2 MiB of state traffic, and
@@ -550,8 +552,8 @@ factor of 2, which is irrelevant against the gaps involved.)
 
 | Quantity | Value |
 |---|---:|
-| MACs | 24 × 262,144 = 6,291,456 |
-| Bytes moved (read + write) | 24 × 2,097,152 = 50,331,648 (48 MiB) |
+| MACs | 24 × 524,288 = 12,582,912 |
+| Bytes moved (read + write) | 24 × 4,194,304 = 100,663,296 (96 MiB) |
 | Arithmetic intensity | unchanged, ≈ 0.25 FLOP/byte (both terms scale identically with layer count) |
 
 **0.25 FLOP/byte is far below where compute becomes the bottleneck on any general-purpose
@@ -574,7 +576,7 @@ per-token time floor:
 
 ```
 50,331,648 bytes / 100×10⁹ bytes/s ≈ 5.03×10⁻⁴ s = 0.503 ms/token
-→ a ceiling of ≈ 1,987 decode tokens/sec from state traffic alone
+→ a ceiling of ≈ 993 decode tokens/sec from state traffic alone
 ```
 
 This is an **upper bound**, not a prediction of achieved decode throughput — it ignores
@@ -600,3 +602,49 @@ grows, even though its absolute size does not change. This is exactly why
 `docs/FINDINGS.md` §4 flags a bf16/fp16 state variant (halving state traffic) as a still-
 open, worthwhile follow-up: it is the one lever in this picture that isn't already being
 pulled by weight quantization work.
+
+---
+
+## Appendix: two robustness notes on the arithmetic-intensity argument
+
+Added 2026-08-02 after recomputing against the selected checkpoint (ADR 0003).
+
+### The intensity ratio is invariant across checkpoints
+
+The absolute figures above are 4B-specific, but the *conclusion* does not depend on them. Both the
+MAC count and the byte count scale linearly with state size, so the ratio is identical:
+
+| Checkpoint | State/layer | MACs/layer/token | Bytes/layer/token | Intensity |
+|---|---:|---:|---:|---:|
+| Qwen3.5-4B (32 v-heads, 24 GDN layers) | 524,288 | 524,288 | 4,194,304 | **0.25 FLOP/byte** |
+| Qwen3.5-0.8B (16 v-heads, 18 GDN layers) | 262,144 | 262,144 | 2,097,152 | **0.25 FLOP/byte** |
+
+That invariance is worth stating in the write-up: GDN decode is bandwidth-bound as a *structural
+property of the rank-1 state update*, not an artefact of one model's dimensions. Each state element
+is touched exactly once per token, so intensity is fixed at ~0.25 FLOP/byte regardless of scale.
+
+### State traffic is real but secondary — weights dominate decode
+
+Comparing the two decode traffic sources at 100 GB/s, this corrects an over-claim made earlier in
+the project:
+
+| Source | Traffic per token | Share |
+|---|---:|---:|
+| Weights, fp16 (4B) | 7.5 GiB | ~99% |
+| Weights, INT4 (4B) | 1.9 GiB | ~95% |
+| GDN state, fp32 (24 layers) | 96 MiB | ~5% at INT4 |
+| GDN state, bf16 (24 layers) | 48 MiB | ~2.4% at INT4 |
+
+Cross-check against a published figure: Qwen2-1.5B at fp16 is ~2.8 GiB of weights, giving ≈33
+tok/s at 100 GB/s — closely matching the vendor's cited ~30 tok/s for that model on this board.
+The weight-bandwidth model is therefore sound.
+
+**Consequence, stated plainly: narrowing the recurrent state to bf16 buys roughly 2–3% of decode
+traffic, not a step change.** Earlier project notes described the bf16 state variant as "the one
+lever that moves decode" — that was wrong. The dominant decode lever is **weight quantization**
+(INT4 weights are a ~4× traffic reduction and take decode from ~12.5 to ~50 tok/s by this model),
+which is where KleidiAI's INT4/i8mm GEMV micro-kernels genuinely earn their place.
+
+The bf16 state variant remains worth doing — it also halves the resident state footprint, which
+matters for fitting long context alongside weights — but it should be prioritised as a memory
+optimisation, not as a decode-throughput one. Bead `ob-8qt.4` has been re-scoped accordingly.
