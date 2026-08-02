@@ -12,3 +12,9 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 dist/
+
+# Agent tooling (not project artifacts)
+.goose-loop.log
+.goose-task.md
+goose-loop.sh
+.beads/.auto-import-issues.jsonl
