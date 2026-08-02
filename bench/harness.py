@@ -105,6 +105,22 @@ QWEN35_08B = ModelConfig(
     num_params=800_000_000,
 )
 
+
+def load_config_from_hub(repo_id: str, timeout: int = 10) -> ModelConfig:
+    """Fetch a checkpoint's config.json from HuggingFace and build a ModelConfig.
+
+    Stdlib-only (json + urllib). Requires network access — use
+    ``load_config_from_dict`` with a local file in offline/CI environments.
+    """
+    import json
+    import urllib.request
+
+    url = f"https://huggingface.co/{repo_id}/raw/main/config.json"
+    with urllib.request.urlopen(url, timeout=timeout) as resp:
+        data = json.loads(resp.read())
+    return load_config_from_dict(data, name=repo_id)
+
+
 _MODEL_PRESETS: dict[str, ModelConfig] = {
     "4b": QWEN35_4B,
     "0.8b": QWEN35_08B,
