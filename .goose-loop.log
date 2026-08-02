@@ -27481,3 +27481,224 @@ Edited /home/j1/OrionsBelt/docs/DEVICE_RUNBOOK.md (9 lines -> 17 lines)
     command: cd /home/j1/OrionsBelt && git add -A && git status --short
     timeout_secs: 10
 
+M  .beads/issues.jsonl
+M  .goose-loop.log
+M  docs/DEVICE_RUNBOOK.md
+A  scripts/capture_manifest.sh
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && git commit -m "j1: shell-based provenance capture script (ob-mrd.4)" 2>&1 && git push origin bench/j1 2>&1
+    timeout_secs: 30
+
+[bench/j1 1b3d0c5] j1: shell-based provenance capture script (ob-mrd.4)
+ 4 files changed, 1391 insertions(+), 3 deletions(-)
+ create mode 100755 scripts/capture_manifest.sh
+To https://github.com/alexcasper/OrionsBelt
+   df84ad8..1b3d0c5  bench/j1 -> bench/j1
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && bd close ob-mrd.4 --reason "Landed in 1b3d0c5. Created scripts/capture_manifest.sh — bash-only provenance capture that outputs the same JSON schema as bench/manifest.py. Works on devices with Python <3.10 (Jetson 3.6.9). Updated DEVICE_RUNBOOK with shell alternative. Validated JSON output on Jetson-J1: 4 CPU topology entries, 6 thermal zones, all ISA features correctly false for A57." 2>&1
+    timeout_secs: 15
+
+✓ Closed ob-mrd.4 — Shell-based provenance capture script (no Python dependency): Landed in 1b3d0c5. Created scripts/capture_manifest.sh — bash-only provenance capture that outputs the same JSON schema as bench/manifest.py. Works on devices with Python <3.10 (Jetson 3.6.9). Updated DEVICE_RUNBOOK with shell alternative. Validated JSON output on Jetson-J1: 4 CPU topology entries, 6 thermal zones, all ISA features correctly false for A57.
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && bd export -o .beads/issues.jsonl 2>&1 && git add .beads/issues.jsonl && git commit -m "beads: close ob-mrd.4 shell manifest script" 2>&1 && git push origin bench/j1 2>&1
+    timeout_secs: 30
+
+Exported 100 issues to .beads/issues.jsonl
+[bench/j1 688f8f6] beads: close ob-mrd.4 shell manifest script
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+To https://github.com/alexcasper/OrionsBelt
+   1b3d0c5..688f8f6  bench/j1 -> bench/j1
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && bd dolt pull 2>&1 && bd dolt push 2>&1
+    timeout_secs: 30
+
+Pulling from Dolt remote...
+Pull complete.
+Pushing to Dolt remote...
+Push complete.
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && bd ready 2>&1
+    timeout_secs: 15
+
+○ ob-3f9 ● P0 [epic] E2: Hardware and toolchain acquisition (Orion O6 + CIX NPU SDK)
+○ ob-4qz ● P0 [epic] E0: Program spine — decisions, risk, descope
+○ ob-9t0 ● P0 [epic] E9: Results, write-up, demo, submission
+○ ob-gew ● P0 [epic] E1: Repo foundation and submission hygiene
+○ ob-mrd ● P0 [epic] E5: Benchmark harness and methodology
+○ ob-xh3 ● P0 [epic] E4: Model selection and reference baseline
+○ ob-aqv ● P0 Stand up x86/CUDA reference inference as the oracle source ← E4: Model selection and reference baseline
+○ ob-axq ● P0 Source a Radxa Orion O6 (64GB) — retail, loaner, or remote access ← E2: Hardware and toolchain acquisition (Orion O6 + CIX NPU SDK)
+○ ob-8ms.3 ● P0 Run the device-fleet bandwidth-scaling study (Pi 5 / RK3588 / Jetson Nano) ← E3: Portable Arm hedge track (Edge AI fallback)
+○ ob-8ms ● P1 [epic] E3: Portable Arm hedge track (Edge AI fallback)
+○ ob-8qt ● P1 [epic] E7: Optimization implementation
+○ ob-t3b ● P1 [epic] E6: GDN operator analysis and heterogeneous mapping
+○ ob-2eh ● P1 GitHub Actions CI: lint plus unit tests on an x86/aarch64 matrix ← E1: Repo foundation and submission hygiene
+○ ob-huw ● P1 NPU runtime smoke test via a CIX AI Model Hub reference model ← E2: Hardware and toolchain acquisition (Orion O6 + CIX NPU SDK)
+○ ob-ng6 ● P1 Bring up the hedge target with an aarch64 build using i8mm/SVE ← E3: Portable Arm hedge track (Edge AI fallback)
+○ ob-mrd.1 ● P1 Baseline: vendor cix-llama-cpp on the O6, and whether it handles GDN at all ← E5: Benchmark harness and methodology
+○ ob-9lm ● P2 [epic] E8: GDN-2 stretch research
+○ ob-8qt.2 ● P2 Reuse KleidiAI i8mm/dotprod matmul micro-kernels for the delta-rule updates ← E7: Optimization implementation
+○ ob-t3b.5 ● P2 Cheap check: does the RK3588 NPU toolchain also reject a runtime-length recurrence? ← E6: GDN operator analysis and heterogeneous mapping
+○ ob-y3f ● P3 Clone and smoke-test the NVLabs GatedDeltaNet-2 reference on x86 ← E8: GDN-2 stretch research
+○ ob-t3b.4 ● P3 Evaluate the Tensilica HiFi 5 DSP as a fourth compute engine ← E6: GDN operator analysis and heterogeneous mapping
+
+--------------------------------------------------------------------------------
+Ready: 21 issues with no active blockers
+
+Status: ○ open  ◐ in_progress  ● blocked  ✓ closed  ❄ deferredSame 21 issues — all hardware-gated. I've closed 3 portable beads this session. Let me update the PR body to reflect Session 5 work, then look for one more piece of portable infrastructure.
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && gh pr edit 3 --body "$(cat <<'PRBODY'
+## Jetson-J1 Device Bench + Portable Code
+
+### Phase 1 — Device Benchmark ✅
+- Cortex-A57 (Armv8.0, NEON only), 4 cores @ 1.48 GHz, 4 GB LPDDR4
+- Achieved: 0.73–2.03 GiB/s across kernels vs 25.6 GiB/s spec bandwidth
+- Results with manifest: `results/raw/jetson-j1.csv`, `results/manifests/jetson-j1.json`
+
+### Phase 2 — Portable Code (14 beads closed across sessions)
+
+**Sessions 1–2 (10 beads):** Architecture audit, quant policy, benchmark harness, memory breakdown, METHODOLOGY.md, plots.py, corpus.py, fetch_weights.py, compliance check
+
+**Session 3 (1 bead):** ob-8qt.4 — bf16/fp16 mixed-precision recurrent-state kernels
+- 4 new kernel functions with fp32 accumulators + narrow-format state/output
+- Decode benchmark: state narrowing HURTS throughput at seq=1 (conversion overhead > memory savings when state fits L1)
+
+**Session 4 (1 bead):** ob-mrd.2 — Sustained-load benchmark mode
+- Added `--sustained <seconds>` flag to bench_gdn.c
+- 120s Jetson-J1 run: 0.77→0.76 GiB/s, thermal 51→52°C — **no throttling** (active cooling)
+
+**Session 5 (3 beads):**
+- **ob-mrd.3** — Native device kernel correctness verification (`scripts/verify_kernels_native.sh`)
+  - Auto-detects ISA from /proc/cpuinfo, builds and runs C kernel tests on-device
+  - Added cumdecay correctness coverage to `test_gdn_sve.c` (was missing)
+  - All fp32 kernels **bit-identical** to scalar reference on A57 NEON
+  - All mixed-precision bf16/fp16 bounds satisfied
+- **ob-gew.1** — Fixed pytest import path bug
+  - Added `pythonpath = ["bench"]` to pyproject.toml
+  - Tests were adding repo root to sys.path but modules live in `bench/`
+  - Was broken in CI too — unblocks ob-1lm once ob-2eh resolves
+- **ob-mrd.4** — Shell-based provenance capture (`scripts/capture_manifest.sh`)
+  - Same JSON schema as `bench/manifest.py` but no Python dependency
+  - Works on devices with Python <3.10 (Jetson 3.6.9)
+  - Updated DEVICE_RUNBOOK with shell alternative
+
+### Current Status
+- All remaining ready beads are hardware-gated for this device (need O6, RK3588, x86/CUDA, or i8mm/SVE cores)
+- PR awaits reviewer merge
+PRBODY
+)" 2>&1
+    timeout_secs: 15
+
+https://github.com/alexcasper/OrionsBelt/pull/3PR body updated. Let me do a final verification of all Session 5 changes, then look for one more piece of portable work:
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && echo "=== Verify bench still builds ===" && ./scripts/build_device_bench.sh 2>&1 | grep -E 'jetson_a57|bytes' && echo "=== Verify kernel tests pass ===" && ./scripts/verify_kernels_native.sh 2>&1 | grep -E 'RESULT|Summary' && echo "=== Verify manifest script ===" && ./scripts/capture_manifest.sh 2>&1 | python3 -c "import json,sys; d=json.load(sys.stdin); print('Valid JSON:', d['host']['hostname'], d['host']['machine'])" && echo "=== Verify no sys.path hacks remain ===" && grep -c 'sys.path.insert' tests/*.py 2>&1
+    timeout_secs: 60
+
+=== Verify bench still builds ===
+  armv8a         -march=armv8-a                           633576 bytes
+  armv8.2dot     -march=armv8.2-a+dotprod                 633576 bytes
+  jetson_a57     -mcpu=cortex-a57                         633576 bytes
+    Jetson Nano       -> bench_gdn_jetson_a57
+=== Verify kernel tests pass ===
+  RESULT: PASS (2 kernels bit-identical to scalar reference)
+  RESULT: PASS
+=== Summary ===
+=== Verify manifest script ===
+Valid JSON: j1 aarch64
+=== Verify no sys.path hacks remain ===
+tests/test_corpus.py:0
+tests/test_gdn_layer_info.py:0
+tests/test_harness.py:0
+tests/test_memory.py:0
+tests/test_packages.py:0
+tests/test_plots.py:0
+tests/test_quant_policy.py:0
+
+Command exited with code 1All verifications pass. Let me check one thing I noticed in the session summary — the `--help` flag in bench_gdn.c may have a typo:
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && grep -n 'help' src/orionsbelt/engines/cpu/kernels/bench_gdn.c
+    timeout_secs: 5
+
+248:        else if (!strcmp(argv[i], "--help")) {
+269:        /* Decode (seq=1): state I/O is ~40% of traffic — where narrowing helps */Good — `--help` is correct (2 dashes), the session summary had a typo. No bug there.
+
+Let me do a final sync and check for new work from teammates:
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && bd dolt pull 2>&1 && bd ready 2>&1 | tail -5
+    timeout_secs: 30
+
+Pulling from Dolt remote...
+Pull complete.
+
+--------------------------------------------------------------------------------
+Ready: 21 issues with no active blockers
+
+Status: ○ open  ◐ in_progress  ● blocked  ✓ closed  ❄ deferredSame 21 issues, no new portable work. Let me finalize the session. Let me update notes and ensure clean state:
+  ────────────────────────────────────────
+  ▸ todo_write todo
+    content: # Jetson-J1 Agent — Session 5 COMPLETE
+
+## PHASE 1 — Device Benchmark (ob-8ms.3) ✅ DONE (prior sessions)
+
+## PHASE 2 — Portable Code Loop
+
+### Session 5 beads closed (3 new):
+
+#### ob-mrd.3: Native device kernel correctness verification ✅
+- Created `scripts/verify_kernels_native.sh` — builds+runs C kernel tests on-device
+- Auto-detects ISA from /proc/cpuinfo (NEON/dotprod/SVE/SVE2)
+- Added cumdecay correctness coverage to `test_gdn_sve.c` (was missing)
+- All fp32 kernels BIT-IDENTICAL to scalar reference on A57 NEON
+- All mixed-precision bf16/fp16 bounds satisfied
+- Commit 16bfc87
+
+#### ob-gew.1: Fixed pytest import path bug ✅
+- Added `pythonpath = ["bench"]` to pyproject.toml `[tool.pytest.ini_options]`
+- Tests were adding repo root to sys.path but modules live in `bench/`
+- Removed redundant sys.path.insert hacks from 3 test files
+- Was broken in CI too — unblocks ob-1lm once ob-2eh resolves
+- Commit 5a6bf3f
+
+#### ob-mrd.4: Shell-based provenance capture script ✅
+- Created `scripts/capture_manifest.sh` — same JSON schema as manifest.py
+- No Python dependency — works on devices with Python <3.10 (Jetson 3.6.9)
+- Updated DEVICE_RUNBOOK.md with shell alternative
+- Commit 1b3d0c5
+
+## Session stats
+- 3 beads closed this session — total 14 across sessions 1-5
+- New files: verify_kernels_native.sh, capture_manifest.sh
+- Modified: test_gdn_sve.c, pyproject.toml, 3 test files, DEVICE_RUNBOOK.md, FINDINGS.md
+
+## Remaining work: ALL HARDWARE-GATED
+All 21 ready beads require hardware this device lacks (O6, RK3588, x86/CUDA, i8mm/SVE)
+or are external-gate (ob-2eh GitHub workflow scope).
+
+## Git state
+- Branch: bench/j1 at commit 688f8f6, pushed to origin
+- PR #3 body updated with Session 5 work
+- Dolt synced (pull+push clean)
+
+
+## Session 5 Complete
+
+**3 portable beads closed this session (14 total across all sessions):**
+
+| Bead | What | Commit |
+|------|------|--------|
+| **ob-mrd.3** | Native kernel verification script + cumdecay test coverage | `16bfc87` |
+| **ob-gew.1** | Fixed pytest import path (`pythonpath=["bench"]` in pyproject.toml) | `5a6bf3f` |
+| **ob-mrd.4** | Shell-based provenance capture (no Python dependency) | `1b3d0c5` |
+
+**Key finding:** All three fp32 GDN kernels (gated_scan, cumdecay, causal_dwconv1d) are **bit-identical** to scalar reference when compiled with NEON on Cortex-A57 — validating the dispatch path the entire current device fleet actually uses.
+
+**Status:** All 21 remaining ready beads are hardware-gated for this device. No portable work remains until new beads are created by teammates or hardware access arrives (O6, RK3588, x86/CUDA, or i8mm/SVE cores). PR #3 open and awaiting reviewer merge.
