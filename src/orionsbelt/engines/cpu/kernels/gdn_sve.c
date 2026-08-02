@@ -136,19 +136,33 @@ void gdn_cumdecay_f32(const float *restrict a, float *restrict decay, size_t seq
         }
     }
 #elif defined(__ARM_NEON)
-    size_t n_vec = channels >> 2;
+    /* Double-width unroll: 8 channels/iter (2 NEON register groups) hides
+     * FMA/MUL latency and doubles memory-level parallelism.  The A57's
+     * 3-4 cycle FMA/MUL latency is perfectly hidden at this width. */
+    size_t n_vec8 = channels >> 3;
 #ifdef _OPENMP
 #pragma omp parallel for schedule(static)
 #endif
-    for (size_t vi = 0; vi < n_vec; ++vi) {
-        size_t c = vi << 2;
+    for (size_t vi = 0; vi < n_vec8; ++vi) {
+        size_t c = vi << 3;
+        float32x4_t run0 = vdupq_n_f32(1.0f);
+        float32x4_t run1 = vdupq_n_f32(1.0f);
+        for (size_t t = 0; t < seq; ++t) {
+            run0 = vmulq_f32(run0, vld1q_f32(a + t * channels + c));
+            run1 = vmulq_f32(run1, vld1q_f32(a + t * channels + c + 4));
+            vst1q_f32(decay + t * channels + c, run0);
+            vst1q_f32(decay + t * channels + c + 4, run1);
+        }
+    }
+    /* Remaining groups of 4 (at most 1) */
+    for (size_t c = n_vec8 << 3; c + 4 <= channels; c += 4) {
         float32x4_t run = vdupq_n_f32(1.0f);
         for (size_t t = 0; t < seq; ++t) {
             run = vmulq_f32(run, vld1q_f32(a + t * channels + c));
             vst1q_f32(decay + t * channels + c, run);
         }
     }
-    for (size_t c = n_vec << 2; c < channels; ++c) {
+    for (size_t c = (n_vec8 << 3) + (((channels >> 2) & 1) << 2); c < channels; ++c) {
         float run = 1.0f;
         for (size_t t = 0; t < seq; ++t) {
             run *= a[t * channels + c];
@@ -204,12 +218,28 @@ void gdn_gated_scan_f32(const float *restrict g, const float *restrict x,
         }
     }
 #elif defined(__ARM_NEON)
-    size_t n_vec = channels >> 2;
+    /* Double-width unroll: 8 channels/iter (2 NEON register groups). */
+    size_t n_vec8 = channels >> 3;
 #ifdef _OPENMP
 #pragma omp parallel for schedule(static)
 #endif
-    for (size_t vi = 0; vi < n_vec; ++vi) {
-        size_t c = vi << 2;
+    for (size_t vi = 0; vi < n_vec8; ++vi) {
+        size_t c = vi << 3;
+        float32x4_t acc0 = vld1q_f32(state + c);
+        float32x4_t acc1 = vld1q_f32(state + c + 4);
+        for (size_t t = 0; t < seq; ++t) {
+            acc0 = vfmaq_f32(vld1q_f32(x + t * channels + c), acc0,
+                             vld1q_f32(g + t * channels + c));
+            acc1 = vfmaq_f32(vld1q_f32(x + t * channels + c + 4), acc1,
+                             vld1q_f32(g + t * channels + c + 4));
+            vst1q_f32(s + t * channels + c, acc0);
+            vst1q_f32(s + t * channels + c + 4, acc1);
+        }
+        vst1q_f32(state + c, acc0);
+        vst1q_f32(state + c + 4, acc1);
+    }
+    /* Remaining groups of 4 (at most 1) */
+    for (size_t c = n_vec8 << 3; c + 4 <= channels; c += 4) {
         float32x4_t acc = vld1q_f32(state + c);
         for (size_t t = 0; t < seq; ++t) {
             acc = vfmaq_f32(vld1q_f32(x + t * channels + c), acc,
@@ -218,7 +248,7 @@ void gdn_gated_scan_f32(const float *restrict g, const float *restrict x,
         }
         vst1q_f32(state + c, acc);
     }
-    for (size_t c = n_vec << 2; c < channels; ++c) {
+    for (size_t c = (n_vec8 << 3) + (((channels >> 2) & 1) << 2); c < channels; ++c) {
         float a2 = state[c];
         for (size_t t = 0; t < seq; ++t) {
             a2 = x[t * channels + c] + a2 * g[t * channels + c];
@@ -390,12 +420,29 @@ void gdn_gated_scan_f16(const float *restrict g, const float *restrict x,
         }
     }
 #elif defined(__ARM_NEON)
-    size_t n_vec = channels >> 2;
+    /* Double-width unroll: 8 channels/iter. */
+    size_t n_vec8 = channels >> 3;
 #ifdef _OPENMP
 #pragma omp parallel for schedule(static)
 #endif
-    for (size_t vi = 0; vi < n_vec; ++vi) {
-        size_t c = vi << 2;
+    for (size_t vi = 0; vi < n_vec8; ++vi) {
+        size_t c = vi << 3;
+        float16x4_t s16_0 = vld1_f16(state + c);
+        float16x4_t s16_1 = vld1_f16(state + c + 4);
+        float32x4_t acc0 = vcvt_f32_f16(s16_0);
+        float32x4_t acc1 = vcvt_f32_f16(s16_1);
+        for (size_t t = 0; t < seq; ++t) {
+            acc0 = vfmaq_f32(vld1q_f32(x + t * channels + c), acc0,
+                             vld1q_f32(g + t * channels + c));
+            acc1 = vfmaq_f32(vld1q_f32(x + t * channels + c + 4), acc1,
+                             vld1q_f32(g + t * channels + c + 4));
+            vst1q_f32(s + t * channels + c, acc0);
+            vst1q_f32(s + t * channels + c + 4, acc1);
+        }
+        vst1_f16(state + c, vcvt_f16_f32(acc0));
+        vst1_f16(state + c + 4, vcvt_f16_f32(acc1));
+    }
+    for (size_t c = n_vec8 << 3; c + 4 <= channels; c += 4) {
         float16x4_t s16 = vld1_f16(state + c);
         float32x4_t acc = vcvt_f32_f16(s16);
         for (size_t t = 0; t < seq; ++t) {
@@ -405,7 +452,7 @@ void gdn_gated_scan_f16(const float *restrict g, const float *restrict x,
         }
         vst1_f16(state + c, vcvt_f16_f32(acc));
     }
-    for (size_t c = n_vec << 2; c < channels; ++c) {
+    for (size_t c = (n_vec8 << 3) + (((channels >> 2) & 1) << 2); c < channels; ++c) {
         float a = (float)state[c];
         for (size_t t = 0; t < seq; ++t) {
             a = x[t * channels + c] + a * g[t * channels + c];
@@ -461,19 +508,30 @@ void gdn_cumdecay_f16(const float *restrict a, __fp16 *restrict decay, size_t se
         }
     }
 #elif defined(__ARM_NEON)
-    size_t n_vec = channels >> 2;
+    /* Double-width unroll: 8 channels/iter. */
+    size_t n_vec8 = channels >> 3;
 #ifdef _OPENMP
 #pragma omp parallel for schedule(static)
 #endif
-    for (size_t vi = 0; vi < n_vec; ++vi) {
-        size_t c = vi << 2;
+    for (size_t vi = 0; vi < n_vec8; ++vi) {
+        size_t c = vi << 3;
+        float32x4_t run0 = vdupq_n_f32(1.0f);
+        float32x4_t run1 = vdupq_n_f32(1.0f);
+        for (size_t t = 0; t < seq; ++t) {
+            run0 = vmulq_f32(run0, vld1q_f32(a + t * channels + c));
+            run1 = vmulq_f32(run1, vld1q_f32(a + t * channels + c + 4));
+            vst1_f16(decay + t * channels + c, vcvt_f16_f32(run0));
+            vst1_f16(decay + t * channels + c + 4, vcvt_f16_f32(run1));
+        }
+    }
+    for (size_t c = n_vec8 << 3; c + 4 <= channels; c += 4) {
         float32x4_t run = vdupq_n_f32(1.0f);
         for (size_t t = 0; t < seq; ++t) {
             run = vmulq_f32(run, vld1q_f32(a + t * channels + c));
             vst1_f16(decay + t * channels + c, vcvt_f16_f32(run));
         }
     }
-    for (size_t c = n_vec << 2; c < channels; ++c) {
+    for (size_t c = (n_vec8 << 3) + (((channels >> 2) & 1) << 2); c < channels; ++c) {
         float run = 1.0f;
         for (size_t t = 0; t < seq; ++t) {
             run *= a[t * channels + c];
@@ -536,12 +594,27 @@ void gdn_gated_scan_bf16(const float *restrict g, const float *restrict x,
         }
     }
 #elif defined(__ARM_NEON)
-    size_t n_vec = channels >> 2;
+    /* Double-width unroll: 8 channels/iter. */
+    size_t n_vec8 = channels >> 3;
 #ifdef _OPENMP
 #pragma omp parallel for schedule(static)
 #endif
-    for (size_t vi = 0; vi < n_vec; ++vi) {
-        size_t c = vi << 2;
+    for (size_t vi = 0; vi < n_vec8; ++vi) {
+        size_t c = vi << 3;
+        float32x4_t acc0 = vcvtq_f32_from_bf16(vld1_u16(state + c));
+        float32x4_t acc1 = vcvtq_f32_from_bf16(vld1_u16(state + c + 4));
+        for (size_t t = 0; t < seq; ++t) {
+            acc0 = vfmaq_f32(vld1q_f32(x + t * channels + c), acc0,
+                             vld1q_f32(g + t * channels + c));
+            acc1 = vfmaq_f32(vld1q_f32(x + t * channels + c + 4), acc1,
+                             vld1q_f32(g + t * channels + c + 4));
+            vst1q_f32(s + t * channels + c, acc0);
+            vst1q_f32(s + t * channels + c + 4, acc1);
+        }
+        vst1_u16(state + c, vcvtq_bf16_from_f32(acc0));
+        vst1_u16(state + c + 4, vcvtq_bf16_from_f32(acc1));
+    }
+    for (size_t c = n_vec8 << 3; c + 4 <= channels; c += 4) {
         float32x4_t acc = vcvtq_f32_from_bf16(vld1_u16(state + c));
         for (size_t t = 0; t < seq; ++t) {
             acc = vfmaq_f32(vld1q_f32(x + t * channels + c), acc,
@@ -550,7 +623,7 @@ void gdn_gated_scan_bf16(const float *restrict g, const float *restrict x,
         }
         vst1_u16(state + c, vcvtq_bf16_from_f32(acc));
     }
-    for (size_t c = n_vec << 2; c < channels; ++c) {
+    for (size_t c = (n_vec8 << 3) + (((channels >> 2) & 1) << 2); c < channels; ++c) {
         float a = bf16_to_f32(state[c]);
         for (size_t t = 0; t < seq; ++t) {
             a = x[t * channels + c] + a * g[t * channels + c];
@@ -600,19 +673,30 @@ void gdn_cumdecay_bf16(const float *restrict a, uint16_t *restrict decay, size_t
         }
     }
 #elif defined(__ARM_NEON)
-    size_t n_vec = channels >> 2;
+    /* Double-width unroll: 8 channels/iter. */
+    size_t n_vec8 = channels >> 3;
 #ifdef _OPENMP
 #pragma omp parallel for schedule(static)
 #endif
-    for (size_t vi = 0; vi < n_vec; ++vi) {
-        size_t c = vi << 2;
+    for (size_t vi = 0; vi < n_vec8; ++vi) {
+        size_t c = vi << 3;
+        float32x4_t run0 = vdupq_n_f32(1.0f);
+        float32x4_t run1 = vdupq_n_f32(1.0f);
+        for (size_t t = 0; t < seq; ++t) {
+            run0 = vmulq_f32(run0, vld1q_f32(a + t * channels + c));
+            run1 = vmulq_f32(run1, vld1q_f32(a + t * channels + c + 4));
+            vst1_u16(decay + t * channels + c, vcvtq_bf16_from_f32(run0));
+            vst1_u16(decay + t * channels + c + 4, vcvtq_bf16_from_f32(run1));
+        }
+    }
+    for (size_t c = n_vec8 << 3; c + 4 <= channels; c += 4) {
         float32x4_t run = vdupq_n_f32(1.0f);
         for (size_t t = 0; t < seq; ++t) {
             run = vmulq_f32(run, vld1q_f32(a + t * channels + c));
             vst1_u16(decay + t * channels + c, vcvtq_bf16_from_f32(run));
         }
     }
-    for (size_t c = n_vec << 2; c < channels; ++c) {
+    for (size_t c = (n_vec8 << 3) + (((channels >> 2) & 1) << 2); c < channels; ++c) {
         float run = 1.0f;
         for (size_t t = 0; t < seq; ++t) {
             run *= a[t * channels + c];
