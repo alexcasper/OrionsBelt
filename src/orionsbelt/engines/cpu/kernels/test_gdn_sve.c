@@ -44,10 +44,10 @@ int main(void){
   gdn_causal_dwconv1d_f32(x,w,o1,hA,T,C);
   refF_conv(x,w,o2,hB,T,C);
 
-  printf("SVE2 kernel vs PRECISION-MATCHED float reference (expect ~0):\n");
+  printf("SVE kernel vs PRECISION-MATCHED float reference (expect ~0):\n");
   report("gated_scan",s1,s2,N); report("gated_scan carried state",stA,stB,C);
   report("causal_dwconv1d",o1,o2,N); report("conv history",hA,hB,3*C);
-  printf("SVE2 kernel vs DOUBLE reference (fp32 accumulation quality):\n");
+  printf("SVE kernel vs DOUBLE reference (fp32 accumulation quality):\n");
   report("gated_scan",s1,s3,N);
 
   double mabs=0; for(size_t i=0;i<N;i++){double d=fabs((double)s1[i]-s2[i]);if(d>mabs)mabs=d;}

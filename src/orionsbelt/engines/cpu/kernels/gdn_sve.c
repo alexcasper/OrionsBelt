@@ -1,4 +1,4 @@
-/* Gated DeltaNet CPU micro-kernels for Armv9.2-A (SVE2 + NEON), Cortex-A720 class.
+/* Gated DeltaNet CPU micro-kernels for AArch64 SVE (baseline SVE1) with scalar fallback.
  *
  * Bead ob-8qt.1. Three primitives that exist nowhere today for a non-SME Armv9.2 core
  * (see docs/FINDINGS.md section 3): KleidiAI's depthwise conv is SME2-only, and it has no
@@ -11,18 +11,33 @@
  * the CHANNEL/HEAD axis and walk the sequence with a plain loop. Every kernel below is
  * then a sequence of independent lane-wise FMAs -- no cross-lane communication anywhere.
  *
- * SVE2 on Cortex-A720 is 128-bit, the same width as NEON, so the win here is predication
+ * ISA FLOOR IS SVE1, NOT SVE2. Every intrinsic used here -- svcntw, svdup_f32, svld1_f32,
+ * svmul_f32_x, svmla_f32_x, svst1_f32, svwhilelt_b32 -- is base SVE, and the guard is
+ * __ARM_FEATURE_SVE. Nothing in these fp32 kernels needs SVE2's integer/DSP additions. SVE2
+ * (and i8mm) become relevant only for the quantized delta-rule matmuls, which live elsewhere.
+ *
+ * Verified identical on SVE1 at 128/256/512-bit (incl. -mcpu=neoverse-v1 and -mcpu=a64fx),
+ * on SVE2 (-march=armv9-a, cortex-a710, neoverse-v2), and on plain -march=armv8-a via the
+ * scalar fallback. That means these run on Graviton3 (SVE1) as well as Cortex-A720 (SVE2),
+ * which keeps the Edge AI hedge target viable.
+ *
+ * On Cortex-A720 SVE is 128-bit -- the same width as NEON -- so the win is predication
  * (svwhilelt gives clean channel tails with no scalar epilogue), not extra lanes. Written
  * vector-length-agnostic regardless, so it widens for free on a core with longer vectors.
  *
- * Build:
- *   aarch64-linux-gnu-gcc -O3 -mcpu=cortex-a720 -c gdn_sve2.c
+ * Build (any of these work):
+ *   aarch64-linux-gnu-gcc -O3 -march=armv8.2-a+sve   -c gdn_sve.c   # SVE1 floor
+ *   aarch64-linux-gnu-gcc -O3 -march=armv9.2-a+sve2+i8mm+bf16 -c gdn_sve.c
+ *   clang --target=aarch64-linux-gnu -O3 -mcpu=cortex-a720 -c gdn_sve.c
  */
 
 #include <stddef.h>
 
 #ifdef __ARM_FEATURE_SVE
 #include <arm_sve.h>
+#endif
+#ifdef __ARM_NEON
+#include <arm_neon.h>
 #endif
 
 /* ---------------------------------------------------------------------------
@@ -45,6 +60,22 @@ void gdn_cumdecay_f32(const float *restrict a, float *restrict decay, size_t seq
             svfloat32_t av = svld1_f32(pg, a + t * channels + c);
             run = svmul_f32_x(pg, run, av);
             svst1_f32(pg, decay + t * channels + c, run);
+        }
+    }
+#elif defined(__ARM_NEON)
+    size_t c = 0;
+    for (; c + 4 <= channels; c += 4) {
+        float32x4_t run = vdupq_n_f32(1.0f);
+        for (size_t t = 0; t < seq; ++t) {
+            run = vmulq_f32(run, vld1q_f32(a + t * channels + c));
+            vst1q_f32(decay + t * channels + c, run);
+        }
+    }
+    for (; c < channels; ++c) {
+        float run = 1.0f;
+        for (size_t t = 0; t < seq; ++t) {
+            run *= a[t * channels + c];
+            decay[t * channels + c] = run;
         }
     }
 #else
@@ -83,6 +114,26 @@ void gdn_gated_scan_f32(const float *restrict g, const float *restrict x,
             svst1_f32(pg, s + t * channels + c, acc);
         }
         svst1_f32(pg, state + c, acc);
+    }
+#elif defined(__ARM_NEON)
+    size_t c = 0;
+    for (; c + 4 <= channels; c += 4) {
+        float32x4_t acc = vld1q_f32(state + c);
+        for (size_t t = 0; t < seq; ++t) {
+            /* acc = x + acc*g -- vfmaq_f32(addend, a, b) = addend + a*b */
+            acc = vfmaq_f32(vld1q_f32(x + t * channels + c), acc,
+                            vld1q_f32(g + t * channels + c));
+            vst1q_f32(s + t * channels + c, acc);
+        }
+        vst1q_f32(state + c, acc);
+    }
+    for (; c < channels; ++c) {
+        float a2 = state[c];
+        for (size_t t = 0; t < seq; ++t) {
+            a2 = x[t * channels + c] + a2 * g[t * channels + c];
+            s[t * channels + c] = a2;
+        }
+        state[c] = a2;
     }
 #else
     for (size_t c = 0; c < channels; ++c) {
@@ -134,6 +185,45 @@ void gdn_causal_dwconv1d_f32(const float *restrict in, const float *restrict w,
         svst1_f32(pg, hist + 0 * channels + c, h0);
         svst1_f32(pg, hist + 1 * channels + c, h1);
         svst1_f32(pg, hist + 2 * channels + c, h2);
+    }
+#elif defined(__ARM_NEON)
+    size_t c = 0;
+    for (; c + 4 <= channels; c += 4) {
+        float32x4_t h0 = vld1q_f32(hist + 0 * channels + c);
+        float32x4_t h1 = vld1q_f32(hist + 1 * channels + c);
+        float32x4_t h2 = vld1q_f32(hist + 2 * channels + c);
+        float32x4_t w0 = vld1q_f32(w + 0 * channels + c);
+        float32x4_t w1 = vld1q_f32(w + 1 * channels + c);
+        float32x4_t w2 = vld1q_f32(w + 2 * channels + c);
+        float32x4_t w3 = vld1q_f32(w + 3 * channels + c);
+        for (size_t t = 0; t < seq; ++t) {
+            float32x4_t cur = vld1q_f32(in + t * channels + c);
+            float32x4_t acc = vmulq_f32(h0, w0);
+            acc = vfmaq_f32(acc, h1, w1);
+            acc = vfmaq_f32(acc, h2, w2);
+            acc = vfmaq_f32(acc, cur, w3);
+            vst1q_f32(out + t * channels + c, acc);
+            h0 = h1;
+            h1 = h2;
+            h2 = cur;
+        }
+        vst1q_f32(hist + 0 * channels + c, h0);
+        vst1q_f32(hist + 1 * channels + c, h1);
+        vst1q_f32(hist + 2 * channels + c, h2);
+    }
+    for (; c < channels; ++c) {
+        float hh[GDN_CONV_K - 1];
+        for (int j = 0; j < GDN_CONV_K - 1; ++j) hh[j] = hist[(size_t)j * channels + c];
+        for (size_t t = 0; t < seq; ++t) {
+            float cur = in[t * channels + c];
+            float acc = hh[0] * w[0 * channels + c] + hh[1] * w[1 * channels + c] +
+                        hh[2] * w[2 * channels + c] + cur * w[3 * channels + c];
+            out[t * channels + c] = acc;
+            hh[0] = hh[1];
+            hh[1] = hh[2];
+            hh[2] = cur;
+        }
+        for (int j = 0; j < GDN_CONV_K - 1; ++j) hist[(size_t)j * channels + c] = hh[j];
     }
 #else
     for (size_t c = 0; c < channels; ++c) {

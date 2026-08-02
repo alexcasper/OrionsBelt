@@ -14,15 +14,25 @@ MARCH=${MARCH:--march=armv9.2-a+sve2+i8mm+bf16}
 
 echo "== cross-compiling for aarch64 ($MARCH)"
 aarch64-linux-gnu-gcc -O3 $MARCH -static \
-    "$K/gdn_sve2.c" "$K/test_gdn_sve2.c" -o "$OUT/verify" -lm
+    "$K/gdn_sve.c" "$K/test_gdn_sve.c" -o "$OUT/verify" -lm
 
 echo "== running under QEMU with 128-bit vectors (as Cortex-A720)"
 QEMU_CPU=max,sve128=on qemu-aarch64 "$OUT/verify"
 
-echo "== running with 256-bit vectors (vector-length-agnostic check)"
-QEMU_CPU=max,sve256=on qemu-aarch64 "$OUT/verify"
-
-echo "== scalar fallback path (no SVE), same reference"
-aarch64-linux-gnu-gcc -O3 -march=armv8-a -static \
-    "$K/gdn_sve2.c" "$K/test_gdn_sve2.c" -o "$OUT/verify_scalar" -lm
-qemu-aarch64 "$OUT/verify_scalar"
+echo "== portability matrix: SVE1 floor, SVE2, and no-SVE fallback"
+# The kernels are SVE1-clean; SVE2 is NOT required. Verified across vector lengths and cores.
+for spec in \
+  "SVE1@128|-march=armv8.2-a+sve|max,sve128=on" \
+  "SVE1@256(Graviton3)|-march=armv8.2-a+sve|max,sve256=on" \
+  "SVE1@512(A64FX)|-march=armv8.2-a+sve|max,sve512=on" \
+  "Neoverse-V1|-mcpu=neoverse-v1|max,sve256=on" \
+  "SVE2/Armv9-A|-march=armv9-a|max,sve128=on" \
+  "Neoverse-V2(Graviton4)|-mcpu=neoverse-v2|max,sve128=on" \
+  "no-SVE scalar|-march=armv8-a|max" ; do
+  IFS='|' read -r label march cpu <<< "$spec"
+  aarch64-linux-gnu-gcc -O3 $march -static \
+      "$K/gdn_sve.c" "$K/test_gdn_sve.c" -o "$OUT/v" -lm
+  printf "  %-24s " "$label"
+  QEMU_CPU=$cpu qemu-aarch64 "$OUT/v" | grep -c "bit-identical to matched reference: YES" \
+      | sed 's/^1$/PASS/; s/^0$/FAIL/'
+done

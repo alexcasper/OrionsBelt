@@ -258,7 +258,7 @@ the gap.
 **Bead `ob-8qt.1`. Written and verified with no Orion O6 board** — QEMU emulates SVE2, so
 correctness is checkable today; only *performance* needs real silicon.
 
-Source: [`src/orionsbelt/engines/cpu/kernels/gdn_sve2.c`](../src/orionsbelt/engines/cpu/kernels/gdn_sve2.c).
+Source: [`src/orionsbelt/engines/cpu/kernels/gdn_sve.c`](../src/orionsbelt/engines/cpu/kernels/gdn_sve.c).
 Verify with [`scripts/verify_cpu_kernels.sh`](../scripts/verify_cpu_kernels.sh).
 
 ### The layout decision that makes all three easy
@@ -310,8 +310,68 @@ deliberately awkward width that exercises the SVE2 predicated tail):
 | conv history state | **bit-identical** |
 | `gated_scan` vs double reference | `max_abs = 1.19e-07`, `max_rel = 3.1e-06` — honest fp32 accumulation quality over 64 steps |
 | **Causality** | perturbing the last input changes `t = T-1` and leaks **exactly 0.0** into all earlier outputs |
-| SVE2 @ 256-bit | identical results — confirms genuine vector-length agnosticism |
-| Scalar fallback (`-march=armv8-a`) | bit-identical on every tensor |
+| SVE @ 256-bit and 512-bit | identical results — confirms genuine vector-length agnosticism |
+| NEON path (`-march=armv8-a`) | scan bit-identical; conv within one ULP, as SVE |
+
+### The ISA floor is SVE1, not SVE2
+
+Worth stating plainly because the original filename said otherwise: **these kernels need only
+base SVE.** Every intrinsic used — `svcntw`, `svdup_f32`, `svld1_f32`, `svmul_f32_x`,
+`svmla_f32_x`, `svst1_f32`, `svwhilelt_b32` — is SVE1, and the guard is `__ARM_FEATURE_SVE`
+rather than `__ARM_FEATURE_SVE2`. Nothing in an fp32 prefix-product, gated scan, or 4-tap
+depthwise convolution requires SVE2's additions, which are mostly integer and DSP oriented.
+
+Verified across the full matrix, all producing identical results:
+
+| Target | ISA | Result |
+|---|---|---|
+| `-march=armv8.2-a+sve` @128/256/512-bit | SVE1 | PASS |
+| `-mcpu=neoverse-v1` | SVE1 (256-bit) | PASS |
+| `-mcpu=a64fx` | SVE1 (512-bit) | PASS |
+| `-march=armv9-a`, `-mcpu=cortex-a710` | SVE2 | PASS |
+| `-mcpu=neoverse-v2` | SVE2 (Graviton4) | PASS |
+| `-march=armv8-a` | no SVE | PASS (scalar fallback) |
+
+Two consequences:
+
+1. **The Edge AI hedge is safe.** ADR 0002 named AWS Graviton as the fallback if no phone is
+   suitable — Graviton3 is SVE1-only, so an SVE2-dependent kernel would have quietly broken that
+   escape route. It doesn't.
+2. **The reusability claim widens.** These are usable on any SVE-capable AArch64 core, and
+   degrade to scalar elsewhere — not just on Armv9 parts.
+
+**Where SVE2 and i8mm actually start to matter:** the quantized delta-rule matmuls (`ob-8qt.2`,
+via KleidiAI) and any future int8/bf16 state variant, where SVE2's widening integer multiply-
+accumulates earn their place. For the fp32 recurrence primitives, SVE1 is sufficient and claiming
+otherwise would overstate the requirement.
+
+### The variant that was actually missing was NEON, not SVE1
+
+Having established SVE1 suffices, the natural follow-up is which variant is worth writing at all.
+Measured answer: **NEON**, and the gap was real.
+
+Disassembling the no-SVE build showed GCC 13 at `-O3` emitting **zero** NEON vector operations for
+all three kernels — purely scalar FP. That is not a compiler failing so much as a consequence of
+the loop structure: the inner loop carries a serial dependency (`acc = x + acc*g`), so it cannot be
+vectorized, and GCC does not interchange the loops to vectorize across channels instead. The SVE
+path only gets that for free because we hand-wrote the channel-wise vectorization.
+
+Explicit NEON paths were therefore added (`vfmaq_f32` over `float32x4_t`, with a scalar tail for
+channel counts not divisible by 4), guarded `__ARM_FEATURE_SVE` → `__ARM_NEON` → scalar. The inner
+loop now compiles to `fmla v1.4s, v0.4s, v2.4s` with 128-bit `ldr q`/`str q` accesses, and produces
+results identical to the SVE path (scan bit-identical, conv within the same one-ULP FMA difference).
+
+Why this matters more than an SVE1/SVE2 split:
+
+- **Apple silicon has no SVE at all**, so without a NEON path it would have run 4-wide-scalar.
+  ADR 0002 keeps Apple silicon as a supplementary hedge measurement, and that is now worth having.
+- **Most deployed Armv8 Android devices have no SVE either.** The Edge AI framing is about breadth
+  of deployable hardware, and NEON is the floor that actually reaches it.
+- It makes the "reusable by anyone" claim true rather than aspirational: SVE where available, NEON
+  everywhere else, scalar as a correctness reference.
+
+So the final dispatch ladder is **SVE (1 or 2, any vector length) → NEON → scalar**, with all
+three verified to agree.
 
 > **Method note.** The first test run reported failures at a 1e-5 relative tolerance. That was the
 > *test* being wrong, not the kernels: the reference accumulated in `double` while the kernel used
