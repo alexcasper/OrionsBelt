@@ -396,6 +396,193 @@ in GDN decode.
 
 ---
 
+## 5a. Jetson Nano A57: real-silicon optimization results (2026-08-03)
+
+**Beads `ob-8ms.3`, `ob-8qt.4`–`ob-8qt.7`. All measurements on jetson-j2 (2nd Jetson Nano unit).**
+
+Section 5 stated "no performance results yet — awaiting real silicon." That wait is over. The kernels
+now run on a Cortex-A57 with a full optimization stack, and the numbers tell a clear story about
+what limits GDN on edge-class Arm silicon.
+
+### Device
+
+| Property | Value |
+|---|---|
+| SoC | NVIDIA Tegra X1 (jetson-j2) |
+| CPU | Cortex-A57 (Armv8.0-A), 4 cores |
+| Frequency | 1479 MHz (governor: performance) |
+| ISA | NEON only — no SVE, no dotprod, no i8mm, no bf16 |
+| L1 D-cache | 48 KB per core |
+| L2 cache | 1 MB shared |
+| DRAM | LPDDR4 64-bit @ 1600 MHz → 12.8 GiB/s peak |
+| Thermals | 43–51 °C across all runs |
+
+This is the most constrained device in the fleet: Armv8.0 with only NEON. Every optimization below
+must work on this ISA floor — no SVE predication, no hardware bf16, no dotprod. That constraint is a
+feature: it proves the kernels are genuinely portable, not silently relying on a newer ISA.
+
+### Baseline (single-threaded NEON)
+
+The kernels as written in §4, compiled at `-O3 -mcpu=cortex-a57`, single-threaded:
+
+| Kernel | 4B p50 (μs) | 4B GiB/s | 0.8B p50 (μs) | 0.8B GiB/s |
+|---|---:|---:|---:|---:|
+| cumdecay | 2108 | 0.93 | 593 | 1.65 |
+| gated_scan | 3893 | 0.76 | 1096 | 1.35 |
+| causal_dwconv1d | 1961 | 1.05 | 518 | 1.99 |
+
+Single-threaded, the kernels achieve <2 GiB/s — under 15% of DRAM peak. The bottleneck is the FMA
+dependency chain in the inner loop: each time step's result depends on the previous, so the pipeline
+stalls for 4 cycles per step regardless of how wide the vector path is.
+
+### Optimization stack
+
+Four portable optimizations were applied sequentially, each building on the last:
+
+#### 1. Mixed-precision state (ob-8qt.4)
+
+The persistent GDN recurrent state (the "KV-cache equivalent") is halved from fp32 to fp16 or bf16,
+while the accumulation loop stays fp32. This halves the persistent memory footprint: 48 MB → 24 MB
+across 24 layers for Qwen3.5-4B.
+
+**Critical precision constraint:** the decay accumulator must be fp32. A gate of 0.5 compounded
+over 64 steps is ~5e-20, which underflows fp16. Only the *storage* is narrowed; the *arithmetic* is
+identical to the fp32 kernel.
+
+Software bf16 conversion (`f32_to_bf16_rne` with round-to-nearest-even) is used because Armv8.0
+has no hardware bf16. NEON-vectorized conversion intrinsics were added in ob-8qt.5 to eliminate the
+scalar bottleneck.
+
+#### 2. OpenMP parallelization (ob-8qt.5)
+
+The channel loop in each kernel is embarrassingly parallel — each channel's recurrence is
+independent. With `-fopenmp` and `#pragma omp parallel for schedule(static)`, channel groups are
+distributed across the 4 A57 cores.
+
+This required restructuring the NEON loops from pointer-stride form
+(`for (c = 0; c + 4 <= channels; c += 4)`) to counting form (`for (vi = 0; vi < n_vec; ++vi)`)
+for OpenMP canonical-loop compatibility. The SVE paths were wrapped in block scopes to declare
+`vl`/`n_vec` before the pragma.
+
+#### 3. NEON double-width unrolling — scan & decay (ob-8qt.6)
+
+The NEON path was widened from 4 channels/iter to 8 channels/iter (two independent `float32x4_t`
+register groups). This creates two independent FMA dependency chains per iteration, which the A57's
+out-of-order scheduler can interleave to hide the 4-cycle FMA/MUL latency.
+
+With two chains and 4-cycle latency, the scheduler can keep 2 FMAs in flight — throughput of 0.5
+FMA/cycle, up from 0.25 FMA/cycle with a single chain. A further doubling to 16-wide would need 4
+chains for full 1.0 FMA/cycle utilization but would exhaust all 32 NEON registers.
+
+#### 4. NEON double-width unrolling — conv (ob-8qt.7)
+
+The same technique applied to the depthwise conv kernel. The conv benefits **more** from unrolling
+than gated_scan/cumdecay because its dependency chain is 4-deep (four chained FMAs: `acc = h0*w0 +
+h1*w1 + h2*w2 + cur*w3`) rather than 1-deep. With a single chain, 3 out of every 4 cycles are wasted
+waiting for the chain to resolve; with two chains, the scheduler can interleave the two independent
+4-deep chains.
+
+### Cumulative results
+
+**Qwen3.5-4B (C=4096, T=64):**
+
+| Stage | cumdecay | gated_scan | conv |
+|---|---:|---:|---:|
+| Baseline (1 thread, NEON 4-wide) | 2108 μs | 3893 μs | 1961 μs |
+| + OpenMP (4 cores) | 829 μs (2.5×) | 1501 μs (2.6×) | 912 μs (2.1×) |
+| + 8-wide unroll (scan/decay) | 526 μs (4.0×) | 1003 μs (3.9×) | 901 μs (2.2×) |
+| + 8-wide unroll (conv) | 510 μs (**4.1×**) | 1010 μs (**3.9×**) | 590 μs (**3.3×**) |
+| Achieved bandwidth | 3.9 GiB/s | 2.9 GiB/s | 3.6 GiB/s |
+
+**Qwen3.5-0.8B (C=2048, T=64):**
+
+| Stage | cumdecay | gated_scan | conv |
+|---|---:|---:|---:|
+| Baseline | 593 μs | 1096 μs | 518 μs |
+| + OpenMP | 335 μs (1.8×) | 454 μs (2.4×) | 321 μs (1.6×) |
+| + 8-wide unroll (scan/decay) | 201 μs (2.9×) | 257 μs (4.3×) | 321 μs (1.6×) |
+| + 8-wide unroll (conv) | 210 μs (**2.8×**) | 280 μs (**3.9×**) | 195 μs (**2.7×**) |
+
+OpenMP's sublinear scaling (2.1–2.6× on 4 cores for 4B) reflects the A57's 1 MB shared L2 and the
+~3 MiB working set that does not fit in cache — threads compete for DRAM bandwidth.
+
+### Mixed-precision: what helps and what doesn't
+
+At the final optimization level, the fp16/bf16 state variants were benchmarked:
+
+| Variant | 4B p50 (μs) | vs fp32 | 0.8B p50 (μs) | vs fp32 |
+|---|---:|---:|---:|---:|
+| cumdecay (fp32 output) | 510 | — | 210 | — |
+| cumdecay_f16 (fp16 output) | 352 | **1.45×** | 164 | **1.28×** |
+| cumdecay_bf16 (bf16 output) | 360 | **1.42×** | 162 | **1.30×** |
+| gated_scan (fp32 state) | 1010 | — | 280 | — |
+| gated_scan_f16 | 1010 | **1.00×** | 297 | 0.94× |
+| gated_scan_bf16 | 1010 | **1.00×** | 284 | 0.99× |
+
+**cumdecay** benefits from half-precision output because the output array (`decay[]`) is
+O(channels × seq) and dominates memory traffic — halving it directly halves bandwidth pressure.
+
+**gated_scan** does not benefit because only the *state* is narrowed (O(channels)), not the scan
+output `s[]` which is O(channels × seq) and stays fp32. The narrowing cost is negligible against the
+inner loop's memory traffic, and the state load/store happens once per chunk boundary — not per time
+step.
+
+This is a useful design data point: **mixed precision helps the prefix-product but not the scan** on
+this architecture. On a device with hardware bf16 or fp16 compute (Armv8.2-A+), the scan inner loop
+itself could run at half precision with an fp32 master accumulator, which would help — but that
+requires ISA extensions the A57 lacks.
+
+### What limits each kernel
+
+| Kernel | Arithmetic intensity | Bottleneck | Evidence |
+|---|---|---|---|
+| gated_scan | 2 FLOP / 12 bytes = 0.17 | FMA latency (4-cycle chain) | 0.52 GFLOP/s achieved vs 47.3 peak = 1.1%; 2.9 GiB/s vs 12.8 peak = 23% |
+| cumdecay | 1 FLOP / 8 bytes = 0.13 | Memory bandwidth | 3.9 GiB/s = 30% of DRAM peak; MUL has lower latency than FMA |
+| conv | 8 FLOP / 4 bytes = 2.0 | Compute (FMA throughput) | 3.6 GFLOP/s = 7.7% of peak; highest GiB/s because it reuses loaded weights 4× |
+
+The conv is the most compute-intensive (8 FLOPs per element loaded, because 4 weight taps are reused
+per input element), which is why the double-width unroll gave the largest relative speedup on it
+(1.5–1.6×). The gated_scan and cumdecay are memory-latency-bound: the FMA dependency chain serializes
+access, preventing the memory system from being saturated.
+
+### Numerical fidelity of mixed precision
+
+| Check | fp16 | bf16 |
+|---|---|---|
+| Single-call max_abs vs fp32 | 1.07 × 10⁻⁴ | 8.49 × 10⁻⁴ |
+| 8-chunk drift worst | 4.07 × 10⁻⁴ | (not measured; expected similar) |
+| Drift trend | Plateaus at chunk 2 — no compounding | — |
+
+fp16 has lower max_abs (10 mantissa bits vs bf16's 7) because GDN state values stay in [−1, 1], where
+fp16's extra mantissa precision matters more than bf16's wider exponent range. The drift plateaus
+after the second chunk, confirming the narrowing error does not compound over successive chunks — the
+fp32 accumulator absorbs the per-chunk rounding.
+
+### Reproducing
+
+```bash
+# Build (on the device, native gcc)
+./scripts/build_device_bench.sh    # outputs dist/bench_gdn_<variant>
+
+# Set performance governor
+for c in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do
+    echo performance | sudo tee "$c"
+done
+
+# Run
+./dist/bench_gdn_jetson_a57 --repeats 30 --csv > results/raw/jetson-j2-conv-unroll.csv
+
+# Correctness
+aarch64-linux-gnu-gcc -O3 -fopenmp -mcpu=cortex-a57 -static \
+    src/orionsbelt/engines/cpu/kernels/test_gdn_sve.c \
+    src/orionsbelt/engines/cpu/kernels/gdn_sve.c \
+    -o dist/test_gdn_sve_jetson_a57 -lm && ./dist/test_gdn_sve_jetson_a57
+```
+
+Raw CSV files for each optimization stage are committed under `results/raw/jetson-j2*.csv`.
+
+---
+
 ## 5. Device microbenchmark: ready to run, awaiting real silicon (2026-08-02)
 
 **Bead `ob-8ms.2`.** The maintainer has Armv8 devices available, which unblocks real Arm
