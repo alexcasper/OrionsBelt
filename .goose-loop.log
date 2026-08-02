@@ -26339,3 +26339,1145 @@ Command exited with code 1No remaining `sys.path.insert` hacks. Let me commit an
     command: cd /home/j1/OrionsBelt && git add -A && git status --short
     timeout_secs: 10
 
+M  .beads/issues.jsonl
+M  .goose-loop.log
+M  pyproject.toml
+M  tests/test_corpus.py
+M  tests/test_harness.py
+M  tests/test_plots.py
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && git commit -m "j1: fix pytest import path — add pythonpath=['bench'] to pyproject.toml (ob-gew.1)" 2>&1 && git push origin bench/j1 2>&1
+    timeout_secs: 30
+
+[bench/j1 5a6bf3f] j1: fix pytest import path — add pythonpath=['bench'] to pyproject.toml (ob-gew.1)
+ 6 files changed, 1189 insertions(+), 9 deletions(-)
+To https://github.com/alexcasper/OrionsBelt
+   f4933b7..5a6bf3f  bench/j1 -> bench/j1
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && bd close ob-gew.1 --reason "Landed in 5a6bf3f. Added pythonpath=['bench'] to [tool.pytest.ini_options] in pyproject.toml. Removed redundant sys.path.insert hacks from test_corpus.py, test_harness.py, test_plots.py. Tests can now import bench/ modules (corpus, schema, harness, plots) without manual path manipulation. Unblocks ob-1lm once ob-2eh is resolved." 2>&1
+    timeout_secs: 15
+
+✓ Closed ob-gew.1 — Fix pytest import path: bench/ modules unimportable from tests: Landed in 5a6bf3f. Added pythonpath=['bench'] to [tool.pytest.ini_options] in pyproject.toml. Removed redundant sys.path.insert hacks from test_corpus.py, test_harness.py, test_plots.py. Tests can now import bench/ modules (corpus, schema, harness, plots) without manual path manipulation. Unblocks ob-1lm once ob-2eh is resolved.
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && bd export -o .beads/issues.jsonl 2>&1 && git add .beads/issues.jsonl && git commit -m "beads: close ob-gew.1 pytest import path fix" 2>&1 && git push origin bench/j1 2>&1
+    timeout_secs: 30
+
+Exported 98 issues to .beads/issues.jsonl
+[bench/j1 df84ad8] beads: close ob-gew.1 pytest import path fix
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+To https://github.com/alexcasper/OrionsBelt
+   5a6bf3f..df84ad8  bench/j1 -> bench/j1
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && bd dolt pull 2>&1 && bd dolt push 2>&1
+    timeout_secs: 30
+
+Pulling from Dolt remote...
+Pull complete.
+Pushing to Dolt remote...
+Push complete.
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && bd ready 2>&1
+    timeout_secs: 15
+
+○ ob-3f9 ● P0 [epic] E2: Hardware and toolchain acquisition (Orion O6 + CIX NPU SDK)
+○ ob-4qz ● P0 [epic] E0: Program spine — decisions, risk, descope
+○ ob-9t0 ● P0 [epic] E9: Results, write-up, demo, submission
+○ ob-gew ● P0 [epic] E1: Repo foundation and submission hygiene
+○ ob-mrd ● P0 [epic] E5: Benchmark harness and methodology
+○ ob-xh3 ● P0 [epic] E4: Model selection and reference baseline
+○ ob-aqv ● P0 Stand up x86/CUDA reference inference as the oracle source ← E4: Model selection and reference baseline
+○ ob-axq ● P0 Source a Radxa Orion O6 (64GB) — retail, loaner, or remote access ← E2: Hardware and toolchain acquisition (Orion O6 + CIX NPU SDK)
+○ ob-8ms.3 ● P0 Run the device-fleet bandwidth-scaling study (Pi 5 / RK3588 / Jetson Nano) ← E3: Portable Arm hedge track (Edge AI fallback)
+○ ob-8ms ● P1 [epic] E3: Portable Arm hedge track (Edge AI fallback)
+○ ob-8qt ● P1 [epic] E7: Optimization implementation
+○ ob-t3b ● P1 [epic] E6: GDN operator analysis and heterogeneous mapping
+○ ob-2eh ● P1 GitHub Actions CI: lint plus unit tests on an x86/aarch64 matrix ← E1: Repo foundation and submission hygiene
+○ ob-huw ● P1 NPU runtime smoke test via a CIX AI Model Hub reference model ← E2: Hardware and toolchain acquisition (Orion O6 + CIX NPU SDK)
+○ ob-ng6 ● P1 Bring up the hedge target with an aarch64 build using i8mm/SVE ← E3: Portable Arm hedge track (Edge AI fallback)
+○ ob-mrd.1 ● P1 Baseline: vendor cix-llama-cpp on the O6, and whether it handles GDN at all ← E5: Benchmark harness and methodology
+○ ob-9lm ● P2 [epic] E8: GDN-2 stretch research
+○ ob-8qt.2 ● P2 Reuse KleidiAI i8mm/dotprod matmul micro-kernels for the delta-rule updates ← E7: Optimization implementation
+○ ob-t3b.5 ● P2 Cheap check: does the RK3588 NPU toolchain also reject a runtime-length recurrence? ← E6: GDN operator analysis and heterogeneous mapping
+○ ob-y3f ● P3 Clone and smoke-test the NVLabs GatedDeltaNet-2 reference on x86 ← E8: GDN-2 stretch research
+○ ob-t3b.4 ● P3 Evaluate the Tensilica HiFi 5 DSP as a fourth compute engine ← E6: GDN operator analysis and heterogeneous mapping
+
+--------------------------------------------------------------------------------
+Ready: 21 issues with no active blockers
+
+Status: ○ open  ◐ in_progress  ● blocked  ✓ closed  ❄ deferredSame 21 issues — all hardware-gated or blocked. Let me look for more portable infrastructure improvements. Let me check what provenance data the benchmark currently captures vs what the runbook requires:
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && cat docs/DEVICE_RUNBOOK.md 2>&1
+    timeout_secs: 10
+
+# Device runbook — getting the first real numbers
+
+Copy-paste procedure for running the GDN kernel benchmark on the Arm fleet (ADR 0005) and
+producing the bandwidth-scaling result (bead `ob-8ms.3`).
+
+Everything here is a **static binary**. The devices need no toolchain, no Python, and no shared
+libraries — just `scp` and run.
+
+---
+
+## 0. Build on the x86 host
+
+```bash
+./scripts/build_device_bench.sh          # writes to dist/
+```
+
+| Device | Binary | Notes |
+|---|---|---|
+| Raspberry Pi 5 | `dist/bench_gdn_pi5_a76` | 4× A76, homogeneous |
+| RK3588 big cluster | `dist/bench_gdn_rk3588_a76` | pin to the A76s |
+| RK3588 little cluster | `dist/bench_gdn_rk3588_a55` | pin to the A55s |
+| Jetson Nano | `dist/bench_gdn_jetson_a57` | Armv8.0, no dotprod |
+
+## 1. Per device
+
+```bash
+scp dist/bench_gdn_<variant> <device>:/tmp/
+ssh <device>
+```
+
+Then on the device:
+
+```bash
+# what does this thing actually have?
+uname -m ; grep -m1 Features /proc/cpuinfo ; nproc
+free -m | head -2
+
+# human-readable first, to eyeball it
+/tmp/bench_gdn_<variant> --repeats 30
+
+# then the machine-readable form
+/tmp/bench_gdn_<variant> --repeats 30 --csv > bench_<device>.csv
+```
+
+**Pin to a cluster on the RK3588** — this is the whole point of having an asymmetric board, and an
+unpinned run on a big.LITTLE SoC is close to meaningless because the scheduler will migrate you
+mid-measurement:
+
+```bash
+# On most RK3588 boards cpu0-3 are the A55 littles and cpu4-7 the A76 bigs.
+# CONFIRM before trusting it — the mapping is board-dependent:
+for c in /sys/devices/system/cpu/cpu[0-7]; do
+  echo "$c $(cat $c/cpufreq/cpuinfo_max_freq 2>/dev/null)"
+done
+# higher max freq = the big cluster
+
+taskset -c 4-7 /tmp/bench_gdn_rk3588_a76 --repeats 30 --csv > bench_rk3588_big.csv
+taskset -c 0-3 /tmp/bench_gdn_rk3588_a55 --repeats 30 --csv > bench_rk3588_little.csv
+```
+
+## 2. Capture provenance
+
+A number without a manifest is not a result (`PLAN.md` §9). If the device has Python 3:
+
+```bash
+scp bench/manifest.py <device>:/tmp/
+ssh <device> 'python3 /tmp/manifest.py' > results/manifests/<device>.json
+```
+
+It is stdlib-only and degrades gracefully, so it will not fail on a minimal image. If there is no
+Python at all, capture the equivalent by hand:
+
+```bash
+uname -a ; cat /proc/cpuinfo | head -30 ; free -m
+for z in /sys/class/thermal/thermal_zone*; do echo "$z $(cat $z/type) $(cat $z/temp)"; done
+for c in /sys/devices/system/cpu/cpu*/cpufreq; do
+  echo "$c $(cat $c/scaling_governor) $(cat $c/cpuinfo_max_freq)"
+done
+```
+
+## 3. Things that will quietly ruin the numbers
+
+- **Thermal throttling.** Check temps before and after. On a Pi 5 without a cooler this is the most
+  likely source of a bad result. If p95 is far above p50, suspect throttling first.
+- **Governor.** `powersave` will halve your figures. Set `performance` if you can, and record which
+  you used either way.
+- **Background load.** Idle the device. `nproc`-many busy processes will show up as spread.
+- **Not pinning on big.LITTLE.** See above.
+- **Reading QEMU numbers as real.** Never benchmark under emulation — see `FINDINGS.md` §5.
+
+## 4. Bring the results back
+
+```bash
+mkdir -p results/raw results/manifests
+scp <device>:bench_<device>.csv results/raw/
+git add results/ && git commit -m "Add measured results from <device>"
+```
+
+---
+
+## What we are actually testing
+
+Not "how fast is my board". The devices span **~17 GB/s (Pi 5) → 25.6 GB/s (Jetson) → ~34 GB/s
+(RK3588)** of spec memory bandwidth, and the hypothesis (`METRICS.md`) is that these kernels are
+**memory-bandwidth-bound at ~0.25 FLOP/byte**. If that holds, achieved throughput should track
+bandwidth roughly linearly and **largely ignore core generation**.
+
+The discriminating case is that the ordering is inverted:
+
+> The **Pi 5 has the newest cores** (A76, Armv8.2, dotprod) but the **lowest bandwidth**.
+> The **Jetson Nano has the oldest cores** (A57, Armv8.0, no dotprod) and **more bandwidth**.
+
+**If the Jetson beats the Pi 5 on the scan kernel** despite three ISA generations less capability,
+that is real evidence for bandwidth-boundedness rather than a confirmation-biased result.
+**If the Pi 5 wins comfortably**, the thesis is wrong or incomplete, and we need to know that —
+several downstream decisions (the CPU-first mapping in `PLAN.md` §3.1, deprioritising the bf16
+state variant, prioritising weight quantization) rest on it.
+
+Either outcome is publishable. Report whichever happens.
+
+The RK3588's ~34 GB/s figure is **estimated** from its quad-channel 16-bit interface, not vendor-
+confirmed — the benchmark's achieved-GiB/s column is there so the spec number can be checked rather
+than trusted.
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && bd show ob-8ms 2>&1
+    timeout_secs: 15
+
+○ ob-8ms [EPIC] · E3: Portable Arm hedge track (Edge AI fallback)   [● P1 · OPEN]
+Type: epic
+Created: 2026-08-02 · Updated: 2026-08-02
+
+DESCRIPTION
+
+  Keep a viable Edge AI submission alive on generic aarch64, independent of   
+  the O6. Not a consolation prize: the GDN memory-scaling thesis is fully     
+  demonstrable on any aarch64 device with i8mm/SVE and a Vulkan or OpenCL GPU,
+  and Edge AI is a legitimate prize category that fits edge inference hardware
+  naturally.                                                                  
+
+
+
+LABELS: hedge, portable
+
+CHILDREN
+  ↳ ✓ ob-8ms.1: Cross-compilation toolchain and CIX sysroot for building O6 binaries from x86 ● P2
+  ↳ ○ ob-uyh: docs/SETUP_PORTABLE.md for reproducible hedge-target setup ● P2
+  ↳ ○ ob-ng6: Bring up the hedge target with an aarch64 build using i8mm/SVE ● P1
+  ↳ ✓ ob-zh4: DECISION: choose the portable aarch64 hedge target ● P1
+  ↳ ○ ob-c9q: Baseline benchmark sweep on the hedge target ● P1
+  ↳ ○ ob-8ms.3: Run the device-fleet bandwidth-scaling study (Pi 5 / RK3588 / Jetson Nano) ● P0
+  ↳ ✓ ob-8ms.2: Standalone GDN kernel microbenchmark for any aarch64 device (Armv8 upward) ● P0
+  ◐ 3/7 complete (42%)
+
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && bd show ob-uyh 2>&1
+    timeout_secs: 15
+
+○ ob-uyh · docs/SETUP_PORTABLE.md for reproducible hedge-target setup   [● P2 · OPEN]
+Type: task
+Created: 2026-08-02 · Updated: 2026-08-02
+
+DESCRIPTION
+
+  Setup instructions are a stated Devpost write-up requirement, and if the    
+  Edge AI track is chosen this document becomes the primary reproduction path 
+  judges will follow.                                                         
+
+
+
+LABELS: hedge, submission
+
+PARENT
+  ↑ ○ ob-8ms: (EPIC) E3: Portable Arm hedge track (Edge AI fallback) ● P1
+
+DEPENDS ON
+  → ○ ob-ng6: Bring up the hedge target with an aarch64 build using i8mm/SVE ● P1
+ob-uyh is blocked on ob-ng6 (hardware). Let me look at what provenance manifest.py captures — I can create a portable shell-based provenance script since manifest.py doesn't work on Python 3.6.9:
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && cat bench/manifest.py 2>&1
+    timeout_secs: 10
+
+"""Run manifest — provenance capture for benchmark runs.
+
+Per PLAN.md section 9: "a number without a manifest is not a result." On a
+passively-cooled edge board, thermal state alone can move throughput enough to
+invalidate a comparison, so this module exists to make that state visible and
+recorded rather than assumed. ``docs/RESULTS_SCHEMA.md`` and ``bench/schema.py``
+already define the CSV-side ``manifest_ref`` column that points at what this
+module produces; this is the other half of that contract.
+
+Targets Python 3.10+, and uses no third-party dependencies -- only stdlib
+modules (``json``, ``os``, ``platform``, ``socket``, ``subprocess``, ``sys``,
+``importlib.metadata``, ``pathlib``, ``re``, ``datetime``, ``glob``). Same
+stdlib-only rule as ``bench/schema.py``: this has to import cleanly in the NOE
+Compiler's Python 3.10 environment and on the board, where we do not control
+the dependency set.
+
+**Design rule: degrade gracefully on any platform.** This runs on an x86 dev
+host today and an aarch64 board later, and it must never take a benchmark run
+down. Every individual probe (a `/proc` read, a `/sys` walk, an import) is
+wrapped in its own try/except and records ``None``/absent on failure rather
+than raising. ``capture()`` itself never raises for probe failures; the worst
+case is a manifest with more nulls in it, not a crashed harness. ``write()``
+following the same rule is why callers can fire-and-forget it after a run.
+"""
+
+from __future__ import annotations
+
+import glob
+import json
+import os
+import platform
+import re
+import socket
+import subprocess
+import sys
+from datetime import datetime, timezone
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as _pkg_version
+from pathlib import Path
+from typing import Any
+
+# ISA features we care about because the CPU kernel dispatch ladder is
+# SVE (1 or 2) -> NEON -> scalar (docs/FINDINGS.md section 4), and the
+# quantized matmul path additionally cares about i8mm/bf16/asimddp/sme
+# (docs/FINDINGS.md section 3.1, 3.3).
+_ISA_FEATURES_OF_INTEREST = ("sve", "sve2", "i8mm", "bf16", "asimddp", "sme")
+
+# Packages whose versions are worth recording if importable, without ever
+# requiring them (bench/schema.py and this module both run stdlib-only; the
+# model/inference stack is a separate, optional concern).
+_OPTIONAL_PACKAGES = ("torch", "transformers", "onnxruntime", "numpy")
+
+
+def _safe(fn, *args, **kwargs):
+    """Run fn, returning None on any exception instead of propagating it.
+
+    The one helper this module leans on throughout: every probe is a call
+    through this wrapper so a single missing /sys file, an absent binary, or
+    a permissions error degrades to a null field rather than crashing the
+    benchmark run that asked for a manifest.
+    """
+    try:
+        return fn(*args, **kwargs)
+    except Exception:
+        return None
+
+
+def _read_text(path: str) -> str | None:
+    return Path(path).read_text(encoding="utf-8", errors="replace")
+
+
+def _run(cmd: list[str]) -> str | None:
+    out = subprocess.run(  # noqa: S603 -- fixed argv lists, no shell, no user input
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        timeout=5,
+        check=True,
+    )
+    return out.stdout.decode("utf-8", errors="replace").strip()
+
+
+# ---------------------------------------------------------------------------
+# Run identity
+# ---------------------------------------------------------------------------
+
+
+def _utc_timestamp() -> str:
+    """ISO 8601 UTC timestamp, e.g. 2026-08-10T14:30:00Z."""
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _git_sha() -> str | None:
+    return _safe(_run, ["git", "rev-parse", "HEAD"])
+
+
+def _git_dirty() -> bool | None:
+    status = _safe(_run, ["git", "status", "--porcelain"])
+    if status is None:
+        return None
+    return len(status) > 0
+
+
+def _default_run_id() -> str:
+    """Fallback run_id when the caller doesn't supply one.
+
+    Mirrors the documented convention in docs/RESULTS_SCHEMA.md section 2:
+    ``<device>_<yyyymmddTHHMMSSZ>_<short_git_sha>`` -- but this module doesn't
+    know "device" (that's a harness/schema concept), so it uses the hostname
+    as a stand-in when called standalone (e.g. via __main__).
+    """
+    host = _safe(socket.gethostname) or "unknown"
+    host = re.sub(r"[^A-Za-z0-9_.-]", "-", host)
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    sha = _git_sha()
+    short_sha = sha[:7] if sha else "nogit"
+    return f"{host}_{stamp}_{short_sha}"
+
+
+# ---------------------------------------------------------------------------
+# Host / device
+# ---------------------------------------------------------------------------
+
+
+def _hostname() -> str | None:
+    return _safe(socket.gethostname)
+
+
+def _kernel_version() -> str | None:
+    return _safe(platform.release)
+
+
+def _machine_arch() -> str | None:
+    return _safe(platform.machine)
+
+
+def _cpu_model() -> str | None:
+    """Best-effort human-readable CPU model string.
+
+    /proc/cpuinfo's "model name" (x86) or the aarch64-equivalent "Hardware"/
+    "model name" fields; falls back to platform.processor() which is often
+    empty on Linux but costs nothing to try.
+    """
+    text = _safe(_read_text, "/proc/cpuinfo")
+    if text:
+        for key in ("model name", "Hardware", "Model"):
+            match = re.search(rf"^{re.escape(key)}\s*:\s*(.+)$", text, re.MULTILINE)
+            if match:
+                return match.group(1).strip()
+    return _safe(platform.processor) or None
+
+
+def _core_count() -> int | None:
+    return _safe(os.cpu_count)
+
+
+def _read_int_file(path: str) -> int | None:
+    text = _safe(_read_text, path)
+    if text is None:
+        return None
+    try:
+        return int(text.strip())
+    except ValueError:
+        return None
+
+
+def _cpufreq_topology() -> list[dict[str, Any]] | None:
+    """Per-CPU big.LITTLE-relevant topology from /sys/devices/system/cpu.
+
+    Reads cpufreq/{scaling_max_freq,scaling_min_freq,scaling_governor} and
+    cpu_capacity per logical CPU. On the CIX P1 the Cortex-A720 "big",
+    A720 "medium", and A520 "little" clusters have distinct max frequencies,
+    so this is how the cluster shape becomes visible without hardcoding
+    a topology this module has no way to know in general. Returns None
+    (rather than []) if the whole /sys/devices/system/cpu tree is absent
+    (e.g. inside some containers), so callers can tell "no cpus found" from
+    "found zero cpus" -- an absent tree is a different failure than an empty
+    result.
+
+    Individual per-CPU fields that are missing (e.g. no cpufreq on this
+    platform, or a virtualized x86 host with no scaling driver) come back
+    as None inside each entry rather than omitting the entry, so the entry
+    count still reflects how many logical CPUs exist.
+    """
+    base = "/sys/devices/system/cpu"
+    if not os.path.isdir(base):
+        return None
+    cpu_dirs = sorted(
+        glob.glob(os.path.join(base, "cpu[0-9]*")),
+        key=lambda p: int(re.search(r"cpu(\d+)$", p).group(1)),
+    )
+    if not cpu_dirs:
+        return None
+
+    topology = []
+    for cpu_dir in cpu_dirs:
+        cpu_id = int(re.search(r"cpu(\d+)$", cpu_dir).group(1))
+        entry: dict[str, Any] = {
+            "cpu": cpu_id,
+            "max_freq_khz": _read_int_file(os.path.join(cpu_dir, "cpufreq", "scaling_max_freq")),
+            "min_freq_khz": _read_int_file(os.path.join(cpu_dir, "cpufreq", "scaling_min_freq")),
+            "governor": _safe(
+                lambda d=cpu_dir: _read_text(os.path.join(d, "cpufreq", "scaling_governor")).strip()
+            ),
+            "cpu_capacity": _read_int_file(os.path.join(cpu_dir, "cpu_capacity")),
+        }
+        topology.append(entry)
+    return topology
+
+
+# ---------------------------------------------------------------------------
+# ISA features (aarch64)
+# ---------------------------------------------------------------------------
+
+
+def _isa_features() -> dict[str, bool] | None:
+    """Parse /proc/cpuinfo's aarch64 "Features" line for the ISA bits we care about.
+
+    This matters because our CPU kernels dispatch SVE -> NEON -> scalar
+    (docs/FINDINGS.md section 4), so a manifest that only records the target
+    architecture and not which extensions are actually present at runtime
+    cannot explain which path ran. Deliberately keyed on what actually
+    appears in /proc/cpuinfo (not on platform.machine()=='aarch64' alone),
+    since the same binary can run in an emulator that reports aarch64 but
+    lacks a feature, or vice versa.
+
+    Returns None on non-aarch64 (or if /proc/cpuinfo is unreadable / has no
+    Features line) since the concept doesn't apply -- e.g. this always comes
+    back None on the x86 dev host this module is verified against.
+    """
+    if _machine_arch() not in ("aarch64", "arm64"):
+        return None
+    text = _safe(_read_text, "/proc/cpuinfo")
+    if not text:
+        return None
+    match = re.search(r"^Features\s*:\s*(.+)$", text, re.MULTILINE)
+    if not match:
+        return None
+    present = set(match.group(1).split())
+    return {feature: feature in present for feature in _ISA_FEATURES_OF_INTEREST}
+
+
+# ---------------------------------------------------------------------------
+# Thermal
+# ---------------------------------------------------------------------------
+
+
+def _thermal_zones() -> list[dict[str, Any]] | None:
+    """Snapshot of /sys/class/thermal/thermal_zone*/{temp,type} at capture time.
+
+    On a passively-cooled edge board this is the whole point (PLAN.md
+    section 9): thermal state alone can move throughput enough to invalidate
+    a comparison. temp is left in the raw millidegree-C integer /sys reports
+    (not divided down) so this module makes no assumption about a particular
+    thermal driver's scaling. Returns None if the thermal_zone tree doesn't
+    exist at all (common on plain x86 dev hosts / some VMs); returns [] only
+    if the tree exists but is empty.
+    """
+    zones = sorted(glob.glob("/sys/class/thermal/thermal_zone*"))
+    if not os.path.isdir("/sys/class/thermal"):
+        return None
+    result = []
+    for zone_dir in zones:
+        result.append(
+            {
+                "zone": os.path.basename(zone_dir),
+                "type": _safe(lambda d=zone_dir: _read_text(os.path.join(d, "type")).strip()),
+                "temp_millicelsius": _read_int_file(os.path.join(zone_dir, "temp")),
+            }
+        )
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Memory
+# ---------------------------------------------------------------------------
+
+
+def _meminfo() -> dict[str, int | None] | None:
+    """MemTotal / MemAvailable (kB, as reported) from /proc/meminfo."""
+    text = _safe(_read_text, "/proc/meminfo")
+    if text is None:
+        return None
+    result: dict[str, int | None] = {"mem_total_kb": None, "mem_available_kb": None}
+    for key, field in (("MemTotal", "mem_total_kb"), ("MemAvailable", "mem_available_kb")):
+        match = re.search(rf"^{key}:\s*(\d+)\s*kB", text, re.MULTILINE)
+        if match:
+            result[field] = int(match.group(1))
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Software
+# ---------------------------------------------------------------------------
+
+
+def _optional_package_versions() -> dict[str, str | None]:
+    """Versions of torch/transformers/onnxruntime/numpy, if importable.
+
+    Uses importlib.metadata rather than importing the packages themselves,
+    so this never pays the cost (or risk) of actually importing a heavy ML
+    library just to ask its version, and never requires any of them to be
+    installed -- per the task's stdlib-only / "do not require them" rule.
+    """
+    versions: dict[str, str | None] = {}
+    for name in _OPTIONAL_PACKAGES:
+        try:
+            versions[name] = _pkg_version(name)
+        except PackageNotFoundError:
+            versions[name] = None
+        except Exception:
+            versions[name] = None
+    return versions
+
+
+# ---------------------------------------------------------------------------
+# capture / write / manifest_ref
+# ---------------------------------------------------------------------------
+
+
+def capture(**caller_fields: Any) -> dict[str, Any]:
+    """Capture a complete run manifest as a plain JSON-serializable dict.
+
+    ``caller_fields`` are additional fields the caller wants recorded verbatim
+    under ``manifest["caller"]`` -- this is how compiler flags and the
+    layer-to-engine dispatch path actually used for a given run get into the
+    manifest, since this module has no way to know them on its own (they are
+    a harness/optimization-implementation concern, not a host-probing one).
+
+    Never raises for probe failures: every probe below is individually
+    wrapped, so the worst outcome is a manifest with more null fields, never
+    an exception that takes a benchmark run down with it.
+    """
+    run_id = caller_fields.pop("run_id", None) or _safe(_default_run_id) or "unknown_run"
+
+    manifest: dict[str, Any] = {
+        "manifest_version": 1,
+        "run_id": run_id,
+        "timestamp_utc": _safe(_utc_timestamp),
+        "git": {
+            "sha": _safe(_git_sha),
+            "dirty": _safe(_git_dirty),
+        },
+        "host": {
+            "hostname": _safe(_hostname),
+            "machine": _safe(_machine_arch),
+            "kernel": _safe(_kernel_version),
+            "os": _safe(platform.platform),
+            "cpu_model": _safe(_cpu_model),
+            "core_count": _safe(_core_count),
+            "cpu_topology": _safe(_cpufreq_topology),
+        },
+        "isa_features": _safe(_isa_features),
+        "thermal_zones": _safe(_thermal_zones),
+        "memory": _safe(_meminfo),
+        "software": {
+            "python_version": sys.version,
+            "python_implementation": _safe(platform.python_implementation),
+            "packages": _safe(_optional_package_versions) or {},
+        },
+        "caller": dict(caller_fields),
+    }
+    return manifest
+
+
+def manifest_ref(run_id: str, *, results_dir: str = "results/manifests") -> str:
+    """Relative-to-repo-root path for a run's manifest, for the CSV's manifest_ref column.
+
+    docs/RESULTS_SCHEMA.md section 3 documents this exact form, e.g.
+    ``results/manifests/o6_20260810T143000Z_a1b2c3d.json``. Uses posixpath-style
+    forward slashes regardless of host OS since this string lands in a
+    committed CSV, not a filesystem call.
+    """
+    return f"{results_dir}/{run_id}.json"
+
+
+def write(manifest: dict[str, Any], path: str | os.PathLike) -> None:
+    """Write manifest to path as JSON, creating parent directories as needed.
+
+    Deliberately narrow: this function's only failure mode should be "disk
+    write failed" (permissions, out of space, bad path), which is a real
+    problem worth surfacing -- unlike the individual probes in capture(),
+    which must never raise. Callers who want the "manifest must never take
+    down a run" property end-to-end should wrap this call, not this function
+    itself, e.g.::
+
+        try:
+            manifest.write(manifest.capture(...), path)
+        except Exception:
+            logging.exception("failed to write run manifest to %s", path)
+    """
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as handle:
+        json.dump(manifest, handle, indent=2, sort_keys=True)
+        handle.write("\n")
+
+
+__all__ = [
+    "capture",
+    "write",
+    "manifest_ref",
+]
+
+
+if __name__ == "__main__":
+    print(json.dumps(capture(), indent=2, sort_keys=True))
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && head -100 PLAN.md 2>&1
+    timeout_secs: 5
+
+# OrionsBelt — Implementation Plan
+
+**Project:** Deploy and optimize a Qwen3.5-family model (Gated DeltaNet hybrid architecture) on Arm silicon, primarily the Radxa Orion O6 (CIX P1 SoC), with a Gated DeltaNet-2 research comparison as the differentiator.
+
+**Competition:** [Arm Create: AI Optimization Challenge](https://arm-ai-optimization-challenge.devpost.com/)
+**Submission deadline:** 2026-08-14, 16:00 PT
+**Plan authored:** 2026-08-02 (**T-12 days**)
+**Source brief:** [`brief.md`](./brief.md)
+**Issue tracking:** [beads](https://beads.gascity.com/) (`bd`), prefix `ob-` — see [`docs/BEADS.md`](./docs/BEADS.md)
+
+---
+
+## 1. Executive summary
+
+The technical thesis is strong and unusually well-matched to the competition: **Gated DeltaNet (GDN) linear-attention layers decode in O(1) memory per token**, where full attention grows a KV cache linearly with context. That advantage is *most visible precisely where memory is scarce* — edge silicon. Demonstrating it concretely on an Arm SoC, with honest before/after numbers, hits the rubric's "Arm-specific optimization" (40 pts) and "WOW factor" (25 pts) at the same time.
+
+The **schedule, not the engineering, is the primary risk.** As of today we hold neither the Orion O6 board nor CIX Early Bird SDK access, and the deadline is 12 days out. Board procurement plus NPU toolchain enrollment are both externally gated — no amount of effort compresses them. This plan therefore runs **two tracks in parallel from day one**:
+
+| Track | Target | Devpost track | Gated on |
+|---|---|---|---|
+| **Primary** | Radxa Orion O6 (CIX P1: 12-core CPU + Immortalis G720 + 28.8 TOPS NPU) | Physical AI | Board arrival + CIX Early Bird approval |
+| **Hedge** | Generic aarch64 (Android phone via Termux, or Apple silicon / AWS Graviton) | Edge AI | Nothing — starts immediately |
+
+> **Corrected 2026-08-02:** the three tracks are Physical AI, Cloud AI, and **Edge AI**. `brief.md`'s
+> "Mobile AI" track does not exist — see [`docs/CLAIM_VERIFICATION.md`](./docs/CLAIM_VERIFICATION.md) §1.1.
+> Edge AI is a better fit than Mobile AI ever was: the O6 is an edge device, not a phone, so *both*
+> tracks remain open to an O6 submission and the hedge no longer requires a phone specifically.
+
+Everything genuinely portable — benchmark harness, correctness oracle, model selection, GDN architecture audit, GDN-2 research, write-up scaffolding — is built **hardware-independent** and runs on either target. A **hard go/no-go on 2026-08-09** picks the track based on what hardware actually exists by then. The hedge is not a consolation prize: the GDN memory-scaling story is fully demonstrable on any aarch64 device with Arm i8mm/SVE and a Vulkan or OpenCL GPU, and Edge AI is a legitimate prize category.
+
+**Explicit non-goal:** we are not pretending to a result we cannot measure. If the NPU never becomes accessible, we ship a CPU+GPU hybrid with rigorous numbers and say so plainly. A reproducible, honestly-reported partial result scores better than an unverifiable claim.
+
+---
+
+## 2. Constraints and ground truth
+
+### 2.1 Hard constraints
+
+| Constraint | Value | Source |
+|---|---|---|
+| Submission close | 2026-08-14 **16:00 PDT** | Devpost rules (verified) |
+| License | OSI-approved (**MIT or Apache-2.0**), public repo | Devpost rules — hard requirement. Making it visible in the About section is our practice, not a stated rule |
+| Repository | Public, open source | Devpost rules |
+| Write-up | Project overview, functionality/output, setup instructions | Devpost rules |
+| Newness | Built or significantly updated during submission period | Devpost rules |
+| Benchmarking | Arm Performix for standardized reporting | Challenge brief |
+| Demo video | Optional, <3 min, YouTube/Vimeo/Youku | Devpost rules |
+| NOE Compiler | **Python 3.10** (verified). Runs on an **x86 host**, direct download, no approval gate | Radxa env-setup docs |
+| NPU model ceiling | models "within ten billion parameters" | Radxa docs (verified) |
+
+### 2.2 Judging rubric → where each point lands
+
+The rubric is the spec. Every workstream below is justified by a line here.
+
+| Criterion | Points | Our answer |
+|---|---:|---|
+| Technological implementation / Arm-specific optimization | 40 | Heterogeneous NPU+GPU+CPU partitioning of GDN layers; INT4/INT8 NPU quantization; Vulkan compute-shader chunkwise scan; big.LITTLE affinity; i8mm/SVE GEMM paths |
+| WOW factor | 25 | Dynamic heterogeneous dispatcher + GDN-2 research comparison — novel architecture optimized *before* broad tooling support exists |
+| Potential impact | 20 | Reusable reference implementation, documented op-coverage findings, migration template for GDN-class models on Arm |
+| Developer experience | 15 | Clean-clone reproduction rehearsal, scripted setup, CI, run manifests |
+
+### 2.3 Claim verification — **done**, see [`docs/CLAIM_VERIFICATION.md`](./docs/CLAIM_VERIFICATION.md)
+
+Bead `ob-ofk` verified `brief.md`'s load-bearing figures against primary sources on 2026-08-02.
+Summary:
+
+**Confirmed:** the 3:1 Gated DeltaNet-to-full-attention ratio (primary source, and it is the
+claim the whole project rests on); small dense variants at 0.8B / 2B / 4B / 9B, so the planned
+0.8B–4B target range is viable; 262K native context (~1M only via YaRN rope scaling); 45 TOPS
+combined and 28.8 TOPS NPU with INT4–TF32; the 12-core three-tier CPU; ~30 tok/s on Qwen2-1.5B
+as a vendor figure; and every competition fact (deadline, $8,000 prize split, 40/25/20/15 rubric,
+MIT-or-Apache-2.0).
+
+**Corrected:** the third track is **Edge AI**, not "Mobile AI"; the "60 layers" figure is wrong
+for the models we care about (dense default is 32 layers → **24 GDN + 8 full attention** at 3:1;
+MoE 35B-A3B is 40); the 397B-A17B upper bound is unconfirmed and dropped; memory bandwidth is
+100GB/s, not "over" it; and GDN-2's RULER gains are real but not quantified in the abstract, so
+they must be described qualitatively until the full paper is read.
+
+**Corrected again (2026-08-02, after the CIX wiki pointer):** the NOE Compiler needs **Python 3.10,
+not 3.8**; the SDK is a **direct download with no approval gate**; and it **runs on an x86 host**.
+This dissolves most of risk R2 and makes the NOE op-coverage audit for GDN operators actionable
+*without the board* — see `docs/CLAIM_VERIFICATION.md` §2.2a.
+
+### 2.4 Verified finding that reshapes the thesis
+
+Upstream publishes measured GDN kernel numbers: optimizing the DeltaNet path speeds up **prefill
+by 1.38–1.49×** and leaves **decode flat**, because "the single-token DeltaNet recurrence is
+memory-bandwidth-bound." On the O6's 100GB/s LPDDR5 this will bind *harder* than on the GB10 those
+numbers came from.
+
+So the two claims worth building the submission around are:
+
+1. **Prefill / TTFT throughput** — where kernel work genuinely pays, and where the advantage
+   *grows with context length*. The right target for `t-gpu-scan` and the NPU offload.
+2. **Decode memory footprint** — O(1) recurrent state versus a linearly-growing KV cache. An
+   architectural property rather than a kernel win, and the thing that makes long context feasible
+   on a 64GB board at all.
+
+What we must **not** promise is a large decode tokens/sec win from GDN kernel optimization. Better
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && gh pr view 3 --json title,state,body 2>&1 | head -5
+    timeout_secs: 15
+
+{"body":"## Jetson-J1 Device Bench + Portable Code\n\n### Phase 1 — Device Benchmark ✅\n- Cortex-A57 (Armv8.0, NEON only), 4 cores @ 1.48 GHz, 4 GB LPDDR4\n- Achieved: 0.73–2.03 GiB/s across kernels vs 25.6 GiB/s spec bandwidth\n- Results with manifest: `results/raw/jetson-j1.csv`, `results/manifests/jetson-j1.json`\n\n### Phase 2 — Portable Code (11 beads closed across sessions)\n\n**Session 1–2 (10 beads):** Architecture audit, quant policy, benchmark harness, memory breakdown, METHODOLOGY.md, plots.py, corpus.py, fetch_weights.py, compliance check\n\n**Session 3 (1 bead):** ob-8qt.4 — bf16/fp16 mixed-precision recurrent-state kernels\n- 4 new kernel functions with fp32 accumulators + narrow-format state/output\n- Correctness verified: bf16 0.38% max error, fp16 0.05% max error\n- Decode benchmark: state narrowing HURTS throughput at seq=1 (conversion overhead > memory savings when state fits L1)\n- State narrowing is a memory-residency optimization, not a decode-throughput optimization\n\n**Session 4 (1 bead):** ob-mrd.2 — Sustained-load benchmark mode\n- Added `--sustained <seconds>` flag to bench_gdn.c\n- 120s run on Jetson-J1: 0.77→0.76 GiB/s, thermal 51→52°C — **no throttling** (active cooling)\n- Portable: every fleet device can produce its own thermal decay curve\n- Addresses PLAN.md risk R7\n\n### Current Status\n- All remaining ready beads are hardware-gated for this device (need O6, RK3588, x86/CUDA, or i8mm/SVE cores)\n- PR awaits reviewer merge","state":"OPEN","title":"j1: device bench + harness + plots + corpus + methodology + weight fetch + compliance"}The PR body needs updating with Session 5 work. But first, let me create the shell-based provenance script — I've been hand-writing JSON manifests on every run because manifest.py needs Python 3.10+. This affects all edge devices with older Python.
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && bd create \
+  --title "Shell-based provenance capture script (no Python dependency)" \
+  --type task \
+  --priority P1 \
+  --parent ob-mrd \
+  --labels "portable" \
+  --description "bench/manifest.py requires Python 3.10+ (from __future__ import annotations, builtin generics). Edge devices like the Jetson Nano run Python 3.6.9 and cannot execute it, forcing manual JSON manifest creation. Create scripts/capture_manifest.sh that captures the same provenance fields (hostname, arch, kernel, cpu_model, core_count, cpu_topology, isa_features, thermal_zones, memory, git sha) and outputs JSON using only bash and standard /proc /sys reads. Same graceful-degradation principle: missing fields become null, never crash." \
+  2>&1
+    timeout_secs: 15
+
+✓ Created issue: ob-mrd.4 — Shell-based provenance capture script (no Python dependency)
+  Priority: P1
+  Status: open
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && bd update ob-mrd.4 --claim 2>&1
+    timeout_secs: 15
+
+✓ Updated issue: ob-mrd.4 — Shell-based provenance capture script (no Python dependency)Now let me implement the shell-based provenance script:
+  ────────────────────────────────────────
+  ▸ write
+    path ~/OrionsBelt/scripts/capture_manifest.sh
+    content: #!/usr/bin/env bash
+# Shell-based run manifest — provenance capture without Python.
+#
+# bench/manifest.py requires Python 3.10+. Edge devices like the Jetson Nano
+# run Python 3.6.9 and cannot execute it, forcing manual JSON creation.
+# This script captures the same provenance fields using only bash and
+# standard /proc /sys reads, outputting schema-compatible JSON.
+#
+# Bead ob-mrd.4. Usage:
+#   ./scripts/capture_manifest.sh > results/manifests/<device>.json
+#   ./scripts/capture_manifest.sh --run-id custom_id > results/manifests/custom.json
+#
+# Same graceful-degradation principle as manifest.py: missing fields become
+# null, the script never crashes. Every probe is individually guarded.
+set -euo pipefail
+
+# --- helpers ---
+
+json_escape() {
+    # Escape a string for JSON: backslash, quote, control chars
+    local s="$1"
+    s="${s//\\/\\\\}"
+    s="${s//\"/\\\"}"
+    s="${s//$'\t'/\\t}"
+    s="${s//$'\n'/\\n}'
+    s="${s//$'\r'/\\r}"
+    printf '%s' "$s"
+}
+
+read_file() {
+    local f="$1"
+    if [ -r "$f" ]; then cat "$f" 2>/dev/null || true; fi
+}
+
+read_trim() {
+    local f="$1"
+    local v
+    v=$(read_file "$f")
+    printf '%s' "${v//[[:space:]]/}"
+}
+
+# --- run identity ---
+
+HOSTNAME_S=$(hostname 2>/dev/null || echo "unknown")
+HOSTNAME_S=$(json_escape "$HOSTNAME_S")
+TIMESTAMP_UTC=$(date -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || echo "unknown")
+
+GIT_SHA="null"
+GIT_DIRTY="null"
+if git rev-parse --git-dir >/dev/null 2>&1; then
+    SHA=$(git rev-parse HEAD 2>/dev/null || true)
+    if [ -n "$SHA" ]; then
+        GIT_SHA="\"$(json_escape "$SHA")\""
+        SHORT_SHA="${SHA:0:7}"
+        STATUS=$(git status --porcelain 2>/dev/null || true)
+        if [ -n "$STATUS" ]; then
+            GIT_DIRTY="true"
+        else
+            GIT_DIRTY="false"
+        fi
+    else
+        SHORT_SHA="nogit"
+    fi
+else
+    SHORT_SHA="nogit"
+fi
+
+# Allow override of run_id
+RUN_ID=""
+ while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --run-id) RUN_ID="$2"; shift 2 ;;
+        *) shift ;;
+    esac
+done
+if [ -z "$RUN_ID" ]; then
+    STAMP=$(date -u +"%Y%m%dT%H%M%SZ" 2>/dev/null || echo "unknown")
+    RUN_ID="${HOSTNAME_S//\"/}_${STAMP}_${SHORT_SHA}"
+fi
+RUN_ID_ESC=$(json_escape "$RUN_ID")
+
+# --- host info ---
+
+ARCH=$(uname -m 2>/dev/null || echo "unknown")
+KERNEL=$(uname -r 2>/dev/null || echo "unknown")
+OS_STR=$(uname -s 2>/dev/null || echo "unknown")
+if [ -n "$(uname -v 2>/dev/null)" ]; then
+    OS_FULL="${OS_STR} $(uname -v 2>/dev/null)"
+else
+    OS_FULL="$OS_STR"
+fi
+
+# CPU model from /proc/cpuinfo
+CPU_MODEL="null"
+CPUINFO=$(read_file /proc/cpuinfo)
+if [ -n "$CPUINFO" ]; then
+    for key in "model name" "Hardware" "Model"; do
+        LINE=$(echo "$CPUINFO" | grep -m1 "^$key" 2>/dev/null || true)
+        if [ -n "$LINE" ]; then
+            VAL="${LINE#*:}"
+            VAL="${VAL#"${VAL%%[![:space:]]*}"}"  # ltrim
+            CPU_MODEL="\"$(json_escape "$VAL")\""
+            break
+        fi
+    done
+fi
+
+# Core count
+CORE_COUNT=$(nproc 2>/dev/null || grep -c ^processor /proc/cpuinfo 2>/dev/null || echo "null")
+
+# --- ISA features (aarch64 only) ---
+
+ISA_JSON="null"
+if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then
+    FEATURES_LINE=$(echo "$CPUINFO" | grep -m1 '^Features' 2>/dev/null || true)
+    if [ -n "$FEATURES_LINE" ]; then
+        FEATURES_STR="${FEATURES_LINE#*:}"
+        ISA_JSON="{"
+        FIRST=1
+        for feat in sve sve2 i8mm bf16 asimddp sme; do
+            if [ "$FIRST" -eq 0 ]; then ISA_JSON+=","; fi
+            if echo "$FEATURES_STR" | grep -qw "$feat" 2>/dev/null; then
+                ISA_JSON+="\"$feat\":true"
+            else
+                ISA_JSON+="\"$feat\":false"
+            fi
+            FIRST=0
+        done
+        ISA_JSON+="}"
+    fi
+fi
+
+# --- CPU topology (per-core freq/governor/capacity) ---
+
+TOPOLOGY_JSON="null"
+CPU_BASE="/sys/devices/system/cpu"
+if [ -d "$CPU_BASE" ]; then
+    CPU_DIRS=$(ls -d "$CPU_BASE"/cpu[0-9]* 2>/dev/null | sort -t 'u' -k4 -n || true)
+    if [ -n "$CPU_DIRS" ]; then
+        TOPOLOGY_JSON="["
+        FIRST=1
+        for cpu_dir in $CPU_DIRS; do
+            if [ "$FIRST" -eq 0 ]; then TOPOLOGY_JSON+=","; fi
+            FIRST=0
+            CPU_ID=$(basename "$cpu_dir" | sed 's/cpu//')
+
+            MAX_FREQ=$(read_trim "$cpu_dir/cpufreq/scaling_max_freq" 2>/dev/null || true)
+            MIN_FREQ=$(read_trim "$cpu_dir/cpufreq/scaling_min_freq" 2>/dev/null || true)
+            GOVERNOR=$(read_trim "$cpu_dir/cpufreq/scaling_governor" 2>/dev/null || true)
+            CAPACITY=$(read_trim "$cpu_dir/cpu_capacity" 2>/dev/null || true)
+
+            [ -z "$MAX_FREQ" ] && MAX_FREQ_JSON="null" || MAX_FREQ_JSON="$MAX_FREQ"
+            [ -z "$MIN_FREQ" ] && MIN_FREQ_JSON="null" || MIN_FREQ_JSON="$MIN_FREQ"
+            [ -z "$GOVERNOR" ] && GOV_JSON="null" || GOV_JSON="\"$(json_escape "$GOVERNOR")\""
+            [ -z "$CAPACITY" ] && CAP_JSON="null" || CAP_JSON="$CAPACITY"
+
+            TOPOLOGY_JSON+="{\"cpu\":$CPU_ID,\"max_freq_khz\":$MAX_FREQ_JSON,\"min_freq_khz\":$MIN_FREQ_JSON,\"governor\":$GOV_JSON,\"cpu_capacity\":$CAP_JSON}"
+        done
+        TOPOLOGY_JSON+="]"
+    fi
+fi
+
+# --- thermal zones ---
+
+THERMAL_JSON="null"
+if [ -d /sys/class/thermal ]; then
+    ZONES=$(ls -d /sys/class/thermal/thermal_zone* 2>/dev/null | sort || true)
+    if [ -n "$ZONES" ]; then
+        THERMAL_JSON="["
+        FIRST=1
+        for zone_dir in $ZONES; do
+            if [ "$FIRST" -eq 0 ]; then THERMAL_JSON+=","; fi
+            FIRST=0
+            ZONE_NAME=$(basename "$zone_dir")
+            ZONE_TYPE=$(read_trim "$zone_dir/type" 2>/dev/null || true)
+            ZONE_TEMP=$(read_trim "$zone_dir/temp" 2>/dev/null || true)
+            [ -z "$ZONE_TYPE" ] && TYPE_JSON="null" || TYPE_JSON="\"$(json_escape "$ZONE_TYPE")\""
+            [ -z "$ZONE_TEMP" ] && TEMP_JSON="null" || TEMP_JSON="$ZONE_TEMP"
+            THERMAL_JSON+="{\"zone\":\"$ZONE_NAME\",\"type\":$TYPE_JSON,\"temp_millicelsius\":$TEMP_JSON}"
+        done
+        THERMAL_JSON+="]"
+    fi
+fi
+
+# --- memory ---
+
+MEM_TOTAL="null"
+MEM_AVAIL="null"
+MEMINFO=$(read_file /proc/meminfo)
+if [ -n "$MEMINFO" ]; then
+    LINE=$(echo "$MEMINFO" | grep -m1 '^MemTotal:' 2>/dev/null || true)
+    if [ -n "$LINE" ]; then MEM_TOTAL=$(echo "$LINE" | grep -oE '[0-9]+' | head -1); fi
+    LINE=$(echo "$MEMINFO" | grep -m1 '^MemAvailable:' 2>/dev/null || true)
+    if [ -n "$LINE" ]; then MEM_AVAIL=$(echo "$LINE" | grep -oE '[0-9]+' | head -1); fi
+fi
+
+# --- Python version (best effort) ---
+
+PY_VER="null"
+if command -v python3 >/dev/null 2>&1; then
+    PY_VER_RAW=$(python3 --version 2>&1 || true)
+    [ -n "$PY_VER_RAW" ] && PY_VER="\"$(json_escape "$PY_VER_RAW")\""
+fi
+
+# --- output JSON ---
+
+cat <<JSONEOF
+{
+  "manifest_version": 1,
+  "run_id": "$RUN_ID_ESC",
+  "timestamp_utc": "$TIMESTAMP_UTC",
+  "source": "scripts/capture_manifest.sh",
+  "git": {
+    "sha": $GIT_SHA,
+    "dirty": $GIT_DIRTY
+  },
+  "host": {
+    "hostname": "$HOSTNAME_S",
+    "machine": "$ARCH",
+    "kernel": "$KERNEL",
+    "os": "$(json_escape "$OS_FULL")",
+    "cpu_model": $CPU_MODEL,
+    "core_count": $CORE_COUNT,
+    "cpu_topology": $TOPOLOGY_JSON
+  },
+  "isa_features": $ISA_JSON,
+  "thermal_zones": $THERMAL_JSON,
+  "memory": {
+    "mem_total_kb": $MEM_TOTAL,
+    "mem_available_kb": $MEM_AVAIL
+  },
+  "software": {
+    "python_version": $PY_VER
+  }
+}
+JSONEOF
+
+
+Created /home/j1/OrionsBelt/scripts/capture_manifest.sh (236 lines)
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && chmod +x scripts/capture_manifest.sh && ./scripts/capture_manifest.sh 2>&1
+    timeout_secs: 15
+
+./scripts/capture_manifest.sh: line 233: unexpected EOF while looking for matching `"'
+
+Command exited with code 2Stray quote in json_escape. Let me fix:
+  ────────────────────────────────────────
+  ▸ edit
+    path ~/OrionsBelt/scripts/capture_manifest.sh
+    after:     s="${s//$'\n'/\\n}"
+    before:     s="${s//$'\n'/\\n}'
+
+Edited /home/j1/OrionsBelt/scripts/capture_manifest.sh (1 lines -> 1 lines)
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && ./scripts/capture_manifest.sh 2>&1
+    timeout_secs: 15
+
+{
+  "manifest_version": 1,
+  "run_id": "j1_20260802T234423Z_df84ad8",
+  "timestamp_utc": "2026-08-02T23:44:23Z",
+  "source": "scripts/capture_manifest.sh",
+  "git": {
+    "sha": "df84ad88005beb646a77a3b28f39689835e1ddf8",
+    "dirty": true
+  },
+  "host": {
+    "hostname": "j1",
+    "machine": "aarch64",
+    "kernel": "4.9.337-tegra",
+    "os": "Linux #1 SMP PREEMPT Mon Nov 4 23:41:41 PST 2024",
+    "cpu_model": "ARMv8 Processor rev 1 (v8l)",
+    "core_count": 4,
+    "cpu_topology": [{"cpu":0,"max_freq_khz":1479000,"min_freq_khz":102000,"governor":"performance","cpu_capacity":null},{"cpu":1,"max_freq_khz":1479000,"min_freq_khz":102000,"governor":"performance","cpu_capacity":null},{"cpu":2,"max_freq_khz":1479000,"min_freq_khz":102000,"governor":"performance","cpu_capacity":null},{"cpu":3,"max_freq_khz":1479000,"min_freq_khz":102000,"governor":"performance","cpu_capacity":null}]
+  },
+  "isa_features": {"sve":false,"sve2":false,"i8mm":false,"bf16":false,"asimddp":false,"sme":false},
+  "thermal_zones": [{"zone":"thermal_zone0","type":"AO-therm","temp_millicelsius":51500},{"zone":"thermal_zone1","type":"CPU-therm","temp_millicelsius":45500},{"zone":"thermal_zone2","type":"GPU-therm","temp_millicelsius":45500},{"zone":"thermal_zone3","type":"PLL-therm","temp_millicelsius":43000},{"zone":"thermal_zone4","type":"PMIC-Die","temp_millicelsius":50000},{"zone":"thermal_zone5","type":"thermal-fan-est","temp_millicelsius":44750}],
+  "memory": {
+    "mem_total_kb": 4059020,
+    "mem_available_kb": 2472112
+  },
+  "software": {
+    "python_version": "Python 3.6.9"
+  }
+}Excellent — works perfectly on real hardware. Let me validate the JSON is parseable:
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && ./scripts/capture_manifest.sh 2>/dev/null | python3 -c "import json,sys; d=json.load(sys.stdin); print('Valid JSON:', len(d), 'top-level keys'); print('Topology entries:', len(d['host']['cpu_topology'])); print('Thermal zones:', len(d['thermal_zones']))" 2>&1
+    timeout_secs: 10
+
+Valid JSON: 10 top-level keys
+Topology entries: 4
+Thermal zones: 6Valid JSON with all fields populated. Let me update the DEVICE_RUNBOOK to mention the shell alternative, then commit:
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && grep -n 'manifest.py\|provenance\|Python 3' docs/DEVICE_RUNBOOK.md
+    timeout_secs: 5
+
+61:## 2. Capture provenance
+63:A number without a manifest is not a result (`PLAN.md` §9). If the device has Python 3:
+66:scp bench/manifest.py <device>:/tmp/
+67:ssh <device> 'python3 /tmp/manifest.py' > results/manifests/<device>.json
+  ────────────────────────────────────────
+  ▸ edit
+    path ~/OrionsBelt/docs/DEVICE_RUNBOOK.md
+    after: A number without a manifest is not a result (`PLAN.md` §9). If the device has Python 3.10+:
+
+```bash
+scp bench/manifest.py <device>:/tmp/
+ssh <device> 'python3 /tmp/manifest.py' > results/manifests/<device>.json
+```
+
+It is stdlib-only and degrades gracefully, so it will not fail on a minimal image.
+If the device has Python < 3.10 (e.g. Jetson Nano's 3.6.9), use the shell-based
+alternative instead — same fields, no Python dependency:
+
+```bash
+scp scripts/capture_manifest.sh <device>:/tmp/
+ssh <device> 'bash /tmp/capture_manifest.sh' > results/manifests/<device>.json
+```
+
+If there is no Python at all and no bash, capture the equivalent by hand:
+    before: A number without a manifest is not a result (`PLAN.md` §9). If the device has Python 3:
+
+```bash
+scp bench/manifest.py <device>:/tmp/
+ssh <device> 'python3 /tmp/manifest.py' > results/manifests/<device>.json
+```
+
+It is stdlib-only and degrades gracefully, so it will not fail on a minimal image. If there is no
+Python at all, capture the equivalent by hand:
+
+Edited /home/j1/OrionsBelt/docs/DEVICE_RUNBOOK.md (9 lines -> 17 lines)
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && git add -A && git status --short
+    timeout_secs: 10
+
