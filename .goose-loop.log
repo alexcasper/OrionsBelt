@@ -19529,3 +19529,32 @@ conversion overhead outweighs the traffic savings. The system-level benefit
 (fitting longer context alongside weights) is real but not measurable in a
 microbenchmark." 2>&1 && git push origin bench/j1 2>&1
 
+[bench/j1 85dd8b5] j1: add decode-mode (seq=1) benchmark configs
+ 2 files changed, 981 insertions(+)
+To https://github.com/alexcasper/OrionsBelt
+   ed9df15..85dd8b5  bench/j1 -> bench/j1
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && bd remember "Decode benchmark finding (seq=1): State narrowing HURTS kernel throughput at decode because (1) state fits in L1 cache (16KB for 4B), so reducing traffic doesn't help, and (2) conversion overhead dominates. fp32 gated_scan: 8.54µs, bf16: 13.80µs (+61% slower), f16: 11.35µs (+33% slower). This confirms state narrowing is a MEMORY-RESIDENCY optimization, not a decode-throughput optimization. The system-level benefit (fitting longer context in RAM alongside state) is real but requires end-to-end measurement, not a kernel microbenchmark." 2>&1
+
+Remembered [decode-benchmark-finding-seq-1-state-narrowing-hurts]: Decode benchmark finding (seq=1): State narrowing HURTS kernel throughput at ...
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && bd dolt push --force 2>&1 && bd export -o .beads/issues.jsonl 2>&1 && git add .beads/issues.jsonl && git commit -m "beads: session 3 flush" 2>&1 && git push origin bench/j1 2>&1
+
+Pushing to Dolt remote...
+Push complete.
+Exported 93 issues to .beads/issues.jsonl
+On branch bench/j1
+Your branch is up-to-date with 'origin/bench/j1'.
+
+Changes not staged for commit:
+	modified:   .goose-loop.log
+
+no changes added to commit
+
+Command exited with code 1
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && git add -A && git commit -m "j1: loop flush 2026-08-02T22:58:00Z" 2>&1 && git push origin bench/j1 2>&1
+
