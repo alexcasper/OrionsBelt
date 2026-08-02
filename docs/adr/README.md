@@ -17,4 +17,14 @@ Decisions already scheduled (see PLAN.md):
 | `t-mapping-adr` | Layer-to-engine assignment across NPU/GPU/CPU |
 | `t-gdn2-decision` | GDN-2 benchmark-only vs layer-swap |
 
-The template is `template.md`, added by bead `t-adr-scaffold`.
+## Numbering
+
+`NNNN-short-slug.md`, sequential from `0001`. **Claim your number before writing** so
+parallel agents don't collide. Assigned so far:
+
+| Number | Subject | Bead |
+|---|---|---|
+| 0001 | GDN-2 decoupled erase/write gating hypothesis | `ob-8m7` |
+| 0002 | Portable aarch64 hedge target | `ob-zh4` |
+
+The template is [`template.md`](./template.md).
