@@ -163,6 +163,9 @@ int main(int argc, char **argv) {
     struct { const char *model; size_t seq, ch, gdn_layers; } cfgs[] = {
         {"Qwen3.5-4B", 64, 32 * 128, 24},
         {"Qwen3.5-0.8B", 64, 16 * 128, 18},
+        /* Decode (seq=1): state I/O is ~40% of traffic — where narrowing helps */
+        {"Qwen3.5-4B_decode", 1, 32 * 128, 24},
+        {"Qwen3.5-0.8B_decode", 1, 16 * 128, 18},
     };
     const int n_cfg = (int)(sizeof(cfgs) / sizeof(cfgs[0]));
 
