@@ -319,12 +319,55 @@ void gdn_causal_dwconv1d_f32(const float *restrict in, const float *restrict w,
         }
     }
 #elif defined(__ARM_NEON)
-    size_t n_vec = channels >> 2;
+    /* Double-width unroll: 8 channels/iter (2 NEON register groups).
+     * The conv's 4-deep FMA chain (acc = h0*w0 + h1*w1 + h2*w2 + cur*w3)
+     * benefits MORE from ILP than gated_scan's single FMA: two independent
+     * chains let the OoO scheduler hide the 4-cycle FMA latency. */
+    size_t n_vec8 = channels >> 3;
 #ifdef _OPENMP
 #pragma omp parallel for schedule(static)
 #endif
-    for (size_t vi = 0; vi < n_vec; ++vi) {
-        size_t c = vi << 2;
+    for (size_t vi = 0; vi < n_vec8; ++vi) {
+        size_t c = vi << 3;
+        float32x4_t h0_0 = vld1q_f32(hist + 0 * channels + c);
+        float32x4_t h0_1 = vld1q_f32(hist + 0 * channels + c + 4);
+        float32x4_t h1_0 = vld1q_f32(hist + 1 * channels + c);
+        float32x4_t h1_1 = vld1q_f32(hist + 1 * channels + c + 4);
+        float32x4_t h2_0 = vld1q_f32(hist + 2 * channels + c);
+        float32x4_t h2_1 = vld1q_f32(hist + 2 * channels + c + 4);
+        float32x4_t w0_0 = vld1q_f32(w + 0 * channels + c);
+        float32x4_t w0_1 = vld1q_f32(w + 0 * channels + c + 4);
+        float32x4_t w1_0 = vld1q_f32(w + 1 * channels + c);
+        float32x4_t w1_1 = vld1q_f32(w + 1 * channels + c + 4);
+        float32x4_t w2_0 = vld1q_f32(w + 2 * channels + c);
+        float32x4_t w2_1 = vld1q_f32(w + 2 * channels + c + 4);
+        float32x4_t w3_0 = vld1q_f32(w + 3 * channels + c);
+        float32x4_t w3_1 = vld1q_f32(w + 3 * channels + c + 4);
+        for (size_t t = 0; t < seq; ++t) {
+            float32x4_t cur0 = vld1q_f32(in + t * channels + c);
+            float32x4_t cur1 = vld1q_f32(in + t * channels + c + 4);
+            float32x4_t acc0 = vmulq_f32(h0_0, w0_0);
+            float32x4_t acc1 = vmulq_f32(h0_1, w0_1);
+            acc0 = vfmaq_f32(acc0, h1_0, w1_0);
+            acc1 = vfmaq_f32(acc1, h1_1, w1_1);
+            acc0 = vfmaq_f32(acc0, h2_0, w2_0);
+            acc1 = vfmaq_f32(acc1, h2_1, w2_1);
+            acc0 = vfmaq_f32(acc0, cur0, w3_0);
+            acc1 = vfmaq_f32(acc1, cur1, w3_1);
+            vst1q_f32(out + t * channels + c, acc0);
+            vst1q_f32(out + t * channels + c + 4, acc1);
+            h0_0 = h1_0; h1_0 = h2_0; h2_0 = cur0;
+            h0_1 = h1_1; h1_1 = h2_1; h2_1 = cur1;
+        }
+        vst1q_f32(hist + 0 * channels + c, h0_0);
+        vst1q_f32(hist + 0 * channels + c + 4, h0_1);
+        vst1q_f32(hist + 1 * channels + c, h1_0);
+        vst1q_f32(hist + 1 * channels + c + 4, h1_1);
+        vst1q_f32(hist + 2 * channels + c, h2_0);
+        vst1q_f32(hist + 2 * channels + c + 4, h2_1);
+    }
+    /* Remaining groups of 4 (at most 1) */
+    for (size_t c = n_vec8 << 3; c + 4 <= channels; c += 4) {
         float32x4_t h0 = vld1q_f32(hist + 0 * channels + c);
         float32x4_t h1 = vld1q_f32(hist + 1 * channels + c);
         float32x4_t h2 = vld1q_f32(hist + 2 * channels + c);
@@ -347,7 +390,7 @@ void gdn_causal_dwconv1d_f32(const float *restrict in, const float *restrict w,
         vst1q_f32(hist + 1 * channels + c, h1);
         vst1q_f32(hist + 2 * channels + c, h2);
     }
-    for (size_t c = n_vec << 2; c < channels; ++c) {
+    for (size_t c = (n_vec8 << 3) + (((channels >> 2) & 1) << 2); c < channels; ++c) {
         float hh[GDN_CONV_K - 1];
         for (int j = 0; j < GDN_CONV_K - 1; ++j) hh[j] = hist[(size_t)j * channels + c];
         for (size_t t = 0; t < seq; ++t) {
