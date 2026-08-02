@@ -57,13 +57,35 @@ dense end.
 The About-section detail is worth doing regardless — it costs nothing and makes compliance
 obvious to a judge — but it is our practice, not a stated requirement.
 
-### 1.5 GDN-2's RULER gains are real but not quantified in the abstract
+### 1.5 GDN-2's RULER gains — **now quantified** (superseded, see below)
 
-The paper confirms the retrieval advantage qualitatively: "Its advantage is most pronounced on
-long-context RULER needle-in-a-haystack benchmarks, where it improves the evaluated multi-key
-retrieval setting." No numeric RULER scores appear in the abstract. `brief.md`'s plan to
-"directly cite the RULER retrieval gains" therefore needs the **full paper**, not the abstract.
-Until then, describe the claim qualitatively.
+*Originally recorded here as abstract-only and qualitative. Superseded 2026-08-02: the full
+paper HTML is reachable at `arxiv.org/html/2605.22791`, and Table 3 contains numeric scores.
+Extracted by parsing the raw HTML table directly rather than via a summarizer — an intermediate
+summarized read dropped a column and misaligned the rest, so these were confirmed cell-by-cell.*
+
+MK-NIAH-1 (multi-key needle-in-a-haystack), 1.3B models, higher is better:
+
+| Setting | Model | 1K | 2K | 4K |
+|---|---|---:|---:|---:|
+| Recurrent-only | Gated DeltaNet | 58.0 | 37.0 | 27.8 |
+| Recurrent-only | **Gated DeltaNet-2** | **72.6** | **51.4** | **37.8** |
+| Hybrid | Gated DeltaNet | 91.0 | 78.4 | 44.8 |
+| Hybrid | **Gated DeltaNet-2** | **93.0** | **84.6** | **48.0** |
+
+The gain is large in the recurrent-only setting (+14.6 / +14.4 / +10.0) and much smaller once
+periodic full attention is present (+2.0 / +6.2 / +3.2). **That second row matters more to us
+than the first**, because Qwen3.5 *is* a hybrid — so the honest expected upside of a GDN-2 swap
+in our setting is the smaller hybrid delta, not the headline recurrent-only one.
+
+A further useful detail from the paper's channel-structure ablation (MK-NIAH-1 @4K): channel-wise
+erase with a scalar write scores 35.2, scalar erase with channel-wise write scores 30.6, and both
+channel-wise scores 37.8. **The erase gate carries most of the benefit** — so if a layer swap is
+ever attempted under time pressure, channel-wise erase is the higher-value half to implement first.
+
+Caveat on cost: the paper measures only **training** throughput on H100 (38.0 → 36.1 Kt/s, ~5%,
+attributed to the added gates) and **never measures single-token decode or inference latency on
+any hardware**. It provides no evidence either way about our bandwidth-bound decode regime.
 
 ---
 
@@ -112,6 +134,9 @@ Concretely useful details found:
   from config, no modeling-code archaeology required.
 - Linear-attention layer shapes: `linear_conv_kernel_dim=4`, `linear_key_head_dim=128`,
   `linear_value_head_dim=128`, `linear_num_key_heads=16`, `linear_num_value_heads=32`.
+  **Correction (2026-08-02, from `docs/MODEL_SURVEY.md`):** these are the *default-config* values
+  and are **not constant across the family** — `linear_num_value_heads` is 16 at 0.8B/2B and 32 at
+  4B/9B. Read the shapes from the chosen checkpoint's own `config.json`, never from the doc default.
 - The DeltaNet path is `Qwen3NextGatedDeltaNet` — Qwen3.5's text backbone reuses Qwen3-Next's
   linear-attention decoder, so Qwen3-Next tooling is likely to transfer.
 - Dense and MoE checkpoints share the same GDN core (`Qwen3_5MoeGatedDeltaNet` ≡
