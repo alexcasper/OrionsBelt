@@ -19,6 +19,14 @@ aarch64-linux-gnu-gcc -O3 $MARCH -static \
 echo "== running under QEMU with 128-bit vectors (as Cortex-A720)"
 QEMU_CPU=max,sve128=on qemu-aarch64 "$OUT/verify"
 
+echo "== mixed-precision f16/bf16 state kernels (ob-8qt.4)"
+# The fp32 accumulator stays wide; only persistent state is narrowed.
+# Verify under the full SVE2 path (Armv9.2) and the NEON fp16 path.
+aarch64-linux-gnu-gcc -O3 $MARCH -static \
+    "$K/gdn_sve.c" "$K/gdn_sve_f16.c" "$K/test_gdn_sve_f16.c" -o "$OUT/verify_f16" -lm
+echo "== running f16/bf16 tests under QEMU (128-bit SVE2)"
+QEMU_CPU=max,sve128=on qemu-aarch64 "$OUT/verify_f16" | tail -1
+
 echo "== portability matrix: SVE1 floor, SVE2, and no-SVE fallback"
 # The kernels are SVE1-clean; SVE2 is NOT required. Verified across vector lengths and cores.
 for spec in \
