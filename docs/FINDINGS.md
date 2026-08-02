@@ -151,3 +151,95 @@ no linear-attention model could have been shipped through it in the first place.
 
 The SDK does ship a vendor `cix-llama-cpp` build (1.3.1) for the board, which is the most likely
 existing inference path — and a candidate baseline, though its GDN support is unverified.
+
+---
+
+## 3. Toolchain and KleidiAI coverage for Armv9.2 GDN kernels (2026-08-02)
+
+Investigating what compiler targets Cortex-A720, and whether Arm's own micro-kernel library
+already contains anything we need for the CPU-hosted GDN scan (`ob-8qt.1`).
+
+### 3.1 Compiler and target flags
+
+**Clang/LLVM ≥17 or GCC ≥13, with `-mcpu=cortex-a720`.** That single flag is sufficient — verified
+by dumping clang 18's predefined feature macros for that target:
+
+```
+__ARM_FEATURE_SVE2 1              __ARM_FEATURE_MATMUL_INT8 1
+__ARM_FEATURE_SVE2_BITPERM 1      __ARM_FEATURE_SVE_MATMUL_INT8 1
+__ARM_FEATURE_SVE 1               __ARM_FEATURE_SVE_MATMUL_FP32 1
+__ARM_FEATURE_BF16 1              __ARM_FEATURE_SVE_BF16 1
+__ARM_FEATURE_DOTPROD 1           __ARM_FEATURE_FP16_FML 1
+```
+
+Equivalent explicit form: `-march=armv9.2-a+sve2+i8mm+bf16`. Arm Compiler for Linux (ACfL) is
+Arm's own LLVM-based toolchain and is a defensible choice for an Arm submission.
+
+Cross-compiling from x86 needs an aarch64 sysroot. Note the DSP SDK archive ships
+`ext/mirror/cix_sysroot.tgz`, which is a CIX-matched sysroot and therefore a better match than a
+generic Debian one.
+
+**Cortex-A720 has no SME.** `__ARM_FEATURE_SME` is absent under `-mcpu=cortex-a720` while a
+`-march=armv9.2-a+sme` control does define it, so the absence is meaningful. Corroborated by
+LLVM's own `AArch64Processors.td` feature list for the core, which contains `FeatureSVE`,
+`FeatureSVE2`, `FeatureSVEBitPerm`, `FeatureMatMulInt8`, `FeatureBF16`, `FeatureDotProd` and
+**no SME or SME2 entry**.
+
+> **Method note.** An earlier attempt to test this by assembling SME instructions under
+> `-mcpu=cortex-a720` was discarded as invalid: clang's integrated assembler accepted SME
+> instructions even without `+sme`, i.e. it does not gate `.s` input on `-mcpu` features. The
+> negative control is what caught it. Feature macros and the LLVM processor definition are the
+> sound tests.
+
+### 3.2 The SVE2 width trap
+
+**SVE2 on Cortex-A720 is 128-bit** — the same width as NEON (Arm's TRM documents SVE with a
+128-bit vector length). So SVE2 buys **predication** (`whilelt`/`svmla_x`, which gives clean tail
+handling for a chunked scan without a scalar epilogue) and gather/scatter — **not** more lanes.
+Anyone expecting a free speedup from "scalable vectors" on this core will be disappointed, and any
+claim we make about SVE2 must be framed as predication and instruction-selection wins rather than
+vector-width wins.
+
+### 3.3 KleidiAI has nothing for the recurrence
+
+Inventoried at KleidiAI `98872b0`. It ships exactly two micro-kernel families:
+
+| Family | Count | ISA targets | Usable on Cortex-A720? |
+|---|---:|---|---|
+| `matmul` | 185 | neon, dotprod, i8mm, sme/sme2/mopa, a few sve | **109 yes** (neon/dotprod/i8mm), 76 no (SME family) |
+| `dwconv` | 4 | **sme2 only** | **None** |
+
+A repo-wide search for `cumsum`, `cumulative`, `prefix.sum`, `scan_`, `recurren`, `ssm`,
+`state.space`, `mamba`, `deltanet`, and `linear.attention` returns **no matching kernel** — the two
+textual hits are incidental substring matches (`ShapesSmallKC`, a Winograd SME path), not
+implementations.
+
+So, concretely, for the three primitives GDN needs on the CPU:
+
+| GDN primitive | KleidiAI status |
+|---|---|
+| delta-rule small matmuls | ✅ **covered** — 109 A720-usable `matmul` kernels, incl. i8mm/dotprod quantized paths |
+| causal depthwise Conv1D | ❌ **exists but SME2-only**, so unusable on Cortex-A720 |
+| gated cumulative decay (prefix product) | ❌ **no primitive of any kind** |
+| chunkwise sequential scan | ❌ **no primitive of any kind** |
+
+### 3.4 What this means for the contribution
+
+This sharpens the project's claim considerably, and it is now specific rather than rhetorical.
+Arm's own optimized-kernel library covers the dense matmuls we need and **nothing else** in the GDN
+stack, and its one depthwise-conv family targets an extension this CPU does not implement.
+
+The contribution is therefore three named micro-kernels that do not exist anywhere today for a
+non-SME Armv9.2 core:
+
+1. causal depthwise Conv1D for SVE2 + NEON (KleidiAI's is SME2-only)
+2. gated cumulative decay / prefix product with predicated tails
+3. the chunkwise gated delta-rule scan
+
+All three are shaped like KleidiAI micro-kernels and are **upstreamable to it** — which is a
+concrete Potential Impact (20 pts) argument rather than an aspirational one: the deliverable is
+reusable by anyone running a linear-attention model on any non-SME Armv9 CPU, not just on the O6.
+
+It also composes with §1: the NPU cannot express the recurrence *and* Arm's kernel library has no
+recurrence primitive, so on this platform the sequential scan has no existing home at all. That is
+the gap.
