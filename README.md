@@ -136,7 +136,13 @@ Full target layout and rationale are in [`PLAN.md`](./PLAN.md) §10. Highlights:
 - [`PLAN.md`](./PLAN.md) — the implementation plan: workstreams, milestones, risk register, descope ladder.
 - [`docs/CLAIM_VERIFICATION.md`](./docs/CLAIM_VERIFICATION.md) — every quantitative claim in this README traced to a primary source, corrected, or dropped. Ground truth for numbers.
 - [`docs/BEADS.md`](./docs/BEADS.md) — how issue tracking works on this project.
-- [`docs/adr/`](./docs/adr/) — architecture decision records for irreversible forks (track selection, hedge target, layer→engine mapping, GDN-2 scope).
+- [`docs/METHODOLOGY.md`](./docs/METHODOLOGY.md) — how we measure: metrics, statistical protocol, thermal control, correctness tolerances.
+- [`docs/QUANTIZATION_POLICY.md`](./docs/QUANTIZATION_POLICY.md) — INT4 weights with FP32 recurrent-state carve-out; the dominant decode-throughput lever.
+- [`docs/COMPLIANCE.md`](./docs/COMPLIANCE.md) — Devpost submission compliance checklist (19 items).
+- [`docs/BACKEND_GUIDE.md`](./docs/BACKEND_GUIDE.md) — how to implement the Backend ABC for a real model (for whoever runs the x86 reference).
+- [`docs/WEIGHTS_LICENSE.md`](./docs/WEIGHTS_LICENSE.md) — model weight licenses and attribution.
+- [`docs/FINDINGS.md`](./docs/FINDINGS.md) — NOE op-coverage gaps, kernel verification, GDN layer-structure audit, precision analysis.
+- [`docs/adr/`](./docs/adr/) — architecture decision records for irreversible forks (track selection, hedge target, layer→engine mapping, quantization policy).
 - [`bench/`](./bench/README.md) — measurement harness: context sweep, metrics, provenance manifests, plotting.
 - [`results/`](./results/README.md) — committed CSVs and figures, once they exist.
 - [`src/orionsbelt/`](./src/orionsbelt/) — model loading/introspection, NPU/GPU/CPU engine backends, layer partitioning, quantization policy.
