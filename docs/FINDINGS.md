@@ -442,3 +442,86 @@ The middle row is the important one: the KV-cache-versus-recurrent-state result 
 the NPU, the GPU, or Armv9 at all. It is a property of the architecture, so **an Armv8 device can
 demonstrate the project's central claim end to end** — which is what moves the Edge AI track from a
 credible plan to a credible result.
+
+## 6. GDN layer structure audit — confirmed from modeling code (ob-37v)
+
+Read directly from the HuggingFace `transformers` library source
+(`src/transformers/models/qwen3_5/modeling_qwen3_5.py`, 2075 lines) and the
+checkpoint's `config.json`. This supersedes every secondary-source figure and
+closes the open assumption flagged in [ADR 0003](./adr/0003-model-checkpoint-selection.md).
+
+### State layout: ADR 0003's assumption is correct
+
+The recurrent state is initialised as **`(batch, num_v_heads, head_k_dim, head_v_dim)`** —
+confirmed at the `torch.zeros(...)` call in both scan paths:
+
+```python
+# modeling_qwen3_5.py, line ~316 (chunk path) and ~363 (recurrent path)
+last_recurrent_state = torch.zeros(
+    batch_size, num_heads, k_head_dim, v_head_dim, ...
+)
+```
+
+For Qwen3.5-4B: `(1, 32, 128, 128)` = **524,288 elements per layer**, fp32
+(`mamba_ssm_dtype: "float32"` in config) = **2 MiB/layer, 48 MiB across 24 GDN layers,
+flat at every context length**. The 0.8B is `(1, 16, 128, 128)` = 262,144 elements
+= 1 MiB/layer, 18 MiB across 18 layers.
+
+### The gated delta-rule update (from `torch_recurrent_gated_delta_rule`)
+
+The single-token decode path, read directly from the torch fallback:
+
+```python
+S_t = S_{t-1} * exp(g_t)                         # gated decay (Mamba2-style)
+kv_mem = sum(S_t * k_t, dim=-2)                  # retrieve: S @ k (batched outer)
+delta = (v_t - kv_mem) * beta_t                  # prediction error × write gate
+S_t += k_t ⊗ delta                               # delta-rule correction
+output = sum(S_t * q_t, dim=-2)                  # retrieve: S @ q (batched outer)
+```
+
+Where `g = -A_log.exp() * softplus(a + dt_bias)` is the input-dependent exponential
+decay gate, and `beta = sigmoid(b)` is the delta-rule write gate. Both are per
+value-head (`num_v_heads` = 32 for 4B). Queries and keys are L2-normalised
+(`use_qk_l2norm_in_kernel=True`). Keys (16 heads) are repeated to match value
+heads (32), a 2:1 ratio similar to GQA.
+
+### Chunkwise scan
+
+Prefill uses `chunk_gated_delta_rule` with **`chunk_size=64`** (default). The chunk
+path computes intra-chunk WY-style decomposition, then carries a recurrent state
+across chunks — the same sequential scan METRICS.md §9 identifies as
+bandwidth-bound at ~0.25 FLOP/byte.
+
+### Causal Conv1D
+
+Depthwise `nn.Conv1d` with `kernel_size=4` (`linear_conv_kernel_dim`), applied to
+concatenated QKV before the delta-rule scan. Fast path uses `causal_conv1d_fn`
+(prefill) / `causal_conv1d_update` (decode, in-place state update); falls back to
+a standard Conv1d when `causal-conv1d` is not installed.
+
+### Layer placement
+
+Confirmed from `layer_types` config: `[GDN, GDN, GDN, FA] × 8` for the 4B (24 GDN +
+8 full attention), `[GDN, GDN, GDN, FA] × 6` for the 0.8B (18 + 6). The
+`full_attention_interval = 4` config field makes the pattern explicit.
+
+### Correction: full-attention head_dim is 256, not 128
+
+The config's `head_dim` field (for the full-attention layers) is **256**, not 128.
+The harness presets in `bench/harness.py` had `fa_head_dim=128`; corrected to 256.
+This changes the KV-cache arithmetic:
+
+| Checkpoint | KV cache/layer/token (fp16) | At 4K | At 262K |
+|---|---:|---:|---:|
+| Qwen3.5-4B (4 KV heads, 256 dim) | 4,096 B | 128 MiB | 8.0 GiB |
+| Qwen3.5-0.8B (2 KV heads, 256 dim) | 2,048 B | 48 MiB | 3.0 GiB |
+
+These match ADR 0003's table exactly.
+
+### Kernel-gap confirmation
+
+The fast path requires `flash-linear-attention` (`fla`) and `causal-conv1d` packages.
+When either is absent, the model logs a warning and falls back to the torch
+implementations above — which are correct but slower and more memory-hungry. **This
+is the exact gap the project documents for Arm/Vulkan**: neither package ships a
+build for the target architectures, so every Arm device runs the slow fallback.

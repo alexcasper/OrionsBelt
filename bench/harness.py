@@ -88,8 +88,8 @@ QWEN35_4B = ModelConfig(
     linear_num_value_heads=32,
     linear_key_head_dim=128,
     linear_value_head_dim=128,
-    fa_n_kv_heads=4,  # GQA, typical Qwen3 -- verify from real config
-    fa_head_dim=128,
+    fa_n_kv_heads=4,  # GQA, verified from config.json (ob-37v)
+    fa_head_dim=256,  # verified from config.json head_dim (ob-37v)
     num_params=4_000_000_000,
 )
 
@@ -100,8 +100,8 @@ QWEN35_08B = ModelConfig(
     linear_num_value_heads=16,
     linear_key_head_dim=128,
     linear_value_head_dim=128,
-    fa_n_kv_heads=2,  # GQA
-    fa_head_dim=128,
+    fa_n_kv_heads=2,  # GQA, verified from config.json (ob-37v)
+    fa_head_dim=256,  # verified from config.json head_dim (ob-37v)
     num_params=800_000_000,
 )
 
