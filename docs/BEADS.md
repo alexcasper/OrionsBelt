@@ -79,7 +79,7 @@ Priority is `0`–`4`, **0 is highest**. Not "high"/"medium"/"low".
 | `external-gate` | Blocked on a third party (procurement, CIX enrollment). **Cannot be worked by effort alone** — `bd ready` listing it does not mean it's actionable by us |
 | `hardware` | Requires physical Orion O6 access |
 | `portable` | Runs anywhere — safe to do before hardware arrives |
-| `hedge` | Belongs to the Mobile AI fallback track |
+| `hedge` | Belongs to the Edge AI fallback track (generic aarch64) |
 | `submission` | Directly required by Devpost rules |
 | `stretch` | Cut first under the descope ladder (`PLAN.md` §7) |
 | `research` | GDN-2 investigation |
@@ -195,7 +195,7 @@ workspace is detected.
 **Project-specific rules for agents:**
 
 1. Read [`PLAN.md`](../PLAN.md) before claiming your first bead — the dependency graph only
-   makes sense with the plan's context, especially the two-track (Physical AI / Mobile AI)
+   makes sense with the plan's context, especially the two-track (Physical AI / Edge AI)
    structure and the deadline pressure.
 2. `bd ready` showing an `external-gate` bead does **not** mean it is actionable. Those wait
    on third parties. Prefer `portable`-labelled work when hardware is unavailable.
