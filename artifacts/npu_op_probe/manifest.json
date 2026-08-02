@@ -1,0 +1,81 @@
+[
+  {
+    "probe": "01_causal_conv1d",
+    "file": "01_causal_conv1d.onnx",
+    "ops": [
+      "Conv"
+    ],
+    "bytes": 32985,
+    "description": "GDN's causal short convolution as a depthwise Conv1D with left-only padding (kernel=4, groups=channels). Tests both depthwise grouping and asymmetric pads."
+  },
+  {
+    "probe": "02_decay_cumprod",
+    "file": "02_decay_cumprod.onnx",
+    "ops": [
+      "CumSum",
+      "Exp",
+      "Log"
+    ],
+    "bytes": 202,
+    "description": "Gated decay as exp(cumsum(log(a))) along the sequence axis. ONNX has no CumProd, so this decomposition is the only standard route -- and CumSum support is the real question on a matmul-oriented NPU."
+  },
+  {
+    "probe": "03_delta_rule_update",
+    "file": "03_delta_rule_update.onnx",
+    "ops": [
+      "Add",
+      "MatMul",
+      "Sub",
+      "Transpose"
+    ],
+    "bytes": 392,
+    "description": "One delta-rule step S <- (I - k k^T) S + k v^T as batched MatMul/Sub/Add. Pure dense linear algebra, so this is the probe most likely to pass -- and if it does not, the NPU cannot host GDN layers at all."
+  },
+  {
+    "probe": "04_gate_chain",
+    "file": "04_gate_chain.onnx",
+    "ops": [
+      "Exp",
+      "Mul",
+      "Neg",
+      "Sigmoid",
+      "Softplus"
+    ],
+    "bytes": 278,
+    "description": "Elementwise gate chain (Sigmoid, Softplus, Neg, Exp, Mul). Expected to be well supported; included so a failure here isolates cheaply."
+  },
+  {
+    "probe": "05_scan_recurrence",
+    "file": "05_scan_recurrence.onnx",
+    "ops": [
+      "Add",
+      "Identity",
+      "Mul",
+      "Scan"
+    ],
+    "bytes": 527,
+    "description": "Chunk-to-chunk recurrence as an ONNX Scan (gated accumulate over 4 chunks). THE CRUX PROBE: NPU compilers often lack control flow entirely. Failure here plus success on the delta-rule probe is the empirical justification for routing the sequential scan off the NPU."
+  },
+  {
+    "probe": "06_loop_recurrence",
+    "file": "06_loop_recurrence.onnx",
+    "ops": [
+      "Identity",
+      "Loop",
+      "Mul"
+    ],
+    "bytes": 446,
+    "description": "The same recurrence via ONNX Loop rather than Scan. Compilers sometimes accept one control-flow form and not the other, so both are probed."
+  },
+  {
+    "probe": "07_loop_dynamic_trip",
+    "file": "07_loop_dynamic_trip.onnx",
+    "ops": [
+      "Loop",
+      "Identity",
+      "Mul"
+    ],
+    "bytes": 443,
+    "description": "Follow-up added after probe 06 turned out to be statically unrolled: identical recurrence but trip_count is a graph INPUT rather than an initializer. Decides whether Loop is genuinely supported as control flow or only ever unrolled. Result: rejected ('Graph is not DAG', shape inference unreliable for non-const max_count), proving unrolling is the only mechanism."
+  }
+]

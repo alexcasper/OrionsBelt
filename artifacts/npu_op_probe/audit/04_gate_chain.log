@@ -1,0 +1,46 @@
+[I] [Parser]: Begin to parse onnx model 04_gate_chain...
+To enable the following instructions: AVX2 AVX512F AVX512_VNNI FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.
+Falling back to TensorFlow client; we recommended you install the Cloud TPU client directly with pip install cloud-tpu-client.
+Creating converter from 7 to 5
+Creating converter from 5 to 7
+Creating converter from 7 to 5
+Creating converter from 5 to 7
+matplotlib data path: /tmp/claude-0/-home-user-OrionsBelt/a5612def-eaf2-5760-b778-12b512ca0156/scratchpad/noe310/lib/python3.10/site-packages/matplotlib/mpl-data
+CONFIGDIR=/root/.config/matplotlib
+interactive is False
+platform is linux
+CACHEDIR=/root/.cache/matplotlib
+Using fontManager instance from /root/.cache/matplotlib/fontlist-v390.json
+[W] [Parser]: Meets issue(Your model ir_version 13 is higher than the checker's (10).) in onnx.check_model, but still proceeds!
+[W] [Parser]: The output name gated is not a node but a tensor. However, we will use the node combine as output node.
+[D] [Parser]: 17:15:14.022924, Input, x, NCHW, [[1, 16, 32, 128], [1, 16, 32, 128]], ['float32', 'float32'], False
+[D] [Parser]: 17:15:14.027043, Input, x, NCHW, [[1, 16, 32, 128], [1, 16, 32, 128]], ['float32', 'float32'], False
+[D] [Parser]: 17:15:14.052020, Sigmoid, sigmoid_gate, NCHW, [[1, 16, 32, 128]], ['float32'], False
+[D] [Parser]: 17:15:14.058458, Softplus, softplus_gate, NCHW, [[1, 16, 32, 128]], ['float32'], False
+[D] [Parser]: 17:15:14.059013, Neg, neg, NCHW, [[1, 16, 32, 128]], ['float32'], False
+[D] [Parser]: 17:15:14.059325, Exp, exp_neg_softplus, NCHW, [[1, 16, 32, 128]], ['float32'], False
+[D] [Parser]: 17:15:14.059758, Mul, combine, NCHW, [[1, 16, 32, 128]], ['float32'], False
+[D] [Parser]: 17:15:14.546027, Input, x, NCHW, [[1, 16, 32, 128], [1, 16, 32, 128]], ['float32', 'float32'], False
+[D] [Parser]: 17:15:14.547732, Sigmoid, sigmoid_gate, NCHW, [[1, 16, 32, 128]], ['float32'], False
+[D] [Parser]: 17:15:14.549926, Softplus, softplus_gate, NCHW, [[1, 16, 32, 128]], ['float32'], False
+[D] [Parser]: 17:15:14.550410, Neg, neg, NCHW, [[1, 16, 32, 128]], ['float32'], False
+[D] [Parser]: 17:15:14.550894, Exp, exp_neg_softplus, NCHW, [[1, 16, 32, 128]], ['float32'], False
+[D] [Parser]: 17:15:14.551336, Mul, combine, NCHW, [[1, 16, 32, 128]], ['float32'], False
+[D] [Parser]: 17:15:14.557656, Input, x, NCHW, [[1, 16, 32, 128], [1, 16, 32, 128]], ['float32', 'float32'], False
+[D] [Parser]: 17:15:14.558986, Sigmoid, sigmoid_gate, NCHW, [[1, 16, 32, 128]], ['float32'], False
+[D] [Parser]: 17:15:14.560701, Softplus, softplus_gate, NCHW, [[1, 16, 32, 128]], ['float32'], False
+[D] [Parser]: 17:15:14.561064, Neg, neg, NCHW, [[1, 16, 32, 128]], ['float32'], False
+[D] [Parser]: 17:15:14.561300, Exp, exp_neg_softplus, NCHW, [[1, 16, 32, 128]], ['float32'], False
+[D] [Parser]: 17:15:14.561701, Mul, combine, NCHW, [[1, 16, 32, 128]], ['float32'], False
+[D] [Parser]: 17:15:15.003994, ArmInput, x, NCHW, [[1, 16, 32, 128], [1, 16, 32, 128]], ['float32', 'float32'], False
+[D] [Parser]: 17:15:15.005834, ArmActivation, sigmoid_gate, NCHW, [[1, 16, 32, 128]], ['float32'], False
+[D] [Parser]: 17:15:15.007813, ArmActivation, softplus_gate, NCHW, [[1, 16, 32, 128]], ['float32'], False
+[D] [Parser]: 17:15:15.008364, ArmNegative, neg, NCHW, [[1, 16, 32, 128]], ['float32'], False
+[D] [Parser]: 17:15:15.008777, ArmExp, exp_neg_softplus, NCHW, [[1, 16, 32, 128]], ['float32'], False
+[D] [Parser]: 17:15:15.010067, ArmEltwise, combine, NCHW, [[1, 16, 32, 128]], ['float32'], False
+[I] [Parser]: The input tensor(s) is/are: x_0
+[I] [Parser]: Input x from cfg is shown as tensor x_0 in IR!
+[I] [Parser]: Output gated from cfg is shown as tensor combine_0 in IR!
+[I] [Parser]: 0 error(s), 2 warning(s) generated.
+[I] [Parser]: Parser done!
+[I] [Parser]: Parser cost 5.45 seconds.

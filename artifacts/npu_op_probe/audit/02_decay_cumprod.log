@@ -1,0 +1,42 @@
+[I] [Parser]: Begin to parse onnx model 02_decay_cumprod...
+To enable the following instructions: AVX2 AVX512F AVX512_VNNI FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.
+Falling back to TensorFlow client; we recommended you install the Cloud TPU client directly with pip install cloud-tpu-client.
+Creating converter from 7 to 5
+Creating converter from 5 to 7
+Creating converter from 7 to 5
+Creating converter from 5 to 7
+matplotlib data path: /tmp/claude-0/-home-user-OrionsBelt/a5612def-eaf2-5760-b778-12b512ca0156/scratchpad/noe310/lib/python3.10/site-packages/matplotlib/mpl-data
+CONFIGDIR=/root/.config/matplotlib
+interactive is False
+platform is linux
+CACHEDIR=/root/.cache/matplotlib
+Using fontManager instance from /root/.cache/matplotlib/fontlist-v390.json
+[W] [Parser]: Meets issue(Your model ir_version 13 is higher than the checker's (10).) in onnx.check_model, but still proceeds!
+[W] [Parser]: The output name decay is not a node but a tensor. However, we will use the node exp as output node.
+[D] [Parser]: 17:14:58.906181, Constant, axis, NCHW, [[]], ['int64'], True
+[D] [Parser]: 17:14:58.906723, Input, a, NCHW, [[1, 16, 32]], ['float32'], False
+[D] [Parser]: 17:14:58.914079, Constant, axis, NCHW, [[]], ['int64'], True
+[D] [Parser]: 17:14:58.914384, Input, a, NCHW, [[1, 16, 32]], ['float32'], False
+[D] [Parser]: 17:14:58.914671, Log, log, NCHW, [[1, 16, 32]], ['float32'], False
+[D] [Parser]: 17:14:58.989665, CumSum, cumsum_seq, NCHW, [[1, 16, 32]], ['float32'], False
+[D] [Parser]: 17:14:58.990186, Exp, exp, NCHW, [[1, 16, 32]], ['float32'], False
+[D] [Parser]: 17:14:59.458134, Constant, axis, NCHW, [[]], ['int64'], True
+[D] [Parser]: 17:14:59.458491, Input, a, NCHW, [[1, 16, 32]], ['float32'], False
+[D] [Parser]: 17:14:59.458678, Log, log, NCHW, [[1, 16, 32]], ['float32'], False
+[D] [Parser]: 17:14:59.459596, CumSum, cumsum_seq, NCHW, [[1, 16, 32]], ['float32'], False
+[D] [Parser]: 17:14:59.459901, Exp, exp, NCHW, [[1, 16, 32]], ['float32'], False
+[D] [Parser]: 17:14:59.464370, Constant, axis, NCHW, [[]], ['int64'], True
+[D] [Parser]: 17:14:59.464603, Input, a, NCHW, [[1, 16, 32]], ['float32'], False
+[D] [Parser]: 17:14:59.464774, Log, log, NCHW, [[1, 16, 32]], ['float32'], False
+[D] [Parser]: 17:14:59.465646, CumSum, cumsum_seq, NCHW, [[1, 16, 32]], ['float32'], False
+[D] [Parser]: 17:14:59.465912, Exp, exp, NCHW, [[1, 16, 32]], ['float32'], False
+[D] [Parser]: 17:14:59.863507, ArmInput, a, NCHW, [[1, 16, 32]], ['float32'], False
+[D] [Parser]: 17:14:59.863935, ArmLog, log, NCHW, [[1, 16, 32]], ['float32'], False
+[D] [Parser]: 17:14:59.865287, ArmCumulate, cumsum_seq, NCHW, [[1, 16, 32]], ['float32'], False
+[D] [Parser]: 17:14:59.865568, ArmExp, exp, NCHW, [[1, 16, 32]], ['float32'], False
+[I] [Parser]: The input tensor(s) is/are: a_0
+[I] [Parser]: Input a from cfg is shown as tensor a_0 in IR!
+[I] [Parser]: Output decay from cfg is shown as tensor exp_0 in IR!
+[I] [Parser]: 0 error(s), 2 warning(s) generated.
+[I] [Parser]: Parser done!
+[I] [Parser]: Parser cost 6.57 seconds.

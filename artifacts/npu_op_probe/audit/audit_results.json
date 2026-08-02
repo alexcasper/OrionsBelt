@@ -1,0 +1,76 @@
+[
+  {
+    "probe": "01_causal_conv1d",
+    "ops": [
+      "Conv"
+    ],
+    "returncode": 0,
+    "verdict": "OK_WITH_WARNINGS",
+    "evidence": "WARNING: All log messages before absl::InitializeLog() is called are written to STDERR",
+    "log": "01_causal_conv1d.log"
+  },
+  {
+    "probe": "02_decay_cumprod",
+    "ops": [
+      "CumSum",
+      "Exp",
+      "Log"
+    ],
+    "returncode": 0,
+    "verdict": "OK_WITH_WARNINGS",
+    "evidence": "WARNING: All log messages before absl::InitializeLog() is called are written to STDERR",
+    "log": "02_decay_cumprod.log"
+  },
+  {
+    "probe": "03_delta_rule_update",
+    "ops": [
+      "Add",
+      "MatMul",
+      "Sub",
+      "Transpose"
+    ],
+    "returncode": 0,
+    "verdict": "OK_WITH_WARNINGS",
+    "evidence": "WARNING: All log messages before absl::InitializeLog() is called are written to STDERR",
+    "log": "03_delta_rule_update.log"
+  },
+  {
+    "probe": "04_gate_chain",
+    "ops": [
+      "Exp",
+      "Mul",
+      "Neg",
+      "Sigmoid",
+      "Softplus"
+    ],
+    "returncode": 0,
+    "verdict": "OK_WITH_WARNINGS",
+    "evidence": "WARNING: All log messages before absl::InitializeLog() is called are written to STDERR",
+    "log": "04_gate_chain.log"
+  },
+  {
+    "probe": "05_scan_recurrence",
+    "ops": [
+      "Add",
+      "Identity",
+      "Mul",
+      "Scan"
+    ],
+    "returncode": 255,
+    "verdict": "UNSUPPORTED_OP",
+    "evidence": "[W] [Parser]: Meet unsupported op type Scan in Node(chunkwise_scan)!",
+    "log": "05_scan_recurrence.log"
+  },
+  {
+    "probe": "06_loop_recurrence",
+    "ops": [
+      "Identity",
+      "Loop",
+      "Mul"
+    ],
+    "returncode": 0,
+    "verdict": "OK_WITH_WARNINGS",
+    "evidence": "WARNING: All log messages before absl::InitializeLog() is called are written to STDERR",
+    "log": "06_loop_recurrence.log"
+  }
+]

@@ -1,0 +1,45 @@
+[I] [Parser]: Begin to parse onnx model 01_causal_conv1d...
+To enable the following instructions: AVX2 AVX512F AVX512_VNNI FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.
+Falling back to TensorFlow client; we recommended you install the Cloud TPU client directly with pip install cloud-tpu-client.
+Creating converter from 7 to 5
+Creating converter from 5 to 7
+Creating converter from 7 to 5
+Creating converter from 5 to 7
+matplotlib data path: /tmp/claude-0/-home-user-OrionsBelt/a5612def-eaf2-5760-b778-12b512ca0156/scratchpad/noe310/lib/python3.10/site-packages/matplotlib/mpl-data
+CONFIGDIR=/root/.config/matplotlib
+interactive is False
+platform is linux
+CACHEDIR=/root/.cache/matplotlib
+Using fontManager instance from /root/.cache/matplotlib/fontlist-v390.json
+[W] [Parser]: Meets issue(Your model ir_version 13 is higher than the checker's (10).) in onnx.check_model, but still proceeds!
+[W] [Parser]: The output name y is not a node but a tensor. However, we will use the node causal_depthwise_conv1d as output node.
+[D] [Parser]: 17:14:50.393806, Constant, w, NCHW, [[2048, 1, 4]], ['float32'], True
+[D] [Parser]: 17:14:50.394236, Input, x, NCHW, [[1, 2048, 32]], ['float32'], False
+[D] [Parser]: 17:14:50.425887, Input, x, NCHW, [[1, 2048, 32]], ['float32'], False
+[D] [Parser]: 17:14:50.427049, Conv, causal_depthwise_conv1d, NCHW, [[1, 2048, 32]], ['float32'], False
+[D] [Parser]: 17:14:51.475384, Input, x, NCHW, [[1, 2048, 32]], ['float32'], False
+[D] [Parser]: 17:14:51.475779, Constant, x_post_reshape_shape, NHWC, [[4]], ['int32'], True
+[D] [Parser]: 17:14:51.476162, Reshape, x_post_reshape, NHWC, [[1, 2048, 1, 32]], ['float32'], False
+[D] [Parser]: 17:14:51.477442, Conv, causal_depthwise_conv1d, NCHW, [[1, 2048, 1, 32]], ['float32'], False
+[D] [Parser]: 17:14:51.477697, Constant, causal_depthwise_conv1d_post_reshape_shape, NHWC, [[3]], ['int32'], True
+[D] [Parser]: 17:14:51.477948, Reshape, causal_depthwise_conv1d_post_reshape, NCHW, [[1, 2048, 32]], ['float32'], False
+[D] [Parser]: 17:14:51.487898, Constant, causal_depthwise_conv1d_post_reshape_shape, NHWC, [[3]], ['int32'], True
+[D] [Parser]: 17:14:51.488287, Input, x, NCHW, [[1, 2048, 32]], ['float32'], False
+[D] [Parser]: 17:14:51.488470, Constant, x_post_reshape_shape, NHWC, [[4]], ['int32'], True
+[D] [Parser]: 17:14:51.488775, Reshape, x_post_reshape, NHWC, [[1, 2048, 1, 32]], ['float32'], False
+[D] [Parser]: 17:14:51.489096, Transpose, x_post_reshape_post_transpose, NHWC, [[1, 1, 32, 2048]], ['float32'], False
+[D] [Parser]: 17:14:51.489970, Conv, causal_depthwise_conv1d, NHWC, [[1, 1, 32, 2048]], ['float32'], False
+[D] [Parser]: 17:14:51.490193, Transpose, causal_depthwise_conv1d_post_transpose, NHWC, [[1, 2048, 1, 32]], ['float32'], False
+[D] [Parser]: 17:14:51.490445, Reshape, causal_depthwise_conv1d_post_reshape, NCHW, [[1, 2048, 32]], ['float32'], False
+[D] [Parser]: 17:14:52.013905, ArmInput, x, NCHW, [[1, 2048, 32]], ['float32'], False
+[D] [Parser]: 17:14:52.014303, ArmReshape, x_post_reshape, NHWC, [[1, 2048, 1, 32]], ['float32'], False
+[D] [Parser]: 17:14:52.014525, ArmTranspose, x_post_reshape_post_transpose, NHWC, [[1, 1, 32, 2048]], ['float32'], False
+[D] [Parser]: 17:14:52.015378, ArmDepthwiseConv, causal_depthwise_conv1d, NHWC, [[1, 1, 32, 2048]], ['float32'], False
+[D] [Parser]: 17:14:52.015647, ArmTranspose, causal_depthwise_conv1d_post_transpose, NHWC, [[1, 2048, 1, 32]], ['float32'], False
+[D] [Parser]: 17:14:52.015836, ArmReshape, causal_depthwise_conv1d_post_reshape, NCHW, [[1, 2048, 32]], ['float32'], False
+[I] [Parser]: The input tensor(s) is/are: x_0
+[I] [Parser]: Input x from cfg is shown as tensor x_0 in IR!
+[I] [Parser]: Output y from cfg is shown as tensor causal_depthwise_conv1d_post_reshape_0 in IR!
+[I] [Parser]: 0 error(s), 2 warning(s) generated.
+[I] [Parser]: Parser done!
+[I] [Parser]: Parser cost 9.65 seconds.

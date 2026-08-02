@@ -1,0 +1,371 @@
+{
+  "nodes": [
+    { "key": "e0", "title": "E0: Program spine — decisions, risk, descope", "type": "epic", "priority": 0, "labels": ["program"],
+      "description": "Go/no-go decisions, risk register, and the descope ladder. First-class epic because with 12 days and two external gates, deciding on time is the deliverable most likely to save the submission. See PLAN.md sections 7 and 8." },
+
+    { "key": "e1", "title": "E1: Repo foundation and submission hygiene", "type": "epic", "priority": 0, "labels": ["submission"],
+      "description": "License, skeleton, tooling, CI, results schema, provenance. Devpost has hard requirements here (OSI license visible in the About section) that are cheap now and impossible to retrofit at the deadline." },
+
+    { "key": "e2", "title": "E2: Hardware and toolchain acquisition (Orion O6 + CIX NPU SDK)", "type": "epic", "priority": 0, "labels": ["hardware", "external-gate"],
+      "description": "Board procurement, CIX Early Bird enrollment, Debian 12 bring-up, Python 3.8 + NOE Compiler, NPU runtime, Vulkan/OpenCL validation, perf tooling. Externally gated and on the critical path: as of 2026-08-02 we hold neither the board nor SDK access." },
+
+    { "key": "e3", "title": "E3: Portable Arm hedge track (Edge AI fallback)", "type": "epic", "priority": 1, "labels": ["hedge", "portable"],
+      "description": "Keep a viable Edge AI submission alive on generic aarch64, independent of the O6. Not a consolation prize: the GDN memory-scaling thesis is fully demonstrable on any aarch64 device with i8mm/SVE and a Vulkan or OpenCL GPU." },
+
+    { "key": "e4", "title": "E4: Model selection and reference baseline", "type": "epic", "priority": 0, "labels": ["portable"],
+      "description": "Pick a Qwen3.5 checkpoint in the 0.8B-4B range, audit its GDN layer structure from modeling code, and stand up an x86 reference that serves as the correctness oracle for every later optimization." },
+
+    { "key": "e5", "title": "E5: Benchmark harness and methodology", "type": "epic", "priority": 0, "labels": ["portable"],
+      "description": "The measurement apparatus. Must be finished before hardware arrives so that the moment a board exists we are profiling within hours, not still writing a runner. Central design point: memory accounting that separates KV cache from GDN recurrent state." },
+
+    { "key": "e6", "title": "E6: GDN operator analysis and heterogeneous mapping", "type": "epic", "priority": 1, "labels": ["hardware"],
+      "description": "The core technical contribution. Profile where GDN's linear recurrence actually bottlenecks, audit what the NOE Compiler can and cannot compile, then fix a layer-to-engine assignment as an ADR. GDN layers are not standard attention, so out-of-box NPU kernel support is unlikely." },
+
+    { "key": "e7", "title": "E7: Optimization implementation", "type": "epic", "priority": 1, "labels": ["hardware"],
+      "description": "Where the 40-point Arm-specific optimization score is earned: NPU quantization, a Vulkan chunkwise scan kernel, big.LITTLE scheduling, and a dynamic heterogeneous dispatcher. Every step is gated by the correctness oracle." },
+
+    { "key": "e8", "title": "E8: GDN-2 stretch research", "type": "epic", "priority": 3, "labels": ["research", "stretch"],
+      "description": "The differentiator aimed at WOW factor and Potential Impact: compare GDN-2's decoupled channel-wise erase/write gating against standard GDN. Default to the cheap benchmark-only arm; escalate to a layer swap only if ahead of schedule. Negative results are publishable." },
+
+    { "key": "e9", "title": "E9: Results, write-up, demo, submission", "type": "epic", "priority": 0, "labels": ["submission"],
+      "description": "Converting work into score: master comparison table, clean-clone reproduction rehearsal, rubric-mapped write-up, README, demo video, compliance pass, and actually hitting submit before 2026-08-14 16:00 PT." },
+
+    { "key": "t-verify-claims", "title": "Verify brief.md's load-bearing claims against primary sources", "type": "task", "priority": 0, "parent_key": "e0", "labels": ["submission", "portable"],
+      "description": "brief.md mixes primary sources (Radxa docs, Devpost rules, arXiv, HF model cards) with weak secondary ones (X posts, blog aggregators, YouTube). Confirm the 3:1 linear:full attention ratio and 60-layer count, ~30 tok/s on Qwen2-1.5B, 45 TOPS combined / 28.8 TOPS NPU, the 262K-1M context figures, the ~10B NPU parameter ceiling, and the GDN-2 RULER gains. Done when each figure we intend to quote is traced to a primary source or dropped. Judges will check; a wrong number costs more than an omitted one." },
+
+    { "key": "t-risk-register", "title": "Stand up living risk register and go/no-go ritual", "type": "chore", "priority": 1, "parent_key": "e0", "labels": ["program"],
+      "description": "Move PLAN.md section 7 into a tracked artifact reviewed daily given the 12-day window. Each risk needs an owner, a trigger condition, and a named mitigation. Done when the register exists and the first review has happened." },
+
+    { "key": "t-descope-ladder", "title": "Ratify the pre-agreed descope ladder with trigger dates", "type": "decision", "priority": 1, "parent_key": "e0", "labels": ["program"],
+      "description": "Lock in what gets cut at T-4 (no NPU access: drop NPU offload, ship CPU+GPU), T-3 (no board: switch to Edge AI on aarch64), T-2 (drop GDN-2 layer swap, keep microbenchmark), T-1 (drop video and the 262K point). Deciding this calmly now is worth more than deciding it at 2am on Aug 13. Anything cut gets filed as a follow-up bead, not deleted." },
+
+    { "key": "t-track-decision", "title": "DECISION (hard date 2026-08-09): Physical AI vs Edge AI track", "type": "decision", "priority": 0, "parent_key": "e0", "labels": ["submission", "program"],
+      "description": "Single most consequential scheduling decision. If the O6 has arrived and booted, target Physical AI. If not, commit to Edge AI on the hedge target and stop spending time on O6-specific work. Hard date so the write-up has five clear days of stable framing. Done when the choice is recorded as an ADR and the README framing follows it." },
+
+    { "key": "t-adr-scaffold", "title": "Set up docs/adr/ with an ADR template", "type": "chore", "priority": 2, "parent_key": "e0", "labels": ["portable"],
+      "description": "Every decision-type bead must produce an ADR before it closes. Provide the template and numbering convention so that requirement is frictionless rather than skipped." },
+
+    { "key": "t-license", "title": "Add Apache-2.0 LICENSE and make it visible in the GitHub About section", "type": "chore", "priority": 0, "parent_key": "e1", "labels": ["submission"],
+      "description": "Hard Devpost requirement, not polish: an OSI-approved license must be visible in the repository's About section. Costs ten minutes on day one and can disqualify the entry if missed. Done when the LICENSE file is committed and GitHub renders 'Apache-2.0' in the About sidebar." },
+
+    { "key": "t-repo-skeleton", "title": "Create the repository directory skeleton", "type": "task", "priority": 0, "parent_key": "e1", "labels": ["portable"],
+      "description": "Lay down src/orionsbelt/{model,engines,partition,quant}, bench/, scripts/, docs/{adr}, results/, tests/ per PLAN.md section 10, with package __init__ files and placeholder READMEs so later work has an obvious home." },
+
+    { "key": "t-py-tooling", "title": "Python tooling: pyproject/uv, ruff, pytest, pre-commit", "type": "task", "priority": 1, "parent_key": "e1", "labels": ["portable"],
+      "description": "Reproducible dependency management and lint/test entry points. Note the constraint split: the NOE Compiler pins Python 3.8, while the harness and reference stack want something modern. Keep them as separate, explicitly documented environments rather than forcing one." },
+
+    { "key": "t-ci", "title": "GitHub Actions CI: lint plus unit tests on an x86/aarch64 matrix", "type": "task", "priority": 1, "parent_key": "e1", "labels": ["portable"],
+      "description": "Judges score Developer Experience at 15 points and a green CI badge is direct evidence. Include an aarch64 job (native runner or QEMU) so portability claims are continuously checked rather than asserted." },
+
+    { "key": "t-results-schema", "title": "Freeze the results schema contract for all benchmark output", "type": "task", "priority": 0, "parent_key": "e1", "labels": ["portable"],
+      "description": "Define the CSV/JSON columns once: run id, git SHA, device, engine assignment, model, quantization, context length, phase, metric, value, unit, repeat index. Early dependency because the harness, the plots, and the final comparison table all bind to it, and changing it late invalidates collected data." },
+
+    { "key": "t-manifest", "title": "Run-manifest provenance capture", "type": "task", "priority": 1, "parent_key": "e1", "labels": ["portable"],
+      "description": "Every benchmark run emits device model, kernel, SDK and driver versions, cpufreq governor, observed clocks, thermal state, and git SHA. Per PLAN.md section 9 a number without a manifest is not a result, and thermal variance on a passively-cooled board makes this non-optional for credibility." },
+
+    { "key": "t-readme-skeleton", "title": "README skeleton with GDN/GDN-2 background written for judges", "type": "task", "priority": 1, "parent_key": "e1", "labels": ["submission"],
+      "description": "Judges may not know Gated DeltaNet. Explain the delta rule, gated decay, causal Conv1D, the hybrid linear:full attention layout, and crucially why O(1)-per-token decode state matters on memory-constrained edge silicon. An unexplained differentiator is not a differentiator." },
+
+    { "key": "t-contrib", "title": "CONTRIBUTING and reproducibility conventions", "type": "chore", "priority": 2, "parent_key": "e1", "labels": ["submission"],
+      "description": "Document how to run benchmarks, where results land, the manifest requirement, and the ADR convention. Feeds the Developer Experience criterion and makes the repo reusable as the migration template we claim it is." },
+
+    { "key": "t-procure-o6", "title": "Source a Radxa Orion O6 (64GB) — retail, loaner, or remote access", "type": "task", "priority": 0, "parent_key": "e2", "labels": ["external-gate", "hardware"],
+      "description": "Dominates the entire schedule and cannot be compressed by effort. Pursue every path in parallel: Radxa direct, retail with expedited shipping, a borrowed board, or SSH access to someone else's O6 (remote access is sufficient for nearly all of our work). Escalate daily until resolved or the T-3 descope trigger fires." },
+
+    { "key": "t-cix-enroll", "title": "Apply to the CIX Early Bird Program for NOE Compiler and AI Model Hub access", "type": "task", "priority": 0, "parent_key": "e2", "labels": ["external-gate", "hardware"],
+      "description": "The NPU toolchain is gated behind this enrollment and approval latency is unknown. Submit immediately, in parallel with procurement, and ask directly about turnaround so the T-4 descope trigger can be evaluated with real information." },
+
+    { "key": "t-o6-flash", "title": "Flash Debian 12 and complete first boot with SSH access", "type": "task", "priority": 0, "parent_key": "e2", "labels": ["hardware"],
+      "description": "Use the radxa-build/orion-o6 images. Capture every step verbatim while doing it once — this becomes docs/SETUP_O6.md, and reconstructing it from memory later produces the vague setup instructions that lose Developer Experience points." },
+
+    { "key": "t-o6-sysbase", "title": "System baseline: CPU topology, memory bandwidth, governors, thermal headroom", "type": "task", "priority": 1, "parent_key": "e2", "labels": ["hardware"],
+      "description": "Map the 4x Cortex-A720 big / 4x A720 medium / 4x A520 little clusters to logical CPU ids, measure achievable LPDDR5 bandwidth against the >100GB/s claim, enumerate cpufreq governors, and establish idle and loaded thermal behavior. Prerequisite for any credible big.LITTLE scheduling work." },
+
+    { "key": "t-perf-tooling", "title": "Install perf/ftrace/powertop and set up Arm Performix on device", "type": "task", "priority": 1, "parent_key": "e2", "labels": ["hardware", "submission"],
+      "description": "Arm Performix is explicitly called for by the challenge brief for standardized reporting, so treat it as a submission requirement rather than a convenience. Confirm it runs on the O6 and produces the expected report format before depending on it." },
+
+    { "key": "t-py38-noe", "title": "Python 3.8 environment plus NOE Compiler install and toy-model smoke compile", "type": "task", "priority": 1, "parent_key": "e2", "labels": ["hardware"],
+      "description": "The NOE Compiler has a hard Python 3.8 dependency, so use a dedicated conda or venv environment isolated from the harness environment. Done when a trivial model compiles end to end, proving the toolchain works before we point it at anything as unusual as a gated recurrent scan." },
+
+    { "key": "t-npu-smoke", "title": "NPU runtime smoke test via a CIX AI Model Hub reference model", "type": "task", "priority": 1, "parent_key": "e2", "labels": ["hardware"],
+      "description": "Run a known-good reference model on the NPU and sanity-check throughput against the ~28.8 TOPS claim. Establishes that runtime, driver, and compiler agree, so later GDN failures are attributable to our operators rather than the platform." },
+
+    { "key": "t-gpu-stack", "title": "Validate the Immortalis G720 Vulkan/OpenCL stack", "type": "task", "priority": 1, "parent_key": "e2", "labels": ["hardware"],
+      "description": "Run vulkaninfo and clpeak, then build llama.cpp with the Vulkan backend as an independent proof the GPU compute path works. The GPU is the most likely home for GDN's recurrent scan, so this must be solid before the mapping decision." },
+
+    { "key": "t-cix-sdk-src", "title": "Sync CIX SDK sources for BSP/kernel-level access (only if needed)", "type": "task", "priority": 3, "parent_key": "e2", "labels": ["hardware", "stretch"],
+      "description": "repo init / repo sync the CIX SDK from GitLab. Deliberately low priority: only pursue if a concrete blocker requires kernel or BSP changes. Speculative deep-stack work is exactly the kind of time sink that sinks a 12-day schedule." },
+
+    { "key": "t-hedge-select", "title": "DECISION: choose the portable aarch64 hedge target", "type": "decision", "priority": 1, "parent_key": "e3", "labels": ["hedge", "portable"],
+      "description": "Android phone via Termux gives the most device-like Edge AI framing; AWS Graviton is easiest to automate but is server silicon; Apple silicon is convenient but not Arm-vendor-aligned with the challenge framing. Weigh availability today against how the write-up will read. Record as an ADR." },
+
+    { "key": "t-hedge-bringup", "title": "Bring up the hedge target with an aarch64 build using i8mm/SVE", "type": "task", "priority": 1, "parent_key": "e3", "labels": ["hedge"],
+      "description": "Get inference running on the chosen aarch64 device with Arm dot-product, i8mm, and SVE paths enabled where available. Confirm the feature flags are actually active at runtime rather than merely compiled in." },
+
+    { "key": "t-hedge-baseline", "title": "Baseline benchmark sweep on the hedge target", "type": "task", "priority": 1, "parent_key": "e3", "labels": ["hedge"],
+      "description": "Run the full harness on the hedge device to produce a real, quotable result set independent of the O6. This is the insurance policy: after this bead closes we have a submittable Edge AI entry even if no board ever arrives." },
+
+    { "key": "t-hedge-docs", "title": "docs/SETUP_PORTABLE.md for reproducible hedge-target setup", "type": "task", "priority": 2, "parent_key": "e3", "labels": ["hedge", "submission"],
+      "description": "Setup instructions are a stated Devpost write-up requirement, and if the Edge AI track is chosen this document becomes the primary reproduction path judges will follow." },
+
+    { "key": "t-model-survey", "title": "Survey Qwen3.5 checkpoints in the 0.8B-4B range", "type": "task", "priority": 0, "parent_key": "e4", "labels": ["portable"],
+      "description": "For each candidate record parameter count, dense vs MoE structure, license terms for redistribution, context window, and the GDN layer configuration from config.json. Filter against 64GB LPDDR5 and the roughly 10B parameter NPU ceiling. Fully hardware-independent, so it starts today." },
+
+    { "key": "t-model-select", "title": "DECISION: primary and fallback Qwen3.5 checkpoint", "type": "decision", "priority": 0, "parent_key": "e4", "labels": ["portable"],
+      "description": "Pick one primary checkpoint plus a smaller fallback for fast iteration. Optimize the choice for demonstrating the GDN scaling thesis, not for headline model size: a small model that reaches 262K context tells our story better than a larger one that cannot. Record as an ADR." },
+
+    { "key": "t-arch-audit", "title": "Audit the GDN layer structure from modeling code", "type": "task", "priority": 0, "parent_key": "e4", "labels": ["portable"],
+      "description": "Read the actual modeling implementation and document the causal Conv1D, decay gating, delta-rule update, chunk size, head dimensions, recurrent state shape, and the real linear:full attention layer ratio and placement. This is the ground truth the whole mapping and quantization strategy depends on, and it supersedes any figure quoted from a secondary source." },
+
+    { "key": "t-x86-ref", "title": "Stand up x86/CUDA reference inference as the oracle source", "type": "task", "priority": 0, "parent_key": "e4", "labels": ["portable"],
+      "description": "Run the selected checkpoint with transformers plus the reference linear-attention kernels on commodity hardware. Produces the trusted outputs every on-device optimization is later validated against, and unblocks GDN-2 work without needing any Arm hardware." },
+
+    { "key": "t-oracle", "title": "Correctness oracle harness with tolerances", "type": "task", "priority": 0, "parent_key": "e4", "labels": ["portable"],
+      "description": "Golden logits and perplexity comparison against the x86 reference with explicit, justified numeric tolerances, including long-context prompts where recurrent state drift compounds. Per PLAN.md section 9, speed that changes outputs is not speed; this bead is what makes that enforceable." },
+
+    { "key": "t-quant-plan", "title": "Quantization policy with FP16 carve-outs", "type": "task", "priority": 1, "parent_key": "e4", "labels": ["portable"],
+      "description": "Decide per-layer INT8/INT4 assignment and which tensors must stay FP16. Recurrent state and gating signals are the prime suspects for precision sensitivity: unlike a KV cache, GDN state is fed back through every step, so quantization error accumulates over the sequence rather than staying local." },
+
+    { "key": "t-weights-fetch", "title": "Weight fetch scripts with license compliance", "type": "task", "priority": 2, "parent_key": "e4", "labels": ["submission"],
+      "description": "Download weights at setup time rather than vendoring them, keeping the repo small and avoiding redistribution terms we have not verified. Record the checkpoint license and any attribution requirements for the compliance pass." },
+
+    { "key": "t-metrics-spec", "title": "Define benchmark metrics precisely", "type": "task", "priority": 0, "parent_key": "e5", "labels": ["portable"],
+      "description": "Pin down decode tokens/sec, prefill throughput, time-to-first-token, peak memory (split into weights, KV cache, and recurrent state), and energy per token, including exactly where each timer starts and stops. Ambiguous metric definitions are how benchmark comparisons quietly become meaningless." },
+
+    { "key": "t-harness-core", "title": "Benchmark runner CLI with context sweep, warmup, repeats, and percentiles", "type": "task", "priority": 0, "parent_key": "e5", "labels": ["portable"],
+      "description": "Sweep 4K, 32K, 128K, and 262K contexts with configurable warmup and repeat counts, emitting per-repeat rows in the frozen schema. Report percentiles rather than best runs. Each context point must be independently useful so a truncated sweep still yields publishable data." },
+
+    { "key": "t-harness-mem", "title": "Memory instrumentation separating KV cache from GDN recurrent state", "type": "task", "priority": 0, "parent_key": "e5", "labels": ["portable"],
+      "description": "The single most important measurement in the project. Attribute memory to weights, the full-attention layers' KV cache, and the GDN layers' fixed-size recurrent state separately, so the plot shows one component growing with context while the other stays flat. Without this split the central claim is asserted rather than demonstrated." },
+
+    { "key": "t-longctx-corpus", "title": "Long-context prompt corpus from 4K to 262K", "type": "task", "priority": 1, "parent_key": "e5", "labels": ["portable"],
+      "description": "Build reproducible needle-in-haystack and RULER-style multi-key prompts across the sweep range, with deterministic generation and committed seeds. Serves double duty as the retrieval-quality evaluation set for the GDN-2 hypothesis." },
+
+    { "key": "t-harness-energy", "title": "Power and energy sampling integration", "type": "task", "priority": 2, "parent_key": "e5", "labels": ["hardware"],
+      "description": "Sample board power during runs to report joules per token alongside throughput. On edge silicon, efficiency is often the more persuasive number, and it strengthens the Physical AI framing considerably." },
+
+    { "key": "t-performix", "title": "Arm Performix integration and standardized report export", "type": "task", "priority": 1, "parent_key": "e5", "labels": ["submission", "hardware"],
+      "description": "Wire the harness to emit Arm Performix standardized reports as the challenge brief requires, and commit the generated artifacts so judges can compare our numbers against other entries on a common basis." },
+
+    { "key": "t-plots", "title": "Plot and table generation from results", "type": "task", "priority": 1, "parent_key": "e5", "labels": ["portable"],
+      "description": "Generate throughput-versus-context curves, the stacked memory decomposition, and the comparison matrix directly from committed CSVs so every figure is reproducible from data rather than hand-assembled. Keep the visual language consistent across all figures." },
+
+    { "key": "t-harness-tests", "title": "Unit tests and a tiny-model smoke run wired into CI", "type": "task", "priority": 1, "parent_key": "e5", "labels": ["portable"],
+      "description": "Cover metric computation, schema conformance, and manifest capture, plus an end-to-end run on a tiny model that finishes in CI time. Protects the harness from silent breakage during the fast, pressured changes of the final days." },
+
+    { "key": "t-methodology-doc", "title": "docs/METHODOLOGY.md — metric definitions and statistical approach", "type": "task", "priority": 1, "parent_key": "e5", "labels": ["submission"],
+      "description": "State how we measure, how many repeats, which percentiles, how thermal state is controlled and reported, and what the correctness tolerances are. Transparent methodology is what separates a credible benchmark from a marketing number." },
+
+    { "key": "t-profile-layers", "title": "Per-layer latency profile across GDN, full-attention, and FFN blocks", "type": "task", "priority": 1, "parent_key": "e6", "labels": ["hardware"],
+      "description": "Break down where time actually goes per layer class at several context lengths, separating prefill from decode. Establishes empirically which layers are worth offloading and prevents the classic mistake of optimizing a block that is not the bottleneck." },
+
+    { "key": "t-profile-recurrence", "title": "Characterize the chunkwise WY recurrent-scan bottleneck", "type": "task", "priority": 1, "parent_key": "e6", "labels": ["hardware"],
+      "description": "Determine whether GDN cost is dominated by the inherently sequential state update or by the chunk-parallel matmul portion, and how that balance shifts between prefill and decode. This is the crux: a sequential scan and a dense matmul want completely different engines, and the answer dictates the mapping decision." },
+
+    { "key": "t-npu-opcov", "title": "NOE Compiler op-coverage audit for GDN operators", "type": "task", "priority": 1, "parent_key": "e6", "labels": ["hardware"],
+      "description": "Systematically test which GDN constituent ops the NOE Compiler accepts: causal Conv1D, cumulative-product decay, the delta-rule update, and gating elementwise chains. Record what compiles, what silently falls back, and what fails outright. Per PLAN.md risk R3 this is a finding rather than a failure, and it is genuinely reusable output for anyone porting a GDN-class model to this silicon." },
+
+    { "key": "t-mapping-adr", "title": "DECISION/ADR: layer-to-engine assignment across NPU, GPU, and CPU", "type": "decision", "priority": 1, "parent_key": "e6", "labels": ["hardware"],
+      "description": "Fix the partitioning with measurements behind it: most likely GDN recurrent scan on GPU or CPU, with periodic full-attention layers and dense FFN/MoE blocks on the NPU, since NPUs are tuned for dense matmuls rather than recurrent scans. Must account for handoff and tensor-residency cost, which can easily exceed the compute saved." },
+
+    { "key": "t-partition-runtime", "title": "Implement the partitioned execution runtime", "type": "task", "priority": 1, "parent_key": "e6", "labels": ["hardware"],
+      "description": "Execute the mapping: per-engine subgraph invocation, tensor residency tracking, zero-copy or minimal-copy handoff between engines, and correct recurrent-state threading across engine boundaries. State continuity across boundaries is the subtle correctness hazard here." },
+
+    { "key": "t-findings-doc", "title": "docs/FINDINGS.md — op-coverage gaps and profiling results", "type": "task", "priority": 2, "parent_key": "e6", "labels": ["submission"],
+      "description": "Write up what we learned about running a novel architecture on this toolchain before broad support exists, including the negative findings. This document is the strongest Potential Impact artifact in the repo: it saves the next person weeks." },
+
+    { "key": "t-npu-export", "title": "Export and quantize NPU-resident subgraphs via NOE (INT8, then INT4)", "type": "task", "priority": 1, "parent_key": "e7", "labels": ["hardware"],
+      "description": "Take the NPU-assigned subgraphs through the NOE Compiler at INT8 first, then attempt INT4. Land INT8 as the safe result before reaching for INT4, so an aggressive-quantization failure cannot cost us the working configuration." },
+
+    { "key": "t-npu-accuracy", "title": "Accuracy regression of quantized NPU subgraphs against the oracle", "type": "task", "priority": 1, "parent_key": "e7", "labels": ["hardware"],
+      "description": "Validate each quantization level against the correctness oracle, including long-context runs where error accumulates through the recurrent state. Report the quality-versus-speed tradeoff honestly rather than quoting throughput from a configuration whose outputs we never checked." },
+
+    { "key": "t-gpu-scan", "title": "Vulkan/OpenCL compute shader for the chunkwise gated delta-rule scan", "type": "task", "priority": 1, "parent_key": "e7", "labels": ["hardware"],
+      "description": "The flagship kernel: implement GDN's chunkwise recurrent update on the Immortalis G720, exploiting chunk-level parallelism while respecting the sequential dependency between chunks. Hand-writing a kernel for an architecture that predates its tooling support is the clearest possible evidence of Arm-specific optimization." },
+
+    { "key": "t-gpu-validate", "title": "Numerical validation of the GPU scan kernel", "type": "task", "priority": 1, "parent_key": "e7", "labels": ["hardware"],
+      "description": "Compare kernel output against the reference implementation across chunk sizes, sequence lengths, and edge cases (sequence not divisible by chunk size, state carry at boundaries). Recurrent kernels can be subtly wrong in ways that only surface at long context, so test there explicitly." },
+
+    { "key": "t-cpu-biglittle", "title": "CPU optimization: big.LITTLE affinity policy and i8mm/SVE GEMM paths", "type": "task", "priority": 1, "parent_key": "e7", "labels": ["hardware"],
+      "description": "Exploit the asymmetric 4+4+4 cluster layout: pin latency-critical prefill to the A720 big cores, keep housekeeping on the A520 little cores, and avoid cross-cluster migration mid-inference. Enable i8mm and SVE paths and verify they are active at runtime. Fully Arm-specific and, unlike the NPU path, not gated on any external approval." },
+
+    { "key": "t-dispatcher", "title": "Dynamic heterogeneous dispatcher routing by phase, load, and thermal state", "type": "task", "priority": 2, "parent_key": "e7", "labels": ["hardware", "stretch"],
+      "description": "The WOW-factor centerpiece: route work across NPU, GPU, and CPU at runtime based on inference phase (prefill vs decode), engine occupancy, and thermal headroom, rather than using a static assignment. Must degrade gracefully to the static mapping if an engine is unavailable, so this cannot become a single point of failure." },
+
+    { "key": "t-thermal", "title": "Sustained-load thermal-throttle characterization and governor tuning", "type": "task", "priority": 2, "parent_key": "e7", "labels": ["hardware"],
+      "description": "Measure how throughput decays over multi-minute sustained inference and tune governors accordingly. Directly addresses PLAN.md risk R7: on passively-cooled edge hardware, a burst number that cannot be sustained is misleading, and steady-state numbers are the honest ones for a Physical AI submission." },
+
+    { "key": "t-ablation", "title": "Ablation matrix across configurations and context lengths", "type": "task", "priority": 1, "parent_key": "e7", "labels": ["submission"],
+      "description": "Run the full grid: full-attention-only baseline, hybrid GDN, plus NPU offload, plus GPU scan kernel, plus dynamic dispatcher, each across the context sweep with memory decomposition. This produces the headline comparison table, and the ablation structure is what makes each optimization's individual contribution attributable rather than lumped together." },
+
+    { "key": "t-gdn2-read", "title": "Deep-read the GDN-2 paper and record the hypothesis as an ADR", "type": "task", "priority": 3, "parent_key": "e8", "labels": ["research", "portable"],
+      "description": "Understand how separate channel-wise erase (b_t) and write (w_t) gates generalize GDN's single scalar gate, and state the testable hypothesis: decoupled gating improves long-context multi-key retrieval at edge-appropriate model sizes. Cheap, hardware-independent, and it front-loads the thinking so the later experiment is mechanical." },
+
+    { "key": "t-gdn2-clone", "title": "Clone and smoke-test the NVLabs GatedDeltaNet-2 reference on x86", "type": "task", "priority": 3, "parent_key": "e8", "labels": ["research", "portable"],
+      "description": "Get the reference implementation running and reproduce a minimal published behavior, establishing a trustworthy comparison point before drawing any conclusions about GDN versus GDN-2." },
+
+    { "key": "t-gdn2-decision", "title": "DECISION: benchmark-only comparison (a) vs layer-swap experiment (b)", "type": "decision", "priority": 3, "parent_key": "e8", "labels": ["research"],
+      "description": "Option (a) microbenchmarks GDN-2 against GDN gating on target hardware: cheap, safe, always deliverable. Option (b) swaps GDN-2 layers into a Qwen3.5-architecture checkpoint: higher reward but needs adaptation compute we may not have (PLAN.md risk R5). Default to (a); escalate only if measurably ahead of schedule at the T-2 checkpoint." },
+
+    { "key": "t-gdn2-bench", "title": "(a) Microbenchmark GDN-2 vs GDN gating on the target device", "type": "task", "priority": 3, "parent_key": "e8", "labels": ["research"],
+      "description": "Compare the two gating formulations at the operator level on real Arm hardware: latency, memory, and arithmetic cost per token at several context lengths. A forward-looking architectural comparison on shipping edge silicon, useful regardless of which way the numbers fall." },
+
+    { "key": "t-gdn2-swap", "title": "(b) Small-scale GDN-2 layer swap into a Qwen3.5-architecture checkpoint", "type": "task", "priority": 4, "parent_key": "e8", "labels": ["research", "stretch"],
+      "description": "Replace GDN layers with GDN-2 in a small checkpoint and run a brief adaptation so the swapped layers are not simply broken. Highest-risk bead in the plan and first to be cut at T-2; only attempt with genuine schedule slack." },
+
+    { "key": "t-gdn2-ruler", "title": "RULER multi-key retrieval evaluation of the long-context hypothesis", "type": "task", "priority": 4, "parent_key": "e8", "labels": ["research", "stretch"],
+      "description": "Test whether decoupled erase/write gating actually improves multi-key retrieval at edge-appropriate scale, using the long-context corpus. This is the direct test of the paper's claim, and either outcome is a real result." },
+
+    { "key": "t-gdn2-note", "title": "Research note on GDN-2 findings, reporting negative results honestly", "type": "task", "priority": 3, "parent_key": "e8", "labels": ["research", "submission"],
+      "description": "Write up whatever we actually found. Per PLAN.md section 9, 'we tested the decoupled-gating retrieval hypothesis at edge scale and it did not hold, here is the profile showing why' scores under Potential Impact and costs nothing under scrutiny, whereas an overstated claim invites exactly the wrong kind of attention." },
+
+    { "key": "t-results-table", "title": "Master comparison table and headline numbers", "type": "task", "priority": 0, "parent_key": "e9", "labels": ["submission"],
+      "description": "Assemble the core result: full-attention-only versus hybrid GDN versus optimized hybrid (versus GDN-2 if implemented) across tokens/sec, TTFT, and memory at each context length. Generated from committed CSVs, with every cell traceable to a manifest-backed run." },
+
+    { "key": "t-repro-rehearsal", "title": "Clean-clone reproduction rehearsal following our own README verbatim", "type": "task", "priority": 0, "parent_key": "e9", "labels": ["submission"],
+      "description": "On a fresh system, clone and follow the documented setup literally without using undocumented knowledge, timing each stage and fixing every gap found. This is the highest-leverage Developer Experience bead: it is where 15 points are won or quietly lost, and it always surfaces missing steps." },
+
+    { "key": "t-writeup", "title": "Devpost write-up mapped section-by-section to the judging rubric", "type": "task", "priority": 0, "parent_key": "e9", "labels": ["submission"],
+      "description": "Cover project overview, functionality and output, and setup instructions as the rules require, framed as 'optimizing a genuinely novel architecture (Gated DeltaNet) for Arm edge silicon before broad tooling support exists'. Address each criterion explicitly, and state honestly what was and was not achieved." },
+
+    { "key": "t-readme-final", "title": "README final pass: background, results, reproduction", "type": "task", "priority": 0, "parent_key": "e9", "labels": ["submission"],
+      "description": "Fold in the GDN background, headline results table, figures, and verified reproduction steps. The README is the first and often only artifact a judge reads carefully, so it must stand alone without the Devpost text." },
+
+    { "key": "t-video", "title": "Script and record a demo video under 3 minutes on hardware", "type": "task", "priority": 2, "parent_key": "e9", "labels": ["submission", "stretch"],
+      "description": "Optional per the rules but explicitly said to help judges substantially. Show the optimization running live on the physical board with visible throughput and memory numbers at long context. Scripted and tightly timed; first casualty at T-1 since it is genuinely optional." },
+
+    { "key": "t-compliance", "title": "Final compliance pass against the submission requirements checklist", "type": "chore", "priority": 0, "parent_key": "e9", "labels": ["submission"],
+      "description": "Verify track selection, public repo, OSI license visible in the About section, all three required write-up sections present, video hosting if used, Arm Performix results included, third-party licenses and NOTICE for dependencies and weights, and the newness statement. Mechanical, and each item is individually capable of disqualifying an otherwise strong entry." },
+
+    { "key": "t-submit", "title": "Submit on Devpost before 2026-08-14 16:00 PT", "type": "task", "priority": 0, "parent_key": "e9", "labels": ["submission"],
+      "description": "Target submission by end of day Aug 13 to leave at least 16 hours of slack for portal problems, upload failures, or a last-minute correction. Done when the submission is confirmed received, not when it is drafted." }
+  ],
+
+  "edges": [
+    { "from_key": "t-descope-ladder", "to_key": "t-risk-register", "type": "blocks" },
+    { "from_key": "t-track-decision", "to_key": "t-procure-o6", "type": "blocks" },
+    { "from_key": "t-track-decision", "to_key": "t-cix-enroll", "type": "blocks" },
+    { "from_key": "t-track-decision", "to_key": "t-hedge-bringup", "type": "blocks" },
+    { "from_key": "t-adr-scaffold", "to_key": "t-repo-skeleton", "type": "blocks" },
+
+    { "from_key": "t-py-tooling", "to_key": "t-repo-skeleton", "type": "blocks" },
+    { "from_key": "t-ci", "to_key": "t-py-tooling", "type": "blocks" },
+    { "from_key": "t-results-schema", "to_key": "t-repo-skeleton", "type": "blocks" },
+    { "from_key": "t-manifest", "to_key": "t-results-schema", "type": "blocks" },
+    { "from_key": "t-readme-skeleton", "to_key": "t-repo-skeleton", "type": "blocks" },
+    { "from_key": "t-readme-skeleton", "to_key": "t-verify-claims", "type": "blocks" },
+    { "from_key": "t-contrib", "to_key": "t-repo-skeleton", "type": "blocks" },
+
+    { "from_key": "t-o6-flash", "to_key": "t-procure-o6", "type": "blocks" },
+    { "from_key": "t-o6-sysbase", "to_key": "t-o6-flash", "type": "blocks" },
+    { "from_key": "t-o6-sysbase", "to_key": "t-manifest", "type": "blocks" },
+    { "from_key": "t-perf-tooling", "to_key": "t-o6-flash", "type": "blocks" },
+    { "from_key": "t-py38-noe", "to_key": "t-o6-flash", "type": "blocks" },
+    { "from_key": "t-py38-noe", "to_key": "t-cix-enroll", "type": "blocks" },
+    { "from_key": "t-npu-smoke", "to_key": "t-py38-noe", "type": "blocks" },
+    { "from_key": "t-gpu-stack", "to_key": "t-o6-flash", "type": "blocks" },
+    { "from_key": "t-cix-sdk-src", "to_key": "t-o6-flash", "type": "blocks" },
+
+    { "from_key": "t-hedge-bringup", "to_key": "t-hedge-select", "type": "blocks" },
+    { "from_key": "t-hedge-baseline", "to_key": "t-hedge-bringup", "type": "blocks" },
+    { "from_key": "t-hedge-baseline", "to_key": "t-harness-core", "type": "blocks" },
+    { "from_key": "t-hedge-docs", "to_key": "t-hedge-bringup", "type": "blocks" },
+
+    { "from_key": "t-model-select", "to_key": "t-model-survey", "type": "blocks" },
+    { "from_key": "t-model-select", "to_key": "t-verify-claims", "type": "blocks" },
+    { "from_key": "t-arch-audit", "to_key": "t-model-select", "type": "blocks" },
+    { "from_key": "t-x86-ref", "to_key": "t-model-select", "type": "blocks" },
+    { "from_key": "t-oracle", "to_key": "t-x86-ref", "type": "blocks" },
+    { "from_key": "t-oracle", "to_key": "t-results-schema", "type": "blocks" },
+    { "from_key": "t-quant-plan", "to_key": "t-arch-audit", "type": "blocks" },
+    { "from_key": "t-weights-fetch", "to_key": "t-model-select", "type": "blocks" },
+
+    { "from_key": "t-metrics-spec", "to_key": "t-results-schema", "type": "blocks" },
+    { "from_key": "t-harness-core", "to_key": "t-metrics-spec", "type": "blocks" },
+    { "from_key": "t-harness-mem", "to_key": "t-harness-core", "type": "blocks" },
+    { "from_key": "t-harness-mem", "to_key": "t-arch-audit", "type": "blocks" },
+    { "from_key": "t-longctx-corpus", "to_key": "t-metrics-spec", "type": "blocks" },
+    { "from_key": "t-harness-energy", "to_key": "t-harness-core", "type": "blocks" },
+    { "from_key": "t-harness-energy", "to_key": "t-perf-tooling", "type": "blocks" },
+    { "from_key": "t-performix", "to_key": "t-harness-core", "type": "blocks" },
+    { "from_key": "t-performix", "to_key": "t-perf-tooling", "type": "blocks" },
+    { "from_key": "t-plots", "to_key": "t-harness-core", "type": "blocks" },
+    { "from_key": "t-plots", "to_key": "t-results-schema", "type": "blocks" },
+    { "from_key": "t-harness-tests", "to_key": "t-harness-core", "type": "blocks" },
+    { "from_key": "t-harness-tests", "to_key": "t-ci", "type": "blocks" },
+    { "from_key": "t-methodology-doc", "to_key": "t-metrics-spec", "type": "blocks" },
+    { "from_key": "t-methodology-doc", "to_key": "t-harness-core", "type": "blocks" },
+
+    { "from_key": "t-profile-layers", "to_key": "t-o6-sysbase", "type": "blocks" },
+    { "from_key": "t-profile-layers", "to_key": "t-harness-core", "type": "blocks" },
+    { "from_key": "t-profile-layers", "to_key": "t-arch-audit", "type": "blocks" },
+    { "from_key": "t-profile-recurrence", "to_key": "t-profile-layers", "type": "blocks" },
+    { "from_key": "t-npu-opcov", "to_key": "t-npu-smoke", "type": "blocks" },
+    { "from_key": "t-npu-opcov", "to_key": "t-arch-audit", "type": "blocks" },
+    { "from_key": "t-mapping-adr", "to_key": "t-profile-recurrence", "type": "blocks" },
+    { "from_key": "t-mapping-adr", "to_key": "t-npu-opcov", "type": "blocks" },
+    { "from_key": "t-mapping-adr", "to_key": "t-gpu-stack", "type": "blocks" },
+    { "from_key": "t-partition-runtime", "to_key": "t-mapping-adr", "type": "blocks" },
+    { "from_key": "t-findings-doc", "to_key": "t-npu-opcov", "type": "blocks" },
+    { "from_key": "t-findings-doc", "to_key": "t-profile-recurrence", "type": "blocks" },
+
+    { "from_key": "t-npu-export", "to_key": "t-mapping-adr", "type": "blocks" },
+    { "from_key": "t-npu-export", "to_key": "t-quant-plan", "type": "blocks" },
+    { "from_key": "t-npu-accuracy", "to_key": "t-npu-export", "type": "blocks" },
+    { "from_key": "t-npu-accuracy", "to_key": "t-oracle", "type": "blocks" },
+    { "from_key": "t-gpu-scan", "to_key": "t-mapping-adr", "type": "blocks" },
+    { "from_key": "t-gpu-scan", "to_key": "t-gpu-stack", "type": "blocks" },
+    { "from_key": "t-gpu-validate", "to_key": "t-gpu-scan", "type": "blocks" },
+    { "from_key": "t-gpu-validate", "to_key": "t-oracle", "type": "blocks" },
+    { "from_key": "t-cpu-biglittle", "to_key": "t-o6-sysbase", "type": "blocks" },
+    { "from_key": "t-cpu-biglittle", "to_key": "t-profile-layers", "type": "blocks" },
+    { "from_key": "t-dispatcher", "to_key": "t-partition-runtime", "type": "blocks" },
+    { "from_key": "t-dispatcher", "to_key": "t-gpu-validate", "type": "blocks" },
+    { "from_key": "t-dispatcher", "to_key": "t-npu-accuracy", "type": "blocks" },
+    { "from_key": "t-dispatcher", "to_key": "t-cpu-biglittle", "type": "blocks" },
+    { "from_key": "t-thermal", "to_key": "t-dispatcher", "type": "blocks" },
+    { "from_key": "t-thermal", "to_key": "t-harness-energy", "type": "blocks" },
+    { "from_key": "t-ablation", "to_key": "t-dispatcher", "type": "blocks" },
+    { "from_key": "t-ablation", "to_key": "t-plots", "type": "blocks" },
+    { "from_key": "t-ablation", "to_key": "t-longctx-corpus", "type": "blocks" },
+    { "from_key": "t-ablation", "to_key": "t-harness-mem", "type": "blocks" },
+
+    { "from_key": "t-gdn2-clone", "to_key": "t-gdn2-read", "type": "blocks" },
+    { "from_key": "t-gdn2-clone", "to_key": "t-arch-audit", "type": "blocks" },
+    { "from_key": "t-gdn2-decision", "to_key": "t-gdn2-clone", "type": "blocks" },
+    { "from_key": "t-gdn2-decision", "to_key": "t-mapping-adr", "type": "blocks" },
+    { "from_key": "t-gdn2-decision", "to_key": "t-descope-ladder", "type": "blocks" },
+    { "from_key": "t-gdn2-bench", "to_key": "t-gdn2-decision", "type": "blocks" },
+    { "from_key": "t-gdn2-bench", "to_key": "t-harness-core", "type": "blocks" },
+    { "from_key": "t-gdn2-swap", "to_key": "t-gdn2-decision", "type": "blocks" },
+    { "from_key": "t-gdn2-swap", "to_key": "t-x86-ref", "type": "blocks" },
+    { "from_key": "t-gdn2-ruler", "to_key": "t-gdn2-swap", "type": "blocks" },
+    { "from_key": "t-gdn2-ruler", "to_key": "t-longctx-corpus", "type": "blocks" },
+    { "from_key": "t-gdn2-note", "to_key": "t-gdn2-bench", "type": "blocks" },
+    { "from_key": "t-gdn2-note", "to_key": "t-gdn2-ruler", "type": "related" },
+
+    { "from_key": "t-results-table", "to_key": "t-ablation", "type": "blocks" },
+    { "from_key": "t-repro-rehearsal", "to_key": "t-results-table", "type": "blocks" },
+    { "from_key": "t-repro-rehearsal", "to_key": "t-readme-skeleton", "type": "blocks" },
+    { "from_key": "t-repro-rehearsal", "to_key": "t-methodology-doc", "type": "blocks" },
+    { "from_key": "t-writeup", "to_key": "t-results-table", "type": "blocks" },
+    { "from_key": "t-writeup", "to_key": "t-track-decision", "type": "blocks" },
+    { "from_key": "t-readme-final", "to_key": "t-repro-rehearsal", "type": "blocks" },
+    { "from_key": "t-readme-final", "to_key": "t-results-table", "type": "blocks" },
+    { "from_key": "t-readme-final", "to_key": "t-findings-doc", "type": "blocks" },
+    { "from_key": "t-video", "to_key": "t-dispatcher", "type": "blocks" },
+    { "from_key": "t-video", "to_key": "t-track-decision", "type": "blocks" },
+    { "from_key": "t-compliance", "to_key": "t-license", "type": "blocks" },
+    { "from_key": "t-compliance", "to_key": "t-weights-fetch", "type": "blocks" },
+    { "from_key": "t-submit", "to_key": "t-writeup", "type": "blocks" },
+    { "from_key": "t-submit", "to_key": "t-readme-final", "type": "blocks" },
+    { "from_key": "t-submit", "to_key": "t-compliance", "type": "blocks" },
+    { "from_key": "t-submit", "to_key": "t-repro-rehearsal", "type": "blocks" },
+
+    { "from_key": "t-hedge-baseline", "to_key": "t-ablation", "type": "related" },
+    { "from_key": "t-writeup", "to_key": "t-verify-claims", "type": "related" },
+    { "from_key": "t-writeup", "to_key": "t-findings-doc", "type": "related" },
+    { "from_key": "t-writeup", "to_key": "t-gdn2-note", "type": "related" },
+    { "from_key": "t-performix", "to_key": "t-results-table", "type": "related" }
+  ]
+}
