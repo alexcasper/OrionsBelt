@@ -283,6 +283,10 @@ class SweepConfig:
     # Output
     manifest_dir: str = "results/manifests"
     notes: str = ""
+    # Prompt source (ob-mrd.2): "synthetic" generates filler text,
+    # "needle"/"ruler" load from the committed corpus (ob-del).
+    prompt_type: str = "synthetic"
+    prompt_dir: str = "bench/prompts"
 
 
 # ---------------------------------------------------------------------------
@@ -295,6 +299,23 @@ _BASE_PROMPT = (
     "decode in O(1) memory per token, unlike full attention which grows a linear "
     "KV cache. This benchmark measures that architectural difference precisely. "
 )
+
+
+def load_corpus_prompt(
+    prompt_type: str, context_length: int, prompt_dir: str = "bench/prompts"
+) -> str:
+    """Load a committed prompt from the corpus (ob-del).
+
+    ``prompt_type`` is "needle" or "ruler". Falls back to ``generate_prompt``
+    if the corpus file is not found, so a truncated corpus doesn't break the sweep.
+    """
+    from pathlib import Path
+
+    path = Path(prompt_dir) / f"{prompt_type}_{context_length}.txt"
+    if path.exists():
+        return path.read_text(encoding="utf-8").rstrip("\n")
+    # Graceful fallback — the sweep should never crash on a missing prompt file
+    return generate_prompt(context_length)
 
 
 def generate_prompt(target_tokens: int, chars_per_token: int = 4) -> str:
@@ -524,7 +545,10 @@ def run_sweep(backend: Backend, config: SweepConfig) -> list[ResultRow]:
     all_rows: list[ResultRow] = []
 
     for ctx_len in config.context_lengths:
-        prompt_text = generate_prompt(ctx_len)
+        if config.prompt_type in ("needle", "ruler"):
+            prompt_text = load_corpus_prompt(config.prompt_type, ctx_len, config.prompt_dir)
+        else:
+            prompt_text = generate_prompt(ctx_len)
 
         # Warmup repeats: full protocol, discarded, never written (METRICS.md section 7)
         for _ in range(config.warmup_count):
@@ -716,6 +740,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="Don't write CSV or manifest, just print the summary",
     )
     parser.add_argument("--notes", default="", help="Notes for every row")
+    parser.add_argument(
+        "--prompt-type",
+        default="synthetic",
+        choices=["synthetic", "needle", "ruler"],
+        help="Prompt source: synthetic (default), needle (haystack), or ruler (multi-key)",
+    )
+    parser.add_argument(
+        "--prompt-dir", default="bench/prompts", help="Directory for committed prompt corpus"
+    )
     # Synthetic-backend timing simulation (for demos only; zero by default)
     parser.add_argument(
         "--prefill-ns-per-token",
@@ -770,6 +803,8 @@ def main(argv: list[str] | None = None) -> int:
         quantization=args.quantization,
         manifest_dir=args.manifest_dir,
         notes=args.notes,
+        prompt_type=args.prompt_type,
+        prompt_dir=args.prompt_dir,
     )
 
     # Run the sweep
