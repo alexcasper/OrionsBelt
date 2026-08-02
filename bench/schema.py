@@ -9,10 +9,16 @@ benchmark harness, the plotting code, and the final comparison table — renamin
 removing anything already in use invalidates already-collected data. See the "changing
 this schema" section of the doc before touching either file.
 
-Python 3.8 compatible on purpose: this must run on the Orion O6 board's Python 3.8
-environment as well as on a modern development machine. No ``match`` statements, no PEP
-604 ``X | Y`` unions, no third-party dependencies -- only ``csv``, ``dataclasses``,
-``enum``, and ``typing`` from the standard library.
+Targets Python 3.10+, and uses no third-party dependencies -- only ``csv``,
+``dataclasses``, ``enum``, ``datetime``, ``math``, and ``re`` from the standard library.
+The stdlib-only rule is deliberate and still holds: this module has to import cleanly in
+the NOE Compiler's own environment and on the board, where we do not control the
+dependency set.
+
+(This file was originally written to a Python 3.8 dialect to accommodate a reported 3.8
+pin on the CIX NOE Compiler. That pin was wrong -- the SDK documents **Python 3.10**, and
+Debian 12 on the board ships 3.11. See docs/CLAIM_VERIFICATION.md section 2.2a. The 3.8
+restriction has been lifted accordingly.)
 """
 
 import csv
@@ -21,7 +27,6 @@ import re
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import Dict, List, Optional, Set
 
 # ---------------------------------------------------------------------------
 # Enums (the closed vocabularies from docs/RESULTS_SCHEMA.md sections 3 and 4)
@@ -108,7 +113,7 @@ class LayerClass(Enum):
 # Metric vocabulary rules (docs/RESULTS_SCHEMA.md section 4)
 # ---------------------------------------------------------------------------
 
-METRIC_UNITS: Dict[MetricName, Unit] = {
+METRIC_UNITS: dict[MetricName, Unit] = {
     MetricName.PREFILL_TOKENS_PER_SEC: Unit.TOKENS_PER_SEC,
     MetricName.DECODE_TOKENS_PER_SEC: Unit.TOKENS_PER_SEC,
     MetricName.TTFT_SECONDS: Unit.SECONDS,
@@ -116,7 +121,7 @@ METRIC_UNITS: Dict[MetricName, Unit] = {
     MetricName.ENERGY_JOULES_PER_TOKEN: Unit.JOULES_PER_TOKEN,
 }
 
-METRIC_ALLOWED_PHASES: Dict[MetricName, Set[Phase]] = {
+METRIC_ALLOWED_PHASES: dict[MetricName, set[Phase]] = {
     MetricName.PREFILL_TOKENS_PER_SEC: {Phase.PREFILL},
     MetricName.DECODE_TOKENS_PER_SEC: {Phase.DECODE},
     MetricName.TTFT_SECONDS: {Phase.PREFILL},
@@ -126,14 +131,14 @@ METRIC_ALLOWED_PHASES: Dict[MetricName, Set[Phase]] = {
 
 # Metrics that require metric_component (currently only peak_memory_bytes -- the
 # three-way memory split).
-METRICS_REQUIRING_COMPONENT: Set[MetricName] = {MetricName.PEAK_MEMORY_BYTES}
+METRICS_REQUIRING_COMPONENT: set[MetricName] = {MetricName.PEAK_MEMORY_BYTES}
 
 # Canonical context sweep points (documentary only -- context_length accepts any
 # positive integer so exploratory/intermediate points are not schema violations).
 CANONICAL_CONTEXT_LENGTHS = (4096, 32768, 131072, 262144)
 
 # Column order as it appears in docs/RESULTS_SCHEMA.md section 3 and in every CSV.
-COLUMNS: List[str] = [
+COLUMNS: list[str] = [
     "run_id",
     "timestamp",
     "git_sha",
@@ -189,7 +194,7 @@ class ResultRow:
     context_length: int
     phase: str
     metric_name: str
-    metric_component: Optional[str]
+    metric_component: str | None
     value: float
     unit: str
     repeat_index: int
@@ -359,7 +364,7 @@ def validate_row(row: ResultRow) -> None:
         raise SchemaValidationError(prefix + ": " + "; ".join(errors))
 
 
-def validate_rows(rows: List[ResultRow]) -> None:
+def validate_rows(rows: list[ResultRow]) -> None:
     """Validate every row, raising a single SchemaValidationError listing every bad row.
 
     Prefer this over calling validate_row() in a loop when checking a whole CSV: it
@@ -381,7 +386,7 @@ def validate_rows(rows: List[ResultRow]) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _row_to_csv_dict(row: ResultRow) -> Dict[str, str]:
+def _row_to_csv_dict(row: ResultRow) -> dict[str, str]:
     out = {}
     for field_name in COLUMNS:
         value = getattr(row, field_name)
@@ -392,7 +397,7 @@ def _row_to_csv_dict(row: ResultRow) -> Dict[str, str]:
     return out
 
 
-def write_csv(rows: List[ResultRow], path: str, validate: bool = True) -> None:
+def write_csv(rows: list[ResultRow], path: str, validate: bool = True) -> None:
     """Write rows to path as a schema-conformant CSV.
 
     Validates all rows first (unless validate=False) so a malformed row is caught before
@@ -422,7 +427,7 @@ def _parse_float(value: str, field_name: str) -> float:
         raise SchemaValidationError(f"{field_name}: could not parse {value!r} as float") from None
 
 
-def read_csv(path: str, validate: bool = True) -> List[ResultRow]:
+def read_csv(path: str, validate: bool = True) -> list[ResultRow]:
     """Read a schema-conformant CSV back into a list of ResultRow.
 
     Uses only the csv module from the standard library. Raises SchemaValidationError if

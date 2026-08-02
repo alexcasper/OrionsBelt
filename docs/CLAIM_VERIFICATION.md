@@ -114,10 +114,34 @@ any hardware**. It provides no evidence either way about our bandwidth-bound dec
 | Up to 64GB, 128-bit LPDDR5 @ 5500MT/s | ✅ Confirmed |
 | ~30 tokens/sec on Qwen2-1.5B | ✅ Confirmed — vendor figure, unstated precision and context length, so treat as a rough sanity target rather than a benchmark |
 | Models "within ten billion parameters" | ✅ Confirmed as vendor wording |
-| CIX Early Bird Program required for latest P1 software | ✅ Confirmed |
+| CIX Early Bird Program required for latest P1 software | ✅ Confirmed as vendor wording — but see §2.2a: it is **not** required for the NOE Compiler / NPU SDK, which downloads directly |
 
-The NOE Compiler's Python 3.8 pin could **not** be confirmed — the cited Radxa NPU SDK page
-now 404s. Treat as unverified and re-check during `t-py38-noe`.
+### 2.2a NPU SDK — **brief.md was wrong, and the news is good** (verified 2026-08-02)
+
+Re-checked against [Radxa's NPU environment-setup page](https://docs.radxa.com/en/orion/o6/app-development/artificial-intelligence/env-setup)
+and the [public CIX Linux wiki](https://github.com/cixtech/cix-manifest/wiki):
+
+| brief.md claimed | Primary source says |
+|---|---|
+| NOE Compiler pins **Python 3.8** | **"The SDK is only compatible with Python 3.10."** Set up via a miniforge 3.10 venv. (Community reports the Python NOE wheel wants 3.11-3.12 and `cix-noe-umd` errors on 3.13+, so treat 3.10 as the documented target and expect version sensitivity.) |
+| SDK access requires **CIX Early Bird enrollment + approval** | **No registration or approval mentioned.** Direct download from the Radxa Download Station via `wget`. |
+| — | **The SDK runs on an x86 Linux host**, not the board. The board's official OS image already ships the NPU driver. |
+
+Three consequences, and they are significant:
+
+1. **The Python 3.8 constraint does not exist.** The correct floor is **3.10**. Any code written
+   to a 3.8 dialect for the NPU toolchain's sake was self-imposed on a false premise.
+2. **Risk R2 largely dissolves.** The NOE Compiler is not gated behind an approval queue. There
+   may still be an Early Bird program for other CIX material, but it is not on the path to
+   compiling models.
+3. **NPU compiler work no longer requires the board.** Because `cixbuild` runs on an x86 host, we
+   can install the SDK and attempt to compile GDN operators *today*, with no hardware. That moves
+   the single most valuable early finding — the NOE op-coverage audit for the gated recurrent scan
+   (risk R3, and the core technical contribution) — from "blocked behind two external gates" to
+   "actionable now". Only *running* the compiled model needs the board.
+
+The separate `cix-manifest` wiki covers the **Linux BSP/kernel build** (CIX EVB, Radxa Orion O6,
+MG MS-R1, BeiQi AI PC) and is fully public — so BSP-level work is ungated too.
 
 ### 2.3 Qwen3.5 architecture (source: [transformers docs](https://huggingface.co/docs/transformers/model_doc/qwen3_5))
 

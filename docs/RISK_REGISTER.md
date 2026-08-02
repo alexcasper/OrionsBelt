@@ -22,7 +22,7 @@ original design intent; reconcile by editing this file, not by treating PLAN.md 
 | # | Risk | Likelihood | Impact | Owner | Trigger condition (dated, observable) | Mitigation | Status (2026-08-02) |
 |---|---|---|---|---|---|---|---|
 | R1 | O6 board does not arrive before deadline | High | Critical | **maintainer** | No tracking number / confirmed ship date by **EOD 2026-08-05** (T-9), OR board not physically in hand by **2026-08-11 (T-3)** | Hedge track (E3) built from day one, hardware-independent; hard track go/no-go 2026-08-09 (`ob-imb`); Edge AI submission on generic aarch64 if trigger fires | Open — no board, no tracking number, no loaner/remote-access lead confirmed as of today |
-| R2 | CIX Early Bird access not granted in time | High | High | **maintainer** | No response/approval to the Early Bird application by **EOD 2026-08-07** (T-7, roughly the M1→M2 boundary), OR not approved by **2026-08-10 (T-4)** | NPU work isolated behind a single ADR (`ob-o4g`); CPU+GPU hybrid (Vulkan scan + i8mm/SVE + big.LITTLE) is a complete, honest submission on its own if NPU never lands | Open — application not yet submitted (`ob-aop` still in `bd ready`, unclaimed) |
+| R2 | ~~CIX Early Bird access not granted in time~~ **LARGELY DISSOLVED 2026-08-02** | Low | Low | agent | N/A — superseded. The NOE Compiler / NPU SDK is a **direct download with no approval gate**, requires **Python 3.10** (not 3.8), and runs on an **x86 host**, per [Radxa env-setup docs](https://docs.radxa.com/en/orion/o6/app-development/artificial-intelligence/env-setup) and the public [cix-manifest wiki](https://github.com/cixtech/cix-manifest/wiki). See `CLAIM_VERIFICATION.md` §2.2a | No mitigation needed for the compile path. Residual risk is only that *running* a compiled artifact still needs the board (folded into R1) | **Downgraded** — was High/High/maintainer-owned. NPU compiler work is now actionable today with no hardware: see bead `ob-t3b.1` |
 | R3 | NOE Compiler has no kernel for GDN recurrent scan | High | Medium | agent | Op-coverage audit (`ob-8xc`) returns "no GDN scan op" for the layer types found in `t-arch-audit` — checkable as soon as NPU access exists | Treated as a finding, not a failure: document the op-coverage gap as a contribution; route the scan to GPU/CPU by design regardless of NPU outcome | Not yet assessable — blocked behind R2 (need NPU/NOE access first) |
 | R4 | Long contexts (262K) exceed 64GB or take too long to benchmark | Medium | Medium | agent | Any single context-length run in the sweep (`ob-del`) exceeds device RAM or a single run exceeds ~30 min wall-clock during harness dry-run | Incremental sweep 4K→32K→128K→262K; each point is independently publishable; drop the top point at T-1 (2026-08-13) per descope ladder | Not yet assessable — harness (`ob-ljh`, `ob-ar3`) not built |
 | R5 | GDN-2 layer swap needs training compute we don't have | High | Low | agent | By **2026-08-10 (T-2 for this decision)**, `ob-9ke` (benchmark-only vs layer-swap decision) is not yet unblocked with schedule slack to spare | Default to benchmark-only option (a); option (b) only attempted if genuinely ahead of schedule at that checkpoint | On track — plan already defaults to option (a); no action needed yet |
@@ -32,9 +32,17 @@ original design intent; reconcile by editing this file, not by treating PLAN.md 
 | R9 | Time runs out mid-optimization | Medium | High | maintainer + agent | Any T-4/T-3/T-2/T-1 trigger below fires (see §3) | Pre-agreed descope ladder (§3) executed on the date, not improvised | Open — ladder defined, not yet needed |
 | R10 | Qwen3.5 checkpoint license restricts redistribution | Low | Medium | agent | License audit during model survey (`ob-eae`/`ob-7fv`) finds a non-redistributable license on the selected checkpoint | License audit is part of model survey; fetch scripts (`ob-ixt`) download weights rather than vendoring them | Not yet assessable — model selection decision not yet made |
 
-**Read R1 and R2 carefully: both are maintainer-owned.** Every other risk in this table can, in
-principle, be advanced or resolved by agent work alone (subject to being unblocked). R1 and R2
-cannot — see §4.
+**Read R1 carefully: it is maintainer-owned.** Every other risk in this table can, in principle,
+be advanced or resolved by agent work alone (subject to being unblocked). R1 cannot — see §4.
+
+> **Update 2026-08-02 (same day this register was written):** R2 has been **downgraded from
+> High/High to Low/Low**. It was written on `brief.md`'s claim that the NPU toolchain sits behind
+> CIX Early Bird enrollment and pins Python 3.8. Both are wrong: the SDK downloads directly with no
+> approval, needs Python 3.10, and — most importantly — **runs on an x86 host**, so GDN operator
+> compilation needs no board at all. This is the single largest de-risking event so far: the NOE
+> op-coverage audit (risk R3, and the project's core technical contribution) moved from
+> double-gated to actionable today. Only R1 (board access) remains a true external gate, and it now
+> blocks only *on-device execution and measurement*, not compiler work.
 
 ---
 

@@ -45,7 +45,7 @@ Everything genuinely portable — benchmark harness, correctness oracle, model s
 | Newness | Built or significantly updated during submission period | Devpost rules |
 | Benchmarking | Arm Performix for standardized reporting | Challenge brief |
 | Demo video | Optional, <3 min, YouTube/Vimeo/Youku | Devpost rules |
-| NOE Compiler | Python 3.8 dependency — **unverified**, cited Radxa page 404s | brief.md, re-check in `t-py38-noe` |
+| NOE Compiler | **Python 3.10** (verified). Runs on an **x86 host**, direct download, no approval gate | Radxa env-setup docs |
 | NPU model ceiling | models "within ten billion parameters" | Radxa docs (verified) |
 
 ### 2.2 Judging rubric → where each point lands
@@ -77,7 +77,10 @@ MoE 35B-A3B is 40); the 397B-A17B upper bound is unconfirmed and dropped; memory
 100GB/s, not "over" it; and GDN-2's RULER gains are real but not quantified in the abstract, so
 they must be described qualitatively until the full paper is read.
 
-**Still unverified:** the NOE Compiler's Python 3.8 pin — the cited Radxa page now 404s.
+**Corrected again (2026-08-02, after the CIX wiki pointer):** the NOE Compiler needs **Python 3.10,
+not 3.8**; the SDK is a **direct download with no approval gate**; and it **runs on an x86 host**.
+This dissolves most of risk R2 and makes the NOE op-coverage audit for GDN operators actionable
+*without the board* — see `docs/CLAIM_VERIFICATION.md` §2.2a.
 
 ### 2.4 Verified finding that reshapes the thesis
 
