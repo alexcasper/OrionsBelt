@@ -220,6 +220,44 @@ useful precedent for how a per-architecture GDN kernel gets packaged.
 
 ---
 
+## 3.1 CIX's own model hub contains no linear-attention architecture (verified 2026-08-02)
+
+Checked the [CIX AI Model Hub on ModelScope](https://www.modelscope.cn/models/cix/ai_model_hub/files?version=26_Q1)
+via the ModelScope file API, at revisions `26_Q1` and `master` (there is no `26_Q2` model-hub
+revision yet, even though the SDK we have is the 26 Q2 release).
+
+`models/Generative_AI/LLM/` holds **38 model entries**. Every one is a conventional
+full-attention transformer:
+
+- Qwen family: Qwen1.5-1.8B/4B, Qwen2-0.5B/1.5B/7B, Qwen2.5-0.5B/1.5B/3B/7B, **Qwen3-0.6B /
+  1.7B / 4B / 8B / 30B-A3B**
+- Llama 2 / 3 / 3.1 / 3.2, Phi-2 / Phi-3-mini / Phi-3.5-mini, Gemma-2-2b, ChatGLM3-6B,
+  InternLM2.5 / InternLM3, ERNIE-4.5 (incl. 21B-A3B), MiniCPM3-4B, GLM-Edge-4B,
+  DeepSeek-R1 distills
+
+**Absent: Qwen3.5, Qwen3-Next, Mamba, RWKV, any Gated DeltaNet or SSM or linear-attention model
+of any kind.** The multimodal directory tells the same story — Qwen2-VL and Qwen2.5-VL/Omni, no
+Qwen3.5-VL.
+
+Two details make this more than an "it's just new" observation:
+
+1. **Qwen3-30B-A3B is present**, so MoE architectures are already supported by the toolchain —
+   sparsity is not the barrier.
+2. **Qwen3 is present**, so the hub is not merely lagging by a generation.
+
+What is missing is specifically the *architecture class*: nothing in CIX's reference collection
+carries a recurrent state instead of a KV cache. That is precisely the hole this project targets,
+and it is now a checkable, citable fact rather than an inference.
+
+**What this does and does not establish.** It does *not* prove the NOE Compiler cannot compile GDN
+operators — that is exactly what the probe graphs in `artifacts/npu_op_probe/` are for, and the
+answer might well be "most of it compiles, the sequential scan does not." What it does establish
+is that **no reference path exists**: nobody has shipped a linear-attention model for this
+silicon, so there is no worked example to copy, no precedent for how the recurrent state is
+carried across invocations, and no vendor-tuned kernel to lean on. That is the strongest available
+support for the framing in §3 — the contribution is not "we optimized a model" but "we did the
+port that had no prior art on this platform."
+
 ## 4. Remaining unverified
 
 | Item | Next step |

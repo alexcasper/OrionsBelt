@@ -137,6 +137,13 @@ more memory-hungry PyTorch ops. It already happens on NVIDIA GB10 (SM121), where
 ships a build. **Arm/Vulkan is the same hole, wider** — and that is the verifiable one-line statement
 of what this project contributes.
 
+**And there is no prior art to copy on this platform.** CIX's own AI Model Hub (`26_Q1`/`master`)
+ships 38 LLMs, every one a conventional full-attention transformer — Qwen3 through 30B-A3B, Llama,
+Phi, InternLM, ERNIE. **Not one linear-attention, SSM, or recurrent-state model.** MoE is supported
+and Qwen3 is present, so neither sparsity nor recency is the barrier; the missing thing is the
+architecture class itself. Verified via the ModelScope file API — see
+[`docs/CLAIM_VERIFICATION.md`](./docs/CLAIM_VERIFICATION.md) §3.1.
+
 **Why this is hard on an NPU.** GDN layers are not standard attention. The chunkwise WY-style recurrent update — delta rule + gated decay + causal Conv1D — is a *sequential scan* over chunk states. NPU accelerators are tuned for dense matmuls, and the CIX NOE Compiler may have no kernel for a gated recurrent scan at all. The interesting engineering question, and the core of our contribution, is therefore:
 
 > Which layers go on which engine? Do GDN scan layers run on GPU/CPU while the periodic full-attention layers and MoE FFN blocks (dense matmul, NPU-friendly) go to the NPU — and what does the handoff cost?
