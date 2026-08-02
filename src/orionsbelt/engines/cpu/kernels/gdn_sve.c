@@ -82,6 +82,22 @@ static inline float bf16_to_f32(uint16_t b) {
     return f;
 }
 
+#ifdef __ARM_NEON
+/* Vectorized NEON fp32→bf16 round-to-nearest-even (4 lanes).
+ * Replaces the O(4) scalar loop with three NEON ops — critical for cumdecay
+ * where the conversion runs every timestep, not just at chunk boundaries. */
+static inline uint16x4_t vcvtq_bf16_from_f32(float32x4_t f) {
+    uint32x4_t u = vreinterpretq_u32_f32(f);
+    uint32x4_t lsb = vandq_u32(vshrq_n_u32(u, 16), vdupq_n_u32(1));
+    uint32x4_t bias = vaddq_u32(vdupq_n_u32(0x7FFF), lsb);
+    return vshrn_n_u32(vaddq_u32(u, bias), 16);
+}
+/* Vectorized NEON bf16→fp32 (4 lanes): widen + shift left 16. */
+static inline float32x4_t vcvtq_f32_from_bf16(uint16x4_t b) {
+    return vreinterpretq_f32_u32(vshll_n_u16(b, 16));
+}
+#endif
+
 /* ---------------------------------------------------------------------------
  * 1. Gated cumulative decay  (inclusive prefix product along the sequence)
  *
@@ -442,16 +458,13 @@ void gdn_gated_scan_bf16(const float *restrict g, const float *restrict x,
 #elif defined(__ARM_NEON)
     size_t c = 0;
     for (; c + 4 <= channels; c += 4) {
-        float tmp[4];
-        for (int j = 0; j < 4; ++j) tmp[j] = bf16_to_f32(state[c + j]);
-        float32x4_t acc = vld1q_f32(tmp);
+        float32x4_t acc = vcvtq_f32_from_bf16(vld1_u16(state + c));
         for (size_t t = 0; t < seq; ++t) {
             acc = vfmaq_f32(vld1q_f32(x + t * channels + c), acc,
                             vld1q_f32(g + t * channels + c));
             vst1q_f32(s + t * channels + c, acc);
         }
-        vst1q_f32(tmp, acc);
-        for (int j = 0; j < 4; ++j) state[c + j] = f32_to_bf16_rne(tmp[j]);
+        vst1_u16(state + c, vcvtq_bf16_from_f32(acc));
     }
     for (; c < channels; ++c) {
         float a = bf16_to_f32(state[c]);
@@ -496,12 +509,9 @@ void gdn_cumdecay_bf16(const float *restrict a, uint16_t *restrict decay, size_t
     size_t c = 0;
     for (; c + 4 <= channels; c += 4) {
         float32x4_t run = vdupq_n_f32(1.0f);
-        float tmp[4];
         for (size_t t = 0; t < seq; ++t) {
             run = vmulq_f32(run, vld1q_f32(a + t * channels + c));
-            vst1q_f32(tmp, run);
-            for (int j = 0; j < 4; ++j)
-                decay[t * channels + c + j] = f32_to_bf16_rne(tmp[j]);
+            vst1_u16(decay + t * channels + c, vcvtq_bf16_from_f32(run));
         }
     }
     for (; c < channels; ++c) {
