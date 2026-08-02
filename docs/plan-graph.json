@@ -9,8 +9,8 @@
     { "key": "e2", "title": "E2: Hardware and toolchain acquisition (Orion O6 + CIX NPU SDK)", "type": "epic", "priority": 0, "labels": ["hardware", "external-gate"],
       "description": "Board procurement, CIX Early Bird enrollment, Debian 12 bring-up, Python 3.8 + NOE Compiler, NPU runtime, Vulkan/OpenCL validation, perf tooling. Externally gated and on the critical path: as of 2026-08-02 we hold neither the board nor SDK access." },
 
-    { "key": "e3", "title": "E3: Portable Arm hedge track (Mobile AI fallback)", "type": "epic", "priority": 1, "labels": ["hedge", "portable"],
-      "description": "Keep a viable Mobile AI submission alive on generic aarch64, independent of the O6. Not a consolation prize: the GDN memory-scaling thesis is fully demonstrable on any aarch64 device with i8mm/SVE and a Vulkan or OpenCL GPU." },
+    { "key": "e3", "title": "E3: Portable Arm hedge track (Edge AI fallback)", "type": "epic", "priority": 1, "labels": ["hedge", "portable"],
+      "description": "Keep a viable Edge AI submission alive on generic aarch64, independent of the O6. Not a consolation prize: the GDN memory-scaling thesis is fully demonstrable on any aarch64 device with i8mm/SVE and a Vulkan or OpenCL GPU." },
 
     { "key": "e4", "title": "E4: Model selection and reference baseline", "type": "epic", "priority": 0, "labels": ["portable"],
       "description": "Pick a Qwen3.5 checkpoint in the 0.8B-4B range, audit its GDN layer structure from modeling code, and stand up an x86 reference that serves as the correctness oracle for every later optimization." },
@@ -37,10 +37,10 @@
       "description": "Move PLAN.md section 7 into a tracked artifact reviewed daily given the 12-day window. Each risk needs an owner, a trigger condition, and a named mitigation. Done when the register exists and the first review has happened." },
 
     { "key": "t-descope-ladder", "title": "Ratify the pre-agreed descope ladder with trigger dates", "type": "decision", "priority": 1, "parent_key": "e0", "labels": ["program"],
-      "description": "Lock in what gets cut at T-4 (no NPU access: drop NPU offload, ship CPU+GPU), T-3 (no board: switch to Mobile AI on aarch64), T-2 (drop GDN-2 layer swap, keep microbenchmark), T-1 (drop video and the 262K point). Deciding this calmly now is worth more than deciding it at 2am on Aug 13. Anything cut gets filed as a follow-up bead, not deleted." },
+      "description": "Lock in what gets cut at T-4 (no NPU access: drop NPU offload, ship CPU+GPU), T-3 (no board: switch to Edge AI on aarch64), T-2 (drop GDN-2 layer swap, keep microbenchmark), T-1 (drop video and the 262K point). Deciding this calmly now is worth more than deciding it at 2am on Aug 13. Anything cut gets filed as a follow-up bead, not deleted." },
 
-    { "key": "t-track-decision", "title": "DECISION (hard date 2026-08-09): Physical AI vs Mobile AI track", "type": "decision", "priority": 0, "parent_key": "e0", "labels": ["submission", "program"],
-      "description": "Single most consequential scheduling decision. If the O6 has arrived and booted, target Physical AI. If not, commit to Mobile AI on the hedge target and stop spending time on O6-specific work. Hard date so the write-up has five clear days of stable framing. Done when the choice is recorded as an ADR and the README framing follows it." },
+    { "key": "t-track-decision", "title": "DECISION (hard date 2026-08-09): Physical AI vs Edge AI track", "type": "decision", "priority": 0, "parent_key": "e0", "labels": ["submission", "program"],
+      "description": "Single most consequential scheduling decision. If the O6 has arrived and booted, target Physical AI. If not, commit to Edge AI on the hedge target and stop spending time on O6-specific work. Hard date so the write-up has five clear days of stable framing. Done when the choice is recorded as an ADR and the README framing follows it." },
 
     { "key": "t-adr-scaffold", "title": "Set up docs/adr/ with an ADR template", "type": "chore", "priority": 2, "parent_key": "e0", "labels": ["portable"],
       "description": "Every decision-type bead must produce an ADR before it closes. Provide the template and numbering convention so that requirement is frictionless rather than skipped." },
@@ -97,16 +97,16 @@
       "description": "repo init / repo sync the CIX SDK from GitLab. Deliberately low priority: only pursue if a concrete blocker requires kernel or BSP changes. Speculative deep-stack work is exactly the kind of time sink that sinks a 12-day schedule." },
 
     { "key": "t-hedge-select", "title": "DECISION: choose the portable aarch64 hedge target", "type": "decision", "priority": 1, "parent_key": "e3", "labels": ["hedge", "portable"],
-      "description": "Android phone via Termux gives the most honest Mobile AI framing; AWS Graviton is easiest to automate but is server silicon; Apple silicon is convenient but not Arm-vendor-aligned with the challenge framing. Weigh availability today against how the write-up will read. Record as an ADR." },
+      "description": "Android phone via Termux gives the most device-like Edge AI framing; AWS Graviton is easiest to automate but is server silicon; Apple silicon is convenient but not Arm-vendor-aligned with the challenge framing. Weigh availability today against how the write-up will read. Record as an ADR." },
 
     { "key": "t-hedge-bringup", "title": "Bring up the hedge target with an aarch64 build using i8mm/SVE", "type": "task", "priority": 1, "parent_key": "e3", "labels": ["hedge"],
       "description": "Get inference running on the chosen aarch64 device with Arm dot-product, i8mm, and SVE paths enabled where available. Confirm the feature flags are actually active at runtime rather than merely compiled in." },
 
     { "key": "t-hedge-baseline", "title": "Baseline benchmark sweep on the hedge target", "type": "task", "priority": 1, "parent_key": "e3", "labels": ["hedge"],
-      "description": "Run the full harness on the hedge device to produce a real, quotable result set independent of the O6. This is the insurance policy: after this bead closes we have a submittable Mobile AI entry even if no board ever arrives." },
+      "description": "Run the full harness on the hedge device to produce a real, quotable result set independent of the O6. This is the insurance policy: after this bead closes we have a submittable Edge AI entry even if no board ever arrives." },
 
     { "key": "t-hedge-docs", "title": "docs/SETUP_PORTABLE.md for reproducible hedge-target setup", "type": "task", "priority": 2, "parent_key": "e3", "labels": ["hedge", "submission"],
-      "description": "Setup instructions are a stated Devpost write-up requirement, and if the Mobile AI track is chosen this document becomes the primary reproduction path judges will follow." },
+      "description": "Setup instructions are a stated Devpost write-up requirement, and if the Edge AI track is chosen this document becomes the primary reproduction path judges will follow." },
 
     { "key": "t-model-survey", "title": "Survey Qwen3.5 checkpoints in the 0.8B-4B range", "type": "task", "priority": 0, "parent_key": "e4", "labels": ["portable"],
       "description": "For each candidate record parameter count, dense vs MoE structure, license terms for redistribution, context window, and the GDN layer configuration from config.json. Filter against 64GB LPDDR5 and the roughly 10B parameter NPU ceiling. Fully hardware-independent, so it starts today." },
