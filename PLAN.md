@@ -150,8 +150,13 @@ architecture class itself. Verified via the ModelScope file API — see
 
 ### 3.1 Working hypothesis: CPU-resident GDN, accelerator-offloaded attention
 
-Adopted 2026-08-02. The mapping ADR (`ob-o4g`) must still confirm it with measurements, but the
-prior is now explicit rather than open:
+Adopted 2026-08-02, and **empirically confirmed the same day** by the NOE operator-coverage audit
+(`ob-t3b.1`, see [`docs/FINDINGS.md`](./docs/FINDINGS.md) §1): every arithmetic operator GDN needs is
+natively supported by the NPU toolchain, but **the sequential recurrence is not expressible at all** —
+`Scan` is rejected, and `Loop` is accepted only when its trip count is a compile-time constant, in
+which case it is statically unrolled. A runtime-length recurrence is rejected outright. So keeping the
+scan on the CPU is not a preference; the NPU has no construct for it. The mapping ADR (`ob-o4g`) still
+owns the final per-layer assignment and the dispatch-cost numbers:
 
 **Armv9.2 CPU hosts the GDN linear layers. The GPU and/or NPU take the periodic full-attention
 layers and the dense FFN blocks.** Not the other way round.

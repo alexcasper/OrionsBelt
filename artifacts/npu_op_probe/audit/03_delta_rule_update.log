@@ -1,0 +1,61 @@
+[I] [Parser]: Begin to parse onnx model 03_delta_rule_update...
+To enable the following instructions: AVX2 AVX512F AVX512_VNNI FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.
+Falling back to TensorFlow client; we recommended you install the Cloud TPU client directly with pip install cloud-tpu-client.
+Creating converter from 7 to 5
+Creating converter from 5 to 7
+Creating converter from 7 to 5
+Creating converter from 5 to 7
+matplotlib data path: /tmp/claude-0/-home-user-OrionsBelt/a5612def-eaf2-5760-b778-12b512ca0156/scratchpad/noe310/lib/python3.10/site-packages/matplotlib/mpl-data
+CONFIGDIR=/root/.config/matplotlib
+interactive is False
+platform is linux
+CACHEDIR=/root/.cache/matplotlib
+Using fontManager instance from /root/.cache/matplotlib/fontlist-v390.json
+[W] [Parser]: Meets issue(Your model ir_version 13 is higher than the checker's (10).) in onnx.check_model, but still proceeds!
+[W] [Parser]: The output name s_out is not a node but a tensor. However, we will use the node write as output node.
+[D] [Parser]: 17:15:07.191260, Input, s_in, NCHW, [[1, 16, 128, 128], [1, 16, 128, 128]], ['float32', 'float32'], False
+[D] [Parser]: 17:15:07.191620, Input, k, NCHW, [[1, 16, 128, 1], [1, 16, 128, 1], [1, 16, 128, 1]], ['float32', 'float32', 'float32'], False
+[D] [Parser]: 17:15:07.192355, Input, v, NCHW, [[1, 16, 1, 128]], ['float32'], False
+[D] [Parser]: 17:15:07.205620, Input, s_in, NCHW, [[1, 16, 128, 128], [1, 16, 128, 128]], ['float32', 'float32'], False
+[D] [Parser]: 17:15:07.205957, Input, k, NCHW, [[1, 16, 128, 1], [1, 16, 128, 1], [1, 16, 128, 1]], ['float32', 'float32', 'float32'], False
+[D] [Parser]: 17:15:07.206329, Transpose, k_T, NCHW, [[1, 16, 1, 128]], ['float32'], False
+[D] [Parser]: 17:15:07.206609, MatMul, kT_S, NCHW, [[1, 16, 1, 128]], ['float32'], False
+[D] [Parser]: 17:15:07.224352, MatMul, k_kT_S, NCHW, [[1, 16, 128, 128]], ['float32'], False
+[D] [Parser]: 17:15:07.225314, Sub, erase, NCHW, [[1, 16, 128, 128]], ['float32'], False
+[D] [Parser]: 17:15:07.225532, Input, v, NCHW, [[1, 16, 1, 128]], ['float32'], False
+[D] [Parser]: 17:15:07.234920, MatMul, outer_kv, NCHW, [[1, 16, 128, 128]], ['float32'], False
+[D] [Parser]: 17:15:07.235783, Add, write, NCHW, [[1, 16, 128, 128]], ['float32'], False
+[D] [Parser]: 17:15:07.753422, Input, s_in, NCHW, [[1, 16, 128, 128], [1, 16, 128, 128]], ['float32', 'float32'], False
+[D] [Parser]: 17:15:07.753780, Input, k, NCHW, [[1, 16, 128, 1], [1, 16, 128, 1], [1, 16, 128, 1]], ['float32', 'float32', 'float32'], False
+[D] [Parser]: 17:15:07.754009, Transpose, k_T, NCHW, [[1, 16, 1, 128]], ['float32'], False
+[D] [Parser]: 17:15:07.754297, MatMul, kT_S, NCHW, [[1, 16, 1, 128]], ['float32'], False
+[D] [Parser]: 17:15:07.776657, MatMul, k_kT_S, NCHW, [[1, 16, 128, 128]], ['float32'], False
+[D] [Parser]: 17:15:07.777459, Sub, erase, NCHW, [[1, 16, 128, 128]], ['float32'], False
+[D] [Parser]: 17:15:07.777661, Input, v, NCHW, [[1, 16, 1, 128]], ['float32'], False
+[D] [Parser]: 17:15:07.787006, MatMul, outer_kv, NCHW, [[1, 16, 128, 128]], ['float32'], False
+[D] [Parser]: 17:15:07.787795, Add, write, NCHW, [[1, 16, 128, 128]], ['float32'], False
+[D] [Parser]: 17:15:07.794632, Input, s_in, NCHW, [[1, 16, 128, 128], [1, 16, 128, 128]], ['float32', 'float32'], False
+[D] [Parser]: 17:15:07.794909, Input, k, NCHW, [[1, 16, 128, 1], [1, 16, 128, 1], [1, 16, 128, 1]], ['float32', 'float32', 'float32'], False
+[D] [Parser]: 17:15:07.795137, Transpose, k_T, NCHW, [[1, 16, 1, 128]], ['float32'], False
+[D] [Parser]: 17:15:07.795359, MatMul, kT_S, NCHW, [[1, 16, 1, 128]], ['float32'], False
+[D] [Parser]: 17:15:07.805242, MatMul, k_kT_S, NCHW, [[1, 16, 128, 128]], ['float32'], False
+[D] [Parser]: 17:15:07.805992, Sub, erase, NCHW, [[1, 16, 128, 128]], ['float32'], False
+[D] [Parser]: 17:15:07.806229, Input, v, NCHW, [[1, 16, 1, 128]], ['float32'], False
+[D] [Parser]: 17:15:07.808247, MatMul, outer_kv, NCHW, [[1, 16, 128, 128]], ['float32'], False
+[D] [Parser]: 17:15:07.808802, Add, write, NCHW, [[1, 16, 128, 128]], ['float32'], False
+[D] [Parser]: 17:15:08.302465, ArmInput, s_in, NCHW, [[1, 16, 128, 128], [1, 16, 128, 128]], ['float32', 'float32'], False
+[D] [Parser]: 17:15:08.302759, ArmInput, k, NCHW, [[1, 16, 128, 1], [1, 16, 128, 1], [1, 16, 128, 1]], ['float32', 'float32', 'float32'], False
+[D] [Parser]: 17:15:08.303117, ArmMatMul, kT_S, NCHW, [[1, 16, 1, 128]], ['float32'], False
+[D] [Parser]: 17:15:08.306113, ArmMatMul, k_kT_S, NCHW, [[1, 16, 128, 128]], ['float32'], False
+[D] [Parser]: 17:15:08.307479, ArmEltwise, erase, NCHW, [[1, 16, 128, 128]], ['float32'], False
+[D] [Parser]: 17:15:08.307674, ArmInput, v, NCHW, [[1, 16, 1, 128]], ['float32'], False
+[D] [Parser]: 17:15:08.309625, ArmMatMul, outer_kv, NCHW, [[1, 16, 128, 128]], ['float32'], False
+[D] [Parser]: 17:15:08.310826, ArmEltwise, write, NCHW, [[1, 16, 128, 128]], ['float32'], False
+[I] [Parser]: The input tensor(s) is/are: s_in_0,k_0,v_0
+[I] [Parser]: Input s_in from cfg is shown as tensor s_in_0 in IR!
+[I] [Parser]: Input k from cfg is shown as tensor k_0 in IR!
+[I] [Parser]: Input v from cfg is shown as tensor v_0 in IR!
+[I] [Parser]: Output s_out from cfg is shown as tensor write_0 in IR!
+[I] [Parser]: 0 error(s), 2 warning(s) generated.
+[I] [Parser]: Parser done!
+[I] [Parser]: Parser cost 6.94 seconds.

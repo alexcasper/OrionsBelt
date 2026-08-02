@@ -66,5 +66,16 @@
     ],
     "bytes": 446,
     "description": "The same recurrence via ONNX Loop rather than Scan. Compilers sometimes accept one control-flow form and not the other, so both are probed."
+  },
+  {
+    "probe": "07_loop_dynamic_trip",
+    "file": "07_loop_dynamic_trip.onnx",
+    "ops": [
+      "Loop",
+      "Identity",
+      "Mul"
+    ],
+    "bytes": 443,
+    "description": "Follow-up added after probe 06 turned out to be statically unrolled: identical recurrence but trip_count is a graph INPUT rather than an initializer. Decides whether Loop is genuinely supported as control flow or only ever unrolled. Result: rejected ('Graph is not DAG', shape inference unreliable for non-const max_count), proving unrolling is the only mechanism."
   }
 ]

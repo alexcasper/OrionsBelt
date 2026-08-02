@@ -1,0 +1,509 @@
+[I] [Parser]: Begin to parse onnx model 07_loop_dynamic_trip...
+To enable the following instructions: AVX2 AVX512F AVX512_VNNI FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.
+Falling back to TensorFlow client; we recommended you install the Cloud TPU client directly with pip install cloud-tpu-client.
+Creating converter from 7 to 5
+Creating converter from 5 to 7
+Creating converter from 7 to 5
+Creating converter from 5 to 7
+matplotlib data path: /tmp/claude-0/-home-user-OrionsBelt/a5612def-eaf2-5760-b778-12b512ca0156/scratchpad/noe310/lib/python3.10/site-packages/matplotlib/mpl-data
+CONFIGDIR=/root/.config/matplotlib
+interactive is False
+platform is linux
+CACHEDIR=/root/.cache/matplotlib
+Using fontManager instance from /root/.cache/matplotlib/fontlist-v390.json
+[W] [Parser]: Meets issue(Your model ir_version 13 is higher than the checker's (10).) in onnx.check_model, but still proceeds!
+[W] [Parser]: The output name state_out is not a node but a tensor. However, we will use the node dynamic_loop as output node.
+[D] [Parser]: 17:18:25.604579, Constant, cond, NCHW, [[]], ['bool'], True
+[D] [Parser]: 17:18:25.605119, Input, state_in, NCHW, [[1, 128]], ['float32'], False
+[D] [Parser]: 17:18:25.605260, Input, trip_count, NCHW, [[]], ['int64'], False
+[D] [Parser]: Subgraph Node(dynamic_loop) is in infer, result is not guaranteed!
+[D] [Parser]: 17:18:25.610106, Constant, cond, NCHW, [[]], ['bool'], True
+[D] [Parser]: 17:18:25.610422, Input, state_in, NCHW, [[1, 128]], ['float32'], False
+[D] [Parser]: 17:18:25.610590, Input, trip_count, NCHW, [[]], ['int64'], False
+[D] [Parser]: Subgraph Node(dynamic_loop) is in infer, result is not guaranteed!
+[W] [Parser]: Loop(dynamic_loop) max_count/cond_in is non-const, the infer shape is unreliable.
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 0 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 1 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 2 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 3 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 4 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 5 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 6 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 7 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 8 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 9 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 10 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 11 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 12 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 13 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 14 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 15 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 16 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 17 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 18 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 19 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 20 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 21 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 22 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 23 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 24 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 25 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 26 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 27 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 28 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 29 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 30 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 31 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 32 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 33 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 34 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 35 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 36 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 37 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 38 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 39 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 40 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 41 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 42 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 43 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 44 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 45 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 46 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 47 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 48 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 49 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 50 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 51 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 52 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 53 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 54 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 55 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 56 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 57 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 58 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 59 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 60 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 61 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 62 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 63 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 64 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 65 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 66 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 67 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 68 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 69 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 70 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 71 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 72 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 73 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 74 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 75 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 76 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 77 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 78 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 79 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 80 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 81 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 82 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 83 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 84 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 85 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 86 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 87 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 88 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 89 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 90 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 91 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 92 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 93 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 94 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 95 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 96 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 97 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 98 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 99 of Node: dynamic_loop
+[D] [Parser]: 17:18:25.647965, Loop, dynamic_loop, NCHW, [[1, 128]], ['float32'], False
+[D] [Parser]: 17:18:26.170151, Constant, cond, NCHW, [[]], ['bool'], True
+[D] [Parser]: 17:18:26.170506, Input, state_in, NCHW, [[1, 128]], ['float32'], False
+[D] [Parser]: 17:18:26.170629, Input, trip_count, NCHW, [[]], ['int64'], False
+[D] [Parser]: Subgraph Node(dynamic_loop) is in infer, result is not guaranteed!
+[W] [Parser]: Loop(dynamic_loop) max_count/cond_in is non-const, the infer shape is unreliable.
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 0 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 1 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 2 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 3 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 4 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 5 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 6 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 7 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 8 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 9 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 10 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 11 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 12 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 13 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 14 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 15 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 16 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 17 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 18 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 19 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 20 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 21 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 22 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 23 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 24 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 25 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 26 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 27 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 28 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 29 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 30 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 31 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 32 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 33 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 34 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 35 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 36 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 37 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 38 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 39 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 40 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 41 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 42 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 43 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 44 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 45 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 46 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 47 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 48 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 49 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 50 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 51 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 52 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 53 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 54 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 55 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 56 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 57 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 58 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 59 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 60 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 61 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 62 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 63 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 64 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 65 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 66 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 67 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 68 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 69 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 70 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 71 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 72 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 73 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 74 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 75 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 76 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 77 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 78 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 79 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 80 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 81 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 82 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 83 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 84 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 85 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 86 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 87 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 88 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 89 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 90 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 91 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 92 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 93 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 94 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 95 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 96 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 97 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 98 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 99 of Node: dynamic_loop
+[D] [Parser]: 17:18:26.214781, Loop, dynamic_loop, NCHW, [[1, 128]], ['float32'], False
+[D] [Parser]: 17:18:26.221199, Constant, cond, NCHW, [[]], ['bool'], True
+[D] [Parser]: 17:18:26.221505, Input, state_in, NCHW, [[1, 128]], ['float32'], False
+[D] [Parser]: 17:18:26.221688, Input, trip_count, NCHW, [[]], ['int64'], False
+[D] [Parser]: Subgraph Node(dynamic_loop) is in infer, result is not guaranteed!
+[W] [Parser]: Loop(dynamic_loop) max_count/cond_in is non-const, the infer shape is unreliable.
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 0 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 1 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 2 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 3 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 4 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 5 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 6 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 7 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 8 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 9 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 10 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 11 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 12 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 13 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 14 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 15 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 16 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 17 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 18 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 19 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 20 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 21 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 22 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 23 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 24 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 25 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 26 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 27 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 28 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 29 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 30 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 31 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 32 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 33 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 34 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 35 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 36 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 37 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 38 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 39 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 40 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 41 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 42 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 43 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 44 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 45 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 46 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 47 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 48 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 49 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 50 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 51 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 52 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 53 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 54 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 55 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 56 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 57 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 58 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 59 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 60 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 61 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 62 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 63 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 64 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 65 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 66 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 67 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 68 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 69 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 70 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 71 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 72 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 73 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 74 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 75 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 76 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 77 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 78 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 79 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 80 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 81 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 82 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 83 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 84 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 85 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 86 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 87 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 88 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 89 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 90 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 91 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 92 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 93 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 94 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 95 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 96 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 97 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 98 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 99 of Node: dynamic_loop
+[D] [Parser]: 17:18:26.262540, Loop, dynamic_loop, NCHW, [[1, 128]], ['float32'], False
+[D] [Parser]: 17:18:26.682062, ArmConstant, cond, NCHW, [[]], ['uint8'], True
+[D] [Parser]: 17:18:26.682391, ArmInput, state_in, NCHW, [[1, 128]], ['float32'], False
+[W] [Parser]: Convert unsupported type int64 to type int32 for Input Node (trip_count)!
+[D] [Parser]: 17:18:26.682577, ArmInput, trip_count, NCHW, [[]], ['int32'], False
+[D] [Parser]: Subgraph Node(dynamic_loop) is in infer, result is not guaranteed!
+[D] [Parser]: Loop(dynamic_loop) max_count/cond_in is non-const, the infer shape is unreliable.
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 0 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 1 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 2 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 3 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 4 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 5 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 6 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 7 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 8 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 9 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 10 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 11 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 12 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 13 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 14 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 15 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 16 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 17 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 18 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 19 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 20 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 21 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 22 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 23 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 24 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 25 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 26 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 27 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 28 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 29 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 30 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 31 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 32 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 33 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 34 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 35 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 36 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 37 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 38 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 39 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 40 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 41 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 42 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 43 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 44 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 45 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 46 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 47 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 48 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 49 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 50 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 51 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 52 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 53 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 54 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 55 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 56 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 57 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 58 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 59 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 60 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 61 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 62 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 63 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 64 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 65 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 66 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 67 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 68 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 69 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 70 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 71 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 72 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 73 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 74 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 75 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 76 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 77 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 78 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 79 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 80 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 81 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 82 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 83 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 84 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 85 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 86 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 87 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 88 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 89 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 90 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 91 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 92 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 93 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 94 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 95 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 96 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 97 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 98 of Node: dynamic_loop
+[I] [Parser]: Loop Subgraph(dynamic_loop_body_subgraph) iter: 99 of Node: dynamic_loop
+[D] [Parser]: 17:18:26.721086, ArmLoop, dynamic_loop, NCHW, [[1, 128]], ['float32'], False
+[D] [Parser]: Subgraph Node(l_state) is in infer, result is not guaranteed!
+[D] [Parser]: 17:18:26.725804, Input, l_state, NCHW, [[1, 128]], ['float32'], False
+[D] [Parser]: Subgraph Node(keep_in) is in infer, result is not guaranteed!
+[D] [Parser]: 17:18:26.726001, Input, keep_in, NCHW, [[]], ['bool'], False
+[D] [Parser]: Subgraph Node(iter) is in infer, result is not guaranteed!
+[D] [Parser]: 17:18:26.726109, Input, iter, NCHW, [[]], ['int64'], False
+[D] [Parser]: Subgraph Node(l_decay) is in infer, result is not guaranteed!
+[D] [Parser]: 17:18:26.726404, Constant, l_decay, NCHW, [[]], ['float32'], True
+[D] [Parser]: Subgraph Node(decay_state) is in infer, result is not guaranteed!
+[D] [Parser]: Subgraph Node(l_state) is in infer, result is not guaranteed!
+[D] [Parser]: 17:18:26.729036, Input, l_state, NCHW, [[1, 128]], ['float32'], False
+[D] [Parser]: Subgraph Node(keep_in) is in infer, result is not guaranteed!
+[D] [Parser]: 17:18:26.729197, Input, keep_in, NCHW, [[]], ['bool'], False
+[D] [Parser]: Subgraph Node(iter) is in infer, result is not guaranteed!
+[D] [Parser]: 17:18:26.729364, Input, iter, NCHW, [[]], ['int64'], False
+[D] [Parser]: 17:18:26.729529, Dummy, keep_out_post_dummy, NHWC, [[], [], [], [1, 128]], ['uint8', 'int64', 'bool', 'float32'], False
+[D] [Parser]: Subgraph Node(l_decay) is in infer, result is not guaranteed!
+[D] [Parser]: 17:18:26.729712, Constant, l_decay, NCHW, [[]], ['float32'], True
+[D] [Parser]: Subgraph Node(decay_state) is in infer, result is not guaranteed!
+[D] [Parser]: 17:18:26.729994, Mul, decay_state, NCHW, [[1, 128]], ['float32'], False
+[D] [Parser]: Subgraph Node(l_state) is in infer, result is not guaranteed!
+[D] [Parser]: 17:18:26.802919, Input, l_state, NCHW, [[1, 128]], ['float32'], False
+[D] [Parser]: Subgraph Node(keep_in) is in infer, result is not guaranteed!
+[D] [Parser]: 17:18:26.803261, Input, keep_in, NCHW, [[]], ['bool'], False
+[D] [Parser]: Subgraph Node(iter) is in infer, result is not guaranteed!
+[D] [Parser]: 17:18:26.803385, Input, iter, NCHW, [[]], ['int64'], False
+[D] [Parser]: 17:18:26.803569, Dummy, keep_out_post_dummy, NHWC, [[], [], [], [1, 128]], ['bool', 'int64', 'bool', 'float32'], False
+[D] [Parser]: Subgraph Node(l_decay) is in infer, result is not guaranteed!
+[D] [Parser]: 17:18:26.803868, Constant, l_decay, NCHW, [[]], ['float32'], True
+[D] [Parser]: Subgraph Node(decay_state) is in infer, result is not guaranteed!
+[D] [Parser]: 17:18:26.804251, Mul, decay_state, NCHW, [[1, 128]], ['float32'], False
+[D] [Parser]: Subgraph Node(l_state) is in infer, result is not guaranteed!
+[D] [Parser]: 17:18:26.810394, Input, l_state, NCHW, [[1, 128]], ['float32'], False
+[D] [Parser]: Subgraph Node(keep_in) is in infer, result is not guaranteed!
+[D] [Parser]: 17:18:26.810552, Input, keep_in, NCHW, [[]], ['bool'], False
+[D] [Parser]: Subgraph Node(iter) is in infer, result is not guaranteed!
+[D] [Parser]: 17:18:26.810692, Input, iter, NCHW, [[]], ['int64'], False
+[D] [Parser]: 17:18:26.810908, Dummy, keep_out_post_dummy, NHWC, [[], [], [], [1, 128]], ['bool', 'int64', 'bool', 'float32'], False
+[D] [Parser]: Subgraph Node(l_decay) is in infer, result is not guaranteed!
+[D] [Parser]: 17:18:26.811110, Constant, l_decay, NCHW, [[]], ['float32'], True
+[D] [Parser]: Subgraph Node(decay_state) is in infer, result is not guaranteed!
+[D] [Parser]: 17:18:26.811387, Mul, decay_state, NCHW, [[1, 128]], ['float32'], False
+[D] [Parser]: Subgraph Node(l_state) is in infer, result is not guaranteed!
+[D] [Parser]: 17:18:27.252301, ArmInput, l_state, NCHW, [[1, 128]], ['float32'], False
+[D] [Parser]: Subgraph Node(keep_in) is in infer, result is not guaranteed!
+[W] [Parser]: Convert unsupported type bool to type uint8 for Input Node (keep_in)!
+[D] [Parser]: 17:18:27.252505, ArmInput, keep_in, NCHW, [[]], ['uint8'], False
+[D] [Parser]: Subgraph Node(iter) is in infer, result is not guaranteed!
+[W] [Parser]: Convert unsupported type int64 to type int32 for Input Node (iter)!
+[D] [Parser]: 17:18:27.252652, ArmInput, iter, NCHW, [[]], ['int32'], False
+[D] [Parser]: 17:18:27.253037, ArmDummy, keep_out_post_dummy, NHWC, [[], [], [], [1, 128]], ['bool', 'int32', 'uint8', 'float32'], False
+[D] [Parser]: Subgraph Node(l_decay) is in infer, result is not guaranteed!
+[D] [Parser]: 17:18:27.253312, ArmConstant, l_decay, NCHW, [[]], ['float32'], True
+[D] [Parser]: Subgraph Node(decay_state) is in infer, result is not guaranteed!
+[D] [Parser]: 17:18:27.253577, ArmMul, decay_state, NCHW, [[1, 128]], ['float32'], False
+[E] [Parser]: Graph(dynamic_loop_body_subgraph) is not DAG!
+Error comes from: 
+  File "/tmp/claude-0/-home-user-OrionsBelt/a5612def-eaf2-5760-b778-12b512ca0156/scratchpad/noe310/lib/python3.10/site-packages/AIPUBuilder/Parser/univ_parser.py", line 288, in univ_parser
+    ERROR(f'[Parser]: Graph({subgraph.name}) is not DAG!')
+
+[D] [Parser]: 17:18:27.254635, ArmConstant, cond, NCHW, [[]], ['uint8'], True
+[D] [Parser]: 17:18:27.254760, ArmInput, state_in, NCHW, [[1, 128]], ['float32'], False
+[D] [Parser]: 17:18:27.254917, ArmInput, trip_count, NCHW, [[]], ['int32'], False
+[D] [Parser]: Subgraph Node(dynamic_loop) is in infer, result is not guaranteed!
+[D] [Parser]: Loop(dynamic_loop) max_count/cond_in is non-const, the infer shape is unreliable.

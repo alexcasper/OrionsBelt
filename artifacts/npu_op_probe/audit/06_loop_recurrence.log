@@ -1,0 +1,58 @@
+[I] [Parser]: Begin to parse onnx model 06_loop_recurrence...
+To enable the following instructions: AVX2 AVX512F AVX512_VNNI FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.
+Falling back to TensorFlow client; we recommended you install the Cloud TPU client directly with pip install cloud-tpu-client.
+Creating converter from 7 to 5
+Creating converter from 5 to 7
+Creating converter from 7 to 5
+Creating converter from 5 to 7
+matplotlib data path: /tmp/claude-0/-home-user-OrionsBelt/a5612def-eaf2-5760-b778-12b512ca0156/scratchpad/noe310/lib/python3.10/site-packages/matplotlib/mpl-data
+CONFIGDIR=/root/.config/matplotlib
+interactive is False
+platform is linux
+CACHEDIR=/root/.cache/matplotlib
+Using fontManager instance from /root/.cache/matplotlib/fontlist-v390.json
+[W] [Parser]: Meets issue(Your model ir_version 13 is higher than the checker's (10).) in onnx.check_model, but still proceeds!
+[W] [Parser]: The output name state_out is not a node but a tensor. However, we will use the node chunkwise_loop as output node.
+[D] [Parser]: 17:15:29.184251, Constant, trip_count, NCHW, [[]], ['int64'], True
+[D] [Parser]: 17:15:29.184558, Constant, cond, NCHW, [[]], ['bool'], True
+[D] [Parser]: 17:15:29.184866, Input, state_in, NCHW, [[1, 128]], ['float32'], False
+[D] [Parser]: Subgraph Node(chunkwise_loop) is in infer, result is not guaranteed!
+[D] [Parser]: 17:15:29.188089, Constant, trip_count, NCHW, [[]], ['int64'], True
+[D] [Parser]: 17:15:29.188315, Constant, cond, NCHW, [[]], ['bool'], True
+[D] [Parser]: 17:15:29.188455, Input, state_in, NCHW, [[1, 128]], ['float32'], False
+[D] [Parser]: Subgraph Node(chunkwise_loop) is in infer, result is not guaranteed!
+[I] [Parser]: Loop Subgraph(chunkwise_loop_body_subgraph) iter: 0 of Node: chunkwise_loop
+[I] [Parser]: Loop Subgraph(chunkwise_loop_body_subgraph) iter: 1 of Node: chunkwise_loop
+[I] [Parser]: Loop Subgraph(chunkwise_loop_body_subgraph) iter: 2 of Node: chunkwise_loop
+[I] [Parser]: Loop Subgraph(chunkwise_loop_body_subgraph) iter: 3 of Node: chunkwise_loop
+[D] [Parser]: 17:15:29.190711, Loop, chunkwise_loop, NCHW, [[1, 128]], ['float32'], False
+[D] [Parser]: 17:15:29.568062, Constant, l_decay, NCHW, [[], [], [], []], ['float32', 'float32', 'float32', 'float32'], True
+[D] [Parser]: 17:15:29.568514, Input, state_in, NCHW, [[1, 128]], ['float32'], False
+[D] [Parser]: 17:15:29.568800, Mul, decay_state, NCHW, [[1, 128]], ['float32'], False
+[D] [Parser]: 17:15:29.569087, Mul, decay_state_0, NCHW, [[1, 128]], ['float32'], False
+[D] [Parser]: 17:15:29.569373, Mul, decay_state_1, NCHW, [[1, 128]], ['float32'], False
+[D] [Parser]: 17:15:29.569695, Mul, decay_state_2, NCHW, [[1, 128]], ['float32'], False
+[D] [Parser]: 17:15:29.620693, Constant, l_decay, NCHW, [[], [], [], []], ['float32', 'float32', 'float32', 'float32'], True
+[D] [Parser]: 17:15:29.621078, Input, state_in, NCHW, [[1, 128]], ['float32'], False
+[D] [Parser]: 17:15:29.621395, Mul, decay_state, NCHW, [[1, 128]], ['float32'], False
+[D] [Parser]: 17:15:29.621616, Mul, decay_state_0, NCHW, [[1, 128]], ['float32'], False
+[D] [Parser]: 17:15:29.621829, Mul, decay_state_1, NCHW, [[1, 128]], ['float32'], False
+[D] [Parser]: 17:15:29.622063, Mul, decay_state_2, NCHW, [[1, 128]], ['float32'], False
+[D] [Parser]: 17:15:29.627216, Constant, l_decay, NCHW, [[], [], [], []], ['float32', 'float32', 'float32', 'float32'], True
+[D] [Parser]: 17:15:29.627550, Input, state_in, NCHW, [[1, 128]], ['float32'], False
+[D] [Parser]: 17:15:29.627804, Mul, decay_state, NCHW, [[1, 128]], ['float32'], False
+[D] [Parser]: 17:15:29.628050, Mul, decay_state_0, NCHW, [[1, 128]], ['float32'], False
+[D] [Parser]: 17:15:29.628324, Mul, decay_state_1, NCHW, [[1, 128]], ['float32'], False
+[D] [Parser]: 17:15:29.628542, Mul, decay_state_2, NCHW, [[1, 128]], ['float32'], False
+[D] [Parser]: 17:15:30.079502, ArmConstant, l_decay, NCHW, [[], [], [], []], ['float32', 'float32', 'float32', 'float32'], True
+[D] [Parser]: 17:15:30.079946, ArmInput, state_in, NCHW, [[1, 128]], ['float32'], False
+[D] [Parser]: 17:15:30.080257, ArmMul, decay_state, NCHW, [[1, 128]], ['float32'], False
+[D] [Parser]: 17:15:30.080480, ArmMul, decay_state_0, NCHW, [[1, 128]], ['float32'], False
+[D] [Parser]: 17:15:30.080727, ArmMul, decay_state_1, NCHW, [[1, 128]], ['float32'], False
+[D] [Parser]: 17:15:30.081009, ArmMul, decay_state_2, NCHW, [[1, 128]], ['float32'], False
+[I] [Parser]: The input tensor(s) is/are: state_in_0
+[I] [Parser]: Input state_in from cfg is shown as tensor state_in_0 in IR!
+[I] [Parser]: Output state_out from cfg is shown as tensor decay_state_2_0 in IR!
+[I] [Parser]: 0 error(s), 2 warning(s) generated.
+[I] [Parser]: Parser done!
+[I] [Parser]: Parser cost 5.37 seconds.

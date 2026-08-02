@@ -1,0 +1,174 @@
+[I] [Parser]: Begin to parse onnx model 05_scan_recurrence...
+To enable the following instructions: AVX2 AVX512F AVX512_VNNI FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.
+Falling back to TensorFlow client; we recommended you install the Cloud TPU client directly with pip install cloud-tpu-client.
+Creating converter from 7 to 5
+Creating converter from 5 to 7
+Creating converter from 7 to 5
+Creating converter from 5 to 7
+matplotlib data path: /tmp/claude-0/-home-user-OrionsBelt/a5612def-eaf2-5760-b778-12b512ca0156/scratchpad/noe310/lib/python3.10/site-packages/matplotlib/mpl-data
+CONFIGDIR=/root/.config/matplotlib
+interactive is False
+platform is linux
+CACHEDIR=/root/.cache/matplotlib
+Using fontManager instance from /root/.cache/matplotlib/fontlist-v390.json
+[W] [Parser]: Meets issue(Your model ir_version 13 is higher than the checker's (10).) in onnx.check_model, but still proceeds!
+[W] [Parser]: Creating operator on Node(chunkwise_scan) failed (name 'ScanOp' is not defined)!
+[W] [Parser]: The output name state_out is not a node but a tensor. However, we will use the node chunkwise_scan as output node.
+[D] [Parser]: 17:15:22.050586, Input, chunks, NCHW, [[4, 1, 128]], ['float32'], False
+[D] [Parser]: 17:15:22.050993, Input, state_in, NCHW, [[1, 128]], ['float32'], False
+[D] [Parser]: 17:15:22.057212, Input, chunks, NCHW, [[4, 1, 128]], ['float32'], False
+[D] [Parser]: 17:15:22.057625, Input, state_in, NCHW, [[1, 128]], ['float32'], False
+[W] [Parser]: Meet unsupported op type Scan in Node(chunkwise_scan)!
+[D] [Parser]: 17:15:22.057858, Scan, chunkwise_scan, NCHW, [None, None], [None, None], False
+[D] [Parser]: 17:15:22.589265, Input, chunks, NCHW, [[4, 1, 128]], ['float32'], False
+[D] [Parser]: 17:15:22.589584, Input, state_in, NCHW, [[1, 128]], ['float32'], False
+[W] [Parser]: Meet unsupported op type Scan in Node(chunkwise_scan)!
+[D] [Parser]: 17:15:22.589727, Scan, chunkwise_scan, NCHW, [None, None], [None, None], False
+[D] [Parser]: 17:15:22.593794, Input, chunks, NCHW, [[4, 1, 128]], ['float32'], False
+[D] [Parser]: 17:15:22.594028, Input, state_in, NCHW, [[1, 128]], ['float32'], False
+[W] [Parser]: Meet unsupported op type Scan in Node(chunkwise_scan)!
+[D] [Parser]: 17:15:22.594153, Scan, chunkwise_scan, NCHW, [None, None], [None, None], False
+[E] [Parser]: Meets exception in back_passes ('NoneType' object is not callable)!
+Traceback (most recent call last):
+  File "/tmp/claude-0/-home-user-OrionsBelt/a5612def-eaf2-5760-b778-12b512ca0156/scratchpad/noe310/lib/python3.10/site-packages/AIPUBuilder/Parser/univ_parser.py", line 394, in process_graph
+    back_passes(graph, params)
+  File "/tmp/claude-0/-home-user-OrionsBelt/a5612def-eaf2-5760-b778-12b512ca0156/scratchpad/noe310/lib/python3.10/site-packages/AIPUBuilder/Parser/front_end/onnx/passes/back_passes.py", line 6498, in back_passes
+    common_subexpression_elimination(graph)
+  File "/tmp/claude-0/-home-user-OrionsBelt/a5612def-eaf2-5760-b778-12b512ca0156/scratchpad/noe310/lib/python3.10/site-packages/AIPUBuilder/Parser/front_end/onnx/passes/back_passes.py", line 3740, in common_subexpression_elimination
+    for key, value in node_obj.copied_attr().items():
+  File "/tmp/claude-0/-home-user-OrionsBelt/a5612def-eaf2-5760-b778-12b512ca0156/scratchpad/noe310/lib/python3.10/site-packages/AIPUBuilder/Parser/ops/op.py", line 387, in copied_attr
+    copied_attr[k] = copy.deepcopy(self._attr[k].value)
+  File "/usr/lib/python3.10/copy.py", line 172, in deepcopy
+    y = _reconstruct(x, memo, *rv)
+  File "/usr/lib/python3.10/copy.py", line 271, in _reconstruct
+    state = deepcopy(state, memo)
+  File "/usr/lib/python3.10/copy.py", line 146, in deepcopy
+    y = copier(x, memo)
+  File "/usr/lib/python3.10/copy.py", line 231, in _deepcopy_dict
+    y[deepcopy(key, memo)] = deepcopy(value, memo)
+  File "/usr/lib/python3.10/copy.py", line 146, in deepcopy
+    y = copier(x, memo)
+  File "/usr/lib/python3.10/copy.py", line 231, in _deepcopy_dict
+    y[deepcopy(key, memo)] = deepcopy(value, memo)
+  File "/usr/lib/python3.10/copy.py", line 146, in deepcopy
+    y = copier(x, memo)
+  File "/usr/lib/python3.10/copy.py", line 231, in _deepcopy_dict
+    y[deepcopy(key, memo)] = deepcopy(value, memo)
+  File "/usr/lib/python3.10/copy.py", line 172, in deepcopy
+    y = _reconstruct(x, memo, *rv)
+  File "/usr/lib/python3.10/copy.py", line 271, in _reconstruct
+    state = deepcopy(state, memo)
+  File "/usr/lib/python3.10/copy.py", line 146, in deepcopy
+    y = copier(x, memo)
+  File "/usr/lib/python3.10/copy.py", line 231, in _deepcopy_dict
+    y[deepcopy(key, memo)] = deepcopy(value, memo)
+  File "/usr/lib/python3.10/copy.py", line 146, in deepcopy
+    y = copier(x, memo)
+  File "/usr/lib/python3.10/copy.py", line 231, in _deepcopy_dict
+    y[deepcopy(key, memo)] = deepcopy(value, memo)
+  File "/usr/lib/python3.10/copy.py", line 161, in deepcopy
+    rv = reductor(4)
+TypeError: 'NoneType' object is not callable
+
+[D] [Parser]: 17:15:22.896781, ArmInput, chunks, NCHW, [[4, 1, 128]], ['float32'], False
+[D] [Parser]: 17:15:22.897145, ArmInput, state_in, NCHW, [[1, 128]], ['float32'], False
+[W] [Parser]: Meet unsupported op type Scan in Node(chunkwise_scan)!
+[D] [Parser]: 17:15:22.897259, Scan, chunkwise_scan, NCHW, [None, None], [None, None], False
+[D] [Parser]: Subgraph Node(b_chunk) is in infer, result is not guaranteed!
+[D] [Parser]: 17:15:22.902129, Input, b_chunk, NCHW, [[1, 128]], ['float32'], False
+[D] [Parser]: Subgraph Node(decay_k) is in infer, result is not guaranteed!
+[D] [Parser]: 17:15:22.902395, Constant, decay_k, NCHW, [[]], ['float32'], True
+[D] [Parser]: Subgraph Node(b_state) is in infer, result is not guaranteed!
+[D] [Parser]: 17:15:22.902581, Input, b_state, NCHW, [[1, 128]], ['float32'], False
+[D] [Parser]: Subgraph Node(decay_state) is in infer, result is not guaranteed!
+[D] [Parser]: Subgraph Node(accumulate) is in infer, result is not guaranteed!
+[D] [Parser]: Subgraph Node(emit) is in infer, result is not guaranteed!
+[D] [Parser]: Subgraph Node(b_chunk) is in infer, result is not guaranteed!
+[D] [Parser]: 17:15:22.908106, Input, b_chunk, NCHW, [[1, 128]], ['float32'], False
+[D] [Parser]: Subgraph Node(decay_k) is in infer, result is not guaranteed!
+[D] [Parser]: 17:15:22.908378, Constant, decay_k, NCHW, [[]], ['float32'], True
+[D] [Parser]: Subgraph Node(b_state) is in infer, result is not guaranteed!
+[D] [Parser]: 17:15:22.908549, Input, b_state, NCHW, [[1, 128]], ['float32'], False
+[D] [Parser]: Subgraph Node(decay_state) is in infer, result is not guaranteed!
+[D] [Parser]: 17:15:22.909034, Mul, decay_state, NCHW, [[1, 128]], ['float32'], False
+[D] [Parser]: Subgraph Node(accumulate) is in infer, result is not guaranteed!
+[D] [Parser]: 17:15:22.909501, Add, accumulate, NCHW, [[1, 128], [1, 128]], ['float32', 'float32'], False
+[D] [Parser]: Subgraph Node(emit) is in infer, result is not guaranteed!
+[D] [Parser]: 17:15:22.909762, Dummy, emit, NCHW, [[1, 128]], ['float32'], False
+[D] [Parser]: Subgraph Node(b_chunk) is in infer, result is not guaranteed!
+[D] [Parser]: 17:15:22.986734, Input, b_chunk, NCHW, [[1, 128]], ['float32'], False
+[D] [Parser]: Subgraph Node(decay_k) is in infer, result is not guaranteed!
+[D] [Parser]: 17:15:22.987018, Constant, decay_k, NCHW, [[]], ['float32'], True
+[D] [Parser]: Subgraph Node(b_state) is in infer, result is not guaranteed!
+[D] [Parser]: 17:15:22.987301, Input, b_state, NCHW, [[1, 128]], ['float32'], False
+[D] [Parser]: Subgraph Node(decay_state) is in infer, result is not guaranteed!
+[D] [Parser]: 17:15:22.987625, Mul, decay_state, NCHW, [[1, 128]], ['float32'], False
+[D] [Parser]: Subgraph Node(accumulate) is in infer, result is not guaranteed!
+[D] [Parser]: 17:15:22.988052, Add, accumulate, NCHW, [[1, 128], [1, 128]], ['float32', 'float32'], False
+[D] [Parser]: Subgraph Node(emit) is in infer, result is not guaranteed!
+[D] [Parser]: 17:15:22.988381, Dummy, emit, NCHW, [[1, 128]], ['float32'], False
+[D] [Parser]: Subgraph Node(b_chunk) is in infer, result is not guaranteed!
+[D] [Parser]: 17:15:22.994140, Input, b_chunk, NCHW, [[1, 128]], ['float32'], False
+[D] [Parser]: Subgraph Node(decay_k) is in infer, result is not guaranteed!
+[D] [Parser]: 17:15:22.994389, Constant, decay_k, NCHW, [[]], ['float32'], True
+[D] [Parser]: Subgraph Node(b_state) is in infer, result is not guaranteed!
+[D] [Parser]: 17:15:22.994590, Input, b_state, NCHW, [[1, 128]], ['float32'], False
+[D] [Parser]: Subgraph Node(decay_state) is in infer, result is not guaranteed!
+[D] [Parser]: 17:15:22.994888, Mul, decay_state, NCHW, [[1, 128]], ['float32'], False
+[D] [Parser]: Subgraph Node(accumulate) is in infer, result is not guaranteed!
+[D] [Parser]: 17:15:22.995142, Add, accumulate, NCHW, [[1, 128], [1, 128]], ['float32', 'float32'], False
+[D] [Parser]: Subgraph Node(emit) is in infer, result is not guaranteed!
+[D] [Parser]: 17:15:22.995343, Dummy, emit, NCHW, [[1, 128]], ['float32'], False
+[D] [Parser]: Subgraph Node(b_chunk) is in infer, result is not guaranteed!
+[D] [Parser]: 17:15:23.437513, ArmInput, b_chunk, NCHW, [[1, 128]], ['float32'], False
+[D] [Parser]: Subgraph Node(decay_k) is in infer, result is not guaranteed!
+[D] [Parser]: 17:15:23.437786, ArmConstant, decay_k, NCHW, [[]], ['float32'], True
+[D] [Parser]: Subgraph Node(b_state) is in infer, result is not guaranteed!
+[D] [Parser]: 17:15:23.437939, ArmInput, b_state, NCHW, [[1, 128]], ['float32'], False
+[D] [Parser]: Subgraph Node(decay_state) is in infer, result is not guaranteed!
+[D] [Parser]: 17:15:23.438213, ArmMul, decay_state, NCHW, [[1, 128]], ['float32'], False
+[D] [Parser]: Subgraph Node(accumulate) is in infer, result is not guaranteed!
+[D] [Parser]: 17:15:23.439010, ArmEltwise, accumulate, NCHW, [[1, 128], [1, 128]], ['float32', 'float32'], False
+[D] [Parser]: Subgraph Node(emit) is in infer, result is not guaranteed!
+[D] [Parser]: 17:15:23.439278, ArmDummy, emit, NCHW, [[1, 128]], ['float32'], False
+[D] [Parser]: 17:15:23.439869, ArmInput, chunks, NCHW, [[4, 1, 128]], ['float32'], False
+[D] [Parser]: 17:15:23.440024, ArmInput, state_in, NCHW, [[1, 128]], ['float32'], False
+[W] [Parser]: Meet unsupported op type Scan in Node(chunkwise_scan)!
+[D] [Parser]: 17:15:23.440139, Scan, chunkwise_scan, NCHW, [None, None], [None, None], False
+[E] [Parser]: An exception occurred with get_outputs_info. Got invalid output shape for Node(chunkwise_scan)!
+Error comes from: 
+  File "/tmp/claude-0/-home-user-OrionsBelt/a5612def-eaf2-5760-b778-12b512ca0156/scratchpad/noe310/lib/python3.10/site-packages/AIPUBuilder/Parser/ops/op.py", line 800, in get_outputs_info
+    ERROR('[Parser]: An exception occurred with get_outputs_info. Got invalid output shape for Node(%s)!' %
+
+[E] [Parser]: An exception occurred with get_outputs_info. Got invalid output shape for Node(chunkwise_scan)!
+Error comes from: 
+  File "/tmp/claude-0/-home-user-OrionsBelt/a5612def-eaf2-5760-b778-12b512ca0156/scratchpad/noe310/lib/python3.10/site-packages/AIPUBuilder/Parser/ops/op.py", line 800, in get_outputs_info
+    ERROR('[Parser]: An exception occurred with get_outputs_info. Got invalid output shape for Node(%s)!' %
+
+[I] [Parser]: The input tensor(s) is/are: state_in_0,chunks_0
+[E] [Parser]: Writing Scan op(chunkwise_scan) that is not supported in serialize!
+Error comes from: 
+  File "/tmp/claude-0/-home-user-OrionsBelt/a5612def-eaf2-5760-b778-12b512ca0156/scratchpad/noe310/lib/python3.10/site-packages/AIPUBuilder/Parser/writer.py", line 43, in write_nodes_attrs
+    ERROR('[Parser]: Writing %s op(%s) that is not supported in serialize!' % (
+
+[E] [Parser]: An exception occurred with get_outputs_info. Got invalid output shape for Node(chunkwise_scan)!
+Error comes from: 
+  File "/tmp/claude-0/-home-user-OrionsBelt/a5612def-eaf2-5760-b778-12b512ca0156/scratchpad/noe310/lib/python3.10/site-packages/AIPUBuilder/Parser/ops/op.py", line 800, in get_outputs_info
+    ERROR('[Parser]: An exception occurred with get_outputs_info. Got invalid output shape for Node(%s)!' %
+
+[E] [Parser]: An exception occurred with get_outputs_info. Got invalid output shape for Node(chunkwise_scan)!
+Error comes from: 
+  File "/tmp/claude-0/-home-user-OrionsBelt/a5612def-eaf2-5760-b778-12b512ca0156/scratchpad/noe310/lib/python3.10/site-packages/AIPUBuilder/Parser/ops/op.py", line 800, in get_outputs_info
+    ERROR('[Parser]: An exception occurred with get_outputs_info. Got invalid output shape for Node(%s)!' %
+
+[I] [Parser]: Input state_in from cfg is shown as tensor state_in_0 in IR!
+[I] [Parser]: Input chunks from cfg is shown as tensor chunks_0 in IR!
+[I] [Parser]: Output state_out from cfg is shown as tensor chunkwise_scan_0 in IR!
+[I] [Parser]: Output ys from cfg is shown as tensor chunkwise_scan_1 in IR!
+[I] [Parser]: 6 error(s), 8 warning(s) generated.
+[E] [Parser]: Parser failed!
+Error comes from: 
+  File "/tmp/claude-0/-home-user-OrionsBelt/a5612def-eaf2-5760-b778-12b512ca0156/scratchpad/noe310/lib/python3.10/site-packages/AIPUBuilder/Parser/univ_main.py", line 176, in main
+    ERROR('Parser failed!')
+
+[I] [Parser]: Parser cost 7.09 seconds.
