@@ -10,7 +10,8 @@ Expected contents as beads land:
 - Python 3.8 environment plus NOE Compiler install — `t-py38-noe`
   (kept separate from the harness environment: the NOE Compiler pins Python 3.8)
 - Portable aarch64 hedge-target setup — `t-hedge-bringup`
-- Weight acquisition, downloaded at setup rather than vendored — `t-weights-fetch`
+- Weight acquisition, downloaded at setup rather than vendored — `t-weights-fetch` → `scripts/fetch_weights.py`
+  (see [docs/MODEL_LICENSES.md](../docs/MODEL_LICENSES.md) for license and attribution)
 - Benchmark sweep drivers — `t-harness-core`
 
 Scripts should be non-interactive and idempotent.
