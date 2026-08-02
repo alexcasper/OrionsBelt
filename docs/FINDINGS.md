@@ -442,3 +442,78 @@ The middle row is the important one: the KV-cache-versus-recurrent-state result 
 the NPU, the GPU, or Armv9 at all. It is a property of the architecture, so **an Armv8 device can
 demonstrate the project's central claim end to end** — which is what moves the Edge AI track from a
 credible plan to a credible result.
+
+---
+
+## 6. First real silicon: RK3588 GDN kernel benchmark (2026-08-02)
+
+**Bead `ob-8ms.3`. Device: `rk3588-t3`. Governor: `performance` (all cores). Thermals: flat
+(38 °C before → 38 °C after, no throttling). Binary: NEON path (no SVE on RK3588).**
+
+Raw CSVs: [`results/raw/rk3588-t3_big.csv`](../results/raw/rk3588-t3_big.csv),
+[`results/raw/rk3588-t3_little.csv`](../results/raw/rk3588-t3_little.csv).
+Provenance: [`results/manifests/rk3588-t3.json`](../results/manifests/rk3588-t3.json).
+
+### Results — A76 big cluster (cpu4-7, 2.3 GHz, pinned)
+
+| Model | Kernel | p50 (µs) | GiB/s | GFLOP/s |
+|---|---|---:|---:|---:|
+| Qwen3.5-4B (ch=4096) | `gdn_cumdecay` | 473 | 4.13 | 0.55 |
+| Qwen3.5-4B | `gdn_gated_scan` | 1514 | 1.96 | 0.35 |
+| Qwen3.5-4B | `gdn_causal_dwconv1d` | 513 | 4.02 | 4.09 |
+| Qwen3.5-0.8B (ch=2048) | `gdn_cumdecay` | 199 | 4.92 | 0.66 |
+| Qwen3.5-0.8B | `gdn_gated_scan` | 336 | 4.41 | 0.78 |
+| Qwen3.5-0.8B | `gdn_causal_dwconv1d` | 187 | 5.51 | 5.61 |
+
+### Results — A55 little cluster (cpu0-3, 1.8 GHz, pinned)
+
+| Model | Kernel | p50 (µs) | GiB/s | GFLOP/s |
+|---|---|---:|---:|---:|
+| Qwen3.5-4B (ch=4096) | `gdn_cumdecay` | 2250 | 0.87 | 0.12 |
+| Qwen3.5-4B | `gdn_gated_scan` | 8429 | 0.35 | 0.06 |
+| Qwen3.5-4B | `gdn_causal_dwconv1d` | 3169 | 0.65 | 0.66 |
+| Qwen3.5-0.8B (ch=2048) | `gdn_cumdecay` | 850 | 1.15 | 0.15 |
+| Qwen3.5-0.8B | `gdn_gated_scan` | 1506 | 0.98 | 0.17 |
+| Qwen3.5-0.8B | `gdn_causal_dwconv1d` | 1101 | 0.94 | 0.95 |
+
+### Finding: the kernels are latency-bound, not bandwidth-bound
+
+The RK3588's estimated spec bandwidth is ~34 GB/s (quad-channel 16-bit LPDDR4X). The achieved
+single-core throughput on the A76 is **1.9–5.6 GiB/s** — roughly **6–16 % of spec**. Even
+accounting for single-core vs whole-SoC bandwidth, this is far below saturation.
+
+The explanation is the **serial dependency chain** in the scan and decay kernels: each timestep
+depends on the previous (`acc = x + acc*g`), so throughput is gated by FMA pipeline latency, not
+data-movement bandwidth. The NEON path vectorizes 4 channels at once, but the sequence axis — where
+the dependency lives — is strictly sequential. At these problem sizes (1 MB per array at the 4B
+shape) the data is L2/L3-resident, so DRAM bandwidth is not the bottleneck at all.
+
+This is consistent with the "decode is bandwidth-bound" thesis *at the model level* (PLAN.md §2.4):
+the per-token decode touches a small recurrent state, and at one token the arithmetic is too sparse
+to keep a core busy. But at the kernel level measured here — a full 64-step chunk of prefill — the
+serial recurrence is **latency-bound**, and the achieved GiB/s column reflects instruction
+throughput, not memory bandwidth. The two claims are not contradictory; they operate at different
+granularities.
+
+### Finding: big.LITTLE ratio exceeds clock ratio
+
+The A76 (2.3 GHz) outperforms the A55 (1.8 GHz) by roughly **4–5×** on the scan kernel, despite a
+clock ratio of only 1.28×. This is expected: the A76 is a wide out-of-order core with better
+branch prediction and deeper pipelines, while the A55 is in-order and stalls on every serial
+dependency. The high p95 spreads on the A55 (up to 267 % on the 0.8B scan) reflect the in-order
+pipeline's sensitivity to scheduling interference.
+
+### Consequence for the O6 prediction
+
+The RK3588's A76 is architecturally close to the Orion O6's A720 (both are wide OoO Armv8/9 cores
+with 128-bit NEON/SVE). Extrapolating from 4–5 GiB/s single-core on the A76 to the O6's A720 at
+SVE2: the SVE2 predication advantage (no scalar tail epilogue) should give a modest improvement,
+but the serial dependency remains the bottleneck. We predict the O6 will land in a similar range
+for these fp32 NEON/SVE kernels — **the path to higher throughput runs through quantization (int8
+via i8mm, halving state traffic) or through unrolling the sequence loop across multiple chunks in
+parallel**, not through raw bandwidth.
+
+The bandwidth-bound argument becomes relevant when quantization halves the data size: if int8 state
+doubles the effective FLOP/byte ratio, the kernels may transition from latency-bound to
+bandwidth-bound, and at that point the O6's 100 GB/s LPDDR5 becomes the deciding factor. That
+transition is the next experiment to run once int8 kernels exist (`ob-8qt.2`).
