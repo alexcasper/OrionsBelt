@@ -299,7 +299,24 @@ Two independent chains feed the same junction. The **hardware chain is externall
 
 ### Descope ladder (pre-agreed)
 
-Deciding this now, calmly, is worth more than deciding it at 2am on Aug 13.
+Deciding this now, calmly, is worth more than deciding it at 2am on Aug 13. Ratified as
+[ADR 0004](./docs/adr/0004-descope-ladder.md).
+
+> **⚠ The board's usefulness cutoff is EARLIER than its abandonment date — 2026-08-08, not Aug 10.**
+> ADR 0004 separates two questions the original ladder conflated: the date we *stop pursuing* a
+> board (T-4, Aug 10) and the last date a board could arrive and still *change the submission*.
+> Even a minimal on-device addendum — flash, boot, NPU and Vulkan smoke test, re-run the already-
+> verified kernels and harness on real silicon, patch the write-up — is ~3 days of hardware work
+> plus ~1 day of write-up integration. Counting back from the Aug 13 EOD internal target gives
+> Aug 9, and one day of padding for the bring-up friction this project has already hit twice on
+> the compiler side alone (the `cixparse` TensorFlow import, GCC 13 rejecting `-mcpu=cortex-a720`)
+> gives **Aug 8**. A board arriving Aug 9–10 yields at best a single opportunistic measurement; a
+> full heterogeneous NPU+GPU+CPU submission needed it by ~Aug 4, which has passed.
+>
+> Practical consequence: **if T-4 fires as written on Aug 10, the useful window had already closed
+> two days earlier.** Keep pursuing the board regardless — it costs the agent-side plan nothing and
+> remote SSH access to someone else's unit would resolve it instantly — but plan the submission on
+> the assumption it does not arrive.
 
 | Trigger | Cut | Keep |
 |---|---|---|
