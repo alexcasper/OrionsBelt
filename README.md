@@ -150,12 +150,14 @@ Full target layout and rationale are in [`PLAN.md`](./PLAN.md) §10. Highlights:
 
 ## Reproducing
 
-Setup documentation is being written and is **not complete yet**:
+Setup documentation:
 
-- `docs/SETUP_O6.md` (Orion O6 bring-up, NPU SDK, Python 3.8 toolchain) — **pending**
-- `docs/SETUP_PORTABLE.md` (generic aarch64 hedge-target setup) — **pending**
+- [`docs/SETUP_PORTABLE.md`](./docs/SETUP_PORTABLE.md) — **complete**: edge-target setup verified on a Raspberry Pi 5 (build, governor, benchmark, manifest, thermal checks). Covers the full device fleet (Pi 5, RK3588, Jetson Nano) with per-device binary selection and cluster pinning.
+- `docs/SETUP_O6.md` (Orion O6 bring-up, NPU SDK) — **pending** (hardware-gated)
+- [`docs/DEVICE_RUNBOOK.md`](./docs/DEVICE_RUNBOOK.md) — copy-paste procedure for running the device benchmark on any Arm device
+- [`scripts/`](./scripts/README.md) — build, fetch, and sweep entry points
 
-Once those land, this section will give a step-by-step, clean-clone reproduction path, verified by rehearsal (tracked in beads as the reproduction-rehearsal task) before submission. We are not fabricating setup commands ahead of that work; check back closer to submission, or see [`scripts/README.md`](./scripts/README.md) for the entry points as they are added.
+The clean-clone reproduction rehearsal (tracked as `ob-kdi`) verifies these steps verbatim on a fresh system before submission.
 
 ## License
 
