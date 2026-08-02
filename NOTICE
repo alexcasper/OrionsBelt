@@ -1,0 +1,32 @@
+# NOTICE
+
+This project (OrionsBelt) is licensed under the Apache License, Version 2.0
+(see [LICENSE](./LICENSE)).
+
+## Third-party software
+
+This project uses the following third-party software packages:
+
+| Package | License | Purpose |
+|---|---|---|
+| NumPy | BSD-3-Clause | Numerical computing (runtime dependency) |
+| pytest | MIT | Testing framework (dev dependency) |
+| ruff | MIT | Linter and formatter (dev dependency) |
+| pre-commit | MIT | Git hook management (dev dependency) |
+| pandas | BSD-3-Clause | Data manipulation for plotting (bench dependency) |
+| matplotlib | PSF-based | Plot generation (bench dependency) |
+| matplotlib (PSF) | Matplotlib only uses BSD-compatible code | Plot generation |
+
+## Model weights
+
+Model weights are downloaded at setup time and are NOT vendored in this repository.
+
+| Model | License | Source |
+|---|---|---|
+| Qwen3.5-4B | Apache-2.0 | https://huggingface.co/Qwen/Qwen3.5-4B |
+| Qwen3.5-0.8B | Apache-2.0 | https://huggingface.co/Qwen/Qwen3.5-0.8B |
+
+Attribution: Qwen3.5 models by Alibaba Cloud / Qwen Team.
+
+See [docs/WEIGHTS_LICENSE.md](./docs/WEIGHTS_LICENSE.md) for the full weight
+license and attribution details.
