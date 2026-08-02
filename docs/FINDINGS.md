@@ -481,6 +481,36 @@ note: state narrowing is a *memory-residency* optimization (halving resident sta
 (Armv8.0-A) despite `__ARM_FEATURE_FP16_VECTOR_ARITHMETIC` being undefined. That macro gates fp16
 *arithmetic* (fmul/fadd on half registers), not conversion, which is base A64 ASIMD.
 
+### Decode-phase narrow-format penalty (ob-mrd.6)
+
+The initial mixed-precision table above measured only prefill (seq=64). The refreshed
+28-row CSV (ob-mrd.5) adds decode (seq=1) configs, and the picture changes sharply:
+
+**Qwen3.5-4B gated_scan — prefill vs decode:**
+
+| Format | Prefill (seq=64) GiB/s | Decode (seq=1) GiB/s | Decode vs fp32 |
+|---|---:|---:|---|
+| fp32 | 0.72 | **9.27** | — |
+| bf16 | 0.74 | 4.52 | **−51%** |
+| fp16 | 0.74 | 5.63 | **−39%** |
+
+At prefill, narrow formats are flat or marginally positive — the I/O traffic reduction
+compensates for the conversion cost. At decode, they are roughly **half the speed** of fp32.
+
+**Why:** at seq=1 the scan touches ~80 KiB of data (5 × 4096 × 4 bytes), which fits entirely
+in the A57's 512 KiB L2 cache. The kernel is measuring cache bandwidth, not DRAM bandwidth —
+hence the 12.9× jump from 0.72 to 9.27 GiB/s for fp32. With data already cache-resident, the
+dominant cost shifts from memory I/O to the fp32↔half conversion instructions (`FCVTN`/`FCVTL`
+for fp16, integer NEON sequence for bf16). Narrowing saves ~20% of traffic but adds ~100%
+conversion overhead when traffic is nearly free.
+
+**Implication for the design:** state narrowing is a **prefill-only** optimization. At decode,
+where GDN's O(1) fixed-state advantage is the whole point, fp32 is both faster and more
+accurate. The optimal dispatch is format-adaptive: narrow state for chunk-parallel prefill,
+fp32 state for token-by-token decode. This is a concrete, measured argument rather than
+conventional wisdom, and it sharpens the project's honest-framing commitment: the mixed-precision
+headline should say "halves resident state during prefill," not "speeds up GDN."
+
 ## Sustained-load thermal characterization (ob-mrd.2)
 
 The benchmark now supports `--sustained <seconds>` which runs `gdn_gated_scan` on the
