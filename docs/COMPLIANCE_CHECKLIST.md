@@ -38,7 +38,7 @@ the deadline.
 | LICENSE file present | ✓ `LICENSE` (Apache 2.0, full text) |
 | License in pyproject.toml | ✓ `license = "Apache-2.0"` |
 | License detected by GitHub | ✓ `licenseInfo.key = "apache-2.0"` |
-| License visible in About section | **⚠ Needs description set** — repo About is currently empty |
+| License visible in About section | ✓ Set description + topics (2026-08-03) |
 | Newness statement | ⚠ Repo is new for this submission (created 2026-08-02) |
 
 **⚠ Action needed (maintainer):** Set repo description and topics:
@@ -56,7 +56,7 @@ Devpost requires three sections. Current status of the README:
 |---|---|---|
 | Project overview | ✓ | README.md §"What Gated DeltaNet is…" + §"The gap this project fills" |
 | Functionality/output | ⚠ Partial | README.md §"Status" — results table pending more device data |
-| Setup instructions | ⚠ Partial | README.md §"Reproducing" — notes "not complete yet" |
+| Setup instructions | ✓ | README.md §"Reproducing" + `docs/SETUP_PORTABLE.md` (quick-start commands) |
 
 **⚠ Action needed:** Complete the README's "Reproducing" section with full setup
 steps (scripts/fetch_weights.py, bench/harness.py invocation, bench/plots.py).
@@ -95,7 +95,7 @@ requested by the challenge brief. Add as opportunistic if hardware arrives.
 | CIX NOE SDK | Proprietary (CIX) | ⚠ Not bundled — external toolchain |
 | KleidiAI | MIT (Arm) | ⚠ Referenced, not bundled |
 
-**NOTICE file:** ⚠ Not yet created — see below.
+**NOTICE file:** ✓ Created 2026-08-03 — see `NOTICE` in repo root.
 
 ## 8. Model weight compliance
 
