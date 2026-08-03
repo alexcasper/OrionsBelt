@@ -18737,3 +18737,12 @@ Exceeded auto-compact threshold of 40%. Performing auto-compaction...
 Ran into this error trying to compact: Rate limit exceeded: [1308][Usage limit reached for 5 hour. Your limit will reset at 2026-08-03 12:21:23][20260803102756a88ad03304af474e].
 
 Please try again or create a new session
+--- j2 iter Mon  3 Aug 03:28:18 BST 2026 ---
+[self-heal: fresh session]
+
+    __( O)>  ● new session · zai glm-5.2
+   \____)    20260803_21 · /home/j2/OrionsBelt
+     L L     goose is ready
+Ran into this error: Rate limit exceeded: [1308][Usage limit reached for 5 hour. Your limit will reset at 2026-08-03 12:21:23][2026080310282984c32b05015248e0].
+
+Please retry if you think this is a transient or recoverable error.
