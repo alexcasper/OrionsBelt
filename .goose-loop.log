@@ -38662,3 +38662,2133 @@ Pull complete.
    \____)    20260803_5 · /home/r5/OrionsBelt
      L L     goose is ready
 All external-gate. Session complete — 3 beads closed, PR #12 open. Awaiting gates.
+--- r5 iter Mon  3 Aug 09:52:29 BST 2026 ---
+
+    __( O)>  ● resuming · zai glm-5.2
+   \____)    20260803_5 · /home/r5/OrionsBelt
+     L L     goose is ready
+
+· Exceeded auto-compact threshold of 40%. Performing auto-compaction...
+
+· Compaction complete
+Continuing the Phase 2 loop — syncing beads and checking for new portable work.
+  ────────────────────────────────────────
+  ▸ shell
+    command: bd dolt pull 2>&1
+
+Pulling from Dolt remote...
+Pull complete.
+  ────────────────────────────────────────
+  ▸ shell
+    command: git status --short 2>&1
+
+ M .goose-loop.log
+  ────────────────────────────────────────
+  ▸ shell
+    command: bd ready 2>&1
+
+○ ob-3f9 ● P0 [epic] E2: Hardware and toolchain acquisition (Orion O6 + CIX NPU SDK)
+○ ob-4qz ● P0 [epic] E0: Program spine — decisions, risk, descope
+○ ob-9t0 ● P0 [epic] E9: Results, write-up, demo, submission
+○ ob-gew ● P0 [epic] E1: Repo foundation and submission hygiene
+○ ob-mrd ● P0 [epic] E5: Benchmark harness and methodology
+○ ob-xh3 ● P0 [epic] E4: Model selection and reference baseline
+○ ob-aqv ● P0 Stand up x86/CUDA reference inference as the oracle source ← E4: Model selection and reference baseline
+○ ob-axq ● P0 Source a Radxa Orion O6 (64GB) — retail, loaner, or remote access ← E2: Hardware and toolchain acquisition (Orion O6 + CIX NPU SDK)
+○ ob-8qt ● P1 [epic] E7: Optimization implementation
+○ ob-t3b ● P1 [epic] E6: GDN operator analysis and heterogeneous mapping
+○ ob-2eh ● P1 GitHub Actions CI: lint plus unit tests on an x86/aarch64 matrix ← E1: Repo foundation and submission hygiene
+○ ob-huw ● P1 NPU runtime smoke test via a CIX AI Model Hub reference model ← E2: Hardware and toolchain acquisition (Orion O6 + CIX NPU SDK)
+○ ob-mrd.1 ● P1 Baseline: vendor cix-llama-cpp on the O6, and whether it handles GDN at all ← E5: Benchmark harness and methodology
+○ ob-8qt.2 ● P2 Reuse KleidiAI i8mm/dotprod matmul micro-kernels for the delta-rule updates ← E7: Optimization implementation
+○ ob-t3b.5 ● P2 Cheap check: does the RK3588 NPU toolchain also reject a runtime-length recurrence? ← E6: GDN operator analysis and heterogeneous mapping
+○ ob-t3b.4 ● P3 Evaluate the Tensilica HiFi 5 DSP as a fourth compute engine ← E6: GDN operator analysis and heterogeneous mapping
+
+--------------------------------------------------------------------------------
+Ready: 16 issues with no active blockers
+
+Status: ○ open  ◐ in_progress  ● blocked  ✓ closed  ❄ deferred16 ready issues now — more than last session. Let me drill into the epics to find any newly available portable sub-tasks.
+  ────────────────────────────────────────
+  ▸ shell
+    command: bd show ob-4qz 2>&1 | head -60
+
+○ ob-4qz [EPIC] · E0: Program spine — decisions, risk, descope   [● P0 · OPEN]
+Type: epic
+Created: 2026-08-02 · Updated: 2026-08-02
+
+DESCRIPTION
+
+  Go/no-go decisions, risk register, and the descope ladder. First-class epic 
+  because with 12 days and two external gates, deciding on time is the        
+  deliverable most likely to save the submission. See PLAN.md sections 7 and  
+  8.                                                                          
+
+
+
+LABELS: program
+
+CHILDREN
+  ↳ ✓ ob-ofk: Verify brief.md's load-bearing claims against primary sources ● P0
+  ↳ ✓ ob-0fp: Stand up living risk register and go/no-go ritual ● P1
+  ↳ ✓ ob-ygm: Set up docs/adr/ with an ADR template ● P2
+  ↳ ○ ob-imb: DECISION (hard date 2026-08-09): Physical AI vs Edge AI track ● P0
+  ↳ ✓ ob-atp: Ratify the pre-agreed descope ladder with trigger dates ● P1
+  ◐ 4/5 complete (80%)
+
+  ────────────────────────────────────────
+  ▸ shell
+    command: bd show ob-gew 2>&1 | head -60
+
+○ ob-gew [EPIC] · E1: Repo foundation and submission hygiene   [● P0 · OPEN]
+Type: epic
+Created: 2026-08-02 · Updated: 2026-08-02
+
+DESCRIPTION
+
+  License, skeleton, tooling, CI, results schema, provenance. Devpost has hard
+  requirements here (OSI license visible in the About section) that are cheap 
+  now and impossible to retrofit at the deadline.                             
+
+
+
+LABELS: submission
+
+CHILDREN
+  ↳ ○ ob-2eh: GitHub Actions CI: lint plus unit tests on an x86/aarch64 matrix ● P1
+  ↳ ✓ ob-q9i: Freeze the results schema contract for all benchmark output ● P1
+  ↳ ✓ ob-0e8: Add Apache-2.0 LICENSE and make it visible in the GitHub About section ● P0
+  ↳ ✓ ob-wfi: Create the repository directory skeleton ● P0
+  ↳ ✓ ob-u37: Run-manifest provenance capture ● P1
+  ↳ ✓ ob-g10: Python tooling: pyproject/uv, ruff, pytest, pre-commit ● P2
+  ↳ ✓ ob-tjs: README skeleton with GDN/GDN-2 background written for judges ● P1
+  ↳ ✓ ob-q35: CONTRIBUTING and reproducibility conventions ● P2
+  ◐ 7/8 complete (87%)
+
+  ────────────────────────────────────────
+  ▸ shell
+    command: bd show ob-9t0 2>&1 | head -60
+
+○ ob-9t0 [EPIC] · E9: Results, write-up, demo, submission   [● P0 · OPEN]
+Type: epic
+Created: 2026-08-02 · Updated: 2026-08-02
+
+DESCRIPTION
+
+  Converting work into score: master comparison table, clean-clone            
+  reproduction rehearsal, rubric-mapped write-up, README, demo video,         
+  compliance pass, and actually hitting submit before 2026-08-14 16:00 PT.    
+
+
+
+LABELS: submission
+
+CHILDREN
+  ↳ ○ ob-f7k: Devpost write-up mapped section-by-section to the judging rubric ● P0
+  ↳ ○ ob-kdi: Clean-clone reproduction rehearsal following our own README verbatim ● P0
+  ↳ ✓ ob-9e2: Final compliance pass against the submission requirements checklist ● P0
+  ↳ ○ ob-j7f: Submit on Devpost before 2026-08-14 16:00 PT ● P0
+  ↳ ○ ob-ami: Master comparison table and headline numbers ● P0
+  ↳ ○ ob-jui: Script and record a demo video under 3 minutes on hardware ● P2
+  ↳ ○ ob-fnq: README final pass: background, results, reproduction ● P0
+  ◐ 1/7 complete (14%)
+
+  ────────────────────────────────────────
+  ▸ shell
+    command: bd show ob-imb 2>&1 | head -50
+
+○ ob-imb · DECISION (hard date 2026-08-09): Physical AI vs Edge AI track   [● P0 · OPEN]
+Type: decision
+Created: 2026-08-02 · Updated: 2026-08-02
+
+DESCRIPTION
+
+  Single most consequential scheduling decision. If the O6 has arrived and    
+  booted, target Physical AI. If not, commit to Edge AI on the hedge target   
+  and stop spending time on O6-specific work. NOTE (verified 2026-08-02): the 
+  three tracks are Physical AI, Cloud AI, and Edge AI - there is no Mobile AI 
+  track, correcting brief.md. Edge AI suits an O6 inference board well, so    
+  both tracks stay open even with hardware in hand. Hard date so the write-up 
+  has five clear days of stable framing. Done when the choice is recorded as  
+  an ADR and the README framing follows it.                                   
+
+
+
+LABELS: program, submission
+
+PARENT
+  ↑ ○ ob-4qz: (EPIC) E0: Program spine — decisions, risk, descope ● P0
+
+DEPENDS ON
+  → ✓ ob-ng6: Bring up the hedge target with an aarch64 build using i8mm/SVE ● P1
+  → ○ ob-axq: Source a Radxa Orion O6 (64GB) — retail, loaner, or remote access ● P0
+  → ✓ ob-aop: Apply to the CIX Early Bird Program for NOE Compiler and AI Model Hub access ● P3
+
+BLOCKS
+  ← ○ ob-jui: Script and record a demo video under 3 minutes on hardware ● P2
+  ← ○ ob-f7k: Devpost write-up mapped section-by-section to the judging rubric ● P0
+
+  ────────────────────────────────────────
+  ▸ shell
+    command: bd show ob-ami 2>&1 | head -40
+
+○ ob-ami · Master comparison table and headline numbers   [● P0 · OPEN]
+Type: task
+Created: 2026-08-02 · Updated: 2026-08-02
+
+DESCRIPTION
+
+  Assemble the core result: full-attention-only versus hybrid GDN versus      
+  optimized hybrid (versus GDN-2 if implemented) across tokens/sec, TTFT, and 
+  memory at each context length. Generated from committed CSVs, with every    
+  cell traceable to a manifest-backed run.                                    
+
+
+
+LABELS: submission
+
+PARENT
+  ↑ ○ ob-9t0: (EPIC) E9: Results, write-up, demo, submission ● P0
+
+DEPENDS ON
+  → ○ ob-rqd: Ablation matrix across configurations and context lengths ● P1
+
+BLOCKS
+  ← ○ ob-kdi: Clean-clone reproduction rehearsal following our own README verbatim ● P0
+  ← ○ ob-fnq: README final pass: background, results, reproduction ● P0
+  ← ○ ob-f7k: Devpost write-up mapped section-by-section to the judging rubric ● P0
+
+RELATED
+  ↔ ○ ob-zzj: Arm Performix integration and standardized report export ● P1
+
+  ────────────────────────────────────────
+  ▸ shell
+    command: bd show ob-rqd 2>&1 | head -40
+
+○ ob-rqd · Ablation matrix across configurations and context lengths   [● P1 · OPEN]
+Type: task
+Created: 2026-08-02 · Updated: 2026-08-02
+
+DESCRIPTION
+
+  Run the full grid: full-attention-only baseline, hybrid GDN, plus NPU       
+  offload, plus GPU scan kernel, plus dynamic dispatcher, each across the     
+  context sweep with memory decomposition. This produces the headline         
+  comparison table, and the ablation structure is what makes each             
+  optimization's individual contribution attributable rather than lumped      
+  together.                                                                   
+
+
+
+LABELS: submission
+
+PARENT
+  ↑ ○ ob-8qt: (EPIC) E7: Optimization implementation ● P1
+
+DEPENDS ON
+  → ✓ ob-del: Long-context prompt corpus from 4K to 262K ● P1
+  → ✓ ob-vfp: Memory instrumentation separating KV cache from GDN recurrent state ● P0
+  → ○ ob-7a9: Dynamic heterogeneous dispatcher routing by phase, load, and thermal state ● P2
+  → ○ ob-mrd.1: Baseline: vendor cix-llama-cpp on the O6, and whether it handles GDN at all ● P1
+  → ✓ ob-9y8: Plot and table generation from results ● P1
+
+BLOCKS
+  ← ○ ob-ami: Master comparison table and headline numbers ● P0
+
+RELATED
+  ↔ ✓ ob-c9q: Baseline benchmark sweep on the hedge target ● P1
+
+  ────────────────────────────────────────
+  ▸ shell
+    command: bd show ob-7a9 2>&1 | head -40
+
+○ ob-7a9 · Dynamic heterogeneous dispatcher routing by phase, load, and thermal state   [● P2 · OPEN]
+Type: task
+Created: 2026-08-02 · Updated: 2026-08-02
+
+DESCRIPTION
+
+  The WOW-factor centerpiece: route work across NPU, GPU, and CPU at runtime  
+  based on inference phase (prefill vs decode), engine occupancy, and thermal 
+  headroom, rather than using a static assignment. Must degrade gracefully to 
+  the static mapping if an engine is unavailable, so this cannot become a     
+  single point of failure.                                                    
+
+
+
+LABELS: hardware, stretch
+
+PARENT
+  ↑ ○ ob-8qt: (EPIC) E7: Optimization implementation ● P1
+
+DEPENDS ON
+  → ○ ob-gzk: Numerical validation of the GPU scan kernel ● P1
+  → ○ ob-8qt.1: Hand-written SVE2/i8mm chunkwise gated delta-rule scan for Cortex-A720 ● P1
+  → ○ ob-dqu: CPU optimization: big.LITTLE affinity policy and i8mm/SVE GEMM paths ● P1
+  → ○ ob-27y: Accuracy regression of quantized NPU subgraphs against the oracle ● P1
+  → ○ ob-i8v: Implement the partitioned execution runtime ● P1
+
+BLOCKS
+  ← ○ ob-rqd: Ablation matrix across configurations and context lengths ● P1
+  ← ○ ob-jui: Script and record a demo video under 3 minutes on hardware ● P2
+  ← ○ ob-dgn: Sustained-load thermal-throttle characterization and governor tuning ● P2
+
+  ────────────────────────────────────────
+  ▸ shell
+    command: bd show ob-8qt 2>&1 | head -50
+
+○ ob-8qt [EPIC] · E7: Optimization implementation   [● P1 · OPEN]
+Type: epic
+Created: 2026-08-02 · Updated: 2026-08-02
+
+DESCRIPTION
+
+  Where the 40-point Arm-specific optimization score is earned: NPU           
+  quantization, a Vulkan chunkwise scan kernel, big.LITTLE scheduling, and a  
+  dynamic heterogeneous dispatcher. Every step is gated by the correctness    
+  oracle.                                                                     
+
+
+
+LABELS: hardware
+
+CHILDREN
+  ↳ ✓ ob-8qt.3: Verified-correct SVE2 reference kernels for decay, scan, and causal conv1d ● P1
+  ↳ ○ ob-8qt.1: Hand-written SVE2/i8mm chunkwise gated delta-rule scan for Cortex-A720 ● P1
+  ↳ ○ ob-q44: Vulkan/OpenCL compute shader for the chunkwise gated delta-rule scan ● P1
+  ↳ ○ ob-27y: Accuracy regression of quantized NPU subgraphs against the oracle ● P1
+  ↳ ○ ob-gzk: Numerical validation of the GPU scan kernel ● P1
+  ↳ ✓ ob-8qt.5: Ablation matrix runner: sweep engine configs across context lengths and generate comparison table ● P2
+  ↳ ○ ob-rqd: Ablation matrix across configurations and context lengths ● P1
+  ↳ ○ ob-onz: Export and quantize NPU-resident subgraphs via NOE (INT8, then INT4) ● P1
+  ↳ ○ ob-8qt.2: Reuse KleidiAI i8mm/dotprod matmul micro-kernels for the delta-rule updates ● P2
+  ↳ ✓ ob-8qt.4: bf16/fp16 recurrent-state variant of the GDN kernels ● P2
+  ↳ ○ ob-7a9: Dynamic heterogeneous dispatcher routing by phase, load, and thermal state ● P2
+  ↳ ○ ob-dqu: CPU optimization: big.LITTLE affinity policy and i8mm/SVE GEMM paths ● P1
+  ↳ ○ ob-dgn: Sustained-load thermal-throttle characterization and governor tuning ● P2
+  ◐ 3/13 complete (23%)
+
+  ────────────────────────────────────────
+  ▸ shell
+    command: bd show ob-dqu 2>&1 | head -40
+
+○ ob-dqu · CPU optimization: big.LITTLE affinity policy and i8mm/SVE GEMM paths   [● P1 · OPEN]
+Type: task
+Created: 2026-08-02 · Updated: 2026-08-02
+
+DESCRIPTION
+
+  Exploit the asymmetric 4+4+4 cluster layout: pin latency-critical prefill to
+  the A720 big cores, keep housekeeping on the A520 little cores, and avoid   
+  cross-cluster migration mid-inference. Enable i8mm and SVE paths and verify 
+  they are active at runtime. Fully Arm-specific and, unlike the NPU path, not
+  gated on any external approval.                                             
+
+
+
+NOTES
+
+  UNBLOCKED FOR REAL WORK by ADR 0005: the RK3588 board has an asymmetric A76 
+  big + A55 little layout, directly analogous to the O6's A720 big/medium +   
+  A520 little. big.LITTLE affinity policy is now developable and MEASURABLE on
+  hardware in hand rather than speculative. Use taskset to pin clusters; the  
+  core-tuned binaries bench_gdn_rk3588_a76 and bench_gdn_rk3588_a55 exist for 
+  exactly this comparison.                                                    
+
+
+
+LABELS: hardware
+
+PARENT
+  ↑ ○ ob-8qt: (EPIC) E7: Optimization implementation ● P1
+
+DEPENDS ON
+  → ○ ob-c9k: Per-layer latency profile across GDN, full-attention, and FFN blocks ● P1
+  → ○ ob-41j: System baseline: CPU topology, memory bandwidth, governors, thermal headroom ● P1
+
+BLOCKS
+  ← ○ ob-7a9: Dynamic heterogeneous dispatcher routing by phase, load, and thermal state ● P2
+
+  ────────────────────────────────────────
+  ▸ shell
+    command: bd show ob-c9k 2>&1 | head -40
+
+○ ob-c9k · Per-layer latency profile across GDN, full-attention, and FFN blocks   [● P1 · OPEN]
+Type: task
+Created: 2026-08-02 · Updated: 2026-08-02
+
+DESCRIPTION
+
+  Break down where time actually goes per layer class at several context      
+  lengths, separating prefill from decode. Establishes empirically which      
+  layers are worth offloading and prevents the classic mistake of optimizing a
+  block that is not the bottleneck.                                           
+
+
+
+LABELS: hardware
+
+PARENT
+  ↑ ○ ob-t3b: (EPIC) E6: GDN operator analysis and heterogeneous mapping ● P1
+
+DEPENDS ON
+  → ○ ob-41j: System baseline: CPU topology, memory bandwidth, governors, thermal headroom ● P1
+  → ✓ ob-37v: Audit the GDN layer structure from modeling code ● P0
+  → ✓ ob-ljh: Benchmark runner CLI with context sweep, warmup, repeats, and percentiles ● P0
+
+BLOCKS
+  ← ○ ob-3ko: Characterize the chunkwise WY recurrent-scan bottleneck ● P1
+  ← ○ ob-dqu: CPU optimization: big.LITTLE affinity policy and i8mm/SVE GEMM paths ● P1
+
+  ────────────────────────────────────────
+  ▸ shell
+    command: bd show ob-41j 2>&1 | head -40
+
+○ ob-41j · System baseline: CPU topology, memory bandwidth, governors, thermal headroom   [● P1 · OPEN]
+Type: task
+Created: 2026-08-02 · Updated: 2026-08-02
+
+DESCRIPTION
+
+  Map the 4x Cortex-A720 big / 4x A720 medium / 4x A520 little clusters to    
+  logical CPU ids, measure achievable LPDDR5 bandwidth against the >100GB/s   
+  claim, enumerate cpufreq governors, and establish idle and loaded thermal   
+  behavior. Prerequisite for any credible big.LITTLE scheduling work.         
+
+
+
+LABELS: hardware
+
+PARENT
+  ↑ ○ ob-3f9: (EPIC) E2: Hardware and toolchain acquisition (Orion O6 + CIX NPU SDK) ● P0
+
+DEPENDS ON
+  → ✓ ob-u37: Run-manifest provenance capture ● P1
+  → ○ ob-iae: Flash Debian 12 and complete first boot with SSH access ● P0
+
+BLOCKS
+  ← ○ ob-c9k: Per-layer latency profile across GDN, full-attention, and FFN blocks ● P1
+  ← ○ ob-dqu: CPU optimization: big.LITTLE affinity policy and i8mm/SVE GEMM paths ● P1
+
+  ────────────────────────────────────────
+  ▸ shell
+    command: bd show ob-t3b 2>&1 | head -40
+
+○ ob-t3b [EPIC] · E6: GDN operator analysis and heterogeneous mapping   [● P1 · OPEN]
+Type: epic
+Created: 2026-08-02 · Updated: 2026-08-02
+
+DESCRIPTION
+
+  The core technical contribution. Profile where GDN's linear recurrence      
+  actually bottlenecks, audit what the NOE Compiler can and cannot compile,   
+  then fix a layer-to-engine assignment as an ADR. GDN layers are not standard
+  attention, so out-of-box NPU kernel support is unlikely.                    
+
+
+
+LABELS: hardware
+
+CHILDREN
+  ↳ ○ ob-t3b.5: Cheap check: does the RK3588 NPU toolchain also reject a runtime-length recurrence? ● P2
+  ↳ ○ ob-8xc: NOE Compiler op-coverage audit for GDN operators ● P1
+  ↳ ○ ob-i8v: Implement the partitioned execution runtime ● P1
+  ↳ ○ ob-0sa: docs/FINDINGS.md — op-coverage gaps and profiling results ● P1
+  ↳ ○ ob-t3b.4: Evaluate the Tensilica HiFi 5 DSP as a fourth compute engine ● P3
+  ↳ ✓ ob-t3b.1: NOE op-coverage audit for GDN operators on an x86 host (no board required) ● P0
+  ↳ ○ ob-3ko: Characterize the chunkwise WY recurrent-scan bottleneck ● P1
+  ↳ ○ ob-c9k: Per-layer latency profile across GDN, full-attention, and FFN blocks ● P1
+  ↳ ○ ob-o4g: DECISION/ADR: layer-to-engine assignment across NPU, GPU, and CPU ● P1
+  ↳ ○ ob-t3b.3: Measure engine-boundary crossing cost (16 crossings per token in a 3:1 hybrid) ● P1
+  ↳ ✓ ob-t3b.2: Author minimal per-operator ONNX probe graphs for the NOE op-coverage audit ● P0
+  ◐ 2/11 complete (18%)
+
+  ────────────────────────────────────────
+  ▸ shell
+    command: bd show ob-3ko 2>&1 | head -40
+
+○ ob-3ko · Characterize the chunkwise WY recurrent-scan bottleneck   [● P1 · OPEN]
+Type: task
+Created: 2026-08-02 · Updated: 2026-08-02
+
+DESCRIPTION
+
+  Determine whether GDN cost is dominated by the inherently sequential state  
+  update or by the chunk-parallel matmul portion, and how that balance shifts 
+  between prefill and decode. This is the crux: a sequential scan and a dense 
+  matmul want completely different engines, and the answer dictates the       
+  mapping decision.                                                           
+
+
+
+LABELS: hardware
+
+PARENT
+  ↑ ○ ob-t3b: (EPIC) E6: GDN operator analysis and heterogeneous mapping ● P1
+
+DEPENDS ON
+  → ○ ob-c9k: Per-layer latency profile across GDN, full-attention, and FFN blocks ● P1
+
+BLOCKS
+  ← ○ ob-0sa: docs/FINDINGS.md — op-coverage gaps and profiling results ● P1
+  ← ○ ob-o4g: DECISION/ADR: layer-to-engine assignment across NPU, GPU, and CPU ● P1
+
+  ────────────────────────────────────────
+  ▸ shell
+    command: bd show ob-xh3 2>&1 | head -40
+
+○ ob-xh3 [EPIC] · E4: Model selection and reference baseline   [● P0 · OPEN]
+Type: epic
+Created: 2026-08-02 · Updated: 2026-08-02
+
+DESCRIPTION
+
+  Pick a Qwen3.5 checkpoint in the 0.8B-4B range, audit its GDN layer         
+  structure from modeling code, and stand up an x86 reference that serves as  
+  the correctness oracle for every later optimization.                        
+
+
+
+LABELS: portable
+
+CHILDREN
+  ↳ ✓ ob-eae: DECISION: primary and fallback Qwen3.5 checkpoint ● P0
+  ↳ ○ ob-3uh: Correctness oracle harness with tolerances ● P0
+  ↳ ✓ ob-xh3.2: Model config introspection: load ModelConfig from Qwen3.5 config.json ● P2
+  ↳ ✓ ob-7fv: Survey Qwen3.5 checkpoints in the 0.8B-4B range ● P0
+  ↳ ✓ ob-xh3.1: Backend implementation guide: how to wrap HF transformers in the Backend ABC for ob-aqv ● P2
+  ↳ ✓ ob-ixt: Weight fetch scripts with license compliance ● P2
+  ↳ ✓ ob-37v: Audit the GDN layer structure from modeling code ● P0
+  ↳ ✓ ob-qpa: Quantization policy with FP16 carve-outs ● P0
+  ↳ ✓ ob-xh3.3: HFTorchBackend class: runnable Backend impl for HF transformers (code, not just guide) ● P2
+  ↳ ○ ob-aqv: Stand up x86/CUDA reference inference as the oracle source ● P0
+  ◐ 8/10 complete (80%)
+
+  ────────────────────────────────────────
+  ▸ shell
+    command: bd show ob-3uh 2>&1 | head -40
+
+○ ob-3uh · Correctness oracle harness with tolerances   [● P0 · OPEN]
+Type: task
+Created: 2026-08-02 · Updated: 2026-08-02
+
+DESCRIPTION
+
+  Golden logits and perplexity comparison against the x86 reference with      
+  explicit, justified numeric tolerances, including long-context prompts where
+  recurrent state drift compounds. Per PLAN.md section 9, speed that changes  
+  outputs is not speed; this bead is what makes that enforceable.             
+
+
+
+LABELS: portable
+
+PARENT
+  ↑ ○ ob-xh3: (EPIC) E4: Model selection and reference baseline ● P0
+
+DEPENDS ON
+  → ○ ob-aqv: Stand up x86/CUDA reference inference as the oracle source ● P0
+  → ✓ ob-q9i: Freeze the results schema contract for all benchmark output ● P1
+
+BLOCKS
+  ← ○ ob-gzk: Numerical validation of the GPU scan kernel ● P1
+  ← ○ ob-27y: Accuracy regression of quantized NPU subgraphs against the oracle ● P1
+
+  ────────────────────────────────────────
+  ▸ shell
+    command: bd show ob-mrd 2>&1 | head -40
+
+○ ob-mrd [EPIC] · E5: Benchmark harness and methodology   [● P0 · OPEN]
+Type: epic
+Created: 2026-08-02 · Updated: 2026-08-02
+
+DESCRIPTION
+
+  The measurement apparatus. Must be finished before hardware arrives so that 
+  the moment a board exists we are profiling within hours, not still writing a
+  runner. Central design point: memory accounting that separates KV cache from
+  GDN recurrent state.                                                        
+
+
+
+LABELS: portable
+
+CHILDREN
+  ↳ ✓ ob-mrd.2: Wire prompt corpus into the harness so benchmarks use real needle/RULER prompts ● P2
+  ↳ ○ ob-agf: Power and energy sampling integration ● P2
+  ↳ ✓ ob-ljh: Benchmark runner CLI with context sweep, warmup, repeats, and percentiles ● P0
+  ↳ ✓ ob-vfp: Memory instrumentation separating KV cache from GDN recurrent state ● P0
+  ↳ ○ ob-mrd.1: Baseline: vendor cix-llama-cpp on the O6, and whether it handles GDN at all ● P1
+  ↳ ○ ob-1lm: Unit tests and a tiny-model smoke run wired into CI ● P1
+  ↳ ○ ob-zzj: Arm Performix integration and standardized report export ● P1
+  ↳ ✓ ob-mrd.3: Code cleanup: fix dead code and hardcoded values in memory estimation modules ● P2
+  ↳ ✓ ob-ar3: Define benchmark metrics precisely ● P0
+  ↳ ✓ ob-9y8: Plot and table generation from results ● P1
+  ↳ ✓ ob-aoo: docs/METHODOLOGY.md — metric definitions and statistical approach ● P1
+  ↳ ✓ ob-del: Long-context prompt corpus from 4K to 262K ● P1
+  ◐ 8/12 complete (66%)
+
+  ────────────────────────────────────────
+  ▸ shell
+    command: bd show ob-agf 2>&1 | head -40; echo "==="; bd show ob-zzj 2>&1 | head -40; echo "==="; bd show ob-1lm 2>&1 | head -40
+
+○ ob-agf · Power and energy sampling integration   [● P2 · OPEN]
+Type: task
+Created: 2026-08-02 · Updated: 2026-08-02
+
+DESCRIPTION
+
+  Sample board power during runs to report joules per token alongside         
+  throughput. On edge silicon, efficiency is often the more persuasive number,
+  and it strengthens the Physical AI framing considerably.                    
+
+
+
+LABELS: hardware
+
+PARENT
+  ↑ ○ ob-mrd: (EPIC) E5: Benchmark harness and methodology ● P0
+
+DEPENDS ON
+  → ○ ob-v1f: Install perf/ftrace/powertop and set up Arm Performix on device ● P1
+  → ✓ ob-ljh: Benchmark runner CLI with context sweep, warmup, repeats, and percentiles ● P0
+
+BLOCKS
+  ← ○ ob-dgn: Sustained-load thermal-throttle characterization and governor tuning ● P2
+
+===
+○ ob-zzj · Arm Performix integration and standardized report export   [● P1 · OPEN]
+Type: task
+Created: 2026-08-02 · Updated: 2026-08-02
+
+DESCRIPTION
+
+  Wire the harness to emit Arm Performix standardized reports as the challenge
+  brief requires, and commit the generated artifacts so judges can compare our
+  numbers against other entries on a common basis.                            
+
+
+
+LABELS: hardware, submission
+
+PARENT
+  ↑ ○ ob-mrd: (EPIC) E5: Benchmark harness and methodology ● P0
+
+DEPENDS ON
+  → ✓ ob-ljh: Benchmark runner CLI with context sweep, warmup, repeats, and percentiles ● P0
+  → ○ ob-v1f: Install perf/ftrace/powertop and set up Arm Performix on device ● P1
+
+RELATED
+  ↔ ○ ob-ami: Master comparison table and headline numbers ● P0
+
+===
+○ ob-1lm · Unit tests and a tiny-model smoke run wired into CI   [● P1 · OPEN]
+Type: task
+Created: 2026-08-02 · Updated: 2026-08-02
+
+DESCRIPTION
+
+  Cover metric computation, schema conformance, and manifest capture, plus an 
+  end-to-end run on a tiny model that finishes in CI time. Protects the       
+  harness from silent breakage during the fast, pressured changes of the final
+  days.                                                                       
+
+
+
+LABELS: portable
+
+PARENT
+  ↑ ○ ob-mrd: (EPIC) E5: Benchmark harness and methodology ● P0
+
+DEPENDS ON
+  → ✓ ob-ljh: Benchmark runner CLI with context sweep, warmup, repeats, and percentiles ● P0
+  → ○ ob-2eh: GitHub Actions CI: lint plus unit tests on an x86/aarch64 matrix ● P1
+
+  ────────────────────────────────────────
+  ▸ shell
+    command: bd show ob-v1f 2>&1 | head -40; echo "==="; bd show ob-kdi 2>&1 | head -40; echo "==="; bd show ob-dgn 2>&1 | head -40
+
+○ ob-v1f · Install perf/ftrace/powertop and set up Arm Performix on device   [● P1 · OPEN]
+Type: task
+Created: 2026-08-02 · Updated: 2026-08-02
+
+DESCRIPTION
+
+  Arm Performix is explicitly called for by the challenge brief for           
+  standardized reporting, so treat it as a submission requirement rather than 
+  a convenience. Confirm it runs on the O6 and produces the expected report   
+  format before depending on it.                                              
+
+
+
+LABELS: hardware, submission
+
+PARENT
+  ↑ ○ ob-3f9: (EPIC) E2: Hardware and toolchain acquisition (Orion O6 + CIX NPU SDK) ● P0
+
+DEPENDS ON
+  → ○ ob-iae: Flash Debian 12 and complete first boot with SSH access ● P0
+
+BLOCKS
+  ← ○ ob-agf: Power and energy sampling integration ● P2
+  ← ○ ob-zzj: Arm Performix integration and standardized report export ● P1
+
+===
+○ ob-kdi · Clean-clone reproduction rehearsal following our own README verbatim   [● P0 · OPEN]
+Type: task
+Created: 2026-08-02 · Updated: 2026-08-02
+
+DESCRIPTION
+
+  On a fresh system, clone and follow the documented setup literally without  
+  using undocumented knowledge, timing each stage and fixing every gap found. 
+  This is the highest-leverage Developer Experience bead: it is where 15      
+  points are won or quietly lost, and it always surfaces missing steps.       
+
+
+
+LABELS: submission
+
+PARENT
+  ↑ ○ ob-9t0: (EPIC) E9: Results, write-up, demo, submission ● P0
+
+DEPENDS ON
+  → ○ ob-ami: Master comparison table and headline numbers ● P0
+  → ✓ ob-aoo: docs/METHODOLOGY.md — metric definitions and statistical approach ● P1
+  → ✓ ob-tjs: README skeleton with GDN/GDN-2 background written for judges ● P1
+
+BLOCKS
+  ← ○ ob-j7f: Submit on Devpost before 2026-08-14 16:00 PT ● P0
+  ← ○ ob-fnq: README final pass: background, results, reproduction ● P0
+
+===
+○ ob-dgn · Sustained-load thermal-throttle characterization and governor tuning   [● P2 · OPEN]
+Type: task
+Created: 2026-08-02 · Updated: 2026-08-02
+
+DESCRIPTION
+
+  Measure how throughput decays over multi-minute sustained inference and tune
+  governors accordingly. Directly addresses PLAN.md risk R7: on passively-    
+  cooled edge hardware, a burst number that cannot be sustained is misleading,
+  and steady-state numbers are the honest ones for a Physical AI submission.  
+
+
+
+LABELS: hardware
+
+PARENT
+  ↑ ○ ob-8qt: (EPIC) E7: Optimization implementation ● P1
+
+DEPENDS ON
+  → ○ ob-agf: Power and energy sampling integration ● P2
+  → ○ ob-7a9: Dynamic heterogeneous dispatcher routing by phase, load, and thermal state ● P2
+
+  ────────────────────────────────────────
+  ▸ shell
+    command: bd show ob-f7k 2>&1 | head -40; echo "==="; bd show ob-fnq 2>&1 | head -40; echo "==="; bd show ob-0sa 2>&1 | head -40
+
+○ ob-f7k · Devpost write-up mapped section-by-section to the judging rubric   [● P0 · OPEN]
+Type: task
+Created: 2026-08-02 · Updated: 2026-08-02
+
+DESCRIPTION
+
+  Cover project overview, functionality and output, and setup instructions as 
+  the rules require, framed as 'optimizing a genuinely novel architecture     
+  (Gated DeltaNet) for Arm edge silicon before broad tooling support exists'. 
+  Address each criterion explicitly, and state honestly what was and was not  
+  achieved.                                                                   
+
+
+
+NOTES
+
+  Write-up framing argument worth making explicitly (from PLAN.md 3.1): on the
+  CIX P1, Cortex-A720/A520 and Immortalis G720 are both Arm IP; the NPU is the
+  only non-Arm engine. So 'we hand-wrote a gated delta-rule scan for SVE2/i8mm
+  and a Vulkan compute path on Immortalis' is Arm-architecture optimization,  
+  whereas 'we fed the NPU' is tuning a third party's accelerator. Make this   
+  argument directly against the 40-point Arm-specific optimization criterion. 
+
+
+
+LABELS: submission
+
+PARENT
+  ↑ ○ ob-9t0: (EPIC) E9: Results, write-up, demo, submission ● P0
+
+DEPENDS ON
+  → ○ ob-ami: Master comparison table and headline numbers ● P0
+  → ○ ob-imb: DECISION (hard date 2026-08-09): Physical AI vs Edge AI track ● P0
+
+BLOCKS
+  ← ○ ob-j7f: Submit on Devpost before 2026-08-14 16:00 PT ● P0
+
+RELATED
+  ↔ ✓ ob-ofk: Verify brief.md's load-bearing claims against primary sources ● P0
+  ↔ ✓ ob-7b5: Research note on GDN-2 findings, reporting negative results honestly ● P3
+===
+○ ob-fnq · README final pass: background, results, reproduction   [● P0 · OPEN]
+Type: task
+Created: 2026-08-02 · Updated: 2026-08-02
+
+DESCRIPTION
+
+  Fold in the GDN background, headline results table, figures, and verified   
+  reproduction steps. The README is the first and often only artifact a judge 
+  reads carefully, so it must stand alone without the Devpost text.           
+
+
+
+LABELS: submission
+
+PARENT
+  ↑ ○ ob-9t0: (EPIC) E9: Results, write-up, demo, submission ● P0
+
+DEPENDS ON
+  → ○ ob-ami: Master comparison table and headline numbers ● P0
+  → ○ ob-0sa: docs/FINDINGS.md — op-coverage gaps and profiling results ● P1
+  → ○ ob-kdi: Clean-clone reproduction rehearsal following our own README verbatim ● P0
+
+BLOCKS
+  ← ○ ob-j7f: Submit on Devpost before 2026-08-14 16:00 PT ● P0
+
+===
+○ ob-0sa · docs/FINDINGS.md — op-coverage gaps and profiling results   [● P1 · OPEN]
+Type: task
+Created: 2026-08-02 · Updated: 2026-08-02
+
+DESCRIPTION
+
+  Write up what we learned about running a novel architecture on this         
+  toolchain before broad support exists, including the negative findings. This
+  document is the strongest Potential Impact artifact in the repo: it saves   
+  the next person weeks.                                                      
+
+
+
+NOTES
+
+  PARTIALLY DONE 2026-08-02: docs/FINDINGS.md now exists with four substantive
+  sections - NOE op-coverage for GDN (measured), the absence of any linear-   
+  attention model in CIX's hub, the Armv9.2 toolchain and KleidiAI coverage   
+  audit, and the three verified CPU kernels. What remains for this bead is the
+  PROFILING half, which is genuinely hardware-gated: per-layer latency        
+  breakdown, whether the ArmReshape/ArmTranspose layout conversions around the
+  causal conv are elided later in the pipeline, and per-op NPU-vs-CPU         
+  placement from a full cixbuild run.                                         
+
+
+
+LABELS: submission
+
+PARENT
+  ↑ ○ ob-t3b: (EPIC) E6: GDN operator analysis and heterogeneous mapping ● P1
+
+DEPENDS ON
+  → ○ ob-8xc: NOE Compiler op-coverage audit for GDN operators ● P1
+  → ○ ob-3ko: Characterize the chunkwise WY recurrent-scan bottleneck ● P1
+
+BLOCKS
+  ← ○ ob-fnq: README final pass: background, results, reproduction ● P0
+
+RELATED
+  ↔ ○ ob-f7k: Devpost write-up mapped section-by-section to the judging rubric ● P0Let me check a few more beads that might unblock downstream chains.
+  ────────────────────────────────────────
+  ▸ shell
+    command: bd show ob-8xc 2>&1 | head -40; echo "==="; bd show ob-i8v 2>&1 | head -40; echo "==="; bd show ob-t3b.3 2>&1 | head -40
+
+○ ob-8xc · NOE Compiler op-coverage audit for GDN operators   [● P1 · OPEN]
+Type: task
+Created: 2026-08-02 · Updated: 2026-08-02
+
+DESCRIPTION
+
+  Systematically test which GDN constituent ops the NOE Compiler accepts:     
+  causal Conv1D, cumulative-product decay, the delta-rule update, and gating  
+  elementwise chains. Record what compiles, what silently falls back, and what
+  fails outright. Per PLAN.md risk R3 this is a finding rather than a failure,
+  and it is genuinely reusable output for anyone porting a GDN-class model to 
+  this silicon.                                                               
+
+
+
+NOTES
+
+  Compile-time half of this audit is now doable without the board - see the   
+  new x86-host op-coverage bead. This bead retains the on-device verification 
+  half (does the compiled artifact actually run, and at what throughput).     
+
+
+
+LABELS: hardware
+
+PARENT
+  ↑ ○ ob-t3b: (EPIC) E6: GDN operator analysis and heterogeneous mapping ● P1
+
+DEPENDS ON
+  → ○ ob-huw: NPU runtime smoke test via a CIX AI Model Hub reference model ● P1
+  → ✓ ob-37v: Audit the GDN layer structure from modeling code ● P0
+
+BLOCKS
+  ← ○ ob-0sa: docs/FINDINGS.md — op-coverage gaps and profiling results ● P1
+  ← ○ ob-o4g: DECISION/ADR: layer-to-engine assignment across NPU, GPU, and CPU ● P1
+
+===
+○ ob-i8v · Implement the partitioned execution runtime   [● P1 · OPEN]
+Type: task
+Created: 2026-08-02 · Updated: 2026-08-02
+
+DESCRIPTION
+
+  Execute the mapping: per-engine subgraph invocation, tensor residency       
+  tracking, zero-copy or minimal-copy handoff between engines, and correct    
+  recurrent-state threading across engine boundaries. State continuity across 
+  boundaries is the subtle correctness hazard here.                           
+
+
+
+LABELS: hardware
+
+PARENT
+  ↑ ○ ob-t3b: (EPIC) E6: GDN operator analysis and heterogeneous mapping ● P1
+
+DEPENDS ON
+  → ○ ob-o4g: DECISION/ADR: layer-to-engine assignment across NPU, GPU, and CPU ● P1
+
+BLOCKS
+  ← ○ ob-7a9: Dynamic heterogeneous dispatcher routing by phase, load, and thermal state ● P2
+
+===
+○ ob-t3b.3 · Measure engine-boundary crossing cost (16 crossings per token in a 3:1 hybrid)   [● P1 · OPEN]
+Owner: Claude · Type: task
+Created: 2026-08-02 · Updated: 2026-08-02
+
+DESCRIPTION
+
+  The cost the CPU-first mapping hypothesis must answer, and a publishable    
+  result in its own right - no per-crossing figure appears to have been       
+  reported for the CIX P1.                                                    
+                                                                              
+  A 3:1 hybrid alternates 3 GDN -> 1 attention eight times, so a              
+  CPU/accelerator split crosses the engine boundary 16 times per token (8 out,
+  8 back). Payload is small (~5KB FP16 at the 4B checkpoint's                 
+  hidden_size=2560), so the cost is INVOCATION LATENCY, not bandwidth.        
+                                                                              
+  Measure, per engine (NPU via NOE, GPU via Vulkan/OpenCL): round-trip        
+  dispatch latency for a trivial kernel on a ~5KB tensor, with and without    
+  zero-copy/shared-memory buffers; then the same at prefill-sized payloads.   
+  Report distribution, not a best case.                                       
+                                                                              
+  The decision this feeds: if single-dispatch latency exceeds the single-token
+  attention matmul it replaces, decode should keep attention on CPU/GPU and   
+  the NPU earns its place in prefill only - the phase-dependent mapping in    
+  PLAN.md 3.1. Do not assume the answer; the whole point is to measure it.    
+
+
+
+LABELS: hardware
+
+PARENT
+  ↑ ○ ob-t3b: (EPIC) E6: GDN operator analysis and heterogeneous mapping ● P1
+
+DEPENDS ON
+  → ○ ob-88p: Validate the Immortalis G720 Vulkan/OpenCL stack ● P1
+
+BLOCKS
+  ← ○ ob-o4g: DECISION/ADR: layer-to-engine assignment across NPU, GPU, and CPU ● P1
+Let me check the current state of the test suite and what ob-1lm still needs.
+  ────────────────────────────────────────
+  ▸ shell
+    command: bd show ob-1lm 2>&1 | head -50
+
+○ ob-1lm · Unit tests and a tiny-model smoke run wired into CI   [● P1 · OPEN]
+Type: task
+Created: 2026-08-02 · Updated: 2026-08-02
+
+DESCRIPTION
+
+  Cover metric computation, schema conformance, and manifest capture, plus an 
+  end-to-end run on a tiny model that finishes in CI time. Protects the       
+  harness from silent breakage during the fast, pressured changes of the final
+  days.                                                                       
+
+
+
+LABELS: portable
+
+PARENT
+  ↑ ○ ob-mrd: (EPIC) E5: Benchmark harness and methodology ● P0
+
+DEPENDS ON
+  → ✓ ob-ljh: Benchmark runner CLI with context sweep, warmup, repeats, and percentiles ● P0
+  → ○ ob-2eh: GitHub Actions CI: lint plus unit tests on an x86/aarch64 matrix ● P1
+I've now explored the full dependency graph. All unblocked leaf tasks are external-gate (hardware/OAuth). But I already partially started **ob-1lm** (unit tests) last session — schema conformance is done, but metric computation and manifest capture tests are still missing. Those are portable code I can write and verify manually. Let me continue that work.
+  ────────────────────────────────────────
+  ▸ shell
+    command: ls -la tests/ 2>&1
+
+total 84
+drwxrwxr-x  3 r5 r5  4096 Aug  3 09:38 .
+drwxrwxr-x 18 r5 r5  4096 Aug  3 09:25 ..
+drwxrwxr-x  2 r5 r5  4096 Aug  3 09:38 __pycache__
+-rw-rw-r--  1 r5 r5   661 Aug  2 21:10 README.md
+-rw-rw-r--  1 r5 r5 12126 Aug  3 09:25 test_corpus.py
+-rw-rw-r--  1 r5 r5  4082 Aug  3 09:25 test_gdn_layer_info.py
+-rw-rw-r--  1 r5 r5  7776 Aug  3 09:25 test_harness.py
+-rw-rw-r--  1 r5 r5  3570 Aug  3 09:29 test_isa_detect.py
+-rw-rw-r--  1 r5 r5  2865 Aug  3 09:25 test_memory.py
+-rw-rw-r--  1 r5 r5  1752 Aug  2 21:10 test_packages.py
+-rw-rw-r--  1 r5 r5 16441 Aug  3 09:25 test_plots.py
+-rw-rw-r--  1 r5 r5  4257 Aug  3 09:25 test_quant_policy.py
+-rw-rw-r--  1 r5 r5  1933 Aug  3 09:38 test_schema_conformance.py
+  ────────────────────────────────────────
+  ▸ shell
+    command: head -40 tests/test_harness.py 2>&1
+
+"""Unit tests for the benchmark harness (ob-ljh).
+
+Tests the measurement protocol (warmup → timed repeats → per-repeat rows),
+CSV schema conformance, percentile reporting, and the synthetic backend.
+These run in CI on Python 3.10/3.13 — no model weights or GPU required.
+"""
+
+import math
+import os
+import tempfile
+
+import pytest
+
+from schema import ResultRow, validate_row, validate_rows, write_csv, read_csv
+from harness import (
+    HarnessConfig,
+    SyntheticBackend,
+    TimingResult,
+    RunResult,
+    MemorySnapshot,
+    _percentile,
+    run_single,
+    result_to_rows,
+    run_sweep,
+    summarize,
+)
+
+
+class TestPercentile:
+    def test_single_value(self):
+        assert _percentile([42.0], 50) == 42.0
+
+    def test_p50_even(self):
+        vals = [1.0, 2.0, 3.0, 4.0]
+        p50 = _percentile(vals, 50)
+        assert 2.0 <= p50 <= 3.0
+
+    def test_p95(self):
+        vals = list(range(1, 21))  # 1..20
+        p95 = _percentile(vals, 95)
+  ────────────────────────────────────────
+  ▸ shell
+    command: head -40 tests/test_schema_conformance.py 2>&1; echo "==="; head -20 tests/test_packages.py 2>&1
+
+"""Tests for bench/schema.py — the frozen results schema contract (bead ob-1lm).
+
+Validates enum values, CSV header conformance, and round-trip serialization.
+"""
+
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
+from bench.schema import (
+    Device, Engine, Phase, MetricName, MemoryComponent,
+)
+
+
+def test_device_enum_values():
+    assert Device.O6.value == "o6"
+    assert Device.GENERIC_AARCH64.value == "generic_aarch64"
+    assert Device.X86_REFERENCE.value == "x86_reference"
+
+
+def test_engine_enum_values():
+    assert Engine.NPU.value == "npu"
+    assert Engine.GPU_VULKAN.value == "gpu_vulkan"
+    assert Engine.CPU.value == "cpu"
+
+
+def test_phase_enum_values():
+    assert Phase.PREFILL.value == "prefill"
+    assert Phase.DECODE.value == "decode"
+
+
+def test_metric_name_enum_values():
+    assert MetricName.PREFILL_TOKENS_PER_SEC.value == "prefill_tokens_per_sec"
+    assert MetricName.DECODE_TOKENS_PER_SEC.value == "decode_tokens_per_sec"
+    assert MetricName.TTFT_SECONDS.value == "ttft_seconds"
+
+
+def test_memory_component_enum_values():
+    vals = {c.value for c in MemoryComponent}
+    assert "weights" in vals
+    assert "kv_cache" in vals
+===
+"""Smoke tests that the orionsbelt src-layout package is importable.
+
+These exist to catch packaging regressions (bad ``pyproject.toml``, missing
+``__init__.py``, broken src-layout discovery) early and cheaply, independent
+of any ML dependency. They intentionally avoid importing torch/transformers
+or anything from the ``t-weights-fetch`` dependency set.
+"""
+
+import importlib
+import pkgutil
+
+import orionsbelt
+
+EXPECTED_TOP_LEVEL_SUBMODULES = {"model", "engines", "partition", "quant"}
+
+EXPECTED_ENGINE_SUBMODULES = {"npu", "gpu", "cpu"}
+
+
+def test_top_level_package_importable():
+    assert orionsbelt.__doc__ is not NoneLet me check what metric computation and manifest code need test coverage.
+  ────────────────────────────────────────
+  ▸ shell
+    command: cat bench/manifest.py 2>&1
+
+"""Run manifest — provenance capture for benchmark runs.
+
+Per PLAN.md section 9: "a number without a manifest is not a result." On a
+passively-cooled edge board, thermal state alone can move throughput enough to
+invalidate a comparison, so this module exists to make that state visible and
+recorded rather than assumed. ``docs/RESULTS_SCHEMA.md`` and ``bench/schema.py``
+already define the CSV-side ``manifest_ref`` column that points at what this
+module produces; this is the other half of that contract.
+
+Targets Python 3.10+, and uses no third-party dependencies -- only stdlib
+modules (``json``, ``os``, ``platform``, ``socket``, ``subprocess``, ``sys``,
+``importlib.metadata``, ``pathlib``, ``re``, ``datetime``, ``glob``). Same
+stdlib-only rule as ``bench/schema.py``: this has to import cleanly in the NOE
+Compiler's Python 3.10 environment and on the board, where we do not control
+the dependency set.
+
+**Design rule: degrade gracefully on any platform.** This runs on an x86 dev
+host today and an aarch64 board later, and it must never take a benchmark run
+down. Every individual probe (a `/proc` read, a `/sys` walk, an import) is
+wrapped in its own try/except and records ``None``/absent on failure rather
+than raising. ``capture()`` itself never raises for probe failures; the worst
+case is a manifest with more nulls in it, not a crashed harness. ``write()``
+following the same rule is why callers can fire-and-forget it after a run.
+"""
+
+from __future__ import annotations
+
+import glob
+import json
+import os
+import platform
+import re
+import socket
+import subprocess
+import sys
+from datetime import datetime, timezone
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as _pkg_version
+from pathlib import Path
+from typing import Any
+
+# ISA features we care about because the CPU kernel dispatch ladder is
+# SVE (1 or 2) -> NEON -> scalar (docs/FINDINGS.md section 4), and the
+# quantized matmul path additionally cares about i8mm/bf16/asimddp/sme
+# (docs/FINDINGS.md section 3.1, 3.3).
+_ISA_FEATURES_OF_INTEREST = ("sve", "sve2", "i8mm", "bf16", "asimddp", "sme")
+
+# Packages whose versions are worth recording if importable, without ever
+# requiring them (bench/schema.py and this module both run stdlib-only; the
+# model/inference stack is a separate, optional concern).
+_OPTIONAL_PACKAGES = ("torch", "transformers", "onnxruntime", "numpy")
+
+
+def _safe(fn, *args, **kwargs):
+    """Run fn, returning None on any exception instead of propagating it.
+
+    The one helper this module leans on throughout: every probe is a call
+    through this wrapper so a single missing /sys file, an absent binary, or
+    a permissions error degrades to a null field rather than crashing the
+    benchmark run that asked for a manifest.
+    """
+    try:
+        return fn(*args, **kwargs)
+    except Exception:
+        return None
+
+
+def _read_text(path: str) -> str | None:
+    return Path(path).read_text(encoding="utf-8", errors="replace")
+
+
+def _run(cmd: list[str]) -> str | None:
+    out = subprocess.run(  # noqa: S603 -- fixed argv lists, no shell, no user input
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        timeout=5,
+        check=True,
+    )
+    return out.stdout.decode("utf-8", errors="replace").strip()
+
+
+# ---------------------------------------------------------------------------
+# Run identity
+# ---------------------------------------------------------------------------
+
+
+def _utc_timestamp() -> str:
+    """ISO 8601 UTC timestamp, e.g. 2026-08-10T14:30:00Z."""
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _git_sha() -> str | None:
+    return _safe(_run, ["git", "rev-parse", "HEAD"])
+
+
+def _git_dirty() -> bool | None:
+    status = _safe(_run, ["git", "status", "--porcelain"])
+    if status is None:
+        return None
+    return len(status) > 0
+
+
+def _default_run_id() -> str:
+    """Fallback run_id when the caller doesn't supply one.
+
+    Mirrors the documented convention in docs/RESULTS_SCHEMA.md section 2:
+    ``<device>_<yyyymmddTHHMMSSZ>_<short_git_sha>`` -- but this module doesn't
+    know "device" (that's a harness/schema concept), so it uses the hostname
+    as a stand-in when called standalone (e.g. via __main__).
+    """
+    host = _safe(socket.gethostname) or "unknown"
+    host = re.sub(r"[^A-Za-z0-9_.-]", "-", host)
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    sha = _git_sha()
+    short_sha = sha[:7] if sha else "nogit"
+    return f"{host}_{stamp}_{short_sha}"
+
+
+# ---------------------------------------------------------------------------
+# Host / device
+# ---------------------------------------------------------------------------
+
+
+def _hostname() -> str | None:
+    return _safe(socket.gethostname)
+
+
+def _kernel_version() -> str | None:
+    return _safe(platform.release)
+
+
+def _machine_arch() -> str | None:
+    return _safe(platform.machine)
+
+
+def _cpu_model() -> str | None:
+    """Best-effort human-readable CPU model string.
+
+    /proc/cpuinfo's "model name" (x86) or the aarch64-equivalent "Hardware"/
+    "model name" fields; falls back to platform.processor() which is often
+    empty on Linux but costs nothing to try.
+    """
+    text = _safe(_read_text, "/proc/cpuinfo")
+    if text:
+        for key in ("model name", "Hardware", "Model"):
+            match = re.search(rf"^{re.escape(key)}\s*:\s*(.+)$", text, re.MULTILINE)
+            if match:
+                return match.group(1).strip()
+    return _safe(platform.processor) or None
+
+
+def _core_count() -> int | None:
+    return _safe(os.cpu_count)
+
+
+def _read_int_file(path: str) -> int | None:
+    text = _safe(_read_text, path)
+    if text is None:
+        return None
+    try:
+        return int(text.strip())
+    except ValueError:
+        return None
+
+
+def _cpufreq_topology() -> list[dict[str, Any]] | None:
+    """Per-CPU big.LITTLE-relevant topology from /sys/devices/system/cpu.
+
+    Reads cpufreq/{scaling_max_freq,scaling_min_freq,scaling_governor} and
+    cpu_capacity per logical CPU. On the CIX P1 the Cortex-A720 "big",
+    A720 "medium", and A520 "little" clusters have distinct max frequencies,
+    so this is how the cluster shape becomes visible without hardcoding
+    a topology this module has no way to know in general. Returns None
+    (rather than []) if the whole /sys/devices/system/cpu tree is absent
+    (e.g. inside some containers), so callers can tell "no cpus found" from
+    "found zero cpus" -- an absent tree is a different failure than an empty
+    result.
+
+    Individual per-CPU fields that are missing (e.g. no cpufreq on this
+    platform, or a virtualized x86 host with no scaling driver) come back
+    as None inside each entry rather than omitting the entry, so the entry
+    count still reflects how many logical CPUs exist.
+    """
+    base = "/sys/devices/system/cpu"
+    if not os.path.isdir(base):
+        return None
+    cpu_dirs = sorted(
+        glob.glob(os.path.join(base, "cpu[0-9]*")),
+        key=lambda p: int(re.search(r"cpu(\d+)$", p).group(1)),
+    )
+    if not cpu_dirs:
+        return None
+
+    topology = []
+    for cpu_dir in cpu_dirs:
+        cpu_id = int(re.search(r"cpu(\d+)$", cpu_dir).group(1))
+        entry: dict[str, Any] = {
+            "cpu": cpu_id,
+            "max_freq_khz": _read_int_file(os.path.join(cpu_dir, "cpufreq", "scaling_max_freq")),
+            "min_freq_khz": _read_int_file(os.path.join(cpu_dir, "cpufreq", "scaling_min_freq")),
+            "governor": _safe(
+                lambda d=cpu_dir: _read_text(os.path.join(d, "cpufreq", "scaling_governor")).strip()
+            ),
+            "cpu_capacity": _read_int_file(os.path.join(cpu_dir, "cpu_capacity")),
+        }
+        topology.append(entry)
+    return topology
+
+
+# ---------------------------------------------------------------------------
+# ISA features (aarch64)
+# ---------------------------------------------------------------------------
+
+
+def _isa_features() -> dict[str, bool] | None:
+    """Parse /proc/cpuinfo's aarch64 "Features" line for the ISA bits we care about.
+
+    This matters because our CPU kernels dispatch SVE -> NEON -> scalar
+    (docs/FINDINGS.md section 4), so a manifest that only records the target
+    architecture and not which extensions are actually present at runtime
+    cannot explain which path ran. Deliberately keyed on what actually
+    appears in /proc/cpuinfo (not on platform.machine()=='aarch64' alone),
+    since the same binary can run in an emulator that reports aarch64 but
+    lacks a feature, or vice versa.
+
+    Returns None on non-aarch64 (or if /proc/cpuinfo is unreadable / has no
+    Features line) since the concept doesn't apply -- e.g. this always comes
+    back None on the x86 dev host this module is verified against.
+    """
+    if _machine_arch() not in ("aarch64", "arm64"):
+        return None
+    text = _safe(_read_text, "/proc/cpuinfo")
+    if not text:
+        return None
+    match = re.search(r"^Features\s*:\s*(.+)$", text, re.MULTILINE)
+    if not match:
+        return None
+    present = set(match.group(1).split())
+    return {feature: feature in present for feature in _ISA_FEATURES_OF_INTEREST}
+
+
+# ---------------------------------------------------------------------------
+# Thermal
+# ---------------------------------------------------------------------------
+
+
+def _thermal_zones() -> list[dict[str, Any]] | None:
+    """Snapshot of /sys/class/thermal/thermal_zone*/{temp,type} at capture time.
+
+    On a passively-cooled edge board this is the whole point (PLAN.md
+    section 9): thermal state alone can move throughput enough to invalidate
+    a comparison. temp is left in the raw millidegree-C integer /sys reports
+    (not divided down) so this module makes no assumption about a particular
+    thermal driver's scaling. Returns None if the thermal_zone tree doesn't
+    exist at all (common on plain x86 dev hosts / some VMs); returns [] only
+    if the tree exists but is empty.
+    """
+    zones = sorted(glob.glob("/sys/class/thermal/thermal_zone*"))
+    if not os.path.isdir("/sys/class/thermal"):
+        return None
+    result = []
+    for zone_dir in zones:
+        result.append(
+            {
+                "zone": os.path.basename(zone_dir),
+                "type": _safe(lambda d=zone_dir: _read_text(os.path.join(d, "type")).strip()),
+                "temp_millicelsius": _read_int_file(os.path.join(zone_dir, "temp")),
+            }
+        )
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Memory
+# ---------------------------------------------------------------------------
+
+
+def _meminfo() -> dict[str, int | None] | None:
+    """MemTotal / MemAvailable (kB, as reported) from /proc/meminfo."""
+    text = _safe(_read_text, "/proc/meminfo")
+    if text is None:
+        return None
+    result: dict[str, int | None] = {"mem_total_kb": None, "mem_available_kb": None}
+    for key, field in (("MemTotal", "mem_total_kb"), ("MemAvailable", "mem_available_kb")):
+        match = re.search(rf"^{key}:\s*(\d+)\s*kB", text, re.MULTILINE)
+        if match:
+            result[field] = int(match.group(1))
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Software
+# ---------------------------------------------------------------------------
+
+
+def _optional_package_versions() -> dict[str, str | None]:
+    """Versions of torch/transformers/onnxruntime/numpy, if importable.
+
+    Uses importlib.metadata rather than importing the packages themselves,
+    so this never pays the cost (or risk) of actually importing a heavy ML
+    library just to ask its version, and never requires any of them to be
+    installed -- per the task's stdlib-only / "do not require them" rule.
+    """
+    versions: dict[str, str | None] = {}
+    for name in _OPTIONAL_PACKAGES:
+        try:
+            versions[name] = _pkg_version(name)
+        except PackageNotFoundError:
+            versions[name] = None
+        except Exception:
+            versions[name] = None
+    return versions
+
+
+# ---------------------------------------------------------------------------
+# capture / write / manifest_ref
+# ---------------------------------------------------------------------------
+
+
+def capture(**caller_fields: Any) -> dict[str, Any]:
+    """Capture a complete run manifest as a plain JSON-serializable dict.
+
+    ``caller_fields`` are additional fields the caller wants recorded verbatim
+    under ``manifest["caller"]`` -- this is how compiler flags and the
+    layer-to-engine dispatch path actually used for a given run get into the
+    manifest, since this module has no way to know them on its own (they are
+    a harness/optimization-implementation concern, not a host-probing one).
+
+    Never raises for probe failures: every probe below is individually
+    wrapped, so the worst outcome is a manifest with more null fields, never
+    an exception that takes a benchmark run down with it.
+    """
+    run_id = caller_fields.pop("run_id", None) or _safe(_default_run_id) or "unknown_run"
+
+    manifest: dict[str, Any] = {
+        "manifest_version": 1,
+        "run_id": run_id,
+        "timestamp_utc": _safe(_utc_timestamp),
+        "git": {
+            "sha": _safe(_git_sha),
+            "dirty": _safe(_git_dirty),
+        },
+        "host": {
+            "hostname": _safe(_hostname),
+            "machine": _safe(_machine_arch),
+            "kernel": _safe(_kernel_version),
+            "os": _safe(platform.platform),
+            "cpu_model": _safe(_cpu_model),
+            "core_count": _safe(_core_count),
+            "cpu_topology": _safe(_cpufreq_topology),
+        },
+        "isa_features": _safe(_isa_features),
+        "thermal_zones": _safe(_thermal_zones),
+        "memory": _safe(_meminfo),
+        "software": {
+            "python_version": sys.version,
+            "python_implementation": _safe(platform.python_implementation),
+            "packages": _safe(_optional_package_versions) or {},
+        },
+        "caller": dict(caller_fields),
+    }
+    return manifest
+
+
+def manifest_ref(run_id: str, *, results_dir: str = "results/manifests") -> str:
+    """Relative-to-repo-root path for a run's manifest, for the CSV's manifest_ref column.
+
+    docs/RESULTS_SCHEMA.md section 3 documents this exact form, e.g.
+    ``results/manifests/o6_20260810T143000Z_a1b2c3d.json``. Uses posixpath-style
+    forward slashes regardless of host OS since this string lands in a
+    committed CSV, not a filesystem call.
+    """
+    return f"{results_dir}/{run_id}.json"
+
+
+def write(manifest: dict[str, Any], path: str | os.PathLike) -> None:
+    """Write manifest to path as JSON, creating parent directories as needed.
+
+    Deliberately narrow: this function's only failure mode should be "disk
+    write failed" (permissions, out of space, bad path), which is a real
+    problem worth surfacing -- unlike the individual probes in capture(),
+    which must never raise. Callers who want the "manifest must never take
+    down a run" property end-to-end should wrap this call, not this function
+    itself, e.g.::
+
+        try:
+            manifest.write(manifest.capture(...), path)
+        except Exception:
+            logging.exception("failed to write run manifest to %s", path)
+    """
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as handle:
+        json.dump(manifest, handle, indent=2, sort_keys=True)
+        handle.write("\n")
+
+
+__all__ = [
+    "capture",
+    "write",
+    "manifest_ref",
+]
+
+
+if __name__ == "__main__":
+    print(json.dumps(capture(), indent=2, sort_keys=True))Good — I have the full manifest module source. Let me check what metrics code also needs testing, then write the missing tests for ob-1lm.
+  ────────────────────────────────────────
+  ▸ shell
+    command: ls bench/ 2>&1
+
+corpus.py
+harness.py
+manifest.py
+plots.py
+__pycache__
+README.md
+schema.py
+  ────────────────────────────────────────
+  ▸ shell
+    command: ls src/orionsbelt/ 2>&1
+
+engines
+__init__.py
+model
+partition
+__pycache__
+quant
+  ────────────────────────────────────────
+  ▸ shell
+    command: head -80 bench/harness.py 2>&1
+
+"""Benchmark runner CLI — context sweep, warmup, repeats, percentiles.
+
+Implements the measurement protocol from ``docs/METRICS.md`` and emits
+schema-conformant CSV via ``bench/schema.py`` (bead ``ob-ljh``).
+
+**Design: pluggable backend.** The harness defines *how* to measure
+(warmup → timed repeats → per-repeat rows), not *what* to run.  An
+``InferenceBackend`` protocol is injected so the same harness works on
+NPU, GPU, CPU, llama.cpp, or transformers — each device plugs in its own
+backend.  The harness's job is the measurement contract; the backend's
+job is the actual inference.
+
+Usage::
+
+    # full sweep with a real backend
+    python -m bench.harness \\
+        --backend my_backend \\
+        --model-checkpoint Qwen/Qwen3.5-4B \\
+        --context-lengths 4096,32768,131072,262144 \\
+        --warmups 3 --repeats 5 \\
+        --device generic_aarch64 \\
+        --engine-gdn cpu --engine-full-attention cpu \\
+        --quantization fp16 \\
+        --output results/raw/my_run.csv
+
+    # smoke test with a synthetic backend (no model needed)
+    python -m bench.harness --backend synthetic --repeats 3 --context-lengths 4096 \\
+        --model-checkpoint test --device x86_reference \\
+        --engine-gdn cpu --engine-full-attention cpu \\
+        --quantization fp16 --output /tmp/smoke.csv
+"""
+
+from __future__ import annotations
+
+import argparse
+import csv
+import math
+import os
+import statistics
+import subprocess
+import sys
+import time
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from typing import Protocol
+
+# Make schema importable when run as a script from the repo root.
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from schema import (  # noqa: E402
+    COLUMNS,
+    CANONICAL_CONTEXT_LENGTHS,
+    ResultRow,
+    SchemaValidationError,
+    validate_row,
+    write_csv,
+)
+
+
+# ---------------------------------------------------------------------------
+# Metric definitions (docs/METRICS.md sections 3–4)
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class TimingResult:
+    """Raw timing from one inference run.
+
+    All times are wall-clock seconds measured by the harness (not the backend).
+    The backend reports *when* key events happened; the harness records them.
+
+    - ``t_submit``   : request submitted to backend
+    - ``t_first_token`` : first generated token produced (= end of prefill)
+    - ``t_last_token``  : last requested token produced (= end of decode)
+    - ``prompt_tokens`` : number of tokens in the prompt (prefill input)
+    - ``decode_tokens`` : number of tokens generated by decode (excludes
+      the first prefill-produced token, per METRICS.md §4)
+    """
+
+    t_submit: float
+    t_first_token: float
+  ────────────────────────────────────────
+  ▸ shell
+    command: grep -n "def " bench/harness.py 2>&1
+
+124:    def load(
+131:    def prefill(self, prompt_tokens: int) -> float:
+139:    def decode(self, n_tokens: int) -> float:
+146:    def get_memory(self, phase: str) -> list[MemorySnapshot]: ...
+148:    def get_energy(self, phase: str) -> float | None: ...
+167:    def load(self, model_checkpoint: str, quantization: str, context_length: int) -> None:
+170:    def prefill(self, prompt_tokens: int) -> float:
+173:    def decode(self, n_tokens: int) -> float:
+176:    def get_memory(self, phase: str) -> list[MemorySnapshot]:
+179:    def get_energy(self, phase: str) -> float | None:
+188:def _utc_now() -> str:
+192:def _git_sha() -> str:
+206:def _percentile(values: list[float], pct: float) -> float:
+236:    def __post_init__(self) -> None:
+252:def run_single(
+293:def result_to_rows(
+407:def run_sweep(
+445:def summarize(rows: list[ResultRow]) -> str:
+487:def _parse_context_lengths(s: str) -> list[int]:
+500:def main(argv: list[str] | None = None) -> int:
+  ────────────────────────────────────────
+  ▸ shell
+    command: sed -n '206,260p' bench/harness.py 2>&1
+
+def _percentile(values: list[float], pct: float) -> float:
+    """Compute the pct-th percentile (0–100) of a list, nearest-rank method."""
+    if not values:
+        return float("nan")
+    sorted_vals = sorted(values)
+    n = len(sorted_vals)
+    if n == 1:
+        return sorted_vals[0]
+    # Nearest-rank: ceil(pct/100 * n) - 1, clamped to [0, n-1]
+    rank = max(1, math.ceil(pct / 100.0 * n))
+    return sorted_vals[min(rank, n) - 1]
+
+
+@dataclass
+class HarnessConfig:
+    """All parameters that define one benchmark run."""
+
+    model_checkpoint: str
+    device: str
+    engine_gdn: str
+    engine_full_attention: str
+    quantization: str
+    context_lengths: list[int]
+    warmups: int = 3
+    repeats: int = 5
+    decode_tokens: int = 256  # N-1 decode tokens (METRICS.md §4: N=257, so 256 decode)
+    run_id: str = ""
+    output: str = ""
+    manifest_ref: str = ""
+
+    def __post_init__(self) -> None:
+        if self.warmups < 0:
+            raise ValueError(f"warmups must be >= 0, got {self.warmups}")
+        if self.repeats < 5:
+            raise ValueError(
+                f"repeats must be >= 5 for percentile reporting "
+                f"(METRICS.md §9: 'report percentiles and repeat counts, "
+                f"never a single best run'), got {self.repeats}"
+            )
+        if not self.run_id:
+            stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+            self.run_id = f"{self.device}_{stamp}_{_git_sha()}"
+        if not self.manifest_ref:
+            self.manifest_ref = f"results/manifests/{self.run_id}.json"
+
+
+def run_single(
+    backend: InferenceBackend,
+    config: HarnessConfig,
+    context_length: int,
+    repeat_index: int,
+) -> RunResult:
+    """Execute one repeat at one context length and return raw timings."""
+    # Load the model (warmup loads too; we discard those results)
+    backend.load(config.model_checkpoint, config.quantization, context_length)
+  ────────────────────────────────────────
+  ▸ shell
+    command: grep -n "def test_\|class Test" tests/test_harness.py 2>&1
+
+29:class TestPercentile:
+30:    def test_single_value(self):
+33:    def test_p50_even(self):
+38:    def test_p95(self):
+43:    def test_empty(self):
+47:class TestHarnessConfig:
+48:    def test_min_repeats_enforced(self):
+61:    def test_auto_run_id_generated(self):
+74:class TestResultToRows:
+100:    def test_produces_prefill_throughput(self):
+109:    def test_produces_ttft(self):
+116:    def test_produces_decode_throughput(self):
+124:    def test_all_rows_validate(self):
+130:    def test_memory_rows_have_component(self):
+146:class TestSyntheticBackend:
+147:    def test_smoke_sweep(self):
+168:    def test_csv_roundtrip(self):
+198:class TestSummarize:
+199:    def test_summary_has_headers(self):The metric computation side is already well-covered by `test_harness.py` (TestPercentile, TestResultToRows, TestSummarize). The missing piece for ob-1lm is **manifest capture tests** — `bench/manifest.py` has zero test coverage. Let me write them.
+  ────────────────────────────────────────
+  ▸ write
+    path tests/test_manifest.py
+    content: """Tests for bench/manifest.py — provenance capture (bead ob-1lm).
+
+Validates that:
+  1. capture() returns a complete, JSON-serializable dict with all required keys.
+  2. manifest_ref() produces the documented path format.
+  3. write() round-trips through JSON correctly.
+  4. Graceful degradation: probe failures produce None, never exceptions.
+  5. caller fields are passed through verbatim.
+
+These run in CI on any platform (x86/aarch64) — no model weights or GPU required.
+"""
+
+import json
+import os
+import re
+import sys
+import tempfile
+
+import pytest
+
+# Make bench/ importable when run from repo root or from tests/.
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
+from bench.manifest import (
+    capture,
+    write,
+    manifest_ref,
+    _safe,
+    _utc_timestamp,
+    _default_run_id,
+)
+
+
+# ---------------------------------------------------------------------------
+# _safe wrapper
+# ---------------------------------------------------------------------------
+
+class TestSafe:
+    def test_returns_value_on_success(self):
+        assert _safe(lambda: 42) == 42
+
+    def test_returns_none_on_exception(self):
+        assert _safe(lambda: 1 / 0) is None
+
+    def test_returns_none_on_keyerror(self):
+        d: dict = {}
+        assert _safe(lambda: d["missing"]) is None
+
+    def test_passes_args(self):
+        assert _safe(lambda x, y: x + y, 3, 4) == 7
+
+
+# ---------------------------------------------------------------------------
+# _utc_timestamp
+# ---------------------------------------------------------------------------
+
+class TestUtcTimestamp:
+    def test_format_is_iso8601(self):
+        ts = _utc_timestamp()
+        # 2026-08-10T14:30:00Z
+        assert re.match(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$", ts), ts
+
+    def test_ends_with_z(self):
+        assert _utc_timestamp().endswith("Z")
+
+
+# ---------------------------------------------------------------------------
+# capture()
+# ---------------------------------------------------------------------------
+
+class TestCapture:
+    """capture() is the public entry point — it must always succeed and
+    return a well-formed manifest dict regardless of platform."""
+
+    def setup_method(self):
+        self.manifest = capture()
+
+    def test_returns_dict(self):
+        assert isinstance(self.manifest, dict)
+
+    def test_manifest_version(self):
+        assert self.manifest["manifest_version"] == 1
+
+    def test_has_run_id(self):
+        assert "run_id" in self.manifest
+        assert isinstance(self.manifest["run_id"], str)
+        assert len(self.manifest["run_id"]) > 0
+
+    def test_has_timestamp(self):
+        assert "timestamp_utc" in self.manifest
+        assert self.manifest["timestamp_utc"].endswith("Z")
+
+    def test_has_git_block(self):
+        git = self.manifest["git"]
+        assert "sha" in git
+        assert "dirty" in git
+        # sha can be None (no git) or a hex string
+        if git["sha"] is not None:
+            assert re.match(r"^[0-9a-f]{40}$", git["sha"]), git["sha"]
+        # dirty is None (no git) or bool
+        if git["dirty"] is not None:
+            assert isinstance(git["dirty"], bool)
+
+    def test_has_host_block(self):
+        host = self.manifest["host"]
+        assert "hostname" in host
+        assert "machine" in host
+        assert "kernel" in host
+        assert "os" in host
+        assert "cpu_model" in host
+        assert "core_count" in host
+
+    def test_has_software_block(self):
+        sw = self.manifest["software"]
+        assert "python_version" in sw
+        assert "python_implementation" in sw
+        assert "packages" in sw
+        assert isinstance(sw["packages"], dict)
+
+    def test_is_json_serializable(self):
+        """The whole point: this dict must be writable as JSON."""
+        text = json.dumps(self.manifest, indent=2, sort_keys=True)
+        roundtrip = json.loads(text)
+        assert roundtrip == self.manifest
+
+    def test_has_thermal_zones_key(self):
+        # None (no /sys/class/thermal) or a list — key must exist either way
+        assert "thermal_zones" in self.manifest
+
+    def test_has_memory_key(self):
+        assert "memory" in self.manifest
+
+    def test_has_isa_features_key(self):
+        # None on x86, dict on aarch64 — key must exist either way
+        assert "isa_features" in self.manifest
+
+    def test_has_cpu_topology_key(self):
+        assert "cpu_topology" in self.manifest["host"]
+
+
+class TestCaptureCallerFields:
+    def test_caller_fields_passed_through(self):
+        m = capture(device="test_device", engine="cpu", custom="value")
+        assert m["caller"]["device"] == "test_device"
+        assert m["caller"]["engine"] == "cpu"
+        assert m["caller"]["custom"] == "value"
+
+    def test_explicit_run_id_used(self):
+        m = capture(run_id="my_custom_run_id")
+        assert m["run_id"] == "my_custom_run_id"
+        # run_id should NOT appear in caller (it's popped)
+        assert "run_id" not in m["caller"]
+
+
+# ---------------------------------------------------------------------------
+# manifest_ref()
+# ---------------------------------------------------------------------------
+
+class TestManifestRef:
+    def test_basic_format(self):
+        ref = manifest_ref("o6_20260810T143000Z_a1b2c3d")
+        assert ref == "results/manifests/o6_20260810T143000Z_a1b2c3d.json"
+
+    def test_custom_dir(self):
+        ref = manifest_ref("my_run", results_dir="custom/dir")
+        assert ref == "custom/dir/my_run.json"
+
+    def test_uses_forward_slashes(self):
+        ref = manifest_ref("test")
+        assert "/" in ref
+        assert "\\" not in ref
+
+
+# ---------------------------------------------------------------------------
+# write()
+# ---------------------------------------------------------------------------
+
+class TestWrite:
+    def test_writes_valid_json(self):
+        manifest = capture()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = os.path.join(tmpdir, "sub", "dir", "manifest.json")
+            write(manifest, path)
+            assert os.path.exists(path)
+            with open(path) as f:
+                loaded = json.load(f)
+            assert loaded == manifest
+
+    def test_creates_parent_directories(self):
+        manifest = {"test": True}
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = os.path.join(tmpdir, "a", "b", "c", "manifest.json")
+            write(manifest, path)
+            assert os.path.exists(path)
+
+    def test_json_has_trailing_newline(self):
+        manifest = {"test": True}
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = os.path.join(tmpdir, "manifest.json")
+            write(manifest, path)
+            with open(path) as f:
+                content = f.read()
+            assert content.endswith("\n")
+
+    def test_sorts_keys(self):
+        manifest = {"z_key": 1, "a_key": 2, "m_key": 3}
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = os.path.join(tmpdir, "manifest.json")
+            write(manifest, path)
+            with open(path) as f:
+                content = f.read()
+            # a_key should come before m_key before z_key
+            assert content.index("a_key") < content.index("m_key") < content.index("z_key")
+
+
+# ---------------------------------------------------------------------------
+# _default_run_id
+# ---------------------------------------------------------------------------
+
+class TestDefaultRunId:
+    def test_format_contains_hostname_timestamp_sha(self):
+        rid = _default_run_id()
+        # hostname_timestamp_sha — all three parts joined by _
+        parts = rid.split("_")
+        # hostname might contain hyphens but the parts are: host, timestamp, sha
+        assert len(parts) >= 3
+        # Last part is short git sha or "nogit"
+        last = parts[-1]
+        assert len(last) == 7  # 7-char short sha or "nogit"
+
+    def test_sanitizes_hostname(self):
+        """Hostname with special chars should be replaced with hyphens."""
+        # We can't control the hostname, but we can verify the ID is clean
+        rid = _default_run_id()
+        # Only alphanumerics, hyphens, dots, underscores
+        assert re.match(r"^[A-Za-z0-9._-]+$", rid), f"Unexpected chars in run_id: {rid}"
+
+
+Created tests/test_manifest.py (236 lines)Now let me verify the tests pass. Let me check if pytest is available, and run the manifest tests.
+  ────────────────────────────────────────
+  ▸ shell
+    command: PYTHONPATH=. python3 -m pytest tests/test_manifest.py -v 2>&1
+
+/usr/bin/python3: No module named pytest
+
+Command exited with code 1
+  ────────────────────────────────────────
+  ▸ shell
+    command: PYTHONPATH=. python3 -c "
+import tests.test_manifest as t
+import inspect, traceback
+
+# Find all test classes and methods
+test_classes = [(name, cls) for name, cls in inspect.getmembers(t, inspect.isclass) if name.startswith('Test')]
+passed = 0
+failed = 0
+errors = []
+for cls_name, cls in test_classes:
+    # Get setup_method if exists
+    instance = cls()
+    methods = [(name, method) for name, method in inspect.getmembers(instance, predicate=inspect.ismethod) if name.startswith('test_')]
+    for method_name, method in methods:
+        try:
+            # Call setup_method if it exists
+            if hasattr(instance, 'setup_method'):
+                instance.setup_method()
+            method()
+            passed += 1
+            print(f'  PASS {cls_name}.{method_name}')
+        except Exception as e:
+            failed += 1
+            errors.append(f'{cls_name}.{method_name}: {e}')
+            print(f'  FAIL {cls_name}.{method_name}: {e}')
+
+print(f'\n=== {passed} passed, {failed} failed ===')
+if errors:
+    print('\nFailures:')
+    for e in errors:
+        print(f'  {e}')
+" 2>&1
+
+Traceback (most recent call last):
+  File "<string>", line 2, in <module>
+    import tests.test_manifest as t
+  File "/home/r5/OrionsBelt/tests/test_manifest.py", line 19, in <module>
+    import pytest
+ModuleNotFoundError: No module named 'pytest'
+
+Command exited with code 1Need to remove the pytest import since it's not available on this device. The tests don't use any pytest-specific features.
+  ────────────────────────────────────────
+  ▸ edit
+    path tests/test_manifest.py
+    before: import pytest
+
+# Make bench/ importable when run from repo root or from tests/.
+    after: # Make bench/ importable when run from repo root or from tests/.
+
+Edited tests/test_manifest.py (3 lines -> 1 lines)
+  ────────────────────────────────────────
+  ▸ shell
+    command: PYTHONPATH=. python3 -c "
+import tests.test_manifest as t
+import inspect, traceback
+
+test_classes = [(name, cls) for name, cls in inspect.getmembers(t, inspect.isclass) if name.startswith('Test')]
+passed = 0
+failed = 0
+errors = []
+for cls_name, cls in test_classes:
+    instance = cls()
+    methods = [(name, method) for name, method in inspect.getmembers(instance, predicate=inspect.ismethod) if name.startswith('test_')]
+    for method_name, method in methods:
+        try:
+            if hasattr(instance, 'setup_method'):
+                instance.setup_method()
+            method()
+            passed += 1
+            print(f'  PASS {cls_name}.{method_name}')
+        except Exception as e:
+            failed += 1
+            errors.append(f'{cls_name}.{method_name}: {e}')
+            print(f'  FAIL {cls_name}.{method_name}: {e}')
+
+print(f'\n=== {passed} passed, {failed} failed ===')
+if errors:
+    for e in errors:
+        print(f'  {e}')
+" 2>&1
+
+  PASS TestCapture.test_has_cpu_topology_key
+  PASS TestCapture.test_has_git_block
+  PASS TestCapture.test_has_host_block
+  PASS TestCapture.test_has_isa_features_key
+  PASS TestCapture.test_has_memory_key
+  PASS TestCapture.test_has_run_id
+  PASS TestCapture.test_has_software_block
+  PASS TestCapture.test_has_thermal_zones_key
+  PASS TestCapture.test_has_timestamp
+  PASS TestCapture.test_is_json_serializable
+  PASS TestCapture.test_manifest_version
+  PASS TestCapture.test_returns_dict
+  PASS TestCaptureCallerFields.test_caller_fields_passed_through
+  PASS TestCaptureCallerFields.test_explicit_run_id_used
+  PASS TestDefaultRunId.test_format_contains_hostname_timestamp_sha
+  PASS TestDefaultRunId.test_sanitizes_hostname
+  PASS TestManifestRef.test_basic_format
+  PASS TestManifestRef.test_custom_dir
+  PASS TestManifestRef.test_uses_forward_slashes
+  PASS TestSafe.test_passes_args
+  PASS TestSafe.test_returns_none_on_exception
+  PASS TestSafe.test_returns_none_on_keyerror
+  PASS TestSafe.test_returns_value_on_success
+  PASS TestUtcTimestamp.test_ends_with_z
+  PASS TestUtcTimestamp.test_format_is_iso8601
+  PASS TestWrite.test_creates_parent_directories
+  PASS TestWrite.test_json_has_trailing_newline
+  PASS TestWrite.test_sorts_keys
+  PASS TestWrite.test_writes_valid_json
+
+=== 29 passed, 0 failed ===All 29 tests pass. Let me also verify the existing schema conformance tests still work, then commit.
+  ────────────────────────────────────────
+  ▸ shell
+    command: PYTHONPATH=. python3 -c "
+import tests.test_schema_conformance as t
+import inspect
+
+test_classes = [(name, cls) for name, cls in inspect.getmembers(t, inspect.isclass) if name.startswith('Test')]
+# Also check module-level test functions
+test_funcs = [(name, fn) for name, fn in inspect.getmembers(t, inspect.isfunction) if name.startswith('test_')]
+passed = 0
+failed = 0
+for name, fn in test_funcs:
+    try:
+        fn()
+        passed += 1
+        print(f'  PASS {name}')
+    except Exception as e:
+        failed += 1
+        print(f'  FAIL {name}: {e}')
+
+# Test class methods (test_schema_conformance uses module-level functions)
+print(f'\n=== {passed} passed, {failed} failed ===')
+" 2>&1
+
+  PASS test_csv_header_from_existing_results
+  PASS test_device_enum_values
+  PASS test_engine_enum_values
+  PASS test_memory_component_enum_values
+  PASS test_metric_name_enum_values
+  PASS test_phase_enum_values
+
+=== 6 passed, 0 failed ===All tests green. Let me commit and push this work.
+  ────────────────────────────────────────
+  ▸ shell
+    command: git add tests/test_manifest.py && git commit -m "j1: manifest capture tests for ob-1lm (29 tests, all pass)" 2>&1
+
+[bench/j1 d947eb3] j1: manifest capture tests for ob-1lm (29 tests, all pass)
+ 1 file changed, 234 insertions(+)
+ create mode 100644 tests/test_manifest.py
+  ────────────────────────────────────────
+  ▸ shell
+    command: git push origin bench/j1 2>&1
+
+To https://github.com/alexcasper/OrionsBelt.git
+   db58e90..d947eb3  bench/j1 -> bench/j1Good, manifest tests are pushed. Let me continue the loop — export beads, sync, and look for more work.
+  ────────────────────────────────────────
+  ▸ shell
+    command: bd export -o .beads/issues.jsonl 2>&1 && git add .beads/issues.jsonl && git commit -m "beads: export after manifest tests" 2>&1 && git push origin bench/j1 2>&1
+
+Exported 101 issues to .beads/issues.jsonl
+[bench/j1 68a6994] beads: export after manifest tests
+ 1 file changed, 7 insertions(+), 7 deletions(-)
+To https://github.com/alexcasper/OrionsBelt.git
+   d947eb3..68a6994  bench/j1 -> bench/j1Ran into this error: Rate limit exceeded: [1308][Usage limit reached for 5 hour. Your limit will reset at 2026-08-03 22:22:17][20260803175741491e2d1653884f40].
+
+Please retry if you think this is a transient or recoverable error.
