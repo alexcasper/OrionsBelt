@@ -60,15 +60,23 @@ taskset -c 0-3 /tmp/bench_gdn_rk3588_a55 --repeats 30 --csv > bench_rk3588_littl
 
 ## 2. Capture provenance
 
-A number without a manifest is not a result (`PLAN.md` §9). If the device has Python 3:
+A number without a manifest is not a result (`PLAN.md` §9). If the device has Python 3.10+:
 
 ```bash
 scp bench/manifest.py <device>:/tmp/
 ssh <device> 'python3 /tmp/manifest.py' > results/manifests/<device>.json
 ```
 
-It is stdlib-only and degrades gracefully, so it will not fail on a minimal image. If there is no
-Python at all, capture the equivalent by hand:
+It is stdlib-only and degrades gracefully, so it will not fail on a minimal image.
+If the device has Python < 3.10 (e.g. Jetson Nano's 3.6.9), use the shell-based
+alternative instead — same fields, no Python dependency:
+
+```bash
+scp scripts/capture_manifest.sh <device>:/tmp/
+ssh <device> 'bash /tmp/capture_manifest.sh' > results/manifests/<device>.json
+```
+
+If there is no Python at all and no bash, capture the equivalent by hand:
 
 ```bash
 uname -a ; cat /proc/cpuinfo | head -30 ; free -m
