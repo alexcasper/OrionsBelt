@@ -1,0 +1,7 @@
+sustained_model,sustained_kernel,dispatch_path,elapsed_s,throughput_gibs,thermal_c,vs_first_pct
+Qwen3.5-4B,gdn_gated_scan,neon,5.0,1.03,52.5,0.0
+Qwen3.5-4B,gdn_gated_scan,neon,10.0,1.03,52.5,0.3
+Qwen3.5-4B,gdn_gated_scan,neon,15.0,1.03,52.5,0.1
+Qwen3.5-4B,gdn_gated_scan,neon,20.0,1.03,53.0,-0.4
+Qwen3.5-4B,gdn_gated_scan,neon,25.0,1.03,53.0,-0.1
+Qwen3.5-4B,gdn_gated_scan,neon,30.0,1.03,53.0,0.0

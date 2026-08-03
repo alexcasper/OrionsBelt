@@ -659,44 +659,66 @@ trade-off, not to suggest it as a recommended setting.
 
 Benchmark data from the device fleet (bead ob-8ms.3, ob-c9q):
 
-| Device | Core | Clock | Spec BW | Scan kernel (4B) | % of spec |
-|---|---|---|---:|---:|---:|
-| Jetson Nano | A57 | 1.48 GHz | 25.6 GB/s | 0.72 GiB/s | **3.0%** |
-| Raspberry Pi 5 | A76 | 2.40 GHz | 17.0 GB/s | 1.84 GiB/s | 11.6% |
-| RK3588 (big) | A76 | 2.40 GHz | 34.0 GB/s | 3.29 GiB/s | 10.4% |
+Every `gdn_gated_scan` figure below is 4B, seq=64, NEON, single-threaded, with
+the source commit from the run's manifest — because the commit turns out to
+matter more than anything else here.
 
-**Finding: the bandwidth-bound thesis holds within a core class and fails
-across core classes.** These are two distinct results and the fleet separates
-them, which is exactly what a three-point bandwidth axis was for.
+| Device | Core | Spec BW | Scan (GiB/s) | Commit | Host |
+|---|---|---:|---:|---|---|
+| Jetson Nano | A57 | 25.6 GB/s | 0.72 | `2c9ac9f` | j1 |
+| Jetson Nano | A57 | 25.6 GB/s | 1.13 | (j2 single) | j2 |
+| Raspberry Pi 5 | A76 | 17.0 GB/s | 1.20 | `28729f3` | r5 |
+| Raspberry Pi 5 | A76 | 17.0 GB/s | 1.84 | `f127a11` | r5 |
+| RK3588 big | A76 | 34.0 GB/s | 1.96 | `28729f3` | t3 |
+| RK3588 big | A76 | 34.0 GB/s | 3.29 | `28729f3` | t4 |
 
-*Within the A76 class it holds.* The Pi 5 and RK3588 big cluster are the same
-core at the same clock and differ almost only in memory system. Spec bandwidth
-2.00× (17.0 → 34.0 GB/s) yields 1.79× achieved throughput (1.84 → 3.29 GiB/s),
-and both land at ~11% of spec. Throughput tracks bandwidth and the residual is
-small.
+**Finding 1 — the pure bandwidth-bound thesis is incomplete at this working
+set.** [ADR 0005](./adr/0005-device-fleet-and-bandwidth-study.md) and
+[`DEVICE_RUNBOOK.md`](./DEVICE_RUNBOOK.md) set the discriminator in advance: the
+Jetson has the **oldest** cores but **more** spec bandwidth than the Pi 5, so a
+purely bandwidth-bound kernel should put the Jetson ahead, and a comfortable Pi 5
+win means the thesis is "wrong or incomplete." **The Pi 5 wins on every available
+pairing**, on all three kernels, with 33% less spec bandwidth. That conclusion
+survives every confound below, so it is the one result here to rely on.
 
-*Across core classes it fails, and this was the designed discriminator.*
-[ADR 0005](./adr/0005-device-fleet-and-bandwidth-study.md) and
-[`DEVICE_RUNBOOK.md`](./DEVICE_RUNBOOK.md) set this up in advance: the Jetson has
-the **oldest** cores but **more** spec bandwidth than the Pi 5, so if the kernel
-were purely bandwidth-bound the Jetson should win. It has **1.51×** the Pi 5's
-spec bandwidth and reaches **0.39×** its throughput — a 3.9× miss against
-prediction, at 3.0% of spec where both A76 parts reach ~11%.
+The mechanism is a working-set effect, and
+[`fleet_bandwidth_scaling.md`](../results/figures/fleet_bandwidth_scaling.md) has
+it right: at seq=64 × 4096 channels the state is ~1 MiB, small enough to be
+L2/L3-resident, so this is not primarily a DRAM test. Core microarchitecture —
+IPC, out-of-order depth, and the A76's ~1.6× clock — dominates. Arithmetic
+intensity of ~0.25 FLOP/byte sets a bandwidth *ceiling*; it does not make a
+core able to reach it.
 
-So on the A57 the bottleneck is **the core, not the memory system**. The runbook
-committed in advance to reporting whichever way this went and to treating a
-comfortable Pi 5 win as the thesis being "wrong or incomplete." It is
-incomplete: arithmetic intensity of ~0.25 FLOP/byte sets a bandwidth *ceiling*,
-but a core has to be able to reach it, and the A57 — in-order-ish, narrower
-NEON, no dotprod, 1.48 GHz — cannot issue loads fast enough to saturate its own
-LPDDR4.
+**Finding 2 — the run-to-run spread is larger than the cross-device effects,
+so no quantitative scaling slope is supportable yet.** This is a measurement
+result, not a hardware one, and it constrains what the rest of the fleet data
+can be used for:
 
-**Consequence for the O6 prediction.** Do not fit all three points and
-extrapolate to 100 GB/s: that fit would be dominated by an outlier that is
-core-bound rather than bandwidth-bound. Extrapolate from the **A76 pair only**,
-which is also the defensible choice on architectural grounds, since the O6's
-Cortex-A720 is A76-class or better. The A57 point stays in the record as the
-boundary condition showing where the thesis stops applying.
+- **`t3` and `t4` are the same commit `28729f3` on the same core class and
+  differ 1.68×** (1.96 vs 3.29 GiB/s). Same code, so this is environment —
+  different physical boards, cluster pinning, governor, or thermal state. It is
+  not explained anywhere in the fleet data.
+- **`pi5-r5` and `pi5-j1` are the same physical board** (identical hostname and
+  `Raspberry Pi 5 Model B Rev 1.0`) at different commits, and differ 1.53×
+  (1.20 → 1.84). That gap is plausibly a real optimization gain, but nothing
+  currently separates it from the same environmental variance seen on t3/t4.
+- No commit-matched measurement covers the Jetson **and** an A76 device, so the
+  headline Jetson-versus-Pi 5 comparison is itself cross-commit. It survives only
+  because the effect is large relative to the spread.
+
+An earlier version of this section reported per-device "% of spec bandwidth"
+figures and a 1.79×-throughput-for-2.00×-bandwidth fit across the A76 pair. Both
+are withdrawn: they mixed `f127a11` Pi 5 data with `28729f3` RK3588 data, and
+picking the other same-commit RK3588 host would have given 1.63× instead of
+2.74× from identical hardware. A slope that moves that much on host selection is
+not a measurement.
+
+**Consequence for the O6 prediction.** Any extrapolation to the O6's ~93–100
+GB/s must be published as an order-of-magnitude estimate with the spread above
+attached, not as a fitted line. Fitting all points would in any case be
+dominated by devices that are not bandwidth-bound at this working set. Closing
+this out needs one commit-matched sweep across all devices with pinning,
+governor, and thermal state recorded — tracked as a follow-up bead.
 
 **Decode (seq=1) on Jetson A57:** the cumdecay kernel reports 4.65 GiB/s at
 seq=1 against 1.16 GiB/s at seq=64 — 4.0× — because the single-token step is
