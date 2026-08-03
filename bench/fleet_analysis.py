@@ -641,6 +641,19 @@ def generate_report(output_path):
     lines.append("NEON double-width unrolling, bf16 conversion vectorization). This shows")
     lines.append("the real-world impact of the optimization track (beads ob-8qt.5/6/7):")
     lines.append("")
+    # Flag it rather than quietly publishing it: the OpenMP CSV has no manifest on any
+    # branch, so under PLAN.md section 9 these speedups are indicative, not results.
+    opt_manifest = os.path.join(
+        MANIFEST_DIR, os.path.basename(J2_OPTIMIZED_CSV).replace(".csv", ".json")
+    )
+    if not os.path.exists(opt_manifest):
+        lines.append(
+            f"> ⚠ **No provenance.** `{os.path.basename(J2_OPTIMIZED_CSV)}` has no manifest on "
+            "any branch, so the speedups below cannot be tied to a specific build or device "
+            "state. PLAN.md section 9: a number without a manifest is not a result. Treat these "
+            "as indicative and re-capture with `bench/manifest.py` alongside the run."
+        )
+        lines.append("")
     lines.append(
         "| Kernel (4B, seq=64) | Single-thread (GiB/s) | 4-core OpenMP (GiB/s) | Speedup |"
     )
