@@ -142,23 +142,128 @@ static double flops_per_call(kernel_id k, size_t seq, size_t ch) {
     return 0.0;
 }
 
+/* ---- Sustained-load mode (ob-mrd.2, ported from j1) ----
+ * Runs gdn_gated_scan on the largest config continuously for N seconds,
+ * sampling throughput and CPU temperature every ~5 seconds to reveal
+ * thermal throttling.  PLAN.md risk R7: burst numbers that cannot be
+ * sustained are misleading on passively-cooled edge hardware. */
+
+static double read_thermal_millideg(void) {
+    FILE *f = fopen("/sys/class/thermal/thermal_zone0/temp", "r");
+    if (!f) return -1.0;
+    double val = -1.0;
+    if (fscanf(f, "%lf", &val) != 1) val = -1.0;
+    fclose(f);
+    return val;                       /* millidegrees Celsius, or -1 */
+}
+
+static void run_sustained(int seconds, int csv_mode) {
+    /* Heaviest workload: Qwen3.5-4B gated_scan at seq=64 */
+    size_t seq = 64, ch = 32 * 128, n = seq * ch;
+
+    float *g  = malloc(n * sizeof(float));
+    float *x  = malloc(n * sizeof(float));
+    float *o  = malloc(n * sizeof(float));
+    float *st = malloc(ch * sizeof(float));
+    if (!g || !x || !o || !st) {
+        fprintf(stderr, "sustained: allocation failed\n");
+        return;
+    }
+    for (size_t i = 0; i < n; ++i) {
+        g[i] = 0.50f + 0.40f * (float)((i * 40503u) % 1000) / 1000.0f;
+        x[i] = (float)((i * 69069u) % 2000) / 1000.0f - 1.0f;
+    }
+    for (size_t i = 0; i < ch; ++i) st[i] = 0.0f;
+
+    double bpc = bytes_per_call(K_SCAN, seq, ch);
+    double sample_int = 5.0;          /* seconds between samples */
+    double t0 = now_s();
+    double deadline = t0 + (double)seconds;
+    double next_sample = t0 + sample_int;
+    long calls_in_window = 0;
+    double window_start = t0;
+    double first_window_gibs = 0.0;
+    int window_idx = 0;
+
+    if (!csv_mode) {
+        printf("Sustained-load: gdn_gated_scan, Qwen3.5-4B (seq=64), %d seconds\n", seconds);
+        printf("  dispatch path: %s\n\n", DISPATCH_PATH);
+        printf("  elapsed  throughput   thermal   vs_first\n");
+        printf("   (sec)    (GiB/s)     (C)        (%%)\n");
+        printf("  ------  ---------   --------   -------\n");
+    } else {
+        printf("sustained_model,sustained_kernel,dispatch_path,elapsed_s,"
+               "throughput_gibs,thermal_c,vs_first_pct\n");
+    }
+
+    while (now_s() < deadline) {
+        gdn_gated_scan_f32(g, x, o, st, seq, ch);
+        calls_in_window++;
+
+        double now = now_s();
+        if (now >= next_sample) {
+            double dt = now - window_start;
+            double avg_s = calls_in_window > 0 ? dt / (double)calls_in_window : dt;
+            double gibs = bpc / avg_s / 1073741824.0;
+            double temp = read_thermal_millideg();
+            if (temp >= 0.0) temp /= 1000.0;
+            double vs_first = 0.0;
+            if (window_idx == 0) first_window_gibs = gibs;
+            if (first_window_gibs > 0.0)
+                vs_first = (gibs - first_window_gibs) / first_window_gibs * 100.0;
+
+            if (csv_mode) {
+                printf("Qwen3.5-4B,gdn_gated_scan,%s,%.1f,%.2f,%.1f,%.1f\n",
+                       DISPATCH_PATH, now - t0, gibs, temp, vs_first);
+            } else {
+                printf("  %6.1f   %8.2f   %7.1f   %+6.1f\n",
+                       now - t0, gibs, temp, vs_first);
+            }
+            fflush(stdout);
+            calls_in_window = 0;
+            window_start = now;
+            next_sample += sample_int;
+            window_idx++;
+        }
+    }
+
+    if (!csv_mode && window_idx > 1) {
+        printf("\n  Burst throughput (first 5 s): %.2f GiB/s\n", first_window_gibs);
+        printf("  Steady-state visible in throughput column — look for decay.\n");
+    }
+
+    free(g); free(x); free(o); free(st);
+}
+
 int main(int argc, char **argv) {
-    int csv = 0, repeats = 15;
+    int csv = 0, repeats = 15, sustained = 0;
     for (int i = 1; i < argc; ++i) {
         if (!strcmp(argv[i], "--csv")) csv = 1;
         else if (!strcmp(argv[i], "--repeats") && i + 1 < argc) repeats = atoi(argv[++i]);
+        else if (!strcmp(argv[i], "--sustained") && i + 1 < argc) sustained = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--help")) {
-            printf("usage: %s [--csv] [--repeats N]\n", argv[0]);
+            printf("usage: %s [--csv] [--repeats N] [--sustained SECONDS]\n", argv[0]);
+            printf("\n  --sustained N   Run gdn_gated_scan for N seconds, sampling\n");
+            printf("                  throughput and thermal every 5 s to reveal throttling.\n");
             return 0;
         }
     }
     if (repeats < 5) repeats = 5;            /* docs/METRICS.md: never report N<5 */
     if (repeats > MAX_REPEATS) repeats = MAX_REPEATS;
 
+    /* Sustained-load mode: separate code path from the burst benchmark. */
+    if (sustained > 0) {
+        run_sustained(sustained, csv);
+        return 0;
+    }
+
     /* Verified Qwen3.5 shapes (ADR 0003). channels = n_value_heads * head_dim. */
     struct { const char *model; size_t seq, ch, gdn_layers; } cfgs[] = {
         {"Qwen3.5-4B", 64, 32 * 128, 24},
         {"Qwen3.5-0.8B", 64, 16 * 128, 18},
+        /* Decode (seq=1): state I/O is ~40% of traffic — where narrowing helps */
+        {"Qwen3.5-4B_decode", 1, 32 * 128, 24},
+        {"Qwen3.5-0.8B_decode", 1, 16 * 128, 18},
     };
     const int n_cfg = (int)(sizeof(cfgs) / sizeof(cfgs[0]));
 
