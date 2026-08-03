@@ -18,6 +18,7 @@ Usage::
 
 import argparse
 import csv
+import json
 import os
 
 # ---------------------------------------------------------------------------
@@ -28,20 +29,28 @@ import os
 DEVICES = [
     # (display_name, csv_path, spec_gibs, cores, isa_generation)
     # Fleet comparison uses single-threaded data for fair cross-device comparison.
-    # All fleet devices (Pi5, RK3588, j1, j2) were captured at commit 28729f3 with
-    # no OpenMP pragmas in the kernel code. j2_single.csv is a fresh single-threaded
-    # run with the current binary (OMP_NUM_THREADS=1) to match that optimization level.
+    # Pi5 and RK3588 were captured at commit 28729f3; the Jetsons at later commits.
+    # That mismatch, plus the fact that every manifest records a dirty tree, is why
+    # the provenance audit below limits this table to qualitative conclusions.
+    #
+    # RK3588 rows use host t4, not t3, on MEASUREMENT QUALITY grounds. On the scan
+    # kernel t3 reports p50 1514us against p95 3832us -- a 153% spread, where the
+    # DEVICE_RUNBOOK calls anything over ~10% suspect and tells you to suspect
+    # throttling first. t4's same-commit run is 17.4%. The apparent 1.68x
+    # "disagreement" between the two hosts was never two valid measurements
+    # disagreeing; t3's run is contaminated. Same story on the little cluster
+    # (t3 29.3% vs t4 12.1%).
     ("Pi 5", "results/raw/pi5-r5.csv", 17.0, "4x Cortex-A76 @ 2.4 GHz", "Armv8.2-A + dotprod"),
     (
         "RK3588 big",
-        "results/raw/rk3588-t3_big.csv",
+        "results/raw/rk3588-t4_big.csv",
         34.0,
         "4x Cortex-A76 @ 2.4 GHz",
         "Armv8.2-A + dotprod",
     ),
     (
         "RK3588 little",
-        "results/raw/rk3588-t3_little.csv",
+        "results/raw/rk3588-t4_little.csv",
         34.0,
         "4x Cortex-A55 @ 1.8 GHz",
         "Armv8.2-A",
@@ -55,7 +64,11 @@ DEVICES = [
     ),
     (
         "Jetson j2",
-        "results/raw/jetson-j2_single.csv",
+        # Was jetson-j2_single.csv (scan 1.13), which has NO manifest — and PLAN.md
+        # section 9 says a number without a manifest is not a result. j2's canonical
+        # single-threaded run is manifest-backed (sha 6ea1771) and reads 0.73, which
+        # agrees with j1's 0.72 to ~1%. The unprovenanced file was the outlier.
+        "results/raw/jetson-j2.csv",
         25.6,
         "4x Cortex-A57 @ 1.48 GHz",
         "Armv8.0-A (NEON only)",
@@ -63,7 +76,10 @@ DEVICES = [
 ]
 
 # Optimized j2 data (OpenMP 4-core + NEON double-width unrolling + bf16 vectorization)
-J2_OPTIMIZED_CSV = "results/raw/jetson-j2.csv"
+# jetson-j2.csv became the single-threaded canonical run upstream, so the OpenMP
+# data moved to its own file. Leaving this pointing at jetson-j2.csv would silently
+# make the optimization-impact table compare single-threaded against itself.
+J2_OPTIMIZED_CSV = "results/raw/jetson-j2-omp-full.csv"
 
 # Devices measured more than once. The DEVICES table above picks ONE run per
 # device, which hides how far the replicates disagree — and on this fleet the
@@ -96,7 +112,39 @@ REPLICATES = [
             ("j1", "results/raw/pi5-j1.csv"),
         ],
     ),
+    (
+        "Jetson j2",
+        "same board, both single-threaded; the 1.13 run has **no manifest**",
+        [
+            ("canonical", "results/raw/jetson-j2.csv"),
+            ("_single", "results/raw/jetson-j2_single.csv"),
+        ],
+    ),
 ]
+
+# Where to look for each run's provenance. A manifest recording dirty=true means
+# its git SHA does NOT identify the code that produced the numbers, which
+# invalidates any "same commit, so the cause must be environmental" reasoning
+# about the replicate spreads above.
+MANIFEST_DIR = "results/manifests"
+
+# DEVICE_RUNBOOK: "spread_pct ... should be <10% for a clean run", and "if p95 is far
+# above p50, suspect throttling first". Rows above this are reported inline so a noisy
+# measurement cannot be quoted as a clean one — which is how a 153%-spread number
+# ended up anchoring the O6 prediction.
+SPREAD_WARN_PCT = 10.0
+
+
+def get_spread(rows, model, kernel):
+    """Return spread_pct for a specific model+kernel, or None."""
+    for r in rows:
+        if r["model"] == model and r["kernel"] == kernel:
+            try:
+                return float(r["spread_pct"])
+            except (KeyError, ValueError):
+                return None
+    return None
+
 
 O6_SPEC_GIBS = 93.1  # 100 GB/s ÷ 1.0737
 
@@ -247,6 +295,65 @@ def plot_cross_device(device_data, output_path):
     return True
 
 
+def _provenance_audit_lines():
+    """Report how many replicate runs were captured from a dirty working tree.
+
+    This is the caveat that limits the replicate-spread analysis above. A manifest
+    with ``dirty: true`` means the recorded SHA does not identify the code that ran,
+    so two runs labelled with the same commit may have executed different binaries
+    — which is why the RK3588 gap cannot be pinned on environment.
+    """
+    dirty, clean, missing = [], [], []
+    for _cls, _note, runs in REPLICATES:
+        for _label, path in runs:
+            base = os.path.basename(path).replace(".csv", "")
+            candidates = [os.path.join(MANIFEST_DIR, base + ".json")]
+            # One manifest covers both clusters of an asymmetric board
+            # (rk3588-t3_big and _little both map to rk3588-t3.json). Restrict the
+            # fallback to those suffixes: a blanket split on "_" would map
+            # jetson-j2_single onto jetson-j2.json and silently invent provenance
+            # for a run that has none, which is exactly what this audit exists to
+            # catch.
+            for suffix in ("_big", "_little"):
+                if base.endswith(suffix):
+                    candidates.append(os.path.join(MANIFEST_DIR, base[: -len(suffix)] + ".json"))
+            path_found = next((c for c in candidates if os.path.exists(c)), None)
+            if path_found is None:
+                missing.append(base)
+                continue
+            try:
+                with open(path_found) as fh:
+                    meta = json.load(fh)
+            except (OSError, ValueError):
+                missing.append(base)
+                continue
+            (dirty if meta.get("git", {}).get("dirty") else clean).append(base)
+
+    out = ["### Provenance audit: were these runs captured from a clean tree?", ""]
+    out.append(
+        f"Of the {len(dirty) + len(clean)} replicate runs with a manifest, "
+        f"**{len(dirty)} recorded `dirty: true`** at capture time and {len(clean)} recorded a "
+        "clean tree."
+    )
+    if missing:
+        out.append("")
+        out.append(
+            f"**{len(missing)} have no manifest at all** ({', '.join(sorted(set(missing)))}) — "
+            "PLAN.md section 9: a number without a manifest is not a result."
+        )
+    out.append("")
+    out.append(
+        "This limits the section above more than the spread itself does. `dirty: true` means the "
+        "recorded SHA does **not** identify the code that produced the numbers, so two runs "
+        "labelled with the same commit may have executed genuinely different binaries. The "
+        "RK3588 gap therefore cannot be attributed to environment rather than to code — both "
+        "explanations stay open and neither is settleable from the committed data. Any re-run "
+        "for `ob-bf7` must be taken from a clean tree."
+    )
+    out.append("")
+    return out
+
+
 def generate_report(output_path):
     """Generate the full fleet bandwidth-scaling markdown report."""
     lines = []
@@ -272,7 +379,7 @@ def generate_report(output_path):
     lines.append("")
     lines.append("| Device | Cores | ISA | Spec BW (GiB/s) |")
     lines.append("|--------|-------|-----|-----------------|")
-    for name, _, spec, cores, _isa in DEVICES:
+    for name, _, spec, cores, isa in DEVICES:
         lines.append(f"| {name} | {cores} | {isa} | {spec:.1f} |")
     lines.append(
         f"| **Orion O6** | 4x A720 big + 4x A720 mid + 4x A520 | Armv9.2-A | **{O6_SPEC_GIBS:.1f}** |"
@@ -293,23 +400,48 @@ def generate_report(output_path):
         model_label = "4B" if "4B" in model else "0.8B"
         lines.append(f"### {model_label} model")
         lines.append("")
-        lines.append("| Device | Spec (GiB/s) | CumDecay | Scan | DWConv1D | Scan/Spec |")
-        lines.append("|--------|-------------|----------|------|----------|-----------|")
+        lines.append(
+            "| Device | Spec (GiB/s) | CumDecay | Scan | DWConv1D | Scan/Spec | Scan spread |"
+        )
+        lines.append(
+            "|--------|-------------|----------|------|----------|-----------|-------------|"
+        )
 
+        noisy = []
         for name, _, spec, _, _ in DEVICES:
             d = device_data[name]
             cd = get_gibs(d["rows"], model, "gdn_cumdecay")
             sc = get_gibs(d["rows"], model, "gdn_gated_scan")
             dw = get_gibs(d["rows"], model, "gdn_causal_dwconv1d")
+            sp = get_spread(d["rows"], model, "gdn_gated_scan")
 
             cd_s = f"{cd:.2f}" if cd else "—"
             sc_s = f"{sc:.2f}" if sc else "—"
             dw_s = f"{dw:.2f}" if dw else "—"
             util = f"{sc / spec * 100:.1f}%" if sc else "—"
+            # Quote the spread next to every headline number. A figure with a huge
+            # p95/p50 gap is not comparable to a clean one, and burying that in the
+            # raw CSV is how a 153%-spread row came to anchor the O6 prediction.
+            if sp is None:
+                sp_s = "—"
+            elif sp > SPREAD_WARN_PCT:
+                sp_s = f"**{sp:.1f}%** ⚠"
+                noisy.append((name, sp))
+            else:
+                sp_s = f"{sp:.1f}%"
 
-            lines.append(f"| {name} | {spec:.1f} | {cd_s} | {sc_s} | {dw_s} | {util} |")
+            lines.append(f"| {name} | {spec:.1f} | {cd_s} | {sc_s} | {dw_s} | {util} | {sp_s} |")
 
         lines.append("")
+        if noisy:
+            worst_name, worst_sp = max(noisy, key=lambda t: t[1])
+            lines.append(
+                f"⚠ {len(noisy)} of {len(DEVICES)} scan rows exceed the DEVICE_RUNBOOK's "
+                f"~{SPREAD_WARN_PCT:.0f}% cleanliness threshold, worst {worst_name} at "
+                f"{worst_sp:.1f}%. The runbook says to suspect thermal throttling first. "
+                "Treat flagged rows as indicative only."
+            )
+            lines.append("")
 
     # ---- Discriminating test ----
     lines.append("## The discriminating test: Jetson (A57, more BW) vs Pi 5 (A76, less BW)")
@@ -392,12 +524,14 @@ def generate_report(output_path):
         lines.append("")
         worst = max(spread_ratios)
         lines.append(
-            "The RK3588 pair is the serious one: **identical source commit**, so the cause is "
-            "environmental — different boards, cluster pinning, governor, or thermal state — "
-            "and none of that is recorded per run. Worst replicate spread on the fleet is "
-            f"**{worst:.2f}x**."
+            "The RK3588 pair looks like the serious one: **identical source commit**, which "
+            "would make the cause purely environmental — different boards, cluster pinning, "
+            "governor or thermal state, none of it recorded per run. But that inference does "
+            "not actually hold; see the provenance audit below. Worst replicate spread on the "
+            f"fleet is **{worst:.2f}x**."
         )
         lines.append("")
+        lines.extend(_provenance_audit_lines())
         lines.append(
             "This report selects `t3` for RK3588 and `r5` for the Pi 5. Selecting the other"
         )
@@ -468,21 +602,32 @@ def generate_report(output_path):
         # Carry the replicate spread into the published range. Anchoring on the other
         # same-commit RK3588 host moves this as much as the IPC assumption does, so a
         # range that ignores it would overstate the precision.
-        rk_alt = get_gibs(
-            load_device_csv("results/raw/rk3588-t4_big.csv"), "Qwen3.5-4B", "gdn_gated_scan"
-        )
-        if rk_alt:
-            alt_low, alt_high = rk_alt * 1.5, rk_alt * 2.5
+        # The rejected anchor, shown explicitly so the choice is auditable rather than
+        # buried in a source comment.
+        rk_rejected_rows = load_device_csv("results/raw/rk3588-t3_big.csv")
+        rk_rejected = get_gibs(rk_rejected_rows, "Qwen3.5-4B", "gdn_gated_scan")
+        rk_rejected_spread = get_spread(rk_rejected_rows, "Qwen3.5-4B", "gdn_gated_scan")
+        if rk_rejected and rk_rejected_spread:
+            rej_low, rej_high = rk_rejected * 1.5, rk_rejected * 2.5
             lines.append(
-                "Carrying the replicate spread through: anchoring on the other same-commit "
-                f"RK3588 host ({rk_alt:.2f} GiB/s rather than {rk_big_scan:.2f}) gives "
-                f"**{alt_low:.1f}-{alt_high:.1f} GiB/s** instead."
+                f"**On the anchor choice.** The other same-commit RK3588 host reports "
+                f"{rk_rejected:.2f} GiB/s, which would give {rej_low:.1f}-{rej_high:.1f} GiB/s "
+                f"instead. That run is **not** used: its spread is "
+                f"{rk_rejected_spread:.0f}% (p50 vs p95), against "
+                f"{get_spread(device_data['RK3588 big']['rows'], 'Qwen3.5-4B', 'gdn_gated_scan'):.0f}% "
+                "for the run above. The DEVICE_RUNBOOK treats anything past "
+                f"~{SPREAD_WARN_PCT:.0f}% as suspect and says to suspect throttling first, so "
+                "this is a quality judgement, not a convenient pick — and it is why the earlier "
+                'framing of a 1.68x host "disagreement" was wrong. One of the two runs is '
+                "simply contaminated."
             )
             lines.append("")
             lines.append(
-                f"So the defensible published claim is **~{min(conservative_low, alt_low):.0f}-{max(conservative_high, alt_high):.0f} GiB/s**, and the *anchor "
-                "choice* — not the IPC assumption — is the dominant uncertainty. Resolving "
-                "`ob-bf7` narrows this more than any modelling refinement would."
+                f"Published claim: **~{conservative_low:.0f}-{conservative_high:.0f} GiB/s**. The "
+                "dominant uncertainty is the IPC/clock assumption, plus the fact that every "
+                "manifest on the fleet records a dirty tree (see the provenance audit). "
+                "Resolving `ob-bf7` — one clean-tree, commit-matched sweep with pinning and "
+                "thermals recorded — narrows this more than any modelling refinement would."
             )
             lines.append("")
         lines.append("To check this prediction: if the O6 board arrives, run")

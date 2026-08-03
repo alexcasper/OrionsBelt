@@ -28,17 +28,35 @@ import sys
 # ---------------------------------------------------------------------------
 
 STANDARD_COLS = [
-    "model", "kernel", "dispatch_path", "seq", "channels", "repeats",
-    "p50_us", "p95_us", "spread_pct", "gib_per_s_p50", "gflop_per_s_p50",
+    "model",
+    "kernel",
+    "dispatch_path",
+    "seq",
+    "channels",
+    "repeats",
+    "p50_us",
+    "p95_us",
+    "spread_pct",
+    "gib_per_s_p50",
+    "gflop_per_s_p50",
 ]
 
 SUSTAINED_COLS = [
-    "sustained_model", "sustained_kernel", "dispatch_path",
-    "elapsed_s", "throughput_gibs", "thermal_c", "vs_first_pct",
+    "sustained_model",
+    "sustained_kernel",
+    "dispatch_path",
+    "elapsed_s",
+    "throughput_gibs",
+    "thermal_c",
+    "vs_first_pct",
 ]
 
 POWER_COLS = [
-    "timestamp_ms", "power_in_mw", "power_gpu_mw", "power_cpu_mw", "temp_milliC",
+    "timestamp_ms",
+    "power_in_mw",
+    "power_gpu_mw",
+    "power_cpu_mw",
+    "temp_milliC",
 ]
 
 # Device spec bandwidth (GiB/s) for sanity-check upper bounds.
@@ -79,7 +97,8 @@ def expected_columns(csv_type):
 # Checks
 # ---------------------------------------------------------------------------
 
-class Issue(object):
+
+class Issue:
     """A single validation issue."""
 
     def __init__(self, severity, csv_name, message):
@@ -88,16 +107,20 @@ class Issue(object):
         self.message = message
 
     def __str__(self):
-        return "  {:s}: {:s} -- {:s}".format(self.severity, self.csv_name, self.message)
+        return f"  {self.severity:s}: {self.csv_name:s} -- {self.message:s}"
 
 
 def get_git_head_sha():
     """Return current HEAD sha, or None if not in a git repo."""
     try:
-        result = subprocess.check_output(
-            ["git", "rev-parse", "HEAD"],
-            stderr=subprocess.DEVNULL,
-        ).decode().strip()
+        result = (
+            subprocess.check_output(
+                ["git", "rev-parse", "HEAD"],
+                stderr=subprocess.DEVNULL,
+            )
+            .decode()
+            .strip()
+        )
         return result
     except Exception:
         return None
@@ -148,40 +171,38 @@ def validate_standard_row(row, csv_name, issues, row_num):
         p95 = float(row["p95_us"])
         spread = float(row["spread_pct"])
         gib = float(row["gib_per_s_p50"])
-        gflop = float(row["gflop_per_s_p50"])
-        seq = int(row["seq"])
         repeats = int(row["repeats"])
+        # Parsed but not otherwise inspected: the conversion itself is the check,
+        # so a malformed value lands in the except below as a parse error.
+        float(row["gflop_per_s_p50"])
+        int(row["seq"])
     except (ValueError, KeyError) as e:
-        issues.append(Issue("ERROR", csv_name,
-                            "row {}: cannot parse numeric fields: {}".format(row_num, e)))
+        issues.append(Issue("ERROR", csv_name, f"row {row_num}: cannot parse numeric fields: {e}"))
         return
 
     # Negative latency
     if p50 <= 0 or p95 <= 0:
-        issues.append(Issue("ERROR", csv_name,
-                            "row {}: non-positive latency (p50={}, p95={})".format(
-                                row_num, p50, p95)))
+        issues.append(
+            Issue("ERROR", csv_name, f"row {row_num}: non-positive latency (p50={p50}, p95={p95})")
+        )
 
     # p95 < p50 is impossible
     if p95 < p50:
-        issues.append(Issue("ERROR", csv_name,
-                            "row {}: p95 ({}) < p50 ({})".format(row_num, p95, p50)))
+        issues.append(Issue("ERROR", csv_name, f"row {row_num}: p95 ({p95}) < p50 ({p50})"))
 
     # Absurd throughput
     if gib > ABSURD_THROUGHPUT:
-        issues.append(Issue("ERROR", csv_name,
-                            "row {}: absurd throughput {} GiB/s".format(row_num, gib)))
+        issues.append(Issue("ERROR", csv_name, f"row {row_num}: absurd throughput {gib} GiB/s"))
 
     # Very high spread
     if spread > 200:
-        issues.append(Issue("WARNING", csv_name,
-                            "row {}: extreme spread {}%".format(row_num, spread)))
+        issues.append(Issue("WARNING", csv_name, f"row {row_num}: extreme spread {spread}%"))
 
     # Too few repeats
     if repeats < 5:
-        issues.append(Issue("ERROR", csv_name,
-                            "row {}: repeats={} (minimum 5 per METRICS.md)".format(
-                                row_num, repeats)))
+        issues.append(
+            Issue("ERROR", csv_name, f"row {row_num}: repeats={repeats} (minimum 5 per METRICS.md)")
+        )
 
 
 def validate_sustained_row(row, csv_name, issues, row_num):
@@ -191,19 +212,15 @@ def validate_sustained_row(row, csv_name, issues, row_num):
         tput = float(row["throughput_gibs"])
         thermal = float(row["thermal_c"])
     except (ValueError, KeyError) as e:
-        issues.append(Issue("ERROR", csv_name,
-                            "row {}: cannot parse: {}".format(row_num, e)))
+        issues.append(Issue("ERROR", csv_name, f"row {row_num}: cannot parse: {e}"))
         return
 
     if tput > ABSURD_THROUGHPUT:
-        issues.append(Issue("ERROR", csv_name,
-                            "row {}: absurd throughput {} GiB/s".format(row_num, tput)))
+        issues.append(Issue("ERROR", csv_name, f"row {row_num}: absurd throughput {tput} GiB/s"))
     if thermal > 120:
-        issues.append(Issue("WARNING", csv_name,
-                            "row {}: very high thermal {}C".format(row_num, thermal)))
+        issues.append(Issue("WARNING", csv_name, f"row {row_num}: very high thermal {thermal}C"))
     if elapsed <= 0:
-        issues.append(Issue("ERROR", csv_name,
-                            "row {}: non-positive elapsed_s".format(row_num)))
+        issues.append(Issue("ERROR", csv_name, f"row {row_num}: non-positive elapsed_s"))
 
 
 def validate_csv(path, csv_name, issues):
@@ -222,15 +239,19 @@ def validate_csv(path, csv_name, issues):
 
             csv_type = detect_csv_type(header)
             if csv_type is None:
-                issues.append(Issue("WARNING", csv_name,
-                                    "unrecognized CSV format ({} columns)".format(len(header))))
+                issues.append(
+                    Issue("WARNING", csv_name, f"unrecognized CSV format ({len(header)} columns)")
+                )
                 return None, 0
 
             expected = expected_columns(csv_type)
             missing = [c for c in expected if c not in header]
             if missing:
-                issues.append(Issue("ERROR", csv_name,
-                                    "missing required columns: {}".format(", ".join(missing))))
+                issues.append(
+                    Issue(
+                        "ERROR", csv_name, "missing required columns: {}".format(", ".join(missing))
+                    )
+                )
 
             row_count = 0
             for i, row in enumerate(reader, start=2):  # row 1 is header
@@ -243,7 +264,7 @@ def validate_csv(path, csv_name, issues):
             return csv_type, row_count
 
     except Exception as e:
-        issues.append(Issue("ERROR", csv_name, "cannot read CSV: {}".format(e)))
+        issues.append(Issue("ERROR", csv_name, f"cannot read CSV: {e}"))
         return None, 0
 
 
@@ -255,65 +276,88 @@ def validate_manifest(csv_name, csv_type, row_count, manifest_path, issues, head
 
     manifest = load_manifest(manifest_path)
     if manifest is None:
-        issues.append(Issue("ERROR", csv_name,
-                            "manifest exists but is invalid JSON: {}".format(manifest_path)))
+        issues.append(
+            Issue("ERROR", csv_name, f"manifest exists but is invalid JSON: {manifest_path}")
+        )
         return
 
-    issues.append(Issue("NOTE", csv_name,
-                        "manifest: {}".format(os.path.basename(manifest_path))))
+    issues.append(Issue("NOTE", csv_name, f"manifest: {os.path.basename(manifest_path)}"))
 
     # Check git SHA staleness (NOTE, not WARNING — manifests are captured at run time)
     git_info = manifest.get("git", {})
     sha = git_info.get("sha", "")
     if sha and head_sha and sha != head_sha:
         short_sha = sha[:7]
-        issues.append(Issue("NOTE", csv_name,
-                            "manifest git_sha {} (run-time snapshot, not current HEAD)".format(
-                                short_sha)))
+        issues.append(
+            Issue(
+                "NOTE",
+                csv_name,
+                f"manifest git_sha {short_sha} (run-time snapshot, not current HEAD)",
+            )
+        )
+
+    # A dirty tree at capture time means the recorded SHA does NOT identify the code
+    # that produced these numbers, so two runs labelled with the same commit may have
+    # run different binaries. This is a WARNING rather than a NOTE because it silently
+    # invalidates cross-run comparison, and it currently affects every fleet manifest.
+    if git_info.get("dirty"):
+        issues.append(
+            Issue(
+                "WARNING",
+                csv_name,
+                "captured from a DIRTY tree -- git_sha {} does not identify the "
+                "code that ran, so this run is not safely comparable to another "
+                "at the 'same' commit".format(sha[:7] if sha else "?"),
+            )
+        )
 
     # For standard CSVs, flag low row counts
     if csv_type == "standard" and row_count < 12:
-        issues.append(Issue("NOTE", csv_name,
-                            "only {} rows -- may be missing decode or mixed-precision variants".format(
-                                row_count)))
+        issues.append(
+            Issue(
+                "NOTE",
+                csv_name,
+                f"only {row_count} rows -- may be missing decode or mixed-precision variants",
+            )
+        )
 
     # Check device spec bandwidth vs achieved
     spec_bw = find_device_spec(csv_name)
     if spec_bw and csv_type == "standard" and row_count > 0:
-        issues.append(Issue("NOTE", csv_name,
-                            "device spec bandwidth: ~{:.0f} GiB/s".format(spec_bw)))
+        issues.append(Issue("NOTE", csv_name, f"device spec bandwidth: ~{spec_bw:.0f} GiB/s"))
 
 
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
+
 def main():
-    parser = argparse.ArgumentParser(
-        description="Validate benchmark CSVs and manifests."
+    parser = argparse.ArgumentParser(description="Validate benchmark CSVs and manifests.")
+    parser.add_argument(
+        "--csv-dir",
+        default="results/raw",
+        help="Directory containing CSV files (default: results/raw)",
     )
-    parser.add_argument("--csv-dir", default="results/raw",
-                        help="Directory containing CSV files (default: results/raw)")
-    parser.add_argument("--manifest-dir", default="results/manifests",
-                        help="Directory containing manifest JSON files (default: results/manifests)")
-    parser.add_argument("--quiet", action="store_true",
-                        help="Suppress output, use exit code only")
+    parser.add_argument(
+        "--manifest-dir",
+        default="results/manifests",
+        help="Directory containing manifest JSON files (default: results/manifests)",
+    )
+    parser.add_argument("--quiet", action="store_true", help="Suppress output, use exit code only")
     args = parser.parse_args()
 
     if not os.path.isdir(args.csv_dir):
-        print("Error: CSV directory not found: {}".format(args.csv_dir))
+        print(f"Error: CSV directory not found: {args.csv_dir}")
         return 2
 
     head_sha = get_git_head_sha()
     all_issues = []
-    csv_files = sorted(
-        f for f in os.listdir(args.csv_dir)
-        if f.endswith(".csv")
-    )
+    csv_files = sorted(f for f in os.listdir(args.csv_dir) if f.endswith(".csv"))
 
     if not csv_files:
         if not args.quiet:
-            print("No CSV files found in {}".format(args.csv_dir))
+            print(f"No CSV files found in {args.csv_dir}")
         return 0
 
     for csv_name in csv_files:
@@ -333,12 +377,13 @@ def main():
             print(issue)
 
         print()
-        print("{} CSV(s) checked, {} issue(s) found".format(
-            len(csv_files), len(errors) + len(warnings)))
+        print(f"{len(csv_files)} CSV(s) checked, {len(errors) + len(warnings)} issue(s) found")
         if errors:
-            print("  {} error(s)".format(len(errors)))
+            print(f"  {len(errors)} error(s)")
         if warnings:
-            print("  {} warning(s)".format(len(warnings)))
+            print(f"  {len(warnings)} warning(s)")
+        if notes:
+            print(f"  {len(notes)} note(s) (informational, not counted as issues)")
 
     # Exit code: 0 = clean, 1 = warnings, 2 = errors
     if errors:

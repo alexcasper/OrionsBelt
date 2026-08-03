@@ -8,9 +8,9 @@ from `METRICS.md` (~0.25 FLOP/byte).
 
 | Device | Cores | ISA | Spec BW (GiB/s) |
 |--------|-------|-----|-----------------|
-| Pi 5 | 4x Cortex-A76 @ 2.4 GHz | Armv8.0-A (NEON only) | 17.0 |
-| RK3588 big | 4x Cortex-A76 @ 2.4 GHz | Armv8.0-A (NEON only) | 34.0 |
-| RK3588 little | 4x Cortex-A55 @ 1.8 GHz | Armv8.0-A (NEON only) | 34.0 |
+| Pi 5 | 4x Cortex-A76 @ 2.4 GHz | Armv8.2-A + dotprod | 17.0 |
+| RK3588 big | 4x Cortex-A76 @ 2.4 GHz | Armv8.2-A + dotprod | 34.0 |
+| RK3588 little | 4x Cortex-A55 @ 1.8 GHz | Armv8.2-A | 34.0 |
 | Jetson j1 | 4x Cortex-A57 @ 1.48 GHz | Armv8.0-A (NEON only) | 25.6 |
 | Jetson j2 | 4x Cortex-A57 @ 1.48 GHz | Armv8.0-A (NEON only) | 25.6 |
 | **Orion O6** | 4x A720 big + 4x A720 mid + 4x A520 | Armv9.2-A | **93.1** |
@@ -25,23 +25,27 @@ section below for what 4-core OpenMP + NEON unrolling achieves on j2.
 
 ### 4B model
 
-| Device | Spec (GiB/s) | CumDecay | Scan | DWConv1D | Scan/Spec |
-|--------|-------------|----------|------|----------|-----------|
-| Pi 5 | 17.0 | 3.74 | 1.20 | 3.23 | 7.1% |
-| RK3588 big | 34.0 | 4.13 | 1.96 | 4.02 | 5.8% |
-| RK3588 little | 34.0 | 0.87 | 0.35 | 0.65 | 1.0% |
-| Jetson j1 | 25.6 | 1.16 | 0.72 | 1.04 | 2.8% |
-| Jetson j2 | 25.6 | 1.32 | 1.13 | 1.20 | 4.4% |
+| Device | Spec (GiB/s) | CumDecay | Scan | DWConv1D | Scan/Spec | Scan spread |
+|--------|-------------|----------|------|----------|-----------|-------------|
+| Pi 5 | 17.0 | 3.74 | 1.20 | 3.23 | 7.1% | 7.4% |
+| RK3588 big | 34.0 | 4.25 | 3.29 | 4.52 | 9.7% | **17.4%** ⚠ |
+| RK3588 little | 34.0 | 0.97 | 0.55 | 0.71 | 1.6% | **12.1%** ⚠ |
+| Jetson j1 | 25.6 | 1.16 | 0.72 | 1.04 | 2.8% | **17.2%** ⚠ |
+| Jetson j2 | 25.6 | 1.15 | 0.73 | 1.04 | 2.9% | 9.4% |
+
+⚠ 3 of 5 scan rows exceed the DEVICE_RUNBOOK's ~10% cleanliness threshold, worst RK3588 big at 17.4%. The runbook says to suspect thermal throttling first. Treat flagged rows as indicative only.
 
 ### 0.8B model
 
-| Device | Spec (GiB/s) | CumDecay | Scan | DWConv1D | Scan/Spec |
-|--------|-------------|----------|------|----------|-----------|
-| Pi 5 | 17.0 | 4.47 | 4.43 | 4.55 | 26.1% |
-| RK3588 big | 34.0 | 4.92 | 4.41 | 5.51 | 13.0% |
-| RK3588 little | 34.0 | 1.15 | 0.98 | 0.94 | 2.9% |
-| Jetson j1 | 25.6 | 1.93 | 1.61 | 1.99 | 6.3% |
-| Jetson j2 | 25.6 | 3.55 | 2.45 | 2.80 | 9.6% |
+| Device | Spec (GiB/s) | CumDecay | Scan | DWConv1D | Scan/Spec | Scan spread |
+|--------|-------------|----------|------|----------|-----------|-------------|
+| Pi 5 | 17.0 | 4.47 | 4.43 | 4.55 | 26.1% | 6.5% |
+| RK3588 big | 34.0 | 5.00 | 4.79 | 6.00 | 14.1% | 3.1% |
+| RK3588 little | 34.0 | 1.19 | 0.99 | 0.92 | 2.9% | 2.2% |
+| Jetson j1 | 25.6 | 1.93 | 1.61 | 1.99 | 6.3% | **18.9%** ⚠ |
+| Jetson j2 | 25.6 | 1.98 | 1.66 | 1.99 | 6.5% | **51.8%** ⚠ |
+
+⚠ 2 of 5 scan rows exceed the DEVICE_RUNBOOK's ~10% cleanliness threshold, worst Jetson j2 at 51.8%. The runbook says to suspect thermal throttling first. Treat flagged rows as indicative only.
 
 ## The discriminating test: Jetson (A57, more BW) vs Pi 5 (A76, less BW)
 
@@ -52,9 +56,9 @@ wins comfortably, the bandwidth-bound thesis is wrong or incomplete.**
 
 | Kernel (4B) | Pi 5 (17.0) | Jetson j1 (25.6) | Jetson j2 (25.6) | Winner | Pi5/J1 ratio |
 |-------------|-------------|------------------|------------------|--------|-------------|
-| Cumulative Decay | 3.74 | 1.16 | 1.32 | **Pi 5** | 3.22x |
-| Gated Delta-Rule Scan | 1.20 | 0.72 | 1.13 | **Pi 5** | 1.67x |
-| Causal DWConv1D | 3.23 | 1.04 | 1.20 | **Pi 5** | 3.11x |
+| Cumulative Decay | 3.74 | 1.16 | 1.15 | **Pi 5** | 3.22x |
+| Gated Delta-Rule Scan | 1.20 | 0.72 | 0.73 | **Pi 5** | 1.67x |
+| Causal DWConv1D | 3.23 | 1.04 | 1.04 | **Pi 5** | 3.11x |
 
 **Result: the Pi 5 wins on ALL three kernels despite having 33% LESS
 spec bandwidth.** The bandwidth-bound hypothesis does NOT hold at
@@ -78,8 +82,17 @@ cross-device effects being interpreted (bead `ob-bf7`):
 | RK3588 big | t3 1.96 vs t4 3.29 | **1.68x** | same source commit `28729f3`, same core class |
 | RK3588 little | t3 0.35 vs t4 0.55 | **1.57x** | same source commit `28729f3`, same core class |
 | Pi 5 | r5 1.20 vs j1 1.84 | **1.53x** | same physical board, *different* commits (`28729f3` vs `f127a11`) |
+| Jetson j2 | canonical 0.73 vs _single 1.13 | **1.55x** | same board, both single-threaded; the 1.13 run has **no manifest** |
 
-The RK3588 pair is the serious one: **identical source commit**, so the cause is environmental — different boards, cluster pinning, governor, or thermal state — and none of that is recorded per run. Worst replicate spread on the fleet is **1.68x**.
+The RK3588 pair looks like the serious one: **identical source commit**, which would make the cause purely environmental — different boards, cluster pinning, governor or thermal state, none of it recorded per run. But that inference does not actually hold; see the provenance audit below. Worst replicate spread on the fleet is **1.68x**.
+
+### Provenance audit: were these runs captured from a clean tree?
+
+Of the 7 replicate runs with a manifest, **7 recorded `dirty: true`** at capture time and 0 recorded a clean tree.
+
+**1 have no manifest at all** (jetson-j2_single) — PLAN.md section 9: a number without a manifest is not a result.
+
+This limits the section above more than the spread itself does. `dirty: true` means the recorded SHA does **not** identify the code that produced the numbers, so two runs labelled with the same commit may have executed genuinely different binaries. The RK3588 gap therefore cannot be attributed to environment rather than to code — both explanations stay open and neither is settleable from the committed data. Any re-run for `ob-bf7` must be taken from a clean tree.
 
 This report selects `t3` for RK3588 and `r5` for the Pi 5. Selecting the other
 run — equally valid, and for RK3588 the *same commit* — would move every O6
@@ -97,10 +110,10 @@ linearly with spec bandwidth. Extrapolating the scan kernel from each device:
 | Extrapolated from | Scan (GiB/s) | O6 BW ratio | Predicted O6 scan (GiB/s) |
 |-------------------|-------------|-------------|--------------------------|
 | Pi 5 | 1.20 | 5.5x | 6.57 |
-| RK3588 big | 1.96 | 2.7x | 5.37 |
-| RK3588 little | 0.35 | 2.7x | 0.96 |
+| RK3588 big | 3.29 | 2.7x | 9.01 |
+| RK3588 little | 0.55 | 2.7x | 1.51 |
 | Jetson j1 | 0.72 | 3.6x | 2.62 |
-| Jetson j2 | 1.13 | 3.6x | 4.11 |
+| Jetson j2 | 0.73 | 3.6x | 2.65 |
 
 **⚠ However, this linear extrapolation is almost certainly WRONG.**
 The discriminating test above shows the kernels are instruction-bound,
@@ -112,15 +125,15 @@ to its 4-5x bandwidth advantage**.
 
 **Core-performance-based prediction** (scaling from RK3588 A76 big cluster):
 
-- RK3588 big scan: 1.96 GiB/s (4x A76 @ 2.4 GHz, Armv8.2)
+- RK3588 big scan: 3.29 GiB/s (4x A76 @ 2.4 GHz, Armv8.2)
 - O6 big cluster: 4x A720 @ 2.8 GHz, Armv9.2 (SVE2, wider OoO)
 - Expected gain from IPC + clock: 1.5-2.5x over A76
-- **Predicted O6 scan throughput: 2.9-4.9 GiB/s**
-- This is ~3-5% of spec bandwidth, vs 6% achieved on A76
+- **Predicted O6 scan throughput: 4.9-8.2 GiB/s**
+- This is ~5-9% of spec bandwidth, vs 10% achieved on A76
 
-Carrying the replicate spread through: anchoring on the other same-commit RK3588 host (3.29 GiB/s rather than 1.96) gives **4.9-8.2 GiB/s** instead.
+**On the anchor choice.** The other same-commit RK3588 host reports 1.96 GiB/s, which would give 2.9-4.9 GiB/s instead. That run is **not** used: its spread is 153% (p50 vs p95), against 17% for the run above. The DEVICE_RUNBOOK treats anything past ~10% as suspect and says to suspect throttling first, so this is a quality judgement, not a convenient pick — and it is why the earlier framing of a 1.68x host "disagreement" was wrong. One of the two runs is simply contaminated.
 
-So the defensible published claim is **~3-8 GiB/s**, and the *anchor choice* — not the IPC assumption — is the dominant uncertainty. Resolving `ob-bf7` narrows this more than any modelling refinement would.
+Published claim: **~5-8 GiB/s**. The dominant uncertainty is the IPC/clock assumption, plus the fact that every manifest on the fleet records a dirty tree (see the provenance audit). Resolving `ob-bf7` — one clean-tree, commit-matched sweep with pinning and thermals recorded — narrows this more than any modelling refinement would.
 
 To check this prediction: if the O6 board arrives, run
 `bench_gdn_armv9sve2 --repeats 30 --csv` and compare.
@@ -134,8 +147,8 @@ the real-world impact of the optimization track (beads ob-8qt.5/6/7):
 | Kernel (4B, seq=64) | Single-thread (GiB/s) | 4-core OpenMP (GiB/s) | Speedup |
 |--------------------|-----------------------|-----------------------|---------|
 | Cumulative Decay | 1.32 | 3.85 | 2.9x |
-| Gated Delta-Rule Scan | 1.13 | 2.94 | 2.6x |
-| Causal DWConv1D | 1.20 | 3.51 | 2.9x |
+| Gated Delta-Rule Scan | 1.13 | 2.96 | 2.6x |
+| Causal DWConv1D | 1.20 | 3.66 | 3.1x |
 
 The 2.5-2.8x speedup from 4 cores (not the theoretical 4x) confirms the
 kernels are partially bandwidth-limited even at seq=64 — the instruction-bound
@@ -151,8 +164,8 @@ narrower state for conversion overhead. On j2 (4-core OpenMP):
 
 | Kernel (4B, seq=1) | fp32 (GiB/s) | bf16 (GiB/s) | fp16 (GiB/s) |
 |--------------------|-------------|-------------|-------------|
-| Cumulative Decay | 8.03 | 5.23 | 5.78 |
-| Gated Delta-Rule Scan | 17.86 | 11.49 | 12.08 |
+| Cumulative Decay | 8.37 | 5.56 | 5.71 |
+| Gated Delta-Rule Scan | 15.10 | 11.49 | 11.96 |
 
 At decode, bf16/fp16 are **slower** than fp32 — the conversion overhead
 (load narrow, widen to fp32, compute, narrow back) exceeds the memory
