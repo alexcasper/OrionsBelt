@@ -549,7 +549,7 @@ def main(argv: list[str] | None = None) -> int:
 
     # Select backend
     if args.backend == "synthetic":
-        backend = Synthetic_backend()
+        backend = SyntheticBackend()
     else:
         print(f"Error: unknown backend '{args.backend}'. Available: synthetic", file=sys.stderr)
         return 1
