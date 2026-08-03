@@ -606,3 +606,27 @@ The power sampling script (`scripts/power_bench.sh`) wraps any bench_gdn invocat
 with synchronized INA3221 sampling and produces energy-per-GiB metrics without
 requiring perf, ftrace, powertop, or Arm Performix — the Jetson's hardware power
 monitor is sufficient.
+
+### Per-kernel energy efficiency comparison
+
+Using the extended `--sustained-kernel` flag (ob-mrd.7), all three fp32 kernels
+were profiled for 10 seconds each under the INA3221 power monitor:
+
+| Kernel | Throughput (GiB/s) | Δ Power board (mW) | Energy (mJ/GiB board) | Energy (mJ/GiB CPU) |
+|--------|-------------------|--------------------|-----------------------|---------------------|
+| `gdn_gated_scan` | 0.74 | 925 | **1250** | 836 |
+| `gdn_causal_dwconv1d` | 0.88 | 903 | **1026** | 767 |
+| `gdn_cumdecay` | 1.06 | 925 | **874** | 667 |
+
+**Key finding: power is constant, energy scales with throughput.** All three
+kernels draw essentially the same incremental board power (~900–925 mW over idle)
+despite different throughput rates. On the A57, the power budget is dominated by
+memory subsystem and core overhead, not by the specific arithmetic pattern. The
+energy-per-GiB metric therefore tracks 1/throughput: `cumdecay` is most
+energy-efficient because it moves data fastest, not because it draws less power.
+
+This has a practical implication for the dispatcher design (ob-7a9): on
+bandwidth-bound cores like the A57, kernel selection affects *latency* but not
+*power draw*. A dynamic dispatcher should optimize for throughput, not for power,
+on this class of hardware. (This may differ on newer cores like A720 where
+compute-bound kernels can draw significantly more power.)
