@@ -132,8 +132,7 @@ def predict_breakdown(
     kv_bytes = _DTYPE_BYTES[kv_cache_dtype]
 
     weights = estimate_weights(info, w_bytes)
-    kv_cache = int(info.kv_cache_bytes_per_token(dtype_size=int(kv_bytes)) * context_length / kv_bytes * info.num_full_attention_layers / info.num_full_attention_layers)
-    # More directly:
+    # KV cache: 2 (K+V) × num_kv_heads × head_dim × context_length × num_full_attn_layers × dtype_bytes
     kv_cache = info.num_key_value_heads * info.full_attn_head_dim * 2 * context_length * info.num_full_attention_layers * kv_bytes
     recurrent_state = info.recurrent_state_elements_per_layer * info.num_gdn_layers * s_bytes
     conv_state = info.conv_state_elements_per_layer * info.num_gdn_layers * s_bytes
