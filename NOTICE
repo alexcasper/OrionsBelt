@@ -1,0 +1,36 @@
+# NOTICE
+
+## OrionsBelt
+
+Copyright 2026 OrionsBelt contributors.
+
+Licensed under the Apache License, Version 2.0.
+
+## Third-party software
+
+This project uses the following third-party software:
+
+| Package | License | Usage |
+|---|---|---|
+| NumPy | BSD-3-Clause | Numerical operations |
+| Matplotlib | Matplotlib license (PSF-based) | Plot generation |
+| pytest | MIT | Testing |
+| ruff | MIT | Linting and formatting |
+
+## Model weights
+
+| Model | Developer | License |
+|---|---|---|
+| Qwen3.5-4B | Qwen Team, Alibaba Cloud (Tongyi Lab) | Apache-2.0 |
+| Qwen3.5-0.8B | Qwen Team, Alibaba Cloud (Tongyi Lab) | Apache-2.0 |
+
+Model weights are downloaded at setup time by `scripts/fetch_weights.py` and are
+not distributed within this repository. See `docs/WEIGHT_LICENSE.md` for full
+license verification details.
+
+## Arm tooling
+
+| Tool | Provider | License |
+|---|---|---|
+| KleidiAI micro-kernels | Arm Ltd | MIT |
+| CIX NOE SDK | CIX Technology | Proprietary (not bundled) |

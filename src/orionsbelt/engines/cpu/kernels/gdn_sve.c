@@ -32,6 +32,8 @@
  */
 
 #include <stddef.h>
+#include <stdint.h>
+#include <string.h>
 
 #ifdef __ARM_FEATURE_SVE
 #include <arm_sve.h>
@@ -239,6 +241,273 @@ void gdn_causal_dwconv1d_f32(const float *restrict in, const float *restrict w,
             h[2] = cur;
         }
         for (int j = 0; j < GDN_CONV_K - 1; ++j) hist[(size_t)j * channels + c] = h[j];
+    }
+#endif
+}
+
+/* ===========================================================================
+ * MIXED-PRECISION STATE VARIANTS (bead ob-8qt.4)
+ *
+ * The recurrent state is the only persistent data structure in GDN decode.
+ * Narrowing it from fp32 to bf16 or fp16 halves memory footprint and I/O
+ * traffic for state load/store — the two streams that execute on every
+ * decode step. At seq=1 (decode), state I/O is ~40% of total traffic; halving
+ * it saves ~20% per-token. At seq=64 (prefill), state is ~1% of traffic, so
+ * the benefit is concentrated at decode — exactly where bandwidth matters most.
+ *
+ * CRITICAL CONSTRAINT: all accumulation stays fp32. A decay product of 0.5^64
+ * ≈ 5e-20 underflows both bf16 and fp16. Only the *storage format* changes;
+ * the *arithmetic format* does not. Mixed precision (narrow state, wide
+ * accumulate), not uniform narrowing.
+ *
+ * API: narrow-format arrays use uint16_t* to be unambiguous about the on-wire
+ * representation, independent of compiler __bf16/__fp16 type support.
+ * =========================================================================== */
+
+/* --- bf16 conversion (software, portable, no ISA dependency) ---
+ *
+ * bf16 shares fp32's 8-bit exponent (same range) with only 7 mantissa bits
+ * (vs fp32's 23). Conversion is round-to-nearest-even on the low 16 bits.
+ * No overflow/underflow handling needed — bf16 covers the same exponent range.
+ */
+static inline uint16_t f32_to_bf16_sw(float f) {
+    uint32_t bits;
+    memcpy(&bits, &f, sizeof(bits));
+    uint32_t lsb = (bits >> 16) & 1;
+    uint32_t rounding_bias = 0x7FFFu + lsb;
+    return (uint16_t)((bits + rounding_bias) >> 16);
+}
+
+static inline float bf16_to_f32_sw(uint16_t b) {
+    uint32_t bits = (uint32_t)b << 16;
+    float f;
+    memcpy(&f, &bits, sizeof(f));
+    return f;
+}
+
+/* --- fp16 (IEEE half) conversion ---
+ *
+ * fp16 has 5-bit exponent (range ±65504) and 10-bit mantissa. On AArch64
+ * the scalar __fp16 type generates a single FCVT instruction (base ISA,
+ * mandatory on all cores including Cortex-A57 at Armv8.0-A). NEON FCVTN/FCVTL
+ * are also base A64 ASIMD. The __ARM_FEATURE_FP16_VECTOR_ARITHMETIC macro
+ * is for fp16 *arithmetic* (fmul/fadd on half regs), which is separate from
+ * conversion and not needed here.
+ */
+static inline uint16_t f32_to_f16_sw(float f) {
+    __fp16 h = (__fp16)f;
+    uint16_t bits;
+    memcpy(&bits, &h, sizeof(bits));
+    return bits;
+}
+
+static inline float f16_to_f32_sw(uint16_t h) {
+    __fp16 hp;
+    memcpy(&hp, &h, sizeof(hp));
+    return (float)hp;
+}
+
+#ifdef __ARM_NEON
+/* --- NEON 4-lane bf16 helpers (software conversion in vector registers) ---
+ *
+ * bf16 has no NEON instruction support until Armv8.6-A (__ARM_FEATURE_BF16).
+ * These helpers do the widening/narrowing using integer NEON ops, which are
+ * available on every AArch64 core. The FMA loop in between runs in fp32. */
+static inline float32x4_t vld1q_bf16_to_f32(const uint16_t *p) {
+    uint16x4_t b = vld1_u16(p);
+    uint32x4_t expanded = vshll_n_u16(b, 16);   /* zero-extend: bf16 → fp32 bit pattern */
+    return vreinterpretq_f32_u32(expanded);
+}
+
+static inline void vst1q_f32_to_bf16(float32x4_t v, uint16_t *p) {
+    uint32x4_t bits = vreinterpretq_u32_f32(v);
+    /* Round-to-nearest-even: add bias of 0x7FFF plus the bit that determines rounding direction */
+    uint32x4_t lsb = vandq_u32(vshrq_n_u32(bits, 16), vdupq_n_u32(1));
+    uint32x4_t rounding = vaddq_u32(vdupq_n_u32(0x7FFF), lsb);
+    uint32x4_t rounded = vaddq_u32(bits, rounding);
+    uint16x4_t result = vmovn_u32(vshrq_n_u32(rounded, 16));
+    vst1_u16(p, result);
+}
+
+/* --- NEON 4-lane fp16 helpers (native FCVTN/FCVTL) --- */
+static inline float32x4_t vld1q_f16_to_f32(const uint16_t *p) {
+    float16x4_t h = vreinterpret_f16_u16(vld1_u16(p));
+    return vcvt_f32_f16(h);                      /* FCVTL: widen 4 × fp16 → 4 × fp32 */
+}
+
+static inline void vst1q_f32_to_f16(float32x4_t v, uint16_t *p) {
+    float16x4_t h = vcvt_f16_f32(v);             /* FCVTN: narrow 4 × fp32 → 4 × fp16 */
+    vst1_u16(p, vreinterpret_u16_f16(h));
+}
+#endif /* __ARM_NEON */
+
+/* ---------------------------------------------------------------------------
+ * 1b. Gated cumulative decay — bf16 output variant
+ *
+ *   decay[t][c] = prod_{i<=t} a[i][c], stored as bf16
+ *
+ * Identical to gdn_cumdecay_f32 except decay[] is written as bf16 (uint16_t),
+ * halving output write traffic and downstream read traffic. The running
+ * product accumulator stays fp32 throughout. Input a[] remains fp32.
+ * Bytes: sizeof(float)*seq*ch (read a) + sizeof(uint16_t)*seq*ch (write decay)
+ *      = 6*seq*ch, vs 8*seq*ch for the fp32 variant — 25% less I/O.
+ * ------------------------------------------------------------------------- */
+void gdn_cumdecay_bf16(const float *restrict a, uint16_t *restrict decay,
+                       size_t seq, size_t channels) {
+#if defined(__ARM_NEON)
+    size_t c = 0;
+    for (; c + 4 <= channels; c += 4) {
+        float32x4_t run = vdupq_n_f32(1.0f);
+        for (size_t t = 0; t < seq; ++t) {
+            run = vmulq_f32(run, vld1q_f32(a + t * channels + c));
+            vst1q_f32_to_bf16(run, decay + t * channels + c);
+        }
+    }
+    for (; c < channels; ++c) {
+        float run = 1.0f;
+        for (size_t t = 0; t < seq; ++t) {
+            run *= a[t * channels + c];
+            decay[t * channels + c] = f32_to_bf16_sw(run);
+        }
+    }
+#else
+    for (size_t c = 0; c < channels; ++c) {
+        float run = 1.0f;
+        for (size_t t = 0; t < seq; ++t) {
+            run *= a[t * channels + c];
+            decay[t * channels + c] = f32_to_bf16_sw(run);
+        }
+    }
+#endif
+}
+
+/* ---------------------------------------------------------------------------
+ * 1c. Gated cumulative decay — fp16 output variant
+ *
+ * Same as bf16 variant but with IEEE half-precision output. Note: fp16's
+ * 5-bit exponent means values below ~6e-5 flush to zero. For decay products
+ * with gates in (0.9, 0.99) over 64 steps this is not an issue (min ~0.001),
+ * but if gate values are smaller (e.g. 0.5), the cumulative product underflows
+ * fp16. The accumulator is fp32 regardless.
+ * ------------------------------------------------------------------------- */
+void gdn_cumdecay_f16(const float *restrict a, uint16_t *restrict decay,
+                      size_t seq, size_t channels) {
+#if defined(__ARM_NEON)
+    size_t c = 0;
+    for (; c + 4 <= channels; c += 4) {
+        float32x4_t run = vdupq_n_f32(1.0f);
+        for (size_t t = 0; t < seq; ++t) {
+            run = vmulq_f32(run, vld1q_f32(a + t * channels + c));
+            vst1q_f32_to_f16(run, decay + t * channels + c);
+        }
+    }
+    for (; c < channels; ++c) {
+        float run = 1.0f;
+        for (size_t t = 0; t < seq; ++t) {
+            run *= a[t * channels + c];
+            decay[t * channels + c] = f32_to_f16_sw(run);
+        }
+    }
+#else
+    for (size_t c = 0; c < channels; ++c) {
+        float run = 1.0f;
+        for (size_t t = 0; t < seq; ++t) {
+            run *= a[t * channels + c];
+            decay[t * channels + c] = f32_to_f16_sw(run);
+        }
+    }
+#endif
+}
+
+/* ---------------------------------------------------------------------------
+ * 2b. Chunkwise gated scan — bf16 state variant
+ *
+ *   s[t][c] = g[t][c] * s[t-1][c] + x[t][c], with state persisted as bf16
+ *
+ * The persistent state[] array (carried across chunk invocations) is stored
+ * as bf16. It is widened to fp32 on load at the start, accumulated in fp32
+ * through the entire chunk, and narrowed back to bf16 on store at the end.
+ * Per-token inputs (g[], x[]) and per-token outputs (s[]) stay fp32.
+ *
+ * This is where narrowing matters most: at decode (seq=1), state read+write
+ * is 2 of 5 memory streams, so halving it saves ~20% of per-token traffic.
+ * The accumulated quantization error per chunk boundary is bounded by bf16's
+ * ~0.4% relative error, which compounds over chunks but stays well within the
+ * correctness tolerances in docs/METHODOLOGY.md for bf16 state.
+ * ------------------------------------------------------------------------- */
+void gdn_gated_scan_bf16(const float *restrict g, const float *restrict x,
+                         float *restrict s, uint16_t *restrict state,
+                         size_t seq, size_t channels) {
+#if defined(__ARM_NEON)
+    size_t c = 0;
+    for (; c + 4 <= channels; c += 4) {
+        float32x4_t acc = vld1q_bf16_to_f32(state + c);
+        for (size_t t = 0; t < seq; ++t) {
+            acc = vfmaq_f32(vld1q_f32(x + t * channels + c), acc,
+                            vld1q_f32(g + t * channels + c));
+            vst1q_f32(s + t * channels + c, acc);
+        }
+        vst1q_f32_to_bf16(acc, state + c);
+    }
+    for (; c < channels; ++c) {
+        float a2 = bf16_to_f32_sw(state[c]);
+        for (size_t t = 0; t < seq; ++t) {
+            a2 = x[t * channels + c] + a2 * g[t * channels + c];
+            s[t * channels + c] = a2;
+        }
+        state[c] = f32_to_bf16_sw(a2);
+    }
+#else
+    for (size_t c = 0; c < channels; ++c) {
+        float a2 = bf16_to_f32_sw(state[c]);
+        for (size_t t = 0; t < seq; ++t) {
+            a2 = x[t * channels + c] + a2 * g[t * channels + c];
+            s[t * channels + c] = a2;
+        }
+        state[c] = f32_to_bf16_sw(a2);
+    }
+#endif
+}
+
+/* ---------------------------------------------------------------------------
+ * 2c. Chunkwise gated scan — fp16 state variant
+ *
+ * Same pattern as bf16 but with IEEE half-precision state. fp16 has higher
+ * mantissa precision than bf16 (10 bits vs 7) but narrower exponent range
+ * (±65504 vs ±3.4e38). For typical GDN state magnitudes (O(1) to O(100)),
+ * fp16's extra mantissa bits give ~2× better accuracy than bf16 at the cost
+ * of potential overflow on extreme values. The accumulator is fp32 regardless.
+ * ------------------------------------------------------------------------- */
+void gdn_gated_scan_f16(const float *restrict g, const float *restrict x,
+                        float *restrict s, uint16_t *restrict state,
+                        size_t seq, size_t channels) {
+#if defined(__ARM_NEON)
+    size_t c = 0;
+    for (; c + 4 <= channels; c += 4) {
+        float32x4_t acc = vld1q_f16_to_f32(state + c);
+        for (size_t t = 0; t < seq; ++t) {
+            acc = vfmaq_f32(vld1q_f32(x + t * channels + c), acc,
+                            vld1q_f32(g + t * channels + c));
+            vst1q_f32(s + t * channels + c, acc);
+        }
+        vst1q_f32_to_f16(acc, state + c);
+    }
+    for (; c < channels; ++c) {
+        float a2 = f16_to_f32_sw(state[c]);
+        for (size_t t = 0; t < seq; ++t) {
+            a2 = x[t * channels + c] + a2 * g[t * channels + c];
+            s[t * channels + c] = a2;
+        }
+        state[c] = f32_to_f16_sw(a2);
+    }
+#else
+    for (size_t c = 0; c < channels; ++c) {
+        float a2 = f16_to_f32_sw(state[c]);
+        for (size_t t = 0; t < seq; ++t) {
+            a2 = x[t * channels + c] + a2 * g[t * channels + c];
+            s[t * channels + c] = a2;
+        }
+        state[c] = f32_to_f16_sw(a2);
     }
 #endif
 }

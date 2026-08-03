@@ -442,3 +442,213 @@ The middle row is the important one: the KV-cache-versus-recurrent-state result 
 the NPU, the GPU, or Armv9 at all. It is a property of the architecture, so **an Armv8 device can
 demonstrate the project's central claim end to end** — which is what moves the Edge AI track from a
 credible plan to a credible result.
+
+### Mixed-precision recurrent-state kernels (ob-8qt.4)
+
+Four narrow-state variants of `gdn_cumdecay` and `gdn_gated_scan` were added (bf16/fp16). All
+accumulate in fp32 — only the storage format narrows. Measured on Jetson A57 (NEON):
+
+| Kernel (4B, seq=64) | Format | p50 (µs) | GiB/s | vs fp32 |
+|---|---|---:|---:|---|
+| cumdecay | fp32 | 1800 | 1.09 | — |
+| cumdecay | bf16 | 1259 | 1.16 | +6% bw, −30% time |
+| cumdecay | f16 | 1006 | 1.46 | +34% bw, −44% time |
+| gated_scan | fp32 | 3925 | 0.75 | — |
+| gated_scan | bf16 | 3987 | 0.74 | ≈ same |
+| gated_scan | f16 | 3948 | 0.75 | ≈ same |
+
+**Cumdecay benefits from narrower output** (less write traffic). Fp16 is fastest because
+`vcvt_f16_f32` maps to the single-cycle `FCVTN` instruction on base A64, while bf16 uses software
+rounding (integer NEON ops).
+
+**Gated_scan shows no measurable difference at seq=64** because state read+write is only ~1% of
+total traffic at prefill chunk size. The benefit concentrates at **decode (seq=1)** where state
+I/O is ~40% of traffic — halving it saves ~20% per token. This confirms the bead's re-scoping
+note: state narrowing is a *memory-residency* optimization (halving resident state from 48 MB to
+24 MB across 24 layers), not a step-change in decode bandwidth.
+
+**Precision findings:**
+- bf16 state: 0.38% max relative error (7 mantissa bits). No values flush to zero — bf16 shares
+  fp32's 8-bit exponent, so even 0.5^64 ≈ 5e-20 is representable.
+- fp16 state: 0.05% max relative error (10 mantissa bits, more precise than bf16). However, fp16's
+  5-bit exponent means small decay products flush to zero: 0.5^20 ≈ 9.5e-7 is near the subnormal
+  floor. For gates in (0.9, 0.99) this is not an issue.
+- **The decay accumulator MUST stay fp32**: confirmed by stress test with constant-0.5 gates,
+  where the running product reaches ~5e-20. Both bf16 and fp16 would underflow this; fp32 handles
+  it cleanly.
+
+**Platform note**: `__fp16` scalar type and `FCVTN`/`FCVTL` NEON conversions work on Cortex-A57
+(Armv8.0-A) despite `__ARM_FEATURE_FP16_VECTOR_ARITHMETIC` being undefined. That macro gates fp16
+*arithmetic* (fmul/fadd on half registers), not conversion, which is base A64 ASIMD.
+
+### Decode-phase narrow-format penalty (ob-mrd.6)
+
+The initial mixed-precision table above measured only prefill (seq=64). The refreshed
+28-row CSV (ob-mrd.5) adds decode (seq=1) configs, and the picture changes sharply:
+
+**Qwen3.5-4B gated_scan — prefill vs decode:**
+
+| Format | Prefill (seq=64) GiB/s | Decode (seq=1) GiB/s | Decode vs fp32 |
+|---|---:|---:|---|
+| fp32 | 0.72 | **9.27** | — |
+| bf16 | 0.74 | 4.52 | **−51%** |
+| fp16 | 0.74 | 5.63 | **−39%** |
+
+At prefill, narrow formats are flat or marginally positive — the I/O traffic reduction
+compensates for the conversion cost. At decode, they are roughly **half the speed** of fp32.
+
+**Why:** at seq=1 the scan touches ~80 KiB of data (5 × 4096 × 4 bytes), which fits entirely
+in the A57's 512 KiB L2 cache. The kernel is measuring cache bandwidth, not DRAM bandwidth —
+hence the 12.9× jump from 0.72 to 9.27 GiB/s for fp32. With data already cache-resident, the
+dominant cost shifts from memory I/O to the fp32↔half conversion instructions (`FCVTN`/`FCVTL`
+for fp16, integer NEON sequence for bf16). Narrowing saves ~20% of traffic but adds ~100%
+conversion overhead when traffic is nearly free.
+
+**Implication for the design:** state narrowing is a **prefill-only** optimization. At decode,
+where GDN's O(1) fixed-state advantage is the whole point, fp32 is both faster and more
+accurate. The optimal dispatch is format-adaptive: narrow state for chunk-parallel prefill,
+fp32 state for token-by-token decode. This is a concrete, measured argument rather than
+conventional wisdom, and it sharpens the project's honest-framing commitment: the mixed-precision
+headline should say "halves resident state during prefill," not "speeds up GDN."
+
+## Sustained-load thermal characterization (ob-mrd.2)
+
+The benchmark now supports `--sustained <seconds>` which runs `gdn_gated_scan` on the
+Qwen3.5-4B config (seq=64) continuously for N seconds, sampling throughput and CPU
+temperature every 5 s. This directly addresses PLAN.md risk R7: on passively-cooled
+edge hardware, a burst number that cannot be sustained is misleading.
+
+**Jetson-J1 (Cortex-A57, active fan cooling), 120-second sustained run:**
+
+| Window | Throughput (GiB/s) | Thermal (°C) | vs first |
+|--------|-------------------|-------------|----------|
+| 0–5 s  | 0.77              | 51.0        | 0.0%     |
+| 55–60 s| 0.76              | 51.5        | -0.8%    |
+| 115–120 s | 0.76           | 52.0        | -0.9%    |
+
+**Finding**: No thermal throttling. The Jetson Nano's active cooling keeps the A57
+at 51–52 °C for the entire 2-minute run. Throughput is essentially flat (0.76–0.77
+GiB/s, <1% variation within noise). The thermal rise is only +1.5 °C.
+
+This is the expected result for actively-cooled hardware. The more interesting
+characterization will come from passively-cooled devices (e.g. Pi 5) where sustained
+load may trigger frequency reduction. The `--sustained` flag is portable — every
+device in the fleet can produce its own decay curve.
+
+## Native NEON kernel correctness verification (ob-mrd.3)
+
+The existing `verify_cpu_kernels.sh` cross-compiles for SVE and verifies under QEMU.
+However, **no device in the current fleet has SVE** — Jetson A57, Pi 5 A76, and
+RK3588 A76/A55 all dispatch through the NEON path. The new
+`scripts/verify_kernels_native.sh` builds and runs the C kernel tests natively on
+each device using its real ISA, validating the actual dispatch path.
+
+**Jetson-J1 (Cortex-A57, Armv8.0-A, NEON) — all tests pass on real silicon:**
+
+| Kernel | vs scalar ref (float) | vs scalar ref (double) | Bit-identical |
+|--------|----------------------|----------------------|---------------|
+| `gdn_gated_scan_f32` | max_abs=0.000 | max_abs=1.19e-7 | YES |
+| `gdn_cumdecay_f32` | max_abs=0.000 | max_abs=5.96e-8 | YES |
+| `gdn_causal_dwconv1d_f32` | max_abs=5.96e-8 | — | ~1 ULP |
+
+The 1-ULP deviation in `causal_dwconv1d` vs the float reference comes from NEON FMA
+contraction (`vfmaq_n_f32` fuses multiply-add), while the scalar reference uses
+separate multiply and add. This is expected and benign — the fused result is actually
+*more* accurate than the unfused one.
+
+Mixed-precision bf16/fp16 variants also pass all bounds on NEON:
+cumdecay bf16 ≤0.4%, fp16 ≤0.05%; gated_scan bf16 ≤0.4%, fp16 ≤0.05%.
+Determinism verified (bit-identical across repeated runs).
+
+**New coverage added**: `test_gdn_sve.c` previously tested only `gated_scan` and
+`causal_dwconv1d`; `cumdecay` was declared but never exercised. Added scalar
+references (float and double) and comparison reporting for `cumdecay`.
+
+---
+
+## INA3221 power/energy characterization on Jetson-J1 (ob-agf.1)
+
+The Jetson Nano exposes a TI INA3221 power monitor through IIO sysfs
+(`/sys/devices/.../iio:device0/`), providing real-time power on three rails:
+
+| Rail | Name | Idle | Avg load (sustained scan) | Peak |
+|------|------|------|--------------------------|------|
+| 0 | POM_5V_IN (board total) | 1906 mW | 2831 mW | 3225 mW |
+| 1 | POM_5V_GPU | 0 mW | 0 mW | 0 mW |
+| 2 | POM_5V_CPU | 448 mW | 1067 mW | 1347 mW |
+
+**Sustained gated_scan (Qwen3.5-4B prefill, 10 s):**
+- Delta power: **925 mW** board (619 mW CPU-only)
+- Throughput: 0.74 GiB/s (stable, no thermal decay)
+- Energy per GiB: **~1250 mJ/GiB board** (~837 mJ/GiB CPU-only)
+- Thermal: 51.7°C → 52.0°C (active fan cooling, no throttle)
+
+**Key observations:**
+
+1. **CPU dominates the power budget.** The delta from idle is 619 mW CPU vs 925 mW
+   board total — 67% of the incremental power is CPU. The GPU rail reads 0 mW
+   (not used by the NEON kernel), so the remaining ~33% is memory controller, I/O,
+   and board overhead.
+
+2. **No thermal throttling at sustained load.** Temperature rose only 0.3°C over
+   10 seconds at peak throughput. The Jetson Nano's active fan cooling is
+   effective for this workload. This confirms the sustained-load finding from
+   ob-mrd.2: throughput is flat at 0.74 GiB/s with no decay.
+
+3. **Energy efficiency context.** At 1.25 J/GiB board-wide, the A57 cores deliver
+   competitive energy efficiency for memory-bound linear-attention workloads. For
+   comparison, a Raspberry Pi 5 (Cortex-A76) would move the same data faster but
+   at higher power — the J/GiB comparison across the device fleet will reveal
+   whether newer cores are more or less energy-efficient per unit of memory
+   bandwidth.
+
+The power sampling script (`scripts/power_bench.sh`) wraps any bench_gdn invocation
+with synchronized INA3221 sampling and produces energy-per-GiB metrics without
+requiring perf, ftrace, powertop, or Arm Performix — the Jetson's hardware power
+monitor is sufficient.
+
+### Per-kernel energy efficiency comparison
+
+Using the extended `--sustained-kernel` flag (ob-mrd.7), all three fp32 kernels
+were profiled for 10 seconds each under the INA3221 power monitor:
+
+| Kernel | Throughput (GiB/s) | Δ Power board (mW) | Energy (mJ/GiB board) | Energy (mJ/GiB CPU) |
+|--------|-------------------|--------------------|-----------------------|---------------------|
+| `gdn_gated_scan` | 0.74 | 925 | **1250** | 836 |
+| `gdn_causal_dwconv1d` | 0.88 | 903 | **1026** | 767 |
+| `gdn_cumdecay` | 1.06 | 925 | **874** | 667 |
+
+**Key finding: power is constant, energy scales with throughput.** All three
+kernels draw essentially the same incremental board power (~900–925 mW over idle)
+despite different throughput rates. On the A57, the power budget is dominated by
+memory subsystem and core overhead, not by the specific arithmetic pattern. The
+energy-per-GiB metric therefore tracks 1/throughput: `cumdecay` is most
+energy-efficient because it moves data fastest, not because it draws less power.
+
+This has a practical implication for the dispatcher design (ob-7a9): on
+bandwidth-bound cores like the A57, kernel selection affects *latency* but not
+*power draw*. A dynamic dispatcher should optimize for throughput, not for power,
+on this class of hardware. (This may differ on newer cores like A720 where
+compute-bound kernels can draw significantly more power.)
+
+### Governor comparison: performance vs ondemand (sustained gated_scan)
+
+| Governor | Throughput (GiB/s) | Idle (mW board) | Δ Power (mW board) | Energy (mJ/GiB board) |
+|----------|-------------------|-----------------|---------------------|----------------------|
+| `performance` | 0.74 | 1906 | 925 | **1250** |
+| `ondemand` | 0.69 | 1698 | 1097 | **1602** |
+
+**Finding: `performance` is both faster and more energy-efficient for sustained
+inference.** Despite `ondemand` lowering idle power by 208 mW (frequency scales
+down when idle), the 7% throughput penalty under load means each GiB costs 28%
+more energy. The frequency ramping latency on A57 is high enough that sustained
+workloads never benefit from scaling.
+
+This directly validates PLAN.md's recommendation to use the `performance`
+governor for all benchmarking. For bursty decode workloads (where idle gaps
+between tokens allow frequency to drop), `ondemand` might save idle energy — but
+that saving is irrelevant if it increases per-token energy under load.
+
+**Practical implication for submission:** all reported numbers use the
+`performance` governor. The `ondemand` comparison is documented to show the
+trade-off, not to suggest it as a recommended setting.
