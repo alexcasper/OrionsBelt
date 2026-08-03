@@ -1,0 +1,21 @@
+{
+  "type": "ruler_multi_key",
+  "target_tokens": 32768,
+  "actual_tokens_approx": 32467,
+  "num_keys": 20,
+  "queried_keys": [
+    "UUE-1232",
+    "LEN-7482",
+    "WTB-1505",
+    "FWT-2000",
+    "JFH-5853"
+  ],
+  "expected_answers": {
+    "UUE-1232": "YUX-0095",
+    "LEN-7482": "VSS-9868",
+    "WTB-1505": "YXQ-2047",
+    "FWT-2000": "RTZ-1824",
+    "JFH-5853": "XVR-4356"
+  },
+  "seed": 20260802
+}

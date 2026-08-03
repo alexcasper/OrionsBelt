@@ -1,0 +1,10 @@
+{
+  "type": "needle_in_haystack",
+  "target_tokens": 32768,
+  "actual_tokens_approx": 32768,
+  "needle": "The annual revenue figure mentioned is 3.7 million dollars.",
+  "question": "What is the annual revenue figure mentioned?",
+  "expected_answer": "3.7 million",
+  "needle_depth_fraction": 0.4999045546520063,
+  "seed": 20260802
+}

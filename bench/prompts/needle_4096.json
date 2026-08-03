@@ -1,0 +1,10 @@
+{
+  "type": "needle_in_haystack",
+  "target_tokens": 4096,
+  "actual_tokens_approx": 4096,
+  "needle": "The secret passcode for the archive is 7294.",
+  "question": "What is the secret passcode for the archive?",
+  "expected_answer": "7294",
+  "needle_depth_fraction": 0.47771912595138716,
+  "seed": 20260802
+}
