@@ -659,18 +659,54 @@ trade-off, not to suggest it as a recommended setting.
 
 Benchmark data from the device fleet (bead ob-8ms.3, ob-c9q):
 
-| Device | Core | Clock | Scan kernel (4B) | Cumdecay (4B) | Ratio to Jetson |
-|---|---|---|---|---|---|
-| Jetson Nano | A57 | 1.48 GHz | 0.72 GiB/s | 1.16 GiB/s | 1.0× |
-| Raspberry Pi 5 | A76 | 2.40 GHz | 1.84 GiB/s | 2.93–3.74 GiB/s | ~2.5–2.6× |
+| Device | Core | Clock | Spec BW | Scan kernel (4B) | % of spec |
+|---|---|---|---:|---:|---:|
+| Jetson Nano | A57 | 1.48 GHz | 25.6 GB/s | 0.72 GiB/s | **3.0%** |
+| Raspberry Pi 5 | A76 | 2.40 GHz | 17.0 GB/s | 1.84 GiB/s | 11.6% |
+| RK3588 (big) | A76 | 2.40 GHz | 34.0 GB/s | 3.29 GiB/s | 10.4% |
 
-**Finding:** The Pi 5 (A76) is ~2.5× faster than the Jetson (A57) on the
-gated-scan kernel, consistent with the clock ratio (1.63×) and the wider
-A76 execution pipeline. No inversion — the A76's advantage scales as expected
-for this memory-bandwidth-bound kernel.
+**Finding: the bandwidth-bound thesis holds within a core class and fails
+across core classes.** These are two distinct results and the fleet separates
+them, which is exactly what a three-point bandwidth axis was for.
 
-**Decode (seq=1) on Jetson A57:** the cumdecay kernel hits 4.65 GiB/s at
-seq=1 vs 1.16 GiB/s at seq=64 — a 4× speedup because the single-token
-recurrence fits entirely in L1 cache. This is the architectural property
-that makes GDN viable on edge silicon: O(1) recurrent state means the
-decode path becomes cache-resident regardless of context length.
+*Within the A76 class it holds.* The Pi 5 and RK3588 big cluster are the same
+core at the same clock and differ almost only in memory system. Spec bandwidth
+2.00× (17.0 → 34.0 GB/s) yields 1.79× achieved throughput (1.84 → 3.29 GiB/s),
+and both land at ~11% of spec. Throughput tracks bandwidth and the residual is
+small.
+
+*Across core classes it fails, and this was the designed discriminator.*
+[ADR 0005](./adr/0005-device-fleet-and-bandwidth-study.md) and
+[`DEVICE_RUNBOOK.md`](./DEVICE_RUNBOOK.md) set this up in advance: the Jetson has
+the **oldest** cores but **more** spec bandwidth than the Pi 5, so if the kernel
+were purely bandwidth-bound the Jetson should win. It has **1.51×** the Pi 5's
+spec bandwidth and reaches **0.39×** its throughput — a 3.9× miss against
+prediction, at 3.0% of spec where both A76 parts reach ~11%.
+
+So on the A57 the bottleneck is **the core, not the memory system**. The runbook
+committed in advance to reporting whichever way this went and to treating a
+comfortable Pi 5 win as the thesis being "wrong or incomplete." It is
+incomplete: arithmetic intensity of ~0.25 FLOP/byte sets a bandwidth *ceiling*,
+but a core has to be able to reach it, and the A57 — in-order-ish, narrower
+NEON, no dotprod, 1.48 GHz — cannot issue loads fast enough to saturate its own
+LPDDR4.
+
+**Consequence for the O6 prediction.** Do not fit all three points and
+extrapolate to 100 GB/s: that fit would be dominated by an outlier that is
+core-bound rather than bandwidth-bound. Extrapolate from the **A76 pair only**,
+which is also the defensible choice on architectural grounds, since the O6's
+Cortex-A720 is A76-class or better. The A57 point stays in the record as the
+boundary condition showing where the thesis stops applying.
+
+**Decode (seq=1) on Jetson A57:** the cumdecay kernel reports 4.65 GiB/s at
+seq=1 against 1.16 GiB/s at seq=64 — 4.0× — because the single-token step is
+**cache-resident** where the seq=64 sweep streams from DRAM. At 4096 channels
+each array is ~16 KiB, so the working set sits in the A57's 32 KiB L1D and 2 MiB
+L2 rather than "entirely in L1"; L2 residency is enough to explain the gap.
+
+Read that 4.65 GiB/s as a latency-dominated figure, not a sustained streaming
+rate: the seq=1 step moves a few tens of KiB in 6.6 µs, so it is not directly
+comparable to the seq=64 number as *bandwidth*. It is still the right thing to
+measure for decode, and the direction is the architectural point — O(1)
+recurrent state means the decode working set stays cache-resident **regardless
+of context length**, where a KV cache grows until it cannot.
