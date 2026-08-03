@@ -7,13 +7,9 @@ state and decay-gate parameters must NOT be quantized below FP16.
 import pytest
 
 from orionsbelt.quant.policy import (
-    ALL_POLICIES,
     GDN_POLICIES,
-    FULL_ATTENTION_POLICIES,
-    MLP_POLICIES,
     Precision,
     QuantScheme,
-    TensorGroupPolicy,
     estimate_weight_footprint_mib,
     policy_for,
 )
@@ -38,13 +34,25 @@ class TestGDNCriticalCarveOuts:
     def test_no_gdn_tensor_below_int8(self):
         """Every GDN tensor is at least INT8 — never below."""
         for p in GDN_POLICIES:
-            tier_order = [Precision.INT4, Precision.INT8, Precision.FP16, Precision.BF16, Precision.FP32]
-            min_tier = min(tier_order.index(p.precision_runtime), tier_order.index(
-                Precision.INT8 if p.scheme in (QuantScheme.WEIGHT_ONLY_INT8, QuantScheme.W8A8) else
-                Precision.INT4 if p.scheme == QuantScheme.WEIGHT_ONLY_INT4 else
-                Precision.FP16 if p.scheme == QuantScheme.FP16 else
-                Precision.FP32
-            ))
+            tier_order = [
+                Precision.INT4,
+                Precision.INT8,
+                Precision.FP16,
+                Precision.BF16,
+                Precision.FP32,
+            ]
+            min_tier = min(
+                tier_order.index(p.precision_runtime),
+                tier_order.index(
+                    Precision.INT8
+                    if p.scheme in (QuantScheme.WEIGHT_ONLY_INT8, QuantScheme.W8A8)
+                    else Precision.INT4
+                    if p.scheme == QuantScheme.WEIGHT_ONLY_INT4
+                    else Precision.FP16
+                    if p.scheme == QuantScheme.FP16
+                    else Precision.FP32
+                ),
+            )
             assert min_tier >= 0  # just ensure no crash; the real checks are below
 
 

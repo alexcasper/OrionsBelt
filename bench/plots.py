@@ -38,7 +38,6 @@ import sys
 from collections import OrderedDict, defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
 
 # ---------------------------------------------------------------------------
 # Data types
@@ -46,7 +45,7 @@ from typing import Dict, List, Optional, Tuple
 
 # Canonical device spec bandwidth (GiB/s) — from DEVICE_RUNBOOK.md "What we are
 # actually testing".  Used for the achieved-vs-spec bandwidth plot.
-DEVICE_SPEC_BANDWIDTH: Dict[str, float] = {
+DEVICE_SPEC_BANDWIDTH: dict[str, float] = {
     # device identifier (lowercase prefix match) → spec GiB/s
     "pi5": 17.0,
     "pi": 17.0,
@@ -57,7 +56,7 @@ DEVICE_SPEC_BANDWIDTH: Dict[str, float] = {
 }
 
 # Human-readable kernel names for plot labels.
-KERNEL_LABELS: Dict[str, str] = {
+KERNEL_LABELS: dict[str, str] = {
     "gdn_cumdecay": "Gated Cumulative Decay",
     "gdn_gated_scan": "Gated Delta-Rule Scan",
     "gdn_causal_dwconv1d": "Causal Depthwise Conv1D",
@@ -123,7 +122,7 @@ MICROBENCH_COLUMNS = [
 ]
 
 
-def detect_format(header: List[str]) -> str:
+def detect_format(header: list[str]) -> str:
     """Return 'microbench' or 'schema' based on CSV header."""
     if "kernel" in header and "dispatch_path" in header:
         return "microbench"
@@ -132,9 +131,9 @@ def detect_format(header: List[str]) -> str:
     raise ValueError(f"Unrecognised CSV header: {header}")
 
 
-def parse_microbench(path: str) -> List[MicrobenchRow]:
+def parse_microbench(path: str) -> list[MicrobenchRow]:
     """Parse a microbenchmark CSV into a list of MicrobenchRow."""
-    rows: List[MicrobenchRow] = []
+    rows: list[MicrobenchRow] = []
     with open(path, newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for raw in reader:
@@ -156,21 +155,21 @@ def parse_microbench(path: str) -> List[MicrobenchRow]:
     return rows
 
 
-def parse_schema(path: str) -> List[SchemaRow]:
+def parse_schema(path: str) -> list[SchemaRow]:
     """Parse a schema-conformant CSV and aggregate repeats to p50/p95.
 
     The harness writes per-repeat rows (one row per repeat_index).  We group by
     all dimensions except repeat_index/value and compute p50 and p95 using the
     nearest-rank method.
     """
-    raw_rows: List[dict] = []
+    raw_rows: list[dict] = []
     with open(path, newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         raw_rows = list(reader)
 
     # Group rows by all dimensions except repeat_index
-    groups: Dict[Tuple, List[float]] = defaultdict(list)
-    meta: Dict[Tuple, dict] = {}
+    groups: dict[tuple, list[float]] = defaultdict(list)
+    meta: dict[tuple, dict] = {}
 
     for raw in raw_rows:
         key = (
@@ -190,7 +189,7 @@ def parse_schema(path: str) -> List[SchemaRow]:
         groups[key].append(val)
         meta[key] = raw
 
-    result: List[SchemaRow] = []
+    result: list[SchemaRow] = []
     for key, values in sorted(groups.items()):
         values_sorted = sorted(values)
         n = len(values_sorted)
@@ -223,7 +222,7 @@ def parse_schema(path: str) -> List[SchemaRow]:
 # ---------------------------------------------------------------------------
 
 
-def microbench_to_markdown(rows: List[MicrobenchRow]) -> str:
+def microbench_to_markdown(rows: list[MicrobenchRow]) -> str:
     """Generate a markdown comparison table from microbenchmark rows."""
     if not rows:
         return "_(no data)_\n"
@@ -242,7 +241,7 @@ def microbench_to_markdown(rows: List[MicrobenchRow]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def microbench_bandwidth_table(rows: List[MicrobenchRow], device_name: str = "") -> str:
+def microbench_bandwidth_table(rows: list[MicrobenchRow], device_name: str = "") -> str:
     """Generate a bandwidth comparison table with spec bandwidth if known."""
     spec_bw = _lookup_spec_bandwidth(device_name)
 
@@ -273,14 +272,14 @@ def microbench_bandwidth_table(rows: List[MicrobenchRow], device_name: str = "")
     return "\n".join(lines) + "\n"
 
 
-def schema_throughput_table(rows: List[SchemaRow]) -> str:
+def schema_throughput_table(rows: list[SchemaRow]) -> str:
     """Generate a throughput vs context-length table from schema rows."""
     tput = [r for r in rows if r.metric_name.endswith("tokens_per_sec")]
     if not tput:
         return "_(no throughput data)_\n"
 
     # Group by (model, device, metric) then sort by context_length
-    groups: Dict[Tuple, List[SchemaRow]] = defaultdict(list)
+    groups: dict[tuple, list[SchemaRow]] = defaultdict(list)
     for r in tput:
         key = (r.model_checkpoint, r.device, r.metric_name)
         groups[key].append(r)
@@ -302,21 +301,23 @@ def schema_throughput_table(rows: List[SchemaRow]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def schema_memory_table(rows: List[SchemaRow]) -> str:
+def schema_memory_table(rows: list[SchemaRow]) -> str:
     """Generate a three-way memory decomposition table from schema rows."""
     mem = [r for r in rows if r.metric_name == "peak_memory_bytes"]
     if not mem:
         return "_(no memory data)_\n"
 
     # Group by (model, device, context_length) and show the three components
-    groups: Dict[Tuple, Dict[str, float]] = defaultdict(dict)
+    groups: dict[tuple, dict[str, float]] = defaultdict(dict)
     for r in mem:
         key = (r.model_checkpoint, r.device, r.context_length)
         comp = r.metric_component or "unknown"
         groups[key][comp] = r.p50
 
     lines = ["## Memory Decomposition (p50)\n"]
-    lines.append("| Model | Device | Context | Weights (MiB) | KV Cache (MiB) | Recurrent State (MiB) | Total (MiB) |")
+    lines.append(
+        "| Model | Device | Context | Weights (MiB) | KV Cache (MiB) | Recurrent State (MiB) | Total (MiB) |"
+    )
     lines.append("|---|---|---:|---:|---:|---:|---:|")
 
     for (model, device, ctx), comps in sorted(groups.items()):
@@ -324,12 +325,14 @@ def schema_memory_table(rows: List[SchemaRow]) -> str:
         k = comps.get("kv_cache", 0) / 1048576.0
         s = comps.get("recurrent_state", 0) / 1048576.0
         total = w + k + s
-        lines.append(f"| {model} | {device} | {ctx:,} | {w:,.1f} | {k:,.1f} | {s:,.1f} | {total:,.1f} |")
+        lines.append(
+            f"| {model} | {device} | {ctx:,} | {w:,.1f} | {k:,.1f} | {s:,.1f} | {total:,.1f} |"
+        )
 
     return "\n".join(lines) + "\n"
 
 
-def _lookup_spec_bandwidth(device_name: str) -> Optional[float]:
+def _lookup_spec_bandwidth(device_name: str) -> float | None:
     """Look up spec bandwidth for a device name (prefix match, case-insensitive)."""
     name = device_name.lower().strip()
     for prefix, bw in DEVICE_SPEC_BANDWIDTH.items():
@@ -365,11 +368,11 @@ def _try_import_matplotlib():
 
 
 def plot_bandwidth_bars(
-    rows: List[MicrobenchRow],
+    rows: list[MicrobenchRow],
     device_name: str,
     output_path: str,
     plt=None,
-) -> Optional[str]:
+) -> str | None:
     """Bar chart: achieved GiB/s per kernel, with spec bandwidth reference line.
 
     Returns the output path if the figure was written, None otherwise.
@@ -393,7 +396,7 @@ def plot_bandwidth_bars(
     x_labels = []
     bar_width = 0.35
 
-    for i, (label, k_rows) in enumerate(kernels.items()):
+    for i, k_rows in enumerate(kernels.values()):
         for j, r in enumerate(k_rows):
             model_short = r.model.replace("Qwen3.5-", "")
             color = PALETTE[j % len(PALETTE)]
@@ -407,17 +410,24 @@ def plot_bandwidth_bars(
 
     if spec_bw:
         ax.axhline(spec_bw, color="#CC0000", linestyle="--", linewidth=1.5, alpha=0.7)
-        ax.text(len(kernels) - 0.5, spec_bw * 1.02, f"Spec: {spec_bw:.1f} GiB/s",
-                fontsize=8, color="#CC0000", ha="right")
+        ax.text(
+            len(kernels) - 0.5,
+            spec_bw * 1.02,
+            f"Spec: {spec_bw:.1f} GiB/s",
+            fontsize=8,
+            color="#CC0000",
+            ha="right",
+        )
 
     # Deduplicate legend (convert to lists for matplotlib compatibility)
     handles, labels = ax.get_legend_handles_labels()
-    by_label = OrderedDict(zip(labels, handles))
+    by_label = OrderedDict(zip(labels, handles, strict=False))
     ax.legend(list(by_label.values()), list(by_label.keys()), fontsize=8, loc="upper right")
 
     ax.set_ylabel("Achieved Bandwidth (GiB/s)")
-    ax.set_title(f"GDN Kernel Bandwidth — {device_name}\n"
-                 f"({rows[0].dispatch_path} dispatch)" if rows else "")
+    ax.set_title(
+        f"GDN Kernel Bandwidth — {device_name}\n({rows[0].dispatch_path} dispatch)" if rows else ""
+    )
     ax.set_ylim(bottom=0)
     ax.grid(axis="y", alpha=0.3)
 
@@ -428,10 +438,10 @@ def plot_bandwidth_bars(
 
 
 def plot_throughput_curve(
-    rows: List[SchemaRow],
+    rows: list[SchemaRow],
     output_path: str,
     plt=None,
-) -> Optional[str]:
+) -> str | None:
     """Line plot: throughput (prefill & decode) vs context length.
 
     Returns the output path if the figure was written, None otherwise.
@@ -444,15 +454,14 @@ def plot_throughput_curve(
         return None
 
     # Group by (model, device, metric)
-    groups: Dict[Tuple, List[SchemaRow]] = defaultdict(list)
+    groups: dict[tuple, list[SchemaRow]] = defaultdict(list)
     for r in tput:
         key = (r.model_checkpoint, r.device, r.metric_name)
         groups[key].append(r)
 
     fig, ax = plt.subplots(figsize=(FIG_W, FIG_H))
 
-    color_idx = 0
-    for (model, device, metric), group in sorted(groups.items()):
+    for color_idx, ((model, device, metric), group) in enumerate(sorted(groups.items())):
         group.sort(key=lambda r: r.context_length)
         ctxs = [r.context_length for r in group]
         p50s = [r.p50 for r in group]
@@ -462,7 +471,6 @@ def plot_throughput_curve(
         phase = "prefill" if "prefill" in metric else "decode"
         label = f"{model_short} {device} ({phase})"
         color = PALETTE[color_idx % len(PALETTE)]
-        color_idx += 1
 
         ax.plot(ctxs, p50s, marker="o", color=color, label=label, linewidth=2)
         ax.fill_between(ctxs, p50s, p95s, alpha=0.15, color=color)
@@ -484,10 +492,10 @@ def plot_throughput_curve(
 
 
 def plot_memory_decomposition(
-    rows: List[SchemaRow],
+    rows: list[SchemaRow],
     output_path: str,
     plt=None,
-) -> Optional[str]:
+) -> str | None:
     """Stacked area plot: weights / KV cache / recurrent state vs context length.
 
     Returns the output path if the figure was written, None otherwise.
@@ -495,14 +503,12 @@ def plot_memory_decomposition(
     if plt is None or not rows:
         return None
 
-    import numpy as np  # noqa: E402
-
     mem = [r for r in rows if r.metric_name == "peak_memory_bytes"]
     if not mem:
         return None
 
     # Group by (model, device) and plot all context lengths
-    groups: Dict[Tuple, Dict[int, Dict[str, float]]] = defaultdict(lambda: defaultdict(dict))
+    groups: dict[tuple, dict[int, dict[str, float]]] = defaultdict(lambda: defaultdict(dict))
     for r in mem:
         key = (r.model_checkpoint, r.device)
         comp = r.metric_component or "unknown"
@@ -510,8 +516,7 @@ def plot_memory_decomposition(
 
     fig, ax = plt.subplots(figsize=(FIG_W, FIG_H))
 
-    color_idx = 0
-    for (model, device), ctx_map in sorted(groups.items()):
+    for color_idx, ((model, device), ctx_map) in enumerate(sorted(groups.items())):
         ctxs = sorted(ctx_map.keys())
         weights = [ctx_map[c].get("weights", 0) for c in ctxs]
         kv = [ctx_map[c].get("kv_cache", 0) for c in ctxs]
@@ -520,16 +525,30 @@ def plot_memory_decomposition(
         model_short = model.replace("Qwen/Qwen3.5-", "")
         base_label = f"{model_short} {device}"
 
-        ax.fill_between(ctxs, 0, weights, alpha=0.6, color=PALETTE[0],
-                        label=f"{base_label} — Weights" if color_idx == 0 else "")
-        ax.fill_between(ctxs, weights, [w + k for w, k in zip(weights, kv)],
-                        alpha=0.6, color=PALETTE[1],
-                        label=f"{base_label} — KV Cache" if color_idx == 0 else "")
-        ax.fill_between(ctxs, [w + k for w, k in zip(weights, kv)],
-                        [w + k + s for w, k, s in zip(weights, kv, state)],
-                        alpha=0.6, color=PALETTE[2],
-                        label=f"{base_label} — Recurrent State" if color_idx == 0 else "")
-        color_idx += 1
+        ax.fill_between(
+            ctxs,
+            0,
+            weights,
+            alpha=0.6,
+            color=PALETTE[0],
+            label=f"{base_label} — Weights" if color_idx == 0 else "",
+        )
+        ax.fill_between(
+            ctxs,
+            weights,
+            [w + k for w, k in zip(weights, kv, strict=False)],
+            alpha=0.6,
+            color=PALETTE[1],
+            label=f"{base_label} — KV Cache" if color_idx == 0 else "",
+        )
+        ax.fill_between(
+            ctxs,
+            [w + k for w, k in zip(weights, kv, strict=False)],
+            [w + k + s for w, k, s in zip(weights, kv, state, strict=False)],
+            alpha=0.6,
+            color=PALETTE[2],
+            label=f"{base_label} — Recurrent State" if color_idx == 0 else "",
+        )
 
     ax.set_xlabel("Context Length (tokens)")
     ax.set_ylabel("Memory (MiB)")
@@ -550,17 +569,18 @@ def plot_memory_decomposition(
 # Main pipeline
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class PlotResult:
     """Summary of what was generated."""
 
-    figures: List[str] = field(default_factory=list)
-    tables: List[str] = field(default_factory=list)
-    warnings: List[str] = field(default_factory=list)
+    figures: list[str] = field(default_factory=list)
+    tables: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
 
 
 def generate_all(
-    csv_paths: List[str],
+    csv_paths: list[str],
     output_dir: str,
     text_only: bool = False,
 ) -> PlotResult:
@@ -578,9 +598,9 @@ def generate_all(
             "Install with: pip install matplotlib"
         )
 
-    all_microbench: List[MicrobenchRow] = []
-    all_schema: List[SchemaRow] = []
-    microbench_by_device: Dict[str, List[MicrobenchRow]] = defaultdict(list)
+    all_microbench: list[MicrobenchRow] = []
+    all_schema: list[SchemaRow] = []
+    microbench_by_device: dict[str, list[MicrobenchRow]] = defaultdict(list)
 
     for csv_path in csv_paths:
         if not os.path.exists(csv_path):
@@ -615,7 +635,7 @@ def generate_all(
         table_path = os.path.join(output_dir, f"{device}_table.md")
         with open(table_path, "w", encoding="utf-8") as f:
             f.write(f"# {device} — Microbenchmark Results\n\n")
-            f.write(f"_Source: committed CSVs in results/raw/_\n\n")
+            f.write("_Source: committed CSVs in results/raw/_\n\n")
             f.write(microbench_to_markdown(rows))
             f.write("\n")
             f.write(microbench_bandwidth_table(rows, device))
@@ -679,13 +699,13 @@ def generate_all(
 
 
 def _plot_cross_device(
-    by_device: Dict[str, List[MicrobenchRow]],
+    by_device: dict[str, list[MicrobenchRow]],
     output_path: str,
     plt,
 ) -> None:
     """Bar chart comparing achieved bandwidth across devices for the scan kernel."""
     # Focus on gated_scan — the core GDN recurrence
-    scan_by_device: Dict[str, Dict[str, float]] = defaultdict(dict)
+    scan_by_device: dict[str, dict[str, float]] = defaultdict(dict)
     for device, rows in by_device.items():
         for r in rows:
             if r.kernel == "gdn_gated_scan":
@@ -710,8 +730,14 @@ def _plot_cross_device(
         for i, device in enumerate(devices):
             x_positions.append(i + j * bar_width)
             heights.append(scan_by_device[device].get(model, 0))
-        ax.bar(x_positions, heights, bar_width, label=model,
-               color=PALETTE[j % len(PALETTE)], alpha=0.85)
+        ax.bar(
+            x_positions,
+            heights,
+            bar_width,
+            label=model,
+            color=PALETTE[j % len(PALETTE)],
+            alpha=0.85,
+        )
 
     ax.set_xticks([i + bar_width * (n_models - 1) / 2 for i in range(n_devices)])
     ax.set_xticklabels(devices, fontsize=9)
@@ -720,8 +746,14 @@ def _plot_cross_device(
     for i, device in enumerate(devices):
         spec = _lookup_spec_bandwidth(device)
         if spec:
-            ax.plot([i - 0.4, i + n_models * bar_width - 0.4 + 0.4], [spec, spec],
-                    color="#CC0000", linestyle="--", linewidth=1, alpha=0.5)
+            ax.plot(
+                [i - 0.4, i + n_models * bar_width - 0.4 + 0.4],
+                [spec, spec],
+                color="#CC0000",
+                linestyle="--",
+                linewidth=1,
+                alpha=0.5,
+            )
 
     ax.set_ylabel("Achieved Bandwidth (GiB/s)")
     ax.set_title("Cross-Device Comparison: Gated Delta-Rule Scan")
@@ -739,7 +771,7 @@ def _plot_cross_device(
 # ---------------------------------------------------------------------------
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Generate plots and tables from committed benchmark CSVs."
     )
@@ -762,7 +794,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     args = parser.parse_args(argv)
 
     # Expand directories to individual CSV files
-    csv_files: List[str] = []
+    csv_files: list[str] = []
     for path in args.csv_paths:
         if os.path.isdir(path):
             for fname in sorted(os.listdir(path)):

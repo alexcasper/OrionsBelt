@@ -61,11 +61,13 @@ class CheckpointLayerInfo:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "key_dim", self.linear_key_head_dim * self.linear_num_key_heads)
-        object.__setattr__(self, "value_dim", self.linear_value_head_dim * self.linear_num_value_heads)
         object.__setattr__(
-            self, "conv_dim", self.key_dim * 2 + self.value_dim
+            self, "value_dim", self.linear_value_head_dim * self.linear_num_value_heads
         )
-        object.__setattr__(self, "kv_head_ratio", self.linear_num_value_heads // self.linear_num_key_heads)
+        object.__setattr__(self, "conv_dim", self.key_dim * 2 + self.value_dim)
+        object.__setattr__(
+            self, "kv_head_ratio", self.linear_num_value_heads // self.linear_num_key_heads
+        )
 
     # --- recurrent state ---
     @property

@@ -33,10 +33,8 @@ Usage::
 from __future__ import annotations
 
 import argparse
-import csv
 import math
 import os
-import statistics
 import subprocess
 import sys
 import time
@@ -47,14 +45,12 @@ from typing import Protocol
 # Make schema importable when run as a script from the repo root.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from schema import (  # noqa: E402
-    COLUMNS,
     CANONICAL_CONTEXT_LENGTHS,
     ResultRow,
     SchemaValidationError,
     validate_row,
     write_csv,
 )
-
 
 # ---------------------------------------------------------------------------
 # Metric definitions (docs/METRICS.md sections 3–4)
@@ -419,7 +415,11 @@ def run_sweep(
 
     for ctx in config.context_lengths:
         if progress:
-            print(f"  context={ctx:>7d}  warmups={config.warmups}  repeats={config.repeats} ...", end="", flush=True)
+            print(
+                f"  context={ctx:>7d}  warmups={config.warmups}  repeats={config.repeats} ...",
+                end="",
+                flush=True,
+            )
 
         # Warmup (results discarded)
         for _w in range(config.warmups):
@@ -461,8 +461,10 @@ def summarize(rows: list[ResultRow]) -> str:
         groups[key].append(row.value)
 
     lines = []
-    lines.append(f"{'context':>8}  {'phase':>7}  {'metric':>26}  {'comp':>16}  "
-                 f"{'p50':>10}  {'p95':>10}  {'spread':>7}")
+    lines.append(
+        f"{'context':>8}  {'phase':>7}  {'metric':>26}  {'comp':>16}  "
+        f"{'p50':>10}  {'p95':>10}  {'spread':>7}"
+    )
     lines.append("-" * 100)
 
     for key in sorted(groups):
@@ -503,31 +505,48 @@ def main(argv: list[str] | None = None) -> int:
         description="Benchmark runner: context sweep, warmup, repeats, percentiles.",
     )
     parser.add_argument(
-        "--backend", default="synthetic",
+        "--backend",
+        default="synthetic",
         help="Inference backend name (default: synthetic for testing).",
     )
     parser.add_argument("--model-checkpoint", required=True, help="HF repo id.")
     parser.add_argument(
-        "--context-lengths", type=_parse_context_lengths,
+        "--context-lengths",
+        type=_parse_context_lengths,
         default=list(CANONICAL_CONTEXT_LENGTHS),
         help="Comma-separated context lengths (default: 4096,32768,131072,262144).",
     )
     parser.add_argument("--warmups", type=int, default=3, help="Discarded warmup repeats.")
     parser.add_argument("--repeats", type=int, default=5, help="Timed repeats (min 5).")
-    parser.add_argument("--decode-tokens", type=int, default=256,
-                        help="Decode tokens to generate (METRICS.md §4: N-1=256).")
-    parser.add_argument("--device", required=True,
-                        choices=["o6", "generic_aarch64", "x86_reference"])
-    parser.add_argument("--engine-gdn", required=True,
-                        choices=["npu", "gpu_vulkan", "gpu_opencl", "cpu", "cuda_reference"])
-    parser.add_argument("--engine-full-attention", required=True,
-                        choices=["npu", "gpu_vulkan", "gpu_opencl", "cpu", "cuda_reference"])
-    parser.add_argument("--quantization", required=True,
-                        help="Quantization code, e.g. fp16, int4_w4a16.")
+    parser.add_argument(
+        "--decode-tokens",
+        type=int,
+        default=256,
+        help="Decode tokens to generate (METRICS.md §4: N-1=256).",
+    )
+    parser.add_argument(
+        "--device", required=True, choices=["o6", "generic_aarch64", "x86_reference"]
+    )
+    parser.add_argument(
+        "--engine-gdn",
+        required=True,
+        choices=["npu", "gpu_vulkan", "gpu_opencl", "cpu", "cuda_reference"],
+    )
+    parser.add_argument(
+        "--engine-full-attention",
+        required=True,
+        choices=["npu", "gpu_vulkan", "gpu_opencl", "cpu", "cuda_reference"],
+    )
+    parser.add_argument(
+        "--quantization", required=True, help="Quantization code, e.g. fp16, int4_w4a16."
+    )
     parser.add_argument("--run-id", default="", help="Override auto-generated run_id.")
     parser.add_argument("--output", default="", help="Output CSV path.")
-    parser.add_argument("--manifest-ref", default="",
-                        help="Manifest path (default: results/manifests/<run_id>.json).")
+    parser.add_argument(
+        "--manifest-ref",
+        default="",
+        help="Manifest path (default: results/manifests/<run_id>.json).",
+    )
     parser.add_argument("--no-progress", action="store_true", help="Suppress progress output.")
 
     args = parser.parse_args(argv)
@@ -549,7 +568,7 @@ def main(argv: list[str] | None = None) -> int:
 
     # Select backend
     if args.backend == "synthetic":
-        backend = Synthetic_backend()
+        backend = SyntheticBackend()
     else:
         print(f"Error: unknown backend '{args.backend}'. Available: synthetic", file=sys.stderr)
         return 1
@@ -557,8 +576,10 @@ def main(argv: list[str] | None = None) -> int:
     # Run the sweep
     print(f"Benchmark run: {config.run_id}")
     print(f"  model: {config.model_checkpoint}")
-    print(f"  device: {config.device}  engine_gdn: {config.engine_gdn}  "
-          f"engine_full_attn: {config.engine_full_attention}")
+    print(
+        f"  device: {config.device}  engine_gdn: {config.engine_gdn}  "
+        f"engine_full_attn: {config.engine_full_attention}"
+    )
     print(f"  quantization: {config.quantization}")
     print(f"  context_lengths: {config.context_lengths}")
     print(f"  warmups: {config.warmups}  repeats: {config.repeats}")
