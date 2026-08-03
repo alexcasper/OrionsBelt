@@ -67,12 +67,12 @@ For 4B: `in_proj_qkv` maps 2560 → 8192; `in_proj_z` maps 2560 → 4096;
 
 ```python
 self.conv1d = nn.Conv1d(
-    in_channels  = key_dim * 2 + value_dim,   # 8192 for 4B
-    out_channels = key_dim * 2 + value_dim,
-    bias         = False,
-    kernel_size  = 4,                          # linear_conv_kernel_dim
-    groups       = key_dim * 2 + value_dim,   # full depthwise
-    padding      = 3,                          # kernel_size - 1 (causal)
+    in_channels=key_dim * 2 + value_dim,  # 8192 for 4B
+    out_channels=key_dim * 2 + value_dim,
+    bias=False,
+    kernel_size=4,  # linear_conv_kernel_dim
+    groups=key_dim * 2 + value_dim,  # full depthwise
+    padding=3,  # kernel_size - 1 (causal)
 )
 ```
 
@@ -92,12 +92,12 @@ self.conv1d = nn.Conv1d(
 
 ```python
 # Per-value-head parameters:
-A_log   = nn.Parameter(...)   # init: uniform(0, 16).log_()  → shape (num_v_heads,)
-dt_bias = nn.Parameter(...)   # init: ones                  → shape (num_v_heads,)
+A_log = nn.Parameter(...)  # init: uniform(0, 16).log_()  → shape (num_v_heads,)
+dt_bias = nn.Parameter(...)  # init: ones                  → shape (num_v_heads,)
 
 # Forward:
-beta = sigmoid(b)                                    # write gate
-g    = -exp(A_log) * softplus(a + dt_bias)           # decay gate (negative ⇒ decay)
+beta = sigmoid(b)  # write gate
+g = -exp(A_log) * softplus(a + dt_bias)  # decay gate (negative ⇒ decay)
 ```
 
 - `g` is **input-dependent** (depends on `a` from `in_proj_a`) and
@@ -155,8 +155,8 @@ before entering the recurrence (`use_qk_l2norm_in_kernel=True`, always).
 ### 2.6 Output norm and projection
 
 ```python
-core_attn_out = Qwen3_5RMSNormGated(core_attn_out, z)   # RMSNorm then SiLU(z)
-output = self.out_proj(core_attn_out)                    # value_dim → hidden_size
+core_attn_out = Qwen3_5RMSNormGated(core_attn_out, z)  # RMSNorm then SiLU(z)
+output = self.out_proj(core_attn_out)  # value_dim → hidden_size
 ```
 
 `RMSNormGated` applies RMS-normalisation, multiplies by a learnable weight,

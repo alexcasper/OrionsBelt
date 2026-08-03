@@ -74,6 +74,7 @@ def _try_huggingface_hub():
     """Import huggingface_hub.snapshot_download if available."""
     try:
         from huggingface_hub import snapshot_download
+
         return snapshot_download
     except ImportError:
         return None
@@ -129,9 +130,7 @@ def _download_file(url, dest_path, chunk_size=1024 * 1024):
             downloaded += len(chunk)
             if total > 0:
                 pct = downloaded * 100 // total
-                sys.stdout.write(
-                    f"\r  {pct}% ({downloaded / 1e6:.1f} MB / {total / 1e6:.1f} MB)"
-                )
+                sys.stdout.write(f"\r  {pct}% ({downloaded / 1e6:.1f} MB / {total / 1e6:.1f} MB)")
                 sys.stdout.flush()
     print()  # newline after progress
 
@@ -173,6 +172,7 @@ def download_via_urllib(repo_id, output_dir):
 
     try:
         from urllib.request import Request, urlopen
+
         req = Request(index_url, headers={"User-Agent": "OrionsBelt/fetch_weights"})
         resp = urlopen(req)
         index = json.loads(resp.read().decode("utf-8"))
@@ -247,9 +247,9 @@ def write_manifest(model_key, local_dir, checksums):
         "approx_size_gb": info["approx_size_gb"],
         "local_dir": local_dir,
         "files": checksums,
-        "downloaded_at": subprocess.check_output(
-            ["date", "-u", "+%Y-%m-%dT%H:%M:%SZ"]
-        ).decode().strip(),
+        "downloaded_at": subprocess.check_output(["date", "-u", "+%Y-%m-%dT%H:%M:%SZ"])
+        .decode()
+        .strip(),
     }
     manifest_path = os.path.join(local_dir, ".fetch_manifest.json")
     with open(manifest_path, "w") as f:
@@ -335,10 +335,12 @@ def main(argv=None):
     models = list(MODELS.keys()) if args.model == "all" else [args.model]
 
     for model_key in models:
-        print("\n=== {} ({}) ===".format(
-            MODELS[model_key]["repo_id"],
-            MODELS[model_key]["role"],
-        ))
+        print(
+            "\n=== {} ({}) ===".format(
+                MODELS[model_key]["repo_id"],
+                MODELS[model_key]["role"],
+            )
+        )
         fetch_model(model_key, args.output_dir, verify_only=args.verify_only)
 
     print("\nAll requested models processed.")

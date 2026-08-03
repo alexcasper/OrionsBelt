@@ -75,11 +75,25 @@ class TestDetectFormat:
 
     def test_schema(self):
         header = [
-            "run_id", "timestamp", "git_sha", "manifest_ref", "device",
-            "engine_gdn", "engine_full_attention", "model_checkpoint",
-            "quantization", "context_length", "phase", "metric_name",
-            "metric_component", "value", "unit", "repeat_index",
-            "repeat_count", "layer_class", "notes",
+            "run_id",
+            "timestamp",
+            "git_sha",
+            "manifest_ref",
+            "device",
+            "engine_gdn",
+            "engine_full_attention",
+            "model_checkpoint",
+            "quantization",
+            "context_length",
+            "phase",
+            "metric_name",
+            "metric_component",
+            "value",
+            "unit",
+            "repeat_index",
+            "repeat_count",
+            "layer_class",
+            "notes",
         ]
         assert detect_format(header) == "schema"
 
@@ -175,7 +189,9 @@ class TestParseSchema:
         # 32K: weights, kv_cache, recurrent_state (3)
         assert len(mem) == 6
 
-        weights_4k = [r for r in mem if r.metric_component == "weights" and r.context_length == 4096]
+        weights_4k = [
+            r for r in mem if r.metric_component == "weights" and r.context_length == 4096
+        ]
         assert len(weights_4k) == 1
         assert weights_4k[0].p50 == pytest.approx(10737418240.0)
 
@@ -282,23 +298,28 @@ class TestSchemaTables:
 class TestDeviceSpecBandwidth:
     def test_jetson_lookup(self):
         from plots import _lookup_spec_bandwidth
+
         assert _lookup_spec_bandwidth("jetson-j1") == 25.6
         assert _lookup_spec_bandwidth("jetson") == 25.6
 
     def test_pi5_lookup(self):
         from plots import _lookup_spec_bandwidth
+
         assert _lookup_spec_bandwidth("pi5") == 17.0
 
     def test_rk3588_lookup(self):
         from plots import _lookup_spec_bandwidth
+
         assert _lookup_spec_bandwidth("rk3588") == 34.0
 
     def test_o6_lookup(self):
         from plots import _lookup_spec_bandwidth
+
         assert _lookup_spec_bandwidth("o6") == 93.1
 
     def test_unknown_returns_none(self):
         from plots import _lookup_spec_bandwidth
+
         assert _lookup_spec_bandwidth("mystery-board") is None
 
 

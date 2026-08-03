@@ -32,6 +32,7 @@ from corpus import (
 class TestGenerateHaystack:
     def test_approximate_length(self):
         import random
+
         rng = random.Random(42)
         target = 10000
         text = generate_haystack(target, rng)
@@ -40,6 +41,7 @@ class TestGenerateHaystack:
 
     def test_deterministic_with_seed(self):
         import random
+
         rng1 = random.Random(42)
         rng2 = random.Random(42)
         text1 = generate_haystack(5000, rng1)
@@ -48,6 +50,7 @@ class TestGenerateHaystack:
 
     def test_different_seeds_differ(self):
         import random
+
         rng1 = random.Random(42)
         rng2 = random.Random(99)
         text1 = generate_haystack(5000, rng1)
@@ -56,6 +59,7 @@ class TestGenerateHaystack:
 
     def test_contains_known_passage(self):
         import random
+
         rng = random.Random(42)
         text = generate_haystack(2000, rng)
         # Should contain text from at least one filler passage
@@ -286,10 +290,12 @@ class TestSaveCorpus:
 class TestSaveManifest:
     def test_manifest_summarises_corpus(self):
         with tempfile.TemporaryDirectory() as tmpdir:
-            items = generate_corpus(CorpusConfig(
-                context_lengths=[4096, 32768],
-                tasks=["niah_single"],
-            ))
+            items = generate_corpus(
+                CorpusConfig(
+                    context_lengths=[4096, 32768],
+                    tasks=["niah_single"],
+                )
+            )
             manifest_path = save_manifest(items, tmpdir)
 
             with open(manifest_path) as f:
@@ -303,9 +309,11 @@ class TestSaveManifest:
 
     def test_manifest_lists_context_lengths(self):
         with tempfile.TemporaryDirectory() as tmpdir:
-            items = generate_corpus(CorpusConfig(
-                context_lengths=[4096, 32768],
-            ))
+            items = generate_corpus(
+                CorpusConfig(
+                    context_lengths=[4096, 32768],
+                )
+            )
             manifest_path = save_manifest(items, tmpdir)
 
             with open(manifest_path) as f:
