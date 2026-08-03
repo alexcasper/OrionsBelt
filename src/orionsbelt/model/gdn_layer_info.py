@@ -53,6 +53,10 @@ class CheckpointLayerInfo:
     full_attn_head_dim: int
     partial_rotary_factor: float
 
+    # --- global model dims ---
+    vocab_size: int
+    intermediate_size: int  # MLP intermediate (gate/up/down)
+
     # --- derived (computed in __post_init__) ---
     key_dim: int = field(init=False)
     value_dim: int = field(init=False)
@@ -84,7 +88,6 @@ class CheckpointLayerInfo:
         v, k, vd = self.recurrent_state_shape
         return v * k * vd
 
-    @property
     def recurrent_state_bytes_per_layer(self, dtype_size: int = 4) -> int:
         return self.recurrent_state_elements_per_layer * dtype_size
 
@@ -162,6 +165,8 @@ _4B = CheckpointLayerInfo(
     num_key_value_heads=4,
     full_attn_head_dim=256,
     partial_rotary_factor=0.25,
+    vocab_size=248320,
+    intermediate_size=12288,
 )
 
 _0_8B = CheckpointLayerInfo(
@@ -181,6 +186,11 @@ _0_8B = CheckpointLayerInfo(
     num_key_value_heads=2,
     full_attn_head_dim=256,
     partial_rotary_factor=0.25,
+    # vocab_size: same tokenizer as 4B (Qwen3.5 family uses unified vocab)
+    vocab_size=248320,
+    # intermediate_size: estimated from 4B ratio (12288/2560 = 4.8).
+    # Unverified against 0.8B config.json — update when confirmed.
+    intermediate_size=4915,
 )
 
 #: Lookup by name.  Primary checkpoint is "4B"; fallback is "0.8B" (ADR 0003).

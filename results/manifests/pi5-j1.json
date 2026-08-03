@@ -1,0 +1,77 @@
+{
+  "caller": {},
+  "git": {
+    "dirty": true,
+    "sha": "f127a11cfdeeefcf2d289f3fa659afec4e5f5380"
+  },
+  "host": {
+    "core_count": 4,
+    "cpu_model": "Raspberry Pi 5 Model B Rev 1.0",
+    "cpu_topology": [
+      {
+        "cpu": 0,
+        "cpu_capacity": 1024,
+        "governor": "performance",
+        "max_freq_khz": 2400000,
+        "min_freq_khz": 1500000
+      },
+      {
+        "cpu": 1,
+        "cpu_capacity": 1024,
+        "governor": "performance",
+        "max_freq_khz": 2400000,
+        "min_freq_khz": 1500000
+      },
+      {
+        "cpu": 2,
+        "cpu_capacity": 1024,
+        "governor": "performance",
+        "max_freq_khz": 2400000,
+        "min_freq_khz": 1500000
+      },
+      {
+        "cpu": 3,
+        "cpu_capacity": 1024,
+        "governor": "performance",
+        "max_freq_khz": 2400000,
+        "min_freq_khz": 1500000
+      }
+    ],
+    "hostname": "r5",
+    "kernel": "6.12.62+rpt-rpi-2712",
+    "machine": "aarch64",
+    "os": "Linux-6.12.62+rpt-rpi-2712-aarch64-with-glibc2.41"
+  },
+  "isa_features": {
+    "asimddp": true,
+    "bf16": false,
+    "i8mm": false,
+    "sme": false,
+    "sve": false,
+    "sve2": false
+  },
+  "manifest_version": 1,
+  "memory": {
+    "mem_available_kb": 2985648,
+    "mem_total_kb": 4142784
+  },
+  "run_id": "r5_20260803T083154Z_f127a11",
+  "software": {
+    "packages": {
+      "numpy": "2.2.4",
+      "onnxruntime": null,
+      "torch": null,
+      "transformers": null
+    },
+    "python_implementation": "CPython",
+    "python_version": "3.13.5 (main, Jun 25 2025, 18:55:22) [GCC 14.2.0]"
+  },
+  "thermal_zones": [
+    {
+      "temp_millicelsius": 66100,
+      "type": "cpu-thermal",
+      "zone": "thermal_zone0"
+    }
+  ],
+  "timestamp_utc": "2026-08-03T08:31:54Z"
+}

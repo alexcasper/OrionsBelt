@@ -90,16 +90,14 @@ def estimate_weights(
         + info.full_attn_head_dim * 2  # q_norm + k_norm
     )
     # MLP/FFN layers (every layer has MLP)
-    # intermediate_size is not in CheckpointLayerInfo; estimate from config
-    # For Qwen3.5: intermediate = hidden * ~4.8 (verified from config)
-    intermediate = int(h * 4.792)  # 2560*12288/2560 = 4.8 for 4B; close enough
+    intermediate = info.intermediate_size
     mlp_per_layer = (
         h * intermediate  # gate_proj
         + h * intermediate  # up_proj
         + intermediate * h  # down_proj
     )
     # Embedding + LM head
-    vocab = 248320
+    vocab = info.vocab_size
     embed = vocab * h
     lm_head = vocab * h
 
@@ -133,18 +131,11 @@ def predict_breakdown(
     kv_bytes = _DTYPE_BYTES[kv_cache_dtype]
 
     weights = estimate_weights(info, w_bytes)
-    kv_cache = int(
-        info.kv_cache_bytes_per_token(dtype_size=int(kv_bytes))
-        * context_length
-        / kv_bytes
-        * info.num_full_attention_layers
-        / info.num_full_attention_layers
-    )
-    # More directly:
+
     kv_cache = (
         info.num_key_value_heads
         * info.full_attn_head_dim
-        * 2
+        * 2  # K + V
         * context_length
         * info.num_full_attention_layers
         * kv_bytes

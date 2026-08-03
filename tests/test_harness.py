@@ -533,6 +533,19 @@ class TestCLI:
         # The operator's own note must survive alongside the marker.
         assert all("pre-existing note" in r.notes for r in rows)
 
+    def test_cli_choices_are_derived_from_the_frozen_schema(self):
+        """The CLI's device/engine choices must not drift from schema.py.
+
+        These were hardcoded literal lists duplicating the schema enums. They
+        agreed, but nothing enforced it, so a schema change would have left the
+        CLI accepting a value that validate_rows rejects only after a full sweep.
+        """
+        from bench.harness import _DEVICE_CHOICES, _ENGINE_CHOICES
+        from bench.schema import Device, Engine
+
+        assert set(_DEVICE_CHOICES) == {d.value for d in Device}
+        assert set(_ENGINE_CHOICES) == {e.value for e in Engine}
+
     def test_rejects_below_minimum_repeats(self):
         with pytest.raises(SystemExit):
             main(
@@ -607,3 +620,49 @@ class TestLoadConfigFromDict:
         )
         assert cfg.num_gdn_layers == 1
         assert cfg.num_full_attention_layers == 1
+
+
+class TestSweepConfigValidation:
+    """SweepConfig rejects schema-invalid values at construction.
+
+    The CLI constrains these through argparse, but callers that build a config
+    directly — scripts/run_ablation.py, bench/hf_backend.py, tests — bypassed
+    that. Without validation here the first symptom of a typo'd device is
+    validate_rows raising *after* the sweep, which at 262K context is expensive.
+    """
+
+    def _cfg(self, **overrides):
+        kwargs = dict(context_lengths=[64], repeat_count=5)
+        kwargs.update(overrides)
+        return SweepConfig(**kwargs)
+
+    def test_valid_config_constructs(self):
+        cfg = self._cfg()
+        assert cfg.device in {
+            d.value for d in __import__("bench.schema", fromlist=["Device"]).Device
+        }
+
+    def test_rejects_unknown_device(self):
+        with pytest.raises(ValueError, match="device must be one of"):
+            self._cfg(device="raspberry-pi-9")
+
+    def test_rejects_unknown_engine_gdn(self):
+        with pytest.raises(ValueError, match="engine_gdn must be one of"):
+            self._cfg(engine_gdn="tpu")
+
+    def test_rejects_unknown_engine_full_attention(self):
+        with pytest.raises(ValueError, match="engine_full_attention must be one of"):
+            self._cfg(engine_full_attention="tpu")
+
+    def test_rejects_repeat_count_below_five(self):
+        with pytest.raises(ValueError, match="never report N < 5"):
+            self._cfg(repeat_count=4)
+
+    def test_accepts_every_schema_enum_value(self):
+        """Whatever the schema allows, the config must allow — no second list."""
+        from bench.schema import Device, Engine
+
+        for d in Device:
+            assert self._cfg(device=d.value).device == d.value
+        for e in Engine:
+            assert self._cfg(engine_gdn=e.value).engine_gdn == e.value
