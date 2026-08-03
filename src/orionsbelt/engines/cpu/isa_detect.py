@@ -22,18 +22,14 @@ Jetson Nano's Python 3.6.9 (no f-strings needed for core logic).
 from __future__ import annotations
 
 import json
-import os
 import platform
-import re
-import subprocess
-from dataclasses import dataclass, field, asdict
-from typing import Dict, List, Optional
+from dataclasses import asdict, dataclass, field
 
 # ---------------------------------------------------------------------------
 # HWCAP feature string → human-readable mapping
 # (matches Linux kernel arch/arm64/include/uapi/asm/hwcap.h)
 # ---------------------------------------------------------------------------
-_HWCAP_MAP: Dict[str, str] = {
+_HWCAP_MAP: dict[str, str] = {
     "fp": "Floating-point (fp)",
     "asimd": "NEON / Advanced SIMD",
     "evtstrm": "Event stream",
@@ -68,14 +64,14 @@ _HWCAP_MAP: Dict[str, str] = {
 
 # Features that drive kernel dispatch decisions
 _DISPATCH_FEATURES = [
-    "asimd",       # NEON — baseline for all Armv8-A
-    "asimddp",     # dotprod — Cortex-A55/A75+, enables SDOT/UDOT
-    "i8mm",        # int8 matmul — needed for INT8 GEMM kernels
-    "sve",         # SVE1 — Cortex-A76+? No, only Armv8.6+ / Armv9
-    "sve2",        # SVE2 — Armv9-A
-    "bf16",        # BF16 — for mixed-precision kernels
-    "fphp",        # FP16 — half-precision FP
-    "asimdhp",     # SIMD HP — half-precision SIMD
+    "asimd",  # NEON — baseline for all Armv8-A
+    "asimddp",  # dotprod — Cortex-A55/A75+, enables SDOT/UDOT
+    "i8mm",  # int8 matmul — needed for INT8 GEMM kernels
+    "sve",  # SVE1 — Cortex-A76+? No, only Armv8.6+ / Armv9
+    "sve2",  # SVE2 — Armv9-A
+    "bf16",  # BF16 — for mixed-precision kernels
+    "fphp",  # FP16 — half-precision FP
+    "asimdhp",  # SIMD HP — half-precision SIMD
 ]
 
 
@@ -85,8 +81,8 @@ class FeatureSet:
 
     machine: str = ""
     features_raw: str = ""
-    features: List[str] = field(default_factory=list)
-    dispatch_features: Dict[str, bool] = field(default_factory=dict)
+    features: list[str] = field(default_factory=list)
+    dispatch_features: dict[str, bool] = field(default_factory=dict)
     recommended_binary: str = ""
     cpu_model: str = ""
     core_count: int = 0
@@ -108,15 +104,15 @@ class FeatureSet:
 def _read_cpuinfo(path: str = "/proc/cpuinfo") -> str:
     """Read /proc/cpuinfo, returning empty string if unavailable."""
     try:
-        with open(path, "r") as f:
+        with open(path) as f:
             return f.read()
-    except (OSError, IOError):
+    except OSError:
         return ""
 
 
-def _parse_cpuinfo(cpuinfo: str) -> Dict[str, str]:
+def _parse_cpuinfo(cpuinfo: str) -> dict[str, str]:
     """Extract fields from the first CPU block of /proc/cpuinfo."""
-    result: Dict[str, str] = {}
+    result: dict[str, str] = {}
     for line in cpuinfo.splitlines():
         line = line.strip()
         if not line:
@@ -172,7 +168,7 @@ def detect_features(cpuinfo_path: str = "/proc/cpuinfo") -> FeatureSet:
     return fs
 
 
-def _recommend_binary(dispatch: Dict[str, bool]) -> str:
+def _recommend_binary(dispatch: dict[str, bool]) -> str:
     """Recommend the most specific bench binary for the detected features."""
     if dispatch.get("sve2"):
         return "armv9sve2"
@@ -186,7 +182,7 @@ def _recommend_binary(dispatch: Dict[str, bool]) -> str:
 
 
 # CPU part number → common name mapping (for documentation)
-_CPU_PARTS: Dict[str, str] = {
+_CPU_PARTS: dict[str, str] = {
     "0xd01": "Cortex-A32",
     "0xd03": "Cortex-A53",
     "0xd04": "Cortex-A35",
@@ -224,9 +220,7 @@ def main() -> int:
     # Enrich output with part name
     d = fs.to_dict()
     d["cpu_part_name"] = part_name
-    d["active_dispatch_features"] = [
-        f for f in _DISPATCH_FEATURES if fs.dispatch_features.get(f)
-    ]
+    d["active_dispatch_features"] = [f for f in _DISPATCH_FEATURES if fs.dispatch_features.get(f)]
     print(json.dumps(d, indent=2))
     return 0
 

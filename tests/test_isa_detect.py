@@ -1,17 +1,16 @@
 """Tests for runtime ISA feature detection (bead ob-ng6)."""
 
-import sys
 import os
+import sys
 import textwrap
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from orionsbelt.engines.cpu.isa_detect import (
-    detect_features,
+    FeatureSet,
     _recommend_binary,
     cpu_part_name,
-    _parse_cpuinfo,
-    FeatureSet,
+    detect_features,
 )
 
 # Simulated /proc/cpuinfo for a Cortex-A76 (Pi 5)
@@ -75,7 +74,9 @@ def test_pi5_detects_dotprod():
 
 def test_jetson_no_dotprod():
     """Jetson A57 (Armv8.0) should detect asimd but NOT dotprod."""
-    import tempfile, pathlib
+    import pathlib
+    import tempfile
+
     d = pathlib.Path(tempfile.mkdtemp())
     path = _write_tmp_cpuinfo(d, _JETSON_CPUINFO)
     fs = detect_features(path)
