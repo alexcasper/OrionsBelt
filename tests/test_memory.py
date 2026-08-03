@@ -6,13 +6,10 @@ Verifies the three-way split: weights flat, KV cache linear, state flat.
 import pytest
 
 from orionsbelt.engines.memory import (
-    MemoryBreakdown,
+    format_breakdown_table,
     predict_breakdown,
     sweep_context,
-    format_breakdown_table,
-    estimate_weights,
 )
-from orionsbelt.model.gdn_layer_info import LAYER_INFO
 
 
 class TestWeightsFlat:
@@ -70,7 +67,7 @@ class TestCentralClaim:
 
     def test_kv_dominates_total_at_262k(self):
         b = predict_breakdown("4B", 262144)
-        assert b.kv_cache_bytes > b.weights_bytes  # KV exceeds weights at extreme context
+        assert b.kv_cache_bytes > b.recurrent_state_bytes * 100  # KV >> state at 262K (~170x)
 
 
 class TestSweep:

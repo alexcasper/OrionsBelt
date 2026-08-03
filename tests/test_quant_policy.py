@@ -7,13 +7,9 @@ state and decay-gate parameters must NOT be quantized below FP16.
 import pytest
 
 from orionsbelt.quant.policy import (
-    ALL_POLICIES,
     GDN_POLICIES,
-    FULL_ATTENTION_POLICIES,
-    MLP_POLICIES,
     Precision,
     QuantScheme,
-    TensorGroupPolicy,
     estimate_weight_footprint_mib,
     policy_for,
 )

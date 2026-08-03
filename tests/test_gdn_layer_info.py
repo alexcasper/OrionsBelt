@@ -100,4 +100,4 @@ class TestQwen35_0_8B:
 
     def test_kv_cache_at_4k(self):
         """6 FA layers, 2 KV heads, 256 head_dim, FP16."""
-        assert self.info.kv_cache_mib_at_context(4096, dtype_size=2) == pytest.approx(24.0, abs=1.0)
+        assert self.info.kv_cache_mib_at_context(4096, dtype_size=2) == pytest.approx(48.0, abs=1.0)

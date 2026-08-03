@@ -7,28 +7,22 @@ import json
 import os
 import tempfile
 
-import pytest
-
 from corpus import (
-    CANONICAL_LENGTHS,
     DEFAULT_CHARS_PER_TOKEN,
-    MASTER_SEED,
-    NIAH_DEPTHS,
-    MULTIKEY_COUNTS,
     FILLER_PASSAGES,
-    NIAH_TEMPLATES,
-    PromptItem,
+    MASTER_SEED,
+    MULTIKEY_COUNTS,
+    NIAH_DEPTHS,
     CorpusConfig,
-    generate_haystack,
-    generate_niah_single,
-    generate_niah_multikey,
-    generate_corpus,
-    save_corpus,
-    save_manifest,
     _depth_seed,
     _task_seed,
+    generate_corpus,
+    generate_haystack,
+    generate_niah_multikey,
+    generate_niah_single,
+    save_corpus,
+    save_manifest,
 )
-
 
 # ---------------------------------------------------------------------------
 # Haystack generation
@@ -201,7 +195,7 @@ class TestGenerateCorpus:
         config = CorpusConfig(context_lengths=[4096])
         items1 = generate_corpus(config)
         items2 = generate_corpus(config)
-        for i1, i2 in zip(items1, items2):
+        for i1, i2 in zip(items1, items2, strict=False):
             assert i1.seed == i2.seed
             assert i1.prompt == i2.prompt
 

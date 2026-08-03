@@ -3,28 +3,22 @@
 Bead ob-9y8 (t-plots).
 """
 
-import csv
 import os
 import tempfile
-from pathlib import Path
 
 import pytest
 
 from plots import (
     MICROBENCH_COLUMNS,
-    DEVICE_SPEC_BANDWIDTH,
-    MicrobenchRow,
-    SchemaRow,
     detect_format,
+    generate_all,
+    microbench_bandwidth_table,
+    microbench_to_markdown,
     parse_microbench,
     parse_schema,
-    microbench_to_markdown,
-    microbench_bandwidth_table,
-    schema_throughput_table,
     schema_memory_table,
-    generate_all,
+    schema_throughput_table,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

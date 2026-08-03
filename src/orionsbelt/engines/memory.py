@@ -13,13 +13,9 @@ are provided.
 
 from __future__ import annotations
 
-import os
-import re
 from dataclasses import dataclass
 
-from orionsbelt.model.gdn_layer_info import CheckpointLayerInfo, LAYER_INFO
-from orionsbelt.quant.policy import QuantScheme
-
+from orionsbelt.model.gdn_layer_info import LAYER_INFO, CheckpointLayerInfo
 
 # Bytes per element by dtype
 _DTYPE_BYTES = {"fp32": 4, "fp16": 2, "bf16": 2, "int8": 1, "int4": 0.5}
@@ -210,7 +206,7 @@ def measure_delta(fn, *args, **kwargs) -> int | None:
     before = _rss_bytes()
     if before is None:
         return None
-    result = fn(*args, **kwargs)
+    fn(*args, **kwargs)
     after = _rss_bytes()
     if after is None:
         return None
