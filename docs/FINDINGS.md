@@ -1140,6 +1140,71 @@ sudo env OMP_NUM_THREADS=1 ./scripts/power_bench.sh --sustained 30 --csv
 
 Power logs are committed at `results/raw/jetson-j2_power_sustained_{1,4}core.csv`.
 
+---
+
+## Jetson-J1 ↔ Jetson-J2 cross-check: OpenMP scaling on Cortex-A57 (2026-08-03)
+
+**Bead `ob-8ms.3`.** Two Jetson Nano units (both Tegra X1, Cortex-A57 quad-core
+@ 1.479 GHz, Armv8.0-A, NEON only) provide a controlled A/B comparison:
+**J1 ran single-threaded baseline kernels**; **J2 ran the same kernels with
+OpenMP 4-thread parallelism** enabled at build time. Same ISA, same governor
+(`performance`), same active fan cooling, same 30-repeat protocol. The only
+variable is thread count.
+
+### Prefill (seq=64) — Qwen3.5-4B
+
+| Kernel | J1 ST (GiB/s) | J2 OMP-4T (GiB/s) | Speedup |
+|--------|-------------:|------------------:|--------:|
+| gdn_cumdecay | 1.16 | 3.85 | **3.3×** |
+| gdn_gated_scan | 0.72 | 2.96 | **4.1×** |
+| gdn_causal_dwconv1d | 1.04 | 3.66 | **3.5×** |
+| gdn_cumdecay_f16 | 1.45 | 4.21 | **2.9×** |
+| gdn_gated_scan_f16 | 0.74 | 2.94 | **4.0×** |
+| gdn_cumdecay_bf16 | 1.25 | 4.16 | **3.3×** |
+| gdn_gated_scan_bf16 | 0.74 | 2.98 | **4.0×** |
+
+### Decode (seq=1) — Qwen3.5-4B
+
+| Kernel | J1 ST (GiB/s) | J2 OMP-4T (GiB/s) | Speedup |
+|--------|-------------:|------------------:|--------:|
+| gdn_cumdecay | 4.65 | 8.37 | **1.8×** |
+| gdn_gated_scan | 9.27 | 15.10 | **1.6×** |
+| gdn_causal_dwconv1d | 4.98 | 13.80 | **2.8×** |
+| gdn_cumdecay_f16 | 3.09 | 5.71 | **1.8×** |
+| gdn_gated_scan_f16 | 5.63 | 11.96 | **2.1×** |
+| gdn_gated_scan_bf16 | 4.52 | 11.49 | **2.5×** |
+
+### Findings
+
+1. **Near-linear scaling on prefill (3.3–4.1× on 4 cores).** These kernels are
+   bandwidth-bound: each thread streams its own slice of the state vector, and
+   the A57's shared L2 provides enough aggregate bandwidth to sustain 4
+   concurrent readers. `gated_scan` scales best (4.1×) because it has the highest
+   arithmetic intensity per byte — the compute overlaps memory latency that would
+   stall a single thread.
+
+2. **Diminishing returns on decode (1.6–2.8×).** At seq=1 the working set is
+   tiny (~16 KB for 0.8B, ~64 KB for 4B per kernel call). Four threads contend
+   for the same cache lines, and thread dispatch overhead (≈2 µs per
+   `#pragma omp parallel`) is a significant fraction of the 3–10 µs kernel
+   runtime. The dispatcher design (`ob-7a9`) should consider single-threaded
+   decode on small cores.
+
+3. **Precision reduction helps cumdecay but not gated_scan — confirmed on both
+   devices.** On J2, `cumdecay_f16` hits 4.21 GiB/s vs 3.85 fp32 (+9%); but
+   `gated_scan_f16` is 2.94 vs 2.96 (≈same). This matches J1's pattern exactly.
+   The scan kernel's bottleneck is the sequential dependency chain, not memory
+   traffic — halving the data type doesn't break the dependency.
+
+4. **GDN2 scan matches GDN1 in prefill, wins in decode.** J2 includes
+   `gdn2_gated_scan` (not present in J1's run): prefill 2.95 GiB/s (≈ GDN1's
+   2.96), decode 16.95 GiB/s (+12% vs GDN1's 15.10). The GDN-2 variant's smaller
+   recurrent state reduces memory traffic at seq=1 where state I/O dominates.
+
+5. **Cross-device consistency.** J2's current run matches the earlier
+   `jetson-j2-full-optimized.csv` (3.82 vs 3.85 GiB/s on cumdecay — within 1%),
+   confirming the benchmark is reproducible across sessions on the same hardware.
+
 ## 6. GDN-2 reference clone and decoupled-gating microbenchmark (2026-08-03)
 
 **Bead ob-y3f. NVLabs GatedDeltaNet-2 repo cloned and analysed; C kernel stub benchmarked on jetson-j2.**
