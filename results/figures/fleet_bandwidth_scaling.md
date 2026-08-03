@@ -67,29 +67,25 @@ core microarchitecture (IPC, OoO depth, clock) dominates over raw DRAM
 bandwidth. The Pi 5's Cortex-A76 has ~1.6x higher clock and substantially
 better IPC than the A57, explaining its win despite less bandwidth.
 
-## ⚠ Measurement spread limits everything below this line
+## ⚠ Replicate spread limits everything below this line
 
-The tables above take **one** run per device, but two devices were measured
-twice, and the disagreement is larger than most of the cross-device effects
-being interpreted (bead `ob-bf7`):
+The tables above take **one** run per device. Several devices were measured
+more than once, and the replicates disagree by more than some of the
+cross-device effects being interpreted (bead `ob-bf7`):
 
-| Device | Runs | Scan (GiB/s) | Ratio | Same commit? |
-|---|---|---|---:|---|
-| RK3588 big | `t3`, `t4` | 1.96 vs **3.29** | 1.68× | **yes — both `28729f3`** |
-| Pi 5 (same board) | `r5`@`28729f3`, `r5`@`f127a11` | 1.20 vs **1.84** | 1.53× | no |
+| Device class | Runs (scan, 4B, GiB/s) | Spread | Why it matters |
+|---|---|---:|---|
+| RK3588 big | t3 1.96 vs t4 3.29 | **1.68x** | same source commit `28729f3`, same core class |
+| RK3588 little | t3 0.35 vs t4 0.55 | **1.57x** | same source commit `28729f3`, same core class |
+| Pi 5 | r5 1.20 vs j1 1.84 | **1.53x** | same physical board, *different* commits (`28729f3` vs `f127a11`) |
 
-The RK3588 pair is the serious one: identical source commit, same core class,
-**1.68× apart**, so the cause is environmental — different physical boards,
-cluster pinning, governor, or thermal state — and none of that is recorded per
-run. The Pi 5 pair is the *same physical board* (identical hostname and
-`Raspberry Pi 5 Model B Rev 1.0`) at two commits, so its gap is plausibly a real
-optimization gain, but nothing here separates it from t3/t4-scale variance.
+The RK3588 pair is the serious one: **identical source commit**, so the cause is environmental — different boards, cluster pinning, governor, or thermal state — and none of that is recorded per run. Worst replicate spread on the fleet is **1.68x**.
 
-This table selects `t3` for RK3588. Selecting `t4` instead — equally valid, same
-commit — would roughly double every O6 figure below. **Treat the predictions as
-order-of-magnitude, not as a fit.** The discriminating result in the previous
-section is unaffected: the Pi 5 beats the Jetson on all three kernels under every
-pairing, and that margin is bigger than this spread.
+This report selects `t3` for RK3588 and `r5` for the Pi 5. Selecting the other
+run — equally valid, and for RK3588 the *same commit* — would move every O6
+figure below by a similar factor. **Treat the predictions as order-of-magnitude,
+not as a fit.** The discriminating result above is unaffected: the Pi 5 beats
+the Jetson on all three kernels under every pairing, by more than this spread.
 
 ## O6 extrapolation (prediction)
 
@@ -122,14 +118,13 @@ to its 4-5x bandwidth advantage**.
 - **Predicted O6 scan throughput: 2.9-4.9 GiB/s**
 - This is ~3-5% of spec bandwidth, vs 6% achieved on A76
 
-Carrying the host spread through: anchoring on `t4`'s 3.29 GiB/s rather than
-`t3`'s 1.96 — same commit, same core class — gives **4.9-8.2 GiB/s** instead. So
-the defensible published claim is **~3-8 GiB/s**, and the anchor choice, not the
-IPC assumption, is the dominant uncertainty. Resolving `ob-bf7` narrows this
-more than any modelling refinement would.
+Carrying the replicate spread through: anchoring on the other same-commit RK3588 host (3.29 GiB/s rather than 1.96) gives **4.9-8.2 GiB/s** instead.
+
+So the defensible published claim is **~3-8 GiB/s**, and the *anchor choice* — not the IPC assumption — is the dominant uncertainty. Resolving `ob-bf7` narrows this more than any modelling refinement would.
 
 To check this prediction: if the O6 board arrives, run
 `bench_gdn_armv9sve2 --repeats 30 --csv` and compare.
+
 ## Optimization impact: j2 single-threaded vs 4-core OpenMP
 
 The j2 CSV was re-run with the current optimized binary (OpenMP 4-core,
