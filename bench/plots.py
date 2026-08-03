@@ -123,13 +123,13 @@ MICROBENCH_COLUMNS = [
 ]
 
 
-def detect_format(header: List[str]) -> str:
-    """Return 'microbench' or 'schema' based on CSV header."""
+def detect_format(header: List[str]) -> Optional[str]:
+    """Return 'microbench', 'schema', or None based on CSV header."""
     if "kernel" in header and "dispatch_path" in header:
         return "microbench"
     if "metric_name" in header and "phase" in header:
         return "schema"
-    raise ValueError(f"Unrecognised CSV header: {header}")
+    return None  # unrecognised (e.g. power monitoring CSVs)
 
 
 def parse_microbench(path: str) -> List[MicrobenchRow]:
@@ -602,6 +602,9 @@ def generate_all(
         elif fmt == "schema":
             rows = parse_schema(csv_path)
             all_schema.extend(rows)
+        else:
+            # Skip unrecognised formats (e.g. power monitoring CSVs)
+            continue
 
     # --- Microbenchmark figures and tables ---
     for device, rows in sorted(microbench_by_device.items()):
