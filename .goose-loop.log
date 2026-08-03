@@ -38335,3 +38335,27 @@ All 9 remaining ready beads require hardware or toolchain access unavailable on 
 - `bench/j1` pushed ✅
 - `bd dolt push` ✅
 - `.beads/issues.jsonl` committed ✅
+--- r5 iter Mon  3 Aug 09:39:24 BST 2026 ---
+
+    __( O)>  ● resuming · zai glm-5.2
+   \____)    20260803_5 · /home/r5/OrionsBelt
+     L L     goose is ready
+~9k tokens. Let me sync and check for new work.
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/r5/OrionsBelt && git pull origin bench/j1 2>&1 | tail -2 && bd dolt pull 2>&1 | tail -1 && bd ready 2>&1 | grep "○" | grep -v "epic" | head -12
+
+ * branch            bench/j1   -> FETCH_HEAD
+Already up to date.
+Pull complete.
+○ ob-aqv ● P0 Stand up x86/CUDA reference inference as the oracle source ← E4: Model selection and reference baseline
+○ ob-axq ● P0 Source a Radxa Orion O6 (64GB) — retail, loaner, or remote access ← E2: Hardware and toolchain acquisition (Orion O6 + CIX NPU SDK)
+○ ob-2eh ● P1 GitHub Actions CI: lint plus unit tests on an x86/aarch64 matrix ← E1: Repo foundation and submission hygiene
+○ ob-huw ● P1 NPU runtime smoke test via a CIX AI Model Hub reference model ← E2: Hardware and toolchain acquisition (Orion O6 + CIX NPU SDK)
+○ ob-mrd.1 ● P1 Baseline: vendor cix-llama-cpp on the O6, and whether it handles GDN at all ← E5: Benchmark harness and methodology
+○ ob-8qt.2 ● P2 Reuse KleidiAI i8mm/dotprod matmul micro-kernels for the delta-rule updates ← E7: Optimization implementation
+○ ob-t3b.5 ● P2 Cheap check: does the RK3588 NPU toolchain also reject a runtime-length recurrence? ← E6: GDN operator analysis and heterogeneous mapping
+○ ob-t3b.4 ● P3 Evaluate the Tensilica HiFi 5 DSP as a fourth compute engine ← E6: GDN operator analysis and heterogeneous mapping
+Status: ○ open  ◐ in_progress  ● blocked  ✓ closed  ❄ deferredNo new ready beads — all 8 remaining are external-gate (O6 board, CUDA, RK3588 NPU, KleidiAI, OAuth scope). No actionable portable work from this device.
+
+**Session status: clean.** 3 beads closed (ob-ng6, ob-c9q, ob-uyh), schema tests added, PR #12 open, all pushed and synced. Working tree clean. Awaiting external gates or teammate contributions to unblock more work.
