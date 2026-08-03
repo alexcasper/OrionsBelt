@@ -238,6 +238,25 @@ class HarnessConfig:
                 f"(METRICS.md §9: 'report percentiles and repeat counts, "
                 f"never a single best run'), got {self.repeats}"
             )
+        # Validate device and engines against the frozen schema — catches
+        # invalid values before a potentially long sweep produces bad CSVs.
+        from bench.schema import Device as _Device
+        from bench.schema import Engine as _Engine
+
+        _valid_devices = {d.value for d in _Device}
+        _valid_engines = {e.value for e in _Engine}
+        if self.device not in _valid_devices:
+            raise ValueError(f"device must be one of {sorted(_valid_devices)}, got {self.device!r}")
+        if self.engine_gdn not in _valid_engines:
+            raise ValueError(
+                f"engine_gdn must be one of {sorted(_valid_engines)}, got {self.engine_gdn!r}"
+            )
+        if self.engine_full_attention not in _valid_engines:
+            raise ValueError(
+                f"engine_full_attention must be one of {sorted(_valid_engines)}, "
+                f"got {self.engine_full_attention!r}"
+            )
+
         if not self.run_id:
             stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
             self.run_id = f"{self.device}_{stamp}_{_git_sha()}"
