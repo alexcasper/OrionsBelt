@@ -1194,12 +1194,22 @@ variable is thread count.
 
 ### Findings
 
-1. **Near-linear scaling on prefill (3.3–4.1× on 4 cores).** These kernels are
-   bandwidth-bound: each thread streams its own slice of the state vector, and
-   the A57's shared L2 provides enough aggregate bandwidth to sustain 4
-   concurrent readers. `gated_scan` scales best (4.1×) because it has the highest
-   arithmetic intensity per byte — the compute overlaps memory latency that would
-   stall a single thread.
+1. **Near-linear scaling on prefill (3.3–4.1× on 4 cores) — which means these
+   kernels are NOT bandwidth-saturated single-threaded.** This point was
+   originally written as evidence that the kernels *are* bandwidth-bound, but the
+   inference runs the wrong way: if one thread already saturated DRAM, adding
+   three more could not buy 3.3–4.1×. `gated_scan` reaching 4.1× on 4 cores is
+   slightly *superlinear*, which only happens when the single-thread baseline was
+   limited by something other than bandwidth — here the serial dependency chain
+   and load latency, which extra threads hide by overlapping independent
+   channels. That is consistent with §5b's conclusion (instruction-overhead-bound
+   at seq=64, ~1 MiB L2-resident working set) rather than in tension with it, and
+   it is the third place in this document where near-linear multicore scaling was
+   misread as a bandwidth result.
+
+   What the scaling does bound is the *aggregate* limit: 4 threads have not yet
+   hit the A57's memory system on this working set, so the ceiling is above 4×
+   single-thread here and the O6 (more cores, ~4× the bandwidth) has headroom.
 
 2. **Diminishing returns on decode (1.6–2.8×).** At seq=1 the working set is
    tiny (~16 KB for 0.8B, ~64 KB for 4B per kernel call). Four threads contend
@@ -1287,3 +1297,46 @@ This validates the microbenchmark-only comparison path (ob-9ke option a) as
 sufficient for the write-up: the cost difference is fully explained by memory
 traffic, and a full layer-swap experiment (option b) is unlikely to reveal
 anything the bandwidth model doesn't already predict.
+
+**Decode (seq=1) on Jetson A57:** the cumdecay kernel reports 4.65 GiB/s at
+seq=1 against 1.16 GiB/s at seq=64 — 4.0× — because the single-token step is
+**cache-resident** where the seq=64 sweep streams from DRAM. At 4096 channels
+each array is ~16 KiB, so the working set sits in the A57's 32 KiB L1D and 2 MiB
+L2 rather than "entirely in L1"; L2 residency is enough to explain the gap.
+
+Read that 4.65 GiB/s as a latency-dominated figure, not a sustained streaming
+rate: the seq=1 step moves a few tens of KiB in 6.6 µs, so it is not directly
+comparable to the seq=64 number as *bandwidth*. It is still the right thing to
+measure for decode, and the direction is the architectural point — O(1)
+recurrent state means the decode working set stays cache-resident **regardless
+of context length**, where a KV cache grows until it cannot.
+
+## Memory decomposition: GDN O(1) state vs full-attention O(n) KV cache (2026-08-03)
+
+The central claim of this project, quantified with verified architecture
+data from `src/orionsbelt/model/gdn_layer_info.py` (Qwen3.5-4B, 32 layers:
+24 GDN + 8 full-attention, pattern 8×(3 GDN → 1 full)).
+
+| Context | Weights | KV cache (FA) | GDN state | Conv state | Total |
+|---|---|---|---|---|---|
+| 4K | 11182 MB | 134 MB | 50 MB | 3 MB | 11370 MB |
+| 32K | 11182 MB | 1074 MB | 50 MB | 3 MB | 12309 MB |
+| 128K | 11182 MB | 4295 MB | 50 MB | 3 MB | 15531 MB |
+| 256K | 11182 MB | 8590 MB | 50 MB | 3 MB | 19826 MB |
+
+**Scaling (relative to 4K baseline):**
+
+| Context | Weights | KV cache | GDN state | Total |
+|---|---|---|---|---|
+| 4K | 1.0× | 1.0× | 1.0× | 1.0× |
+| 32K | 1.0× | 8.0× | 1.0× | 1.1× |
+| 128K | 1.0× | 32.0× | 1.0× | 1.4× |
+| 256K | 1.0× | 64.0× | 1.0× | 1.7× |
+
+**Key insight:** At 256K context, the GDN recurrent state is 50 MB
+(constant regardless of context length) while the full-attention KV cache
+balloons to 8.6 GB — a **171× difference**. GDN saves 8.5 GB of memory
+at this context length, which is the difference between fitting in 8 GB
+edge DRAM and not. Weights (11.2 GB at FP16) dominate at all context
+lengths, which is why INT4 weight quantization (PLAN.md §6, ADR 0004)
+is the complementary half of the story.

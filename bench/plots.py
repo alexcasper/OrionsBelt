@@ -122,13 +122,18 @@ MICROBENCH_COLUMNS = [
 ]
 
 
-def detect_format(header: list[str]) -> str:
-    """Return 'microbench' or 'schema' based on CSV header."""
+def detect_format(header: list[str]) -> str | None:
+    """Return 'microbench', 'schema', or None based on CSV header.
+
+    Returns None rather than raising for unrecognised headers: results/raw/ also
+    holds power-monitor CSVs, and generate_all() walks the whole directory, so a
+    raise here took the entire plot run down over a file it never needed.
+    """
     if "kernel" in header and "dispatch_path" in header:
         return "microbench"
     if "metric_name" in header and "phase" in header:
         return "schema"
-    raise ValueError(f"Unrecognised CSV header: {header}")
+    return None  # unrecognised (e.g. power monitoring CSVs)
 
 
 def parse_microbench(path: str) -> list[MicrobenchRow]:
@@ -622,6 +627,9 @@ def generate_all(
         elif fmt == "schema":
             rows = parse_schema(csv_path)
             all_schema.extend(rows)
+        else:
+            # Skip unrecognised formats (e.g. power monitoring CSVs)
+            continue
 
     # --- Microbenchmark figures and tables ---
     for device, rows in sorted(microbench_by_device.items()):

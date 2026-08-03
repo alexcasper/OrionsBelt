@@ -97,9 +97,14 @@ class TestDetectFormat:
         ]
         assert detect_format(header) == "schema"
 
-    def test_unknown_raises(self):
-        with pytest.raises(ValueError, match="Unrecognised"):
-            detect_format(["foo", "bar", "baz"])
+    def test_unknown_returns_none(self):
+        """Unrecognised headers return None rather than raising.
+
+        results/raw/ also holds power-monitor CSVs, and generate_all() walks the
+        whole directory — so raising here took the entire plot run down over a
+        file it never needed to read.
+        """
+        assert detect_format(["foo", "bar", "baz"]) is None
 
 
 # ---------------------------------------------------------------------------
