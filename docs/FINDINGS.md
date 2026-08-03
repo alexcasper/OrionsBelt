@@ -652,3 +652,25 @@ that saving is irrelevant if it increases per-token energy under load.
 **Practical implication for submission:** all reported numbers use the
 `performance` governor. The `ondemand` comparison is documented to show the
 trade-off, not to suggest it as a recommended setting.
+
+---
+
+## Cross-device kernel bandwidth comparison (2026-08-03)
+
+Benchmark data from the device fleet (bead ob-8ms.3, ob-c9q):
+
+| Device | Core | Clock | Scan kernel (4B) | Cumdecay (4B) | Ratio to Jetson |
+|---|---|---|---|---|---|
+| Jetson Nano | A57 | 1.48 GHz | 0.72 GiB/s | 1.16 GiB/s | 1.0× |
+| Raspberry Pi 5 | A76 | 2.40 GHz | 1.84 GiB/s | 2.93–3.74 GiB/s | ~2.5–2.6× |
+
+**Finding:** The Pi 5 (A76) is ~2.5× faster than the Jetson (A57) on the
+gated-scan kernel, consistent with the clock ratio (1.63×) and the wider
+A76 execution pipeline. No inversion — the A76's advantage scales as expected
+for this memory-bandwidth-bound kernel.
+
+**Decode (seq=1) on Jetson A57:** the cumdecay kernel hits 4.65 GiB/s at
+seq=1 vs 1.16 GiB/s at seq=64 — a 4× speedup because the single-token
+recurrence fits entirely in L1 cache. This is the architectural property
+that makes GDN viable on edge silicon: O(1) recurrent state means the
+decode path becomes cache-resident regardless of context length.
