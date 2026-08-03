@@ -630,3 +630,25 @@ bandwidth-bound cores like the A57, kernel selection affects *latency* but not
 *power draw*. A dynamic dispatcher should optimize for throughput, not for power,
 on this class of hardware. (This may differ on newer cores like A720 where
 compute-bound kernels can draw significantly more power.)
+
+### Governor comparison: performance vs ondemand (sustained gated_scan)
+
+| Governor | Throughput (GiB/s) | Idle (mW board) | Δ Power (mW board) | Energy (mJ/GiB board) |
+|----------|-------------------|-----------------|---------------------|----------------------|
+| `performance` | 0.74 | 1906 | 925 | **1250** |
+| `ondemand` | 0.69 | 1698 | 1097 | **1602** |
+
+**Finding: `performance` is both faster and more energy-efficient for sustained
+inference.** Despite `ondemand` lowering idle power by 208 mW (frequency scales
+down when idle), the 7% throughput penalty under load means each GiB costs 28%
+more energy. The frequency ramping latency on A57 is high enough that sustained
+workloads never benefit from scaling.
+
+This directly validates PLAN.md's recommendation to use the `performance`
+governor for all benchmarking. For bursty decode workloads (where idle gaps
+between tokens allow frequency to drop), `ondemand` might save idle energy — but
+that saving is irrelevant if it increases per-token energy under load.
+
+**Practical implication for submission:** all reported numbers use the
+`performance` governor. The `ondemand` comparison is documented to show the
+trade-off, not to suggest it as a recommended setting.
