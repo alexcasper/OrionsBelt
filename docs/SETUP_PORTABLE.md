@@ -211,3 +211,30 @@ The discriminating case: the Pi 5 has the **newest cores** (A76) but the
 **more bandwidth**. If the Nano beats the Pi 5 on the scan kernel, that is strong
 evidence for bandwidth-boundedness. See [`docs/DEVICE_RUNBOOK.md`](./DEVICE_RUNBOOK.md)
 §"What we are actually testing" for the full analysis.
+
+### Reading the CSV columns
+
+| Column | Meaning |
+|---|---|
+| `gib_per_s_p50` | Achieved memory bandwidth in GiB/s — compare against the device spec |
+| `gflop_per_s_p50` | Achieved compute throughput |
+| `spread_pct` | `(p95 - p50) / p50 × 100` — should be under ~10% for a clean run |
+| `dispatch_path` | `neon`, `sve` or `scalar` — which compiled path actually ran |
+
+### What the fleet measured (2026-08-03)
+
+Sanity-check your own numbers against these, all `gdn_gated_scan`, 4B, seq=64,
+NEON path (see [`FINDINGS.md`](./FINDINGS.md) for the full analysis):
+
+| Device | Spec BW | Achieved | % of spec |
+|---|---:|---:|---:|
+| Jetson Nano (A57) | 25.6 GB/s | 0.72 GiB/s | **3.0%** |
+| Raspberry Pi 5 (A76) | 17.0 GB/s | 1.84 GiB/s | 11.6% |
+| RK3588 big (A76) | 34.0 GB/s | 3.29 GiB/s | 10.4% |
+
+The answer to the discriminating question above turned out to be **split**, so
+do not read a low Jetson number as a broken setup — it is real. Within the A76
+class the kernel does track bandwidth (2.00× the spec gives 1.79× the
+throughput). The A57 does not: it has 1.5× the Pi 5's spec bandwidth and reaches
+0.39× its throughput, sitting at 3% of spec where both A76 parts reach ~11%. On
+that core the bottleneck is the core, not the memory system.
