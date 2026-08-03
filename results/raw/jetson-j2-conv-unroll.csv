@@ -1,0 +1,15 @@
+model,kernel,dispatch_path,seq,channels,repeats,p50_us,p95_us,spread_pct,gib_per_s_p50,gflop_per_s_p50
+Qwen3.5-4B,gdn_cumdecay,neon,64,4096,30,507.303,575.951,13.5,3.85,0.52
+Qwen3.5-4B,gdn_gated_scan,neon,64,4096,30,1017.524,1829.522,79.8,2.91,0.52
+Qwen3.5-4B,gdn_causal_dwconv1d,neon,64,4096,30,577.670,889.605,54.0,3.57,3.63
+Qwen3.5-4B,gdn_cumdecay_f16,neon,64,4096,30,360.216,1433.055,297.8,4.07,0.73
+Qwen3.5-4B,gdn_gated_scan_f16,neon,64,4096,30,978.982,1044.608,6.7,3.01,0.54
+Qwen3.5-4B,gdn_cumdecay_bf16,neon,64,4096,30,378.551,471.626,24.6,3.87,0.69
+Qwen3.5-4B,gdn_gated_scan_bf16,neon,64,4096,30,1004.451,1063.254,5.9,2.93,0.52
+Qwen3.5-0.8B,gdn_cumdecay,neon,64,2048,30,210.162,1624.101,672.8,4.65,0.62
+Qwen3.5-0.8B,gdn_gated_scan,neon,64,2048,30,280.215,328.029,17.1,5.28,0.94
+Qwen3.5-0.8B,gdn_causal_dwconv1d,neon,64,2048,30,191.515,197.765,3.3,5.38,5.48
+Qwen3.5-0.8B,gdn_cumdecay_f16,neon,64,2048,30,168.389,171.618,1.9,4.35,0.78
+Qwen3.5-0.8B,gdn_gated_scan_f16,neon,64,2048,30,283.184,326.935,15.4,5.20,0.93
+Qwen3.5-0.8B,gdn_cumdecay_bf16,neon,64,2048,30,168.077,184.223,9.6,4.36,0.78
+Qwen3.5-0.8B,gdn_gated_scan_bf16,neon,64,2048,30,284.122,346.675,22.0,5.18,0.92

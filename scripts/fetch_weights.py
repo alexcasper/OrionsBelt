@@ -38,8 +38,6 @@ import json
 import os
 import subprocess
 import sys
-from typing import Dict, List, Optional
-
 
 # ---------------------------------------------------------------------------
 # Model registry
@@ -76,6 +74,7 @@ def _try_huggingface_hub():
     """Import huggingface_hub.snapshot_download if available."""
     try:
         from huggingface_hub import snapshot_download
+
         return snapshot_download
     except ImportError:
         return None
@@ -95,7 +94,7 @@ def download_via_hub(repo_id, output_dir):
     os.makedirs(local_dir, exist_ok=True)
 
     print("  Downloading via huggingface_hub (with resume)...")
-    path = snapshot_download(
+    snapshot_download(
         repo_id=repo_id,
         local_dir=local_dir,
         # Exclude large unnecessary files (e.g. optimizer states)
@@ -113,9 +112,9 @@ def _download_file(url, dest_path, chunk_size=1024 * 1024):
     # type: (str, str, int) -> None
     """Download a single file with progress reporting."""
     try:
-        from urllib.request import urlopen, Request
+        from urllib.request import Request, urlopen
     except ImportError:
-        raise RuntimeError("urllib not available (minimal Python install?)")
+        raise RuntimeError("urllib not available (minimal Python install?)") from None
 
     req = Request(url, headers={"User-Agent": "OrionsBelt/fetch_weights"})
     resp = urlopen(req)
@@ -131,11 +130,7 @@ def _download_file(url, dest_path, chunk_size=1024 * 1024):
             downloaded += len(chunk)
             if total > 0:
                 pct = downloaded * 100 // total
-                sys.stdout.write(
-                    "\r  {}% ({:.1f} MB / {:.1f} MB)".format(
-                        pct, downloaded / 1e6, total / 1e6
-                    )
-                )
+                sys.stdout.write(f"\r  {pct}% ({downloaded / 1e6:.1f} MB / {total / 1e6:.1f} MB)")
                 sys.stdout.flush()
     print()  # newline after progress
 
@@ -169,14 +164,15 @@ def download_via_urllib(repo_id, output_dir):
     local_dir = os.path.join(output_dir, repo_id.replace("/", "--"))
     os.makedirs(local_dir, exist_ok=True)
 
-    base_url = "https://huggingface.co/{}/resolve/main".format(repo_id)
+    base_url = f"https://huggingface.co/{repo_id}/resolve/main"
 
     # First, check the safetensors index to find shard filenames
-    index_url = "{}/model.safetensors.index.json".format(base_url)
+    index_url = f"{base_url}/model.safetensors.index.json"
     shards = []  # type: List[str]
 
     try:
-        from urllib.request import urlopen, Request
+        from urllib.request import Request, urlopen
+
         req = Request(index_url, headers={"User-Agent": "OrionsBelt/fetch_weights"})
         resp = urlopen(req)
         index = json.loads(resp.read().decode("utf-8"))
@@ -192,16 +188,16 @@ def download_via_urllib(repo_id, output_dir):
     for fname in all_files:
         dest = os.path.join(local_dir, fname)
         if os.path.exists(dest):
-            print("  [skip] {} (already present)".format(fname))
+            print(f"  [skip] {fname} (already present)")
             continue
 
-        url = "{}/{}".format(base_url, fname)
-        print("  Downloading {}...".format(fname))
+        url = f"{base_url}/{fname}"
+        print(f"  Downloading {fname}...")
         try:
             _download_file(url, dest)
         except urllib.error.HTTPError as e:
             if e.code == 404:
-                print("  [skip] {} (not found — optional file)".format(fname))
+                print(f"  [skip] {fname} (not found — optional file)")
             else:
                 raise
 
@@ -251,9 +247,9 @@ def write_manifest(model_key, local_dir, checksums):
         "approx_size_gb": info["approx_size_gb"],
         "local_dir": local_dir,
         "files": checksums,
-        "downloaded_at": subprocess.check_output(
-            ["date", "-u", "+%Y-%m-%dT%H:%M:%SZ"]
-        ).decode().strip(),
+        "downloaded_at": subprocess.check_output(["date", "-u", "+%Y-%m-%dT%H:%M:%SZ"])
+        .decode()
+        .strip(),
     }
     manifest_path = os.path.join(local_dir, ".fetch_manifest.json")
     with open(manifest_path, "w") as f:
@@ -278,22 +274,22 @@ def fetch_model(model_key, output_dir, verify_only=False):
 
     if verify_only:
         if not os.path.isdir(local_dir):
-            print("ERROR: {} not downloaded yet".format(repo_id))
+            print(f"ERROR: {repo_id} not downloaded yet")
             sys.exit(1)
-        print("Verifying {}...".format(repo_id))
+        print(f"Verifying {repo_id}...")
         checksums = verify_download(local_dir)
         manifest_path = write_manifest(model_key, local_dir, checksums)
-        print("  {} files verified".format(len(checksums)))
-        print("  Manifest: {}".format(manifest_path))
+        print(f"  {len(checksums)} files verified")
+        print(f"  Manifest: {manifest_path}")
         return local_dir
 
     # Check if already downloaded
     if os.path.isdir(local_dir) and os.listdir(local_dir):
-        print("{} already present at {}".format(repo_id, local_dir))
+        print(f"{repo_id} already present at {local_dir}")
         print("  Verifying checksums...")
         checksums = verify_download(local_dir)
         manifest_path = write_manifest(model_key, local_dir, checksums)
-        print("  {} files verified".format(len(checksums)))
+        print(f"  {len(checksums)} files verified")
         return local_dir
 
     print("Downloading {} (~{:.1f} GB)...".format(repo_id, info["approx_size_gb"]))
@@ -309,7 +305,7 @@ def fetch_model(model_key, output_dir, verify_only=False):
     print("  Computing checksums...")
     checksums = verify_download(local_dir)
     manifest_path = write_manifest(model_key, local_dir, checksums)
-    print("  Done: {} files, manifest at {}".format(len(checksums), manifest_path))
+    print(f"  Done: {len(checksums)} files, manifest at {manifest_path}")
     return local_dir
 
 
@@ -322,12 +318,12 @@ def main(argv=None):
         "--model",
         choices=list(MODELS.keys()) + ["all"],
         default=DEFAULT_MODEL,
-        help="Which model to fetch (default: {} = Qwen3.5-4B)".format(DEFAULT_MODEL),
+        help=f"Which model to fetch (default: {DEFAULT_MODEL} = Qwen3.5-4B)",
     )
     parser.add_argument(
         "--output-dir",
         default=DEFAULT_OUTPUT_DIR,
-        help="Output directory (default: {})".format(DEFAULT_OUTPUT_DIR),
+        help=f"Output directory (default: {DEFAULT_OUTPUT_DIR})",
     )
     parser.add_argument(
         "--verify-only",
@@ -339,10 +335,12 @@ def main(argv=None):
     models = list(MODELS.keys()) if args.model == "all" else [args.model]
 
     for model_key in models:
-        print("\n=== {} ({}) ===".format(
-            MODELS[model_key]["repo_id"],
-            MODELS[model_key]["role"],
-        ))
+        print(
+            "\n=== {} ({}) ===".format(
+                MODELS[model_key]["repo_id"],
+                MODELS[model_key]["role"],
+            )
+        )
         fetch_model(model_key, args.output_dir, verify_only=args.verify_only)
 
     print("\nAll requested models processed.")

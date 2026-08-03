@@ -11,19 +11,18 @@ import tempfile
 
 import pytest
 
-from schema import ResultRow, validate_row, validate_rows, write_csv, read_csv
 from harness import (
     HarnessConfig,
+    MemorySnapshot,
+    RunResult,
     SyntheticBackend,
     TimingResult,
-    RunResult,
-    MemorySnapshot,
     _percentile,
-    run_single,
     result_to_rows,
     run_sweep,
     summarize,
 )
+from schema import read_csv, validate_row, validate_rows, write_csv
 
 
 class TestPercentile:

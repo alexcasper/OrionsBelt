@@ -1,0 +1,74 @@
+{
+  "timestamp": "2026-08-02T22:43:36+0100",
+  "hostname": "j2",
+  "device_label": "jetson-j2",
+  "uname": "Linux j2 4.9.337-tegra #1 SMP PREEMPT Mon Nov 4 23:41:41 PST 2024 aarch64 aarch64 aarch64 GNU/Linux",
+  "architecture": "aarch64",
+  "python_version": "3.6.9",
+  "cpu_features": "Features\t: fp asimd evtstrm aes pmull sha1 sha2 crc32",
+  "nproc": "4",
+  "cpus": [
+    {
+      "cpu": 0,
+      "governor": "performance",
+      "max_freq_khz": "1479000",
+      "cur_freq_khz": "1479000"
+    },
+    {
+      "cpu": 1,
+      "governor": "performance",
+      "max_freq_khz": "1479000",
+      "cur_freq_khz": "1479000"
+    },
+    {
+      "cpu": 2,
+      "governor": "performance",
+      "max_freq_khz": "1479000",
+      "cur_freq_khz": "1479000"
+    },
+    {
+      "cpu": 3,
+      "governor": "performance",
+      "max_freq_khz": "1479000",
+      "cur_freq_khz": "1479000"
+    }
+  ],
+  "thermals_post": [
+    {
+      "zone": "thermal_zone0",
+      "type": "AO-therm",
+      "temp_millic": "47000"
+    },
+    {
+      "zone": "thermal_zone1",
+      "type": "CPU-therm",
+      "temp_millic": "43500"
+    },
+    {
+      "zone": "thermal_zone2",
+      "type": "GPU-therm",
+      "temp_millic": "41500"
+    },
+    {
+      "zone": "thermal_zone3",
+      "type": "PLL-therm",
+      "temp_millic": "39500"
+    },
+    {
+      "zone": "thermal_zone4",
+      "type": "PMIC-Die",
+      "temp_millic": "50000"
+    },
+    {
+      "zone": "thermal_zone5",
+      "type": "thermal-fan-est",
+      "temp_millic": "42250"
+    }
+  ],
+  "meminfo": "total        used        free      shared  buff/cache   available\nMem:           3962         915         330         168        2717        2685",
+  "git_sha": "28729f3e0a3ce38093084f2b39b0c4b24f976164",
+  "git_branch": "bench/j2",
+  "binary": "dist/bench_gdn_jetson_a57",
+  "build_flags": "-mcpu=cortex-a57 -static -O3",
+  "compiler": "aarch64-linux-gnu-gcc (Ubuntu/Linaro 7.5.0-3ubuntu1~18.04) 7.5.0"
+}

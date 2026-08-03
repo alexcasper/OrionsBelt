@@ -33,6 +33,11 @@ for spec in \
   aarch64-linux-gnu-gcc -O3 $march -static \
       "$K/gdn_sve.c" "$K/test_gdn_sve.c" -o "$OUT/v" -lm
   printf "  %-24s " "$label"
-  QEMU_CPU=$cpu qemu-aarch64 "$OUT/v" | grep -c "bit-identical to matched reference: YES" \
-      | sed 's/^1$/PASS/; s/^0$/FAIL/'
+  # Count-agnostic on purpose: the number of "bit-identical" lines grows as kernels are
+  # added (fp32, bf16, fp16...). An exact-count check silently stopped reporting when main
+  # gained the narrow-precision kernels, so assert on absence-of-failure instead.
+  out=$(QEMU_CPU=$cpu qemu-aarch64 "$OUT/v" 2>&1)
+  ok=$(printf '%s' "$out" | grep -c "bit-identical to matched reference: YES" || true)
+  bad=$(printf '%s' "$out" | grep -ciE "bit-identical to matched reference: no|EXCEEDS TOLERANCE|CAUSALITY VIOLATED|FAIL" || true)
+  if [ "$ok" -ge 1 ] && [ "$bad" -eq 0 ]; then echo "PASS ($ok checks)"; else echo "FAIL (ok=$ok bad=$bad)"; fi
 done
