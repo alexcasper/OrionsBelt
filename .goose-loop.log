@@ -38488,3 +38488,17 @@ Pull complete.
 ○ ob-2eh ● P1 GitHub Actions CI: lint plus unit tests on an x86/aarch64 matrix ← E1: Repo foundation and submission hygieneSame ready beads, all external-gate. No new portable work.
 
 **Session complete.** 3 beads closed (ob-ng6, ob-c9q, ob-uyh), schema tests added, PR #12 open. All committed and synced. Awaiting external gates.
+--- r5 iter Mon  3 Aug 09:44:24 BST 2026 ---
+
+    __( O)>  ● resuming · zai glm-5.2
+   \____)    20260803_5 · /home/r5/OrionsBelt
+     L L     goose is ready
+
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/r5/OrionsBelt && bd dolt pull 2>&1 | tail -1 && bd ready 2>&1 | grep "○" | grep -v "epic" | wc -l
+
+Pull complete.
+99 ready beads, all external-gate. No new portable work available.
+
+**Session stable.** 3 beads closed (ob-ng6, ob-c9q, ob-uyh), schema tests added, PR #12 open. All committed and synced. Nothing actionable until external gates clear.
