@@ -37970,3 +37970,12 @@ Please retry if you think this is a transient or recoverable error.
 Ran into this error trying to compact: Rate limit exceeded: [1308][Usage limit reached for 5 hour. Your limit will reset at 2026-08-03 17:21:27][202608031321070a2c86443e3046f4].
 
 Please try again or create a new session
+--- r5 iter Mon  3 Aug 05:21:29 BST 2026 ---
+[self-heal: fresh session]
+
+    __( O)>  ● new session · zai glm-5.2
+   \____)    20260803_1 · /home/r5/OrionsBelt
+     L L     goose is ready
+Ran into this error: Rate limit exceeded: [1308][Usage limit reached for 5 hour. Your limit will reset at 2026-08-03 17:21:27][202608031321409c7eba7d0def47b0].
+
+Please retry if you think this is a transient or recoverable error.
