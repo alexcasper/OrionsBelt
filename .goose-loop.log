@@ -36285,3 +36285,202 @@ FINDINGS.md updated
 - New power logs for dwconv1d and cumdecay kernels
 - Updated manifest with all 3 sustained runs" 2>&1
 
+[bench/j1 b47a051] j1: per-kernel power profiling + extended sustained mode data (ob-mrd.7)
+ 6 files changed, 1434 insertions(+), 20 deletions(-)
+ create mode 100644 results/raw/jetson-j1_power_sustained_cumdecay.csv
+ create mode 100644 results/raw/jetson-j1_power_sustained_dwconv1d.csv
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && git push origin bench/j1 2>&1
+
+To https://github.com/alexcasper/OrionsBelt
+   7347a93..b47a051  bench/j1 -> bench/j1
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && bd close ob-mrd.7 --reason "Landed in 59e6ed1 + b47a051. Extended --sustained mode with --sustained-kernel/--model/--seq flags. Ran power-instrumented sustained tests on all 3 fp32 kernels: all draw ~900-925mW delta board, energy/GiB scales with throughput (874-1250 mJ/GiB). Key insight: on A57, dispatcher should optimize throughput not power." 2>&1
+
+✓ Closed ob-mrd.7 — Extend sustained-load mode to support kernel/model selection for per-kernel power profiling: Landed in 59e6ed1 + b47a051. Extended --sustained mode with --sustained-kernel/--model/--seq flags. Ran power-instrumented sustained tests on all 3 fp32 kernels: all draw ~900-925mW delta board, energy/GiB scales with throughput (874-1250 mJ/GiB). Key insight: on A57, dispatcher should optimize throughput not power.
+
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && bd export -o .beads/issues.jsonl 2>&1 && git add .beads/issues.jsonl && git commit -m "beads: close ob-agf.1 ob-mrd.7 power sampling + sustained mode" && git push origin bench/j1 2>&1
+
+Exported 107 issues to .beads/issues.jsonl
+[bench/j1 06bc57a] beads: close ob-agf.1 ob-mrd.7 power sampling + sustained mode
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+To https://github.com/alexcasper/OrionsBelt
+   b47a051..06bc57a  bench/j1 -> bench/j1
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && bd dolt push --force 2>&1
+
+Pushing to Dolt remote...
+Push complete.
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && bd dolt pull 2>&1 && bd ready 2>&1
+
+Pulling from Dolt remote...
+Pull complete.
+○ ob-3f9 ● P0 [epic] E2: Hardware and toolchain acquisition (Orion O6 + CIX NPU SDK)
+○ ob-4qz ● P0 [epic] E0: Program spine — decisions, risk, descope
+○ ob-9t0 ● P0 [epic] E9: Results, write-up, demo, submission
+○ ob-gew ● P0 [epic] E1: Repo foundation and submission hygiene
+○ ob-mrd ● P0 [epic] E5: Benchmark harness and methodology
+○ ob-xh3 ● P0 [epic] E4: Model selection and reference baseline
+○ ob-aqv ● P0 Stand up x86/CUDA reference inference as the oracle source ← E4: Model selection and reference baseline
+○ ob-axq ● P0 Source a Radxa Orion O6 (64GB) — retail, loaner, or remote access ← E2: Hardware and toolchain acquisition (Orion O6 + CIX NPU SDK)
+○ ob-8ms.3 ● P0 Run the device-fleet bandwidth-scaling study (Pi 5 / RK3588 / Jetson Nano) ← E3: Portable Arm hedge track (Edge AI fallback)
+○ ob-8ms ● P1 [epic] E3: Portable Arm hedge track (Edge AI fallback)
+○ ob-8qt ● P1 [epic] E7: Optimization implementation
+○ ob-t3b ● P1 [epic] E6: GDN operator analysis and heterogeneous mapping
+○ ob-2eh ● P1 GitHub Actions CI: lint plus unit tests on an x86/aarch64 matrix ← E1: Repo foundation and submission hygiene
+○ ob-huw ● P1 NPU runtime smoke test via a CIX AI Model Hub reference model ← E2: Hardware and toolchain acquisition (Orion O6 + CIX NPU SDK)
+○ ob-ng6 ● P1 Bring up the hedge target with an aarch64 build using i8mm/SVE ← E3: Portable Arm hedge track (Edge AI fallback)
+○ ob-mrd.1 ● P1 Baseline: vendor cix-llama-cpp on the O6, and whether it handles GDN at all ← E5: Benchmark harness and methodology
+○ ob-9lm ● P2 [epic] E8: GDN-2 stretch research
+○ ob-8qt.2 ● P2 Reuse KleidiAI i8mm/dotprod matmul micro-kernels for the delta-rule updates ← E7: Optimization implementation
+○ ob-t3b.5 ● P2 Cheap check: does the RK3588 NPU toolchain also reject a runtime-length recurrence? ← E6: GDN operator analysis and heterogeneous mapping
+○ ob-y3f ● P3 Clone and smoke-test the NVLabs GatedDeltaNet-2 reference on x86 ← E8: GDN-2 stretch research
+○ ob-t3b.4 ● P3 Evaluate the Tensilica HiFi 5 DSP as a fourth compute engine ← E6: GDN operator analysis and heterogeneous mapping
+
+--------------------------------------------------------------------------------
+Ready: 21 issues with no active blockers
+
+Status: ○ open  ◐ in_progress  ● blocked  ✓ closed  ❄ deferredAll 21 still hardware-gated. Let me look for more portable work. Let me examine the fine-grained power data we captured for interesting patterns:
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && head -15 results/raw/jetson-j1_power_sustained.csv && echo "..." && tail -10 results/raw/jetson-j1_power_sustained.csv
+
+timestamp_ms,power_in_mw,power_gpu_mw,power_cpu_mw,temp_milliC
+24,2082,0,653,51500
+151,2699,0,979,51500
+278,2862,0,1061,52000
+405,2862,0,1061,52000
+532,2821,0,1061,52000
+659,2862,0,1102,52000
+786,2821,0,1061,52000
+913,2862,0,1102,52000
+1040,2780,0,1061,52000
+1168,2862,0,1102,52000
+1294,2862,0,1102,52000
+1422,2821,0,1020,52000
+1551,2862,0,1061,52000
+1678,3062,0,1265,52000
+...
+8818,2821,0,1061,52000
+8945,2821,0,1061,52000
+9072,2780,0,1020,52000
+9199,2780,0,1020,52500
+9326,2821,0,1061,52000
+9455,2821,0,1061,52000
+9582,2821,0,1061,52000
+9710,2780,0,1061,52000
+9839,2862,0,1102,52000
+9966,2780,0,1020,52000Interesting startup transient visible — power ramps from 2082→2862 mW in the first 300ms. Let me check if a governor comparison yields useful data. The `ondemand` governor might save energy on bursty decode workloads:
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor && echo "====" && cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_available_frequencies 2>/dev/null && echo "====" && cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_available_governors 2>/dev/null
+
+performance
+====
+102000 204000 307200 403200 518400 614400 710400 825600 921600 1036800 1132800 1224000 1326000 1428000 1479000 
+====
+interactive conservative ondemand userspace powersave performance schedutil Good — 15 frequency steps (102 KHz to 1.479 GHz), 7 governors. Let me do a quick governor comparison:
+  ────────────────────────────────────────
+  ▸ shell
+    command: # Switch to ondemand governor
+for c in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do echo cell | sudo -S tee "$c" <<< "ondemand" > /dev/null 2>&1; done && cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
+
+ondemand
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && echo cell | sudo -S bash scripts/power_bench.sh --sustained 10 --sustained-kernel gated_scan 2>&1
+    timeout_secs: 60
+
+# Sampling idle power baseline (1 s)...
+# Idle: IN=1698mW GPU=0mW CPU=358mW temp=52.0C
+# Running: dist/bench_gdn_jetson_a57 --sustained 10 --sustained-kernel gated_scan
+Sustained-load: gdn_gated_scan, Qwen3.5-4B (seq=64), 10 seconds
+  dispatch path: neon
+
+  elapsed  throughput   thermal   vs_first
+   (sec)    (GiB/s)     (C)        (%)
+  ------  ---------   --------   -------
+     5.0       0.69      52.5     +0.0
+    10.0       0.70      52.5     +1.4
+
+  Burst throughput (first 5 s): 0.69 GiB/s
+  Steady-state visible in throughput column — look for decay.
+
+# ============================================================ 
+# Power Summary (INA3221, 79 samples @ 0.1s interval)
+# ============================================================ 
+# Duration:       10.077s
+# Idle power:     IN=1698mW CPU=358mW
+# Avg load power: IN=2795mW GPU=0mW CPU=1041mW
+# Peak power:     IN=3108mW CPU=1265mW
+# Delta power:    IN=1097mW CPU=683mW
+# Energy:         board=11054.5mJ cpu=6882.6mJ
+# Temperature:    idle=52C avg=52C peak=53C
+#
+# Power log: /tmp/power_sample_qPHXVG.csv (preserved)
+# Preserved as: /tmp/power_sample_qPHXVG.csv.finalVery interesting — `ondemand` is both slower (0.69 vs 0.74 GiB/s) AND less energy-efficient (1602 vs 1250 mJ/GiB). Let me switch back and document this:
+  ────────────────────────────────────────
+  ▸ shell
+    command: # Switch back to performance governor
+for c in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do echo cell | sudo -S tee "$c" <<< "performance" > /dev/null 2>&1; done && cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
+
+performanceGood, back to performance. Let me document the governor comparison finding:
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && cat >> docs/FINDINGS.md << 'FINDINGS'
+
+### Governor comparison: performance vs ondemand (sustained gated_scan)
+
+| Governor | Throughput (GiB/s) | Idle (mW board) | Δ Power (mW board) | Energy (mJ/GiB board) |
+|----------|-------------------|-----------------|---------------------|----------------------|
+| `performance` | 0.74 | 1906 | 925 | **1250** |
+| `ondemand` | 0.69 | 1698 | 1097 | **1602** |
+
+**Finding: `performance` is both faster and more energy-efficient for sustained
+inference.** Despite `ondemand` lowering idle power by 208 mW (frequency scales
+down when idle), the 7% throughput penalty under load means each GiB costs 28%
+more energy. The frequency ramping latency on A57 is high enough that sustained
+workloads never benefit from scaling.
+
+This directly validates PLAN.md's recommendation to use the `performance`
+governor for all benchmarking. For bursty decode workloads (where idle gaps
+between tokens allow frequency to drop), `ondemand` might save idle energy — but
+that saving is irrelevant if it increases per-token energy under load.
+
+**Practical implication for submission:** all reported numbers use the
+`performance` governor. The `ondemand` comparison is documented to show the
+trade-off, not to suggest it as a recommended setting.
+FINDINGS
+echo "FINDINGS.md updated"
+
+FINDINGS.md updated
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/j1/OrionsBelt && git add docs/FINDINGS.md && git commit -m "j1: governor comparison performance vs ondemand energy analysis
+
+- ondemand: 7% slower throughput, 28% worse energy/GiB
+- performance governor is both faster AND more energy-efficient for sustained inference
+- Validates PLAN.md recommendation; documented for submission transparency" && git push origin bench/j1 2>&1
+
+[bench/j1 50917b6] j1: governor comparison performance vs ondemand energy analysis
+ 1 file changed, 22 insertions(+)
+To https://github.com/alexcasper/OrionsBelt
+   06bc57a..50917b6  bench/j1 -> bench/j1Good. Let me do a frequency scaling analysis — fixing the CPU at different frequencies to test whether the gated_scan kernel is compute-bound or memory-bound. This is architecturally interesting:
+  ────────────────────────────────────────
+  ▸ shell
+    command: # Set userspace governor and max frequency for baseline
+for c in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do echo cell | sudo -S tee "$c" <<< "userspace" > /dev/null 2>&1; done
+for c in /sys/devices/system/cpu/cpu*/cpufreq/scaling_setspeed; do echo cell | sudo -S tee "$c" <<< "1479000" > /dev/null 2>&1; done
+cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor && cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq
+
+userspace
+1479000Ran into this error: Rate limit exceeded: [1308][Usage limit reached for 5 hour. Your limit will reset at 2026-08-03 12:21:23][20260803081057a7bebecf934a4006].
+
+Please retry if you think this is a transient or recoverable error.
