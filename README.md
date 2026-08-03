@@ -99,35 +99,37 @@ A portable aarch64 target (the **Edge AI** hedge track) is being brought up in p
 
 ## Status
 
-**This is an in-progress research repository as of 2026-08-02.** Neither the Orion O6 board nor CIX Early Bird SDK access is in hand yet — both are externally gated (procurement, vendor approval) and cannot be compressed by effort alone. A hard go/no-go between the Physical AI (O6) and Edge AI (portable aarch64) framing is scheduled for 2026-08-09; the portable hedge track runs from day one regardless of that decision, so hardware-independent work is not blocked on it.
+**This is an in-progress research repository as of 2026-08-03.** Neither the Orion O6 board nor CIX Early Bird SDK access is in hand yet — both are externally gated (procurement, vendor approval) and cannot be compressed by effort alone. A hard go/no-go between the Physical AI (O6) and Edge AI (portable aarch64) framing is scheduled for 2026-08-09; the portable hedge track runs from day one regardless of that decision, so hardware-independent work is not blocked on it.
 
-**No benchmark numbers have been measured yet.** Nothing below or in `results/` should be read as a reported result — the results schema and harness scaffolding are being built first, deliberately, so that the moment hardware or a suitable hedge target is available, the remaining work is measurement rather than tooling.
+**Device microbenchmarks are running on the Jetson Nano (Cortex-A57, NEON).** Three GDN CPU kernels (gated cumulative decay, gated delta-rule scan, causal depthwise Conv1D) plus mixed-precision bf16/fp16 variants have been measured at verified Qwen3.5-4B and 0.8B shapes, in both prefill and decode phases. Results are committed with provenance manifests; see [`docs/FINDINGS.md`](./docs/FINDINGS.md) for analysis and [`results/raw/`](./results/raw/) for CSVs. The full inference harness (end-to-end tokens/sec, TTFT, memory decomposition) is still pending hardware access.
 
 | Item | Status |
 |---|---|
 | Implementation plan (`PLAN.md`) | Done |
 | Claim verification against primary sources (`docs/CLAIM_VERIFICATION.md`) | Done |
 | Repository skeleton, Apache-2.0 license | Done |
-| Results schema (`docs/RESULTS_SCHEMA.md`) | In progress |
-| Benchmark harness scaffolding (`bench/`) | Scaffolded, not yet producing data |
+| Results schema (`docs/RESULTS_SCHEMA.md`) | Done |
+| Benchmark harness (`bench/`) + device microbenchmark (`bench_gdn.c`) | Producing data |
 | Model survey / selection (`docs/MODEL_SURVEY.md`) | In progress |
-| Architecture decision records (`docs/adr/`) | In progress |
+| Architecture decision records (`docs/adr/`) | 5 ADRs recorded |
+| CPU GDN kernels (NEON/SVE/scalar) | Verified, benchmarked on A57 |
+| Mixed-precision state kernels (bf16/fp16) | Implemented, benchmarked on A57 |
 | Orion O6 board bring-up | **Pending** — board not yet in hand |
 | CIX Early Bird SDK / NPU toolchain access | **Pending** — not yet approved |
-| Portable aarch64 hedge target bring-up | Pending |
-| Per-layer engine mapping, kernel implementation | Not started |
-| Measured results (prefill/TTFT, decode, memory decomposition) | **Not started — no numbers exist yet** |
+| Portable aarch64 hedge target (Pi 5 / RK3588) | Pending |
+| Per-layer engine mapping (NPU/GPU/CPU) | Hypothesis only — pending measurements |
+| Full inference results (tokens/sec, TTFT, memory) | **Not started — needs hardware** |
 
-> **Results table and figures:** placeholder only, pending measurement.
+> **Results so far:** device-fleet microbenchmark data from the Jetson Nano.
 >
 > ```
 > results/
->   raw/         <- per-run CSVs, schema TBD in docs/RESULTS_SCHEMA.md — empty
->   manifests/   <- one provenance manifest per run — empty
->   figures/     <- generated scaling / memory-decomposition plots — empty
+>   raw/         <- per-run CSVs — jetson-j1.csv (28 rows), jetson-j1_sustained.csv
+>   manifests/   <- provenance manifests — jetson-j1.json, jetson-j1_sustained.json
+>   figures/     <- generated plots — pending plots.py run on a Python 3.10+ host
 > ```
 >
-> See [`results/README.md`](./results/README.md) for the intended layout once data lands.
+> See [`results/README.md`](./results/README.md) for the layout and [`docs/FINDINGS.md`](./docs/FINDINGS.md) for findings.
 
 ## Repository layout
 

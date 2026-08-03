@@ -87,3 +87,4 @@ quote-style = "double"
 testpaths = ["tests"]
 addopts = "-q"
 python_files = ["test_*.py"]
+pythonpath = ["bench"]

@@ -15,3 +15,5 @@ dist/
 
 # Downloaded model weights (never vendored — fetched at setup time)
 models/
+# Downloaded model weights — never committed (license compliance, repo size)
+weights/

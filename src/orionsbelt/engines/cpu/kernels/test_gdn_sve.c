@@ -15,9 +15,13 @@ static void refF_conv(const float*in,const float*w,float*o,float*h,size_t T,size
       o[t*C+c]=H[0]*w[0*C+c]+H[1]*w[1*C+c]+H[2]*w[2*C+c]+cur*w[3*C+c];
       H[0]=H[1];H[1]=H[2];H[2]=cur;}
     h[0*C+c]=H[0];h[1*C+c]=H[1];h[2*C+c]=H[2];}}
+static void refF_decay(const float*a,float*d,size_t T,size_t C){
+  for(size_t c=0;c<C;c++){float run=1.0f;for(size_t t=0;t<T;t++){run*=a[t*C+c];d[t*C+c]=run;}}}
 /* double reference, for the honest numerical-quality view */
 static void refD_scan(const float*g,const float*x,float*s,float*st,size_t T,size_t C){
   for(size_t c=0;c<C;c++){double a=st[c];for(size_t t=0;t<T;t++){a=x[t*C+c]+a*g[t*C+c];s[t*C+c]=(float)a;}st[c]=(float)a;}}
+static void refD_decay(const float*a,float*d,size_t T,size_t C){
+  for(size_t c=0;c<C;c++){double run=1.0;for(size_t t=0;t<T;t++){run*=a[t*C+c];d[t*C+c]=(float)run;}}}
 
 static void report(const char*n,const float*a,const float*b,size_t N){
   double mabs=0,mrel=0; size_t big=0;
@@ -32,8 +36,11 @@ int main(void){
   float *o1=malloc(N*4),*o2=malloc(N*4);
   float *stA=malloc(C*4),*stB=malloc(C*4),*stC=malloc(C*4);
   float *hA=malloc(3*C*4),*hB=malloc(3*C*4);
+  float *d1=malloc(N*4),*d2=malloc(N*4),*d3=malloc(N*4);
+  float *a_decay=malloc(N*4);
   srand(7);
   for(size_t i=0;i<N;i++){g[i]=0.5f+0.4f*(rand()/(float)RAND_MAX);x[i]=(rand()/(float)RAND_MAX)-0.5f;}
+  for(size_t i=0;i<N;i++)a_decay[i]=0.1f+0.8f*(rand()/(float)RAND_MAX);
   for(size_t i=0;i<4*C;i++)w[i]=(rand()/(float)RAND_MAX)-0.5f;
   for(size_t i=0;i<C;i++){float v=(rand()/(float)RAND_MAX)-0.5f;stA[i]=stB[i]=stC[i]=v;}
   for(size_t i=0;i<3*C;i++){float v=(rand()/(float)RAND_MAX)-0.5f;hA[i]=hB[i]=v;}
@@ -41,17 +48,26 @@ int main(void){
   gdn_gated_scan_f32(g,x,s1,stA,T,C);
   refF_scan(g,x,s2,stB,T,C);
   refD_scan(g,x,s3,stC,T,C);
+  gdn_cumdecay_f32(a_decay,d1,T,C);
+  refF_decay(a_decay,d2,T,C);
+  refD_decay(a_decay,d3,T,C);
   gdn_causal_dwconv1d_f32(x,w,o1,hA,T,C);
   refF_conv(x,w,o2,hB,T,C);
 
   printf("SVE kernel vs PRECISION-MATCHED float reference (expect ~0):\n");
   report("gated_scan",s1,s2,N); report("gated_scan carried state",stA,stB,C);
+  report("cumdecay",d1,d2,N);
   report("causal_dwconv1d",o1,o2,N); report("conv history",hA,hB,3*C);
   printf("SVE kernel vs DOUBLE reference (fp32 accumulation quality):\n");
   report("gated_scan",s1,s3,N);
+  report("cumdecay",d1,d3,N);
 
   double mabs=0; for(size_t i=0;i<N;i++){double d=fabs((double)s1[i]-s2[i]);if(d>mabs)mabs=d;}
   int exact = (mabs==0.0);
   printf("\ngated_scan bit-identical to matched reference: %s\n", exact?"YES":"no");
+
+  mabs=0; for(size_t i=0;i<N;i++){double d=fabs((double)d1[i]-d2[i]);if(d>mabs)mabs=d;}
+  exact = (mabs==0.0);
+  printf("cumdecay bit-identical to matched reference: %s\n", exact?"YES":"no");
   return 0;
 }

@@ -29,6 +29,10 @@
 void gdn_cumdecay_f32(const float *, float *, size_t, size_t);
 void gdn_gated_scan_f32(const float *, const float *, float *, float *, size_t, size_t);
 void gdn_causal_dwconv1d_f32(const float *, const float *, float *, float *, size_t, size_t);
+void gdn_cumdecay_bf16(const float *, uint16_t *, size_t, size_t);
+void gdn_gated_scan_bf16(const float *, const float *, float *, uint16_t *, size_t, size_t);
+void gdn_cumdecay_f16(const float *, uint16_t *, size_t, size_t);
+void gdn_gated_scan_f16(const float *, const float *, float *, uint16_t *, size_t, size_t);
 
 /* Which path did the compiler actually select in gdn_sve.c? Mirrors its guard order exactly. */
 #if defined(__ARM_FEATURE_SVE)
@@ -80,13 +84,21 @@ static stats_t summarize(double *samples, int n) {
     return s;
 }
 
-typedef enum { K_DECAY, K_SCAN, K_CONV } kernel_id;
+typedef enum { K_DECAY, K_SCAN, K_CONV,
+               K_DECAY_BF16, K_SCAN_BF16,
+               K_DECAY_F16, K_SCAN_F16,
+               K_MAX } kernel_id;
 
 static const char *kernel_name(kernel_id k) {
     switch (k) {
-        case K_DECAY: return "gdn_cumdecay";
-        case K_SCAN: return "gdn_gated_scan";
-        case K_CONV: return "gdn_causal_dwconv1d";
+        case K_DECAY:      return "gdn_cumdecay";
+        case K_SCAN:       return "gdn_gated_scan";
+        case K_CONV:       return "gdn_causal_dwconv1d";
+        case K_DECAY_BF16: return "gdn_cumdecay_bf16";
+        case K_SCAN_BF16:  return "gdn_gated_scan_bf16";
+        case K_DECAY_F16:  return "gdn_cumdecay_f16";
+        case K_SCAN_F16:   return "gdn_gated_scan_f16";
+        case K_MAX:        return "?";
     }
     return "?";
 }
@@ -95,14 +107,25 @@ static const char *kernel_name(kernel_id k) {
  * bandwidth-bound argument in docs/METRICS.md is built on, so the accounting is explicit
  * rather than folded into a constant. */
 static double bytes_per_call(kernel_id k, size_t seq, size_t ch) {
-    double e = (double)sizeof(float);
+    double e = (double)sizeof(float);   /* 4 bytes (fp32) */
+    double h = (double)sizeof(uint16_t); /* 2 bytes (bf16/fp16) */
+    double s = (double)seq, c = (double)ch;
     switch (k) {
-        /* read a[], write decay[] */
-        case K_DECAY: return e * 2.0 * (double)seq * (double)ch;
-        /* read g[], read x[], write s[], plus state read+write */
-        case K_SCAN: return e * (3.0 * (double)seq * (double)ch + 2.0 * (double)ch);
+        /* read a[], write decay[] — both fp32 */
+        case K_DECAY:      return e * 2.0 * s * c;
+        /* read g[], read x[], write s[], plus state read+write — all fp32 */
+        case K_SCAN:       return e * (3.0 * s * c + 2.0 * c);
         /* read in[], write out[], weights + history are small and resident */
-        case K_CONV: return e * (2.0 * (double)seq * (double)ch + 7.0 * (double)ch);
+        case K_CONV:       return e * (2.0 * s * c + 7.0 * c);
+        /* read a[fp32], write decay[bf16] — saves 25% output traffic */
+        case K_DECAY_BF16: return e * s * c + h * s * c;
+        /* read g+x[fp32], write s[fp32], read+write state[bf16] — saves state I/O */
+        case K_SCAN_BF16:  return e * 3.0 * s * c + h * 2.0 * c;
+        /* read a[fp32], write decay[fp16] — same traffic as bf16 variant */
+        case K_DECAY_F16:  return e * s * c + h * s * c;
+        /* read g+x[fp32], write s[fp32], read+write state[fp16] */
+        case K_SCAN_F16:   return e * 3.0 * s * c + h * 2.0 * c;
+        case K_MAX:        return 0.0;
     }
     return 0.0;
 }
@@ -110,30 +133,208 @@ static double bytes_per_call(kernel_id k, size_t seq, size_t ch) {
 static double flops_per_call(kernel_id k, size_t seq, size_t ch) {
     double n = (double)seq * (double)ch;
     switch (k) {
-        case K_DECAY: return n;             /* one multiply per element */
-        case K_SCAN: return 2.0 * n;        /* one FMA per element */
-        case K_CONV: return 8.0 * n;        /* 4 taps, mul + 3 FMA */
+        case K_DECAY:      return n;             /* one multiply per element */
+        case K_SCAN:       return 2.0 * n;       /* one FMA per element */
+        case K_CONV:       return 8.0 * n;       /* 4 taps, mul + 3 FMA */
+        /* Narrow-format variants do the same FLOPs — only I/O width changes */
+        case K_DECAY_BF16: return n;
+        case K_SCAN_BF16:  return 2.0 * n;
+        case K_DECAY_F16:  return n;
+        case K_SCAN_F16:   return 2.0 * n;
+        case K_MAX:        return 0.0;
     }
     return 0.0;
 }
 
+/* ---- Sustained-load mode (ob-mrd.2, extended ob-mrd.7) ----
+ * Runs a selectable kernel continuously for N seconds, sampling throughput
+ * and CPU temperature every ~5 seconds to reveal thermal throttling.
+ * PLAN.md risk R7: burst numbers that cannot be sustained are misleading
+ * on passively-cooled edge hardware. */
+
+static double read_thermal_millideg(void) {
+    FILE *f = fopen("/sys/class/thermal/thermal_zone0/temp", "r");
+    if (!f) return -1.0;
+    double val = -1.0;
+    if (fscanf(f, "%lf", &val) != 1) val = -1.0;
+    fclose(f);
+    return val;                       /* millidegrees Celsius, or -1 */
+}
+
+static kernel_id parse_kernel(const char *s) {
+    if (!strcmp(s, "cumdecay"))      return K_DECAY;
+    if (!strcmp(s, "gated_scan"))    return K_SCAN;
+    if (!strcmp(s, "dwconv1d"))      return K_CONV;
+    if (!strcmp(s, "cumdecay_bf16")) return K_DECAY_BF16;
+    if (!strcmp(s, "gated_scan_bf16")) return K_SCAN_BF16;
+    if (!strcmp(s, "cumdecay_f16"))  return K_DECAY_F16;
+    if (!strcmp(s, "gated_scan_f16")) return K_SCAN_F16;
+    return K_MAX;  /* invalid */
+}
+
+static void run_sustained(int seconds, int csv_mode,
+                          kernel_id kid, const char *model_name,
+                          size_t seq, size_t ch, size_t gdn_layers) {
+    size_t n = seq * ch;
+
+    /* Allocate all buffers (some kernels don't use all of them, but the
+     * allocation is tiny relative to the run time and keeps the code simple). */
+    float *a   = malloc(n * sizeof(float));
+    float *out = malloc(n * sizeof(float));
+    float *g   = malloc(n * sizeof(float));
+    float *x   = malloc(n * sizeof(float));
+    float *state = malloc(ch * sizeof(float));
+    float *w   = malloc(4 * ch * sizeof(float));
+    float *hist = malloc(3 * ch * sizeof(float));
+    uint16_t *decay_narrow = malloc(n * sizeof(uint16_t));
+    uint16_t *state_narrow = malloc(ch * sizeof(uint16_t));
+    if (!a || !out || !g || !x || !state || !w || !hist ||
+        !decay_narrow || !state_narrow) {
+        fprintf(stderr, "sustained: allocation failed\n");
+        return;
+    }
+
+    /* Fill with representative data (same patterns as main benchmark) */
+    for (size_t i = 0; i < n; ++i) {
+        a[i] = 0.90f + 0.09f * (float)((i * 2654435761u) % 1000) / 1000.0f;
+        g[i] = 0.50f + 0.40f * (float)((i * 40503u) % 1000) / 1000.0f;
+        x[i] = (float)((i * 69069u) % 2000) / 1000.0f - 1.0f;
+    }
+    for (size_t i = 0; i < ch; ++i) { state[i] = 0.0f; state_narrow[i] = 0; }
+    for (size_t i = 0; i < 4 * ch; ++i) w[i] = 0.1f;
+    for (size_t i = 0; i < 3 * ch; ++i) hist[i] = 0.0f;
+
+    double bpc = bytes_per_call(kid, seq, ch);
+    double sample_int = 5.0;
+    double t0 = now_s();
+    double deadline = t0 + (double)seconds;
+    double next_sample = t0 + sample_int;
+    long calls_in_window = 0;
+    double window_start = t0;
+    double first_window_gibs = 0.0;
+    int window_idx = 0;
+
+    if (!csv_mode) {
+        printf("Sustained-load: %s, %s (seq=%zu), %d seconds\n",
+               kernel_name(kid), model_name, seq, seconds);
+        printf("  dispatch path: %s\n\n", DISPATCH_PATH);
+        printf("  elapsed  throughput   thermal   vs_first\n");
+        printf("   (sec)    (GiB/s)     (C)        (%%)\n");
+        printf("  ------  ---------   --------   -------\n");
+    } else {
+        printf("sustained_model,sustained_kernel,dispatch_path,elapsed_s,"
+               "throughput_gibs,thermal_c,vs_first_pct\n");
+    }
+
+    while (now_s() < deadline) {
+        switch (kid) {
+            case K_DECAY:      gdn_cumdecay_f32(a, out, seq, ch); break;
+            case K_SCAN:       gdn_gated_scan_f32(g, x, out, state, seq, ch); break;
+            case K_CONV:       gdn_causal_dwconv1d_f32(x, w, out, hist, seq, ch); break;
+            case K_DECAY_BF16: gdn_cumdecay_bf16(a, decay_narrow, seq, ch); break;
+            case K_SCAN_BF16:  gdn_gated_scan_bf16(g, x, out, state_narrow, seq, ch); break;
+            case K_DECAY_F16:  gdn_cumdecay_f16(a, decay_narrow, seq, ch); break;
+            case K_SCAN_F16:   gdn_gated_scan_f16(g, x, out, state_narrow, seq, ch); break;
+            case K_MAX:        break;
+        }
+        calls_in_window++;
+
+        double now = now_s();
+        if (now >= next_sample) {
+            double dt = now - window_start;
+            double avg_s = calls_in_window > 0 ? dt / (double)calls_in_window : dt;
+            double gibs = bpc / avg_s / 1073741824.0;
+            double temp = read_thermal_millideg();
+            if (temp >= 0.0) temp /= 1000.0;
+            double vs_first = 0.0;
+            if (window_idx == 0) first_window_gibs = gibs;
+            if (first_window_gibs > 0.0)
+                vs_first = (gibs - first_window_gibs) / first_window_gibs * 100.0;
+
+            if (csv_mode) {
+                printf("%s,%s,%s,%.1f,%.2f,%.1f,%.1f\n",
+                       model_name, kernel_name(kid), DISPATCH_PATH,
+                       now - t0, gibs, temp, vs_first);
+            } else {
+                printf("  %6.1f   %8.2f   %7.1f   %+6.1f\n",
+                       now - t0, gibs, temp, vs_first);
+            }
+            fflush(stdout);
+            calls_in_window = 0;
+            window_start = now;
+            next_sample += sample_int;
+            window_idx++;
+        }
+    }
+
+    if (!csv_mode && window_idx > 1) {
+        printf("\n  Burst throughput (first 5 s): %.2f GiB/s\n", first_window_gibs);
+        printf("  Steady-state visible in throughput column — look for decay.\n");
+    }
+
+    free(a); free(out); free(g); free(x); free(state);
+    free(w); free(hist); free(decay_narrow); free(state_narrow);
+}
+
 int main(int argc, char **argv) {
-    int csv = 0, repeats = 15;
+    int csv = 0, repeats = 15, sustained = 0;
+    kernel_id sus_kernel = K_SCAN;
+    const char *sus_model = "Qwen3.5-4B";
+    size_t sus_seq = 64, sus_ch = 32 * 128, sus_layers = 24;
+
     for (int i = 1; i < argc; ++i) {
         if (!strcmp(argv[i], "--csv")) csv = 1;
         else if (!strcmp(argv[i], "--repeats") && i + 1 < argc) repeats = atoi(argv[++i]);
+        else if (!strcmp(argv[i], "--sustained") && i + 1 < argc) sustained = atoi(argv[++i]);
+        else if (!strcmp(argv[i], "--sustained-kernel") && i + 1 < argc) {
+            sus_kernel = parse_kernel(argv[++i]);
+            if (sus_kernel == K_MAX) {
+                fprintf(stderr, "unknown kernel: %s\n  valid: cumdecay gated_scan dwconv1d "
+                        "cumdecay_bf16 gated_scan_bf16 cumdecay_f16 gated_scan_f16\n", argv[i]);
+                return 1;
+            }
+        }
+        else if (!strcmp(argv[i], "--sustained-model") && i + 1 < argc) {
+            const char *m = argv[++i];
+            if (!strcmp(m, "4B")) { sus_model = "Qwen3.5-4B"; sus_ch = 32*128; sus_layers = 24; }
+            else if (!strcmp(m, "0.8B")) { sus_model = "Qwen3.5-0.8B"; sus_ch = 16*128; sus_layers = 18; }
+            else { fprintf(stderr, "unknown model: %s (use 4B or 0.8B)\n", m); return 1; }
+        }
+        else if (!strcmp(argv[i], "--sustained-seq") && i + 1 < argc) {
+            sus_seq = (size_t)atoi(argv[++i]);
+        }
         else if (!strcmp(argv[i], "--help")) {
-            printf("usage: %s [--csv] [--repeats N]\n", argv[0]);
+            printf("usage: %s [--csv] [--repeats N] [--sustained SECONDS] \\\n", argv[0]);
+            printf("         [--sustained-kernel NAME] [--sustained-model 4B|0.8B] [--sustained-seq N]\n");
+            printf("\n  --sustained N       Run a kernel for N seconds, sampling\n");
+            printf("                      throughput and thermal every 5 s to reveal throttling.\n");
+            printf("  --sustained-kernel  Kernel for sustained mode (default: gated_scan)\n");
+            printf("                      Valid: cumdecay gated_scan dwconv1d\n");
+            printf("                             cumdecay_bf16 gated_scan_bf16\n");
+            printf("                             cumdecay_f16 gated_scan_f16\n");
+            printf("  --sustained-model   Model config: 4B or 0.8B (default: 4B)\n");
+            printf("  --sustained-seq     Sequence length: 64=prefill, 1=decode (default: 64)\n");
             return 0;
         }
     }
     if (repeats < 5) repeats = 5;            /* docs/METRICS.md: never report N<5 */
     if (repeats > MAX_REPEATS) repeats = MAX_REPEATS;
 
+    /* Sustained-load mode: runs gdn_gated_scan for N seconds and exits.
+     * Separate code path from the p50/p95 burst benchmark above. */
+    if (sustained > 0) {
+        run_sustained(sustained, csv, sus_kernel, sus_model,
+                      sus_seq, sus_ch, sus_layers);
+        return 0;
+    }
+
     /* Verified Qwen3.5 shapes (ADR 0003). channels = n_value_heads * head_dim. */
     struct { const char *model; size_t seq, ch, gdn_layers; } cfgs[] = {
         {"Qwen3.5-4B", 64, 32 * 128, 24},
         {"Qwen3.5-0.8B", 64, 16 * 128, 18},
+        /* Decode (seq=1): state I/O is ~40% of traffic — where narrowing helps */
+        {"Qwen3.5-4B_decode", 1, 32 * 128, 24},
+        {"Qwen3.5-0.8B_decode", 1, 16 * 128, 18},
     };
     const int n_cfg = (int)(sizeof(cfgs) / sizeof(cfgs[0]));
 
@@ -160,7 +361,10 @@ int main(int argc, char **argv) {
         float *state = malloc(ch * sizeof(float));
         float *w = malloc(4 * ch * sizeof(float));
         float *hist = malloc(3 * ch * sizeof(float));
-        if (!a || !out || !g || !x || !state || !w || !hist) {
+        uint16_t *decay_narrow = malloc(n * sizeof(uint16_t));
+        uint16_t *state_narrow = malloc(ch * sizeof(uint16_t));
+        if (!a || !out || !g || !x || !state || !w || !hist ||
+            !decay_narrow || !state_narrow) {
             fprintf(stderr, "allocation failed for %s (needs ~%.0f MiB)\n", cfgs[c].model,
                     (double)(4 * n + 8 * ch) * sizeof(float) / 1048576.0);
             return 1;
@@ -173,6 +377,7 @@ int main(int argc, char **argv) {
             x[i] = (float)((i * 69069u) % 2000) / 1000.0f - 1.0f;
         }
         for (size_t i = 0; i < ch; ++i) state[i] = 0.0f;
+        for (size_t i = 0; i < ch; ++i) state_narrow[i] = 0;
         for (size_t i = 0; i < 4 * ch; ++i) w[i] = 0.1f;
         for (size_t i = 0; i < 3 * ch; ++i) hist[i] = 0.0f;
 
@@ -180,14 +385,19 @@ int main(int argc, char **argv) {
             printf("%s  (seq=%zu, channels=%zu, %zu GDN layers)\n", cfgs[c].model, seq, ch,
                    cfgs[c].gdn_layers);
 
-        for (kernel_id k = K_DECAY; k <= K_CONV; ++k) {
+        for (kernel_id k = K_DECAY; k < K_MAX; ++k) {
             double samples[MAX_REPEATS];
             for (int r = 0; r < WARMUPS + repeats; ++r) {
                 double t0 = now_s();
                 switch (k) {
-                    case K_DECAY: gdn_cumdecay_f32(a, out, seq, ch); break;
-                    case K_SCAN: gdn_gated_scan_f32(g, x, out, state, seq, ch); break;
-                    case K_CONV: gdn_causal_dwconv1d_f32(x, w, out, hist, seq, ch); break;
+                    case K_DECAY:      gdn_cumdecay_f32(a, out, seq, ch); break;
+                    case K_SCAN:       gdn_gated_scan_f32(g, x, out, state, seq, ch); break;
+                    case K_CONV:       gdn_causal_dwconv1d_f32(x, w, out, hist, seq, ch); break;
+                    case K_DECAY_BF16: gdn_cumdecay_bf16(a, decay_narrow, seq, ch); break;
+                    case K_SCAN_BF16:  gdn_gated_scan_bf16(g, x, out, state_narrow, seq, ch); break;
+                    case K_DECAY_F16:  gdn_cumdecay_f16(a, decay_narrow, seq, ch); break;
+                    case K_SCAN_F16:   gdn_gated_scan_f16(g, x, out, state_narrow, seq, ch); break;
+                    case K_MAX:        break;
                 }
                 double dt = now_s() - t0;
                 if (r >= WARMUPS) samples[r - WARMUPS] = dt;
@@ -215,6 +425,7 @@ int main(int argc, char **argv) {
             printf("\n");
         }
         free(a); free(out); free(g); free(x); free(state); free(w); free(hist);
+        free(decay_narrow); free(state_narrow);
     }
 
     if (!csv) {
