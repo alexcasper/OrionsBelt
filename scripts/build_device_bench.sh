@@ -27,10 +27,13 @@ CC=${CC:-aarch64-linux-gnu-gcc}
 #   armv9sve2    Armv9-A + SVE2. Cortex-A710/A720, Orion O6. Exercises the SVE path.
 build() {
     local name="$1" flags="$2"
-    if $CC -O3 $flags -static "$K/gdn_sve.c" "$K/bench_gdn.c" -o "$OUT/bench_gdn_$name" -lm \
+    if $CC -O3 -fopenmp $flags -static "$K/gdn_sve.c" "$K/bench_gdn.c" -o "$OUT/bench_gdn_$name" -lm \
         2>/dev/null; then
         printf "  %-14s %-40s %s bytes\n" "$name" "$flags" \
             "$(stat -c%s "$OUT/bench_gdn_$name")"
+        # Also build the correctness test binary with the same flags
+        $CC -O3 -fopenmp $flags -static "$K/test_gdn_sve.c" "$K/gdn_sve.c" \
+            -o "$OUT/test_gdn_sve_$name" -lm 2>/dev/null || true
     else
         printf "  %-14s %-40s SKIPPED (toolchain rejects these flags)\n" "$name" "$flags"
     fi
