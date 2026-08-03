@@ -38286,3 +38286,52 @@ All schema tests passed
 Tests enum values, CSV header conformance against committed result files.
 The CI wiring half of ob-1lm remains blocked by ob-2eh (OAuth workflow scope)." && git push origin bench/j1 2>&1 | tail -2
 
+[bench/j1 7c6615f] j1: schema conformance tests for bench results (ob-1lm portable part)
+ 2 files changed, 384 insertions(+)
+ create mode 100644 tests/test_schema_conformance.py
+To https://github.com/alexcasper/OrionsBelt.git
+   5722131..7c6615f  bench/j1 -> bench/j1~10k tokens remaining. Let me do a final sync and wrap up cleanly.
+  ────────────────────────────────────────
+  ▸ shell
+    command: cd /home/r5/OrionsBelt && git status --short && echo "===LOG===" && git log --oneline -6 && echo "===PUSH BEADS===" && bd export -o .beads/issues.jsonl 2>&1 && git add .beads/issues.jsonl && git diff --cached --stat && git commit -m "beads: sync after schema tests" 2>&1 | head -2 && git push origin bench/j1 2>&1 | tail -2 && bd dolt push 2>&1 | tail -2
+
+ M .goose-loop.log
+===LOG===
+7c6615f j1: schema conformance tests for bench results (ob-1lm portable part)
+5722131 j1: cross-device kernel bandwidth comparison in FINDINGS.md
+0deee65 beads: close ob-uyh (SETUP_PORTABLE.md landed)
+b062d48 j1: docs/SETUP_PORTABLE.md reproducible hedge-target setup (ob-uyh)
+cc583d1 beads: close ob-c9q (Pi5 baseline sweep landed)
+65f496d j1: baseline benchmark sweep on Pi 5 hedge target (ob-c9q)
+===PUSH BEADS===
+Exported 101 issues to .beads/issues.jsonl
+ .beads/issues.jsonl | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+[bench/j1 db58e90] beads: sync after schema tests
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+To https://github.com/alexcasper/OrionsBelt.git
+   7c6615f..db58e90  bench/j1 -> bench/j1
+Pushing to Dolt remote...
+Push complete.~9k tokens remaining. Everything is committed, pushed, and synced. Here's the final status:
+
+## Session Complete — j1 agent on `bench/j1`
+
+### Beads closed (3)
+| Bead | Deliverable | Commit |
+|---|---|---|
+| **ob-ng6** ✅ | Runtime ISA feature detector (`src/orionsbelt/engines/cpu/isa_detect.py` + tests) | `c6389cc` |
+| **ob-c9q** ✅ | Pi 5 baseline benchmark sweep (`results/raw/pi5-j1.csv` + manifest) | `65f496d` |
+| **ob-uyh** ✅ | `docs/SETUP_PORTABLE.md` — full Edge AI reproduction guide | `b062d48` |
+
+### Additional contributions
+- Schema conformance tests (`tests/test_schema_conformance.py`) — portable part of ob-1lm (`7c6615f`)
+- Cross-device bandwidth comparison appended to `docs/FINDINGS.md` (`5722131`)
+- [PR #12](https://github.com/alexcasper/OrionsBelt/pull/12) open, awaiting reviewer merge
+
+### Remaining work — all external-gate
+All 9 remaining ready beads require hardware or toolchain access unavailable on this node (O6 board, CUDA, RK3588 NPU, KleidiAI, or GitHub OAuth workflow scope). No further portable work is actionable.
+
+### Sync state
+- `bench/j1` pushed ✅
+- `bd dolt push` ✅
+- `.beads/issues.jsonl` committed ✅
