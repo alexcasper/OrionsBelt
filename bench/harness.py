@@ -44,7 +44,7 @@ from typing import Protocol
 
 # Make schema importable when run as a script from the repo root.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from schema import (  # noqa: E402
+from bench.schema import (  # noqa: E402
     CANONICAL_CONTEXT_LENGTHS,
     ResultRow,
     SchemaValidationError,
