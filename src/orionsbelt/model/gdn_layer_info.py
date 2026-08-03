@@ -82,7 +82,6 @@ class CheckpointLayerInfo:
         v, k, vd = self.recurrent_state_shape
         return v * k * vd
 
-    @property
     def recurrent_state_bytes_per_layer(self, dtype_size: int = 4) -> int:
         return self.recurrent_state_elements_per_layer * dtype_size
 
