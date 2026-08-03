@@ -8,9 +8,9 @@ from `METRICS.md` (~0.25 FLOP/byte).
 
 | Device | Cores | ISA | Spec BW (GiB/s) |
 |--------|-------|-----|-----------------|
-| Pi 5 | 4x Cortex-A76 @ 2.4 GHz | Armv8.2-A + dotprod | 17.0 |
-| RK3588 big | 4x Cortex-A76 @ 2.4 GHz | Armv8.2-A + dotprod | 34.0 |
-| RK3588 little | 4x Cortex-A55 @ 1.8 GHz | Armv8.2-A | 34.0 |
+| Pi 5 | 4x Cortex-A76 @ 2.4 GHz | Armv8.0-A (NEON only) | 17.0 |
+| RK3588 big | 4x Cortex-A76 @ 2.4 GHz | Armv8.0-A (NEON only) | 34.0 |
+| RK3588 little | 4x Cortex-A55 @ 1.8 GHz | Armv8.0-A (NEON only) | 34.0 |
 | Jetson j1 | 4x Cortex-A57 @ 1.48 GHz | Armv8.0-A (NEON only) | 25.6 |
 | Jetson j2 | 4x Cortex-A57 @ 1.48 GHz | Armv8.0-A (NEON only) | 25.6 |
 | **Orion O6** | 4x A720 big + 4x A720 mid + 4x A520 | Armv9.2-A | **93.1** |

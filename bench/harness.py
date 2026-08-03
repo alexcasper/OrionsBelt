@@ -39,6 +39,8 @@ from bench.manifest import capture, manifest_ref  # noqa: E402
 from bench.manifest import write as write_manifest  # noqa: E402
 from bench.metrics import Summary, summarize  # noqa: E402
 from bench.schema import (  # noqa: E402
+    Device,
+    Engine,
     LayerClass,
     ResultRow,
     validate_rows,
@@ -338,6 +340,37 @@ class SweepConfig:
     # Provenance escape hatch: run outside a git repo. Off by default so an
     # un-attributable run cannot be produced by accident (see _git_short_sha).
     allow_missing_sha: bool = False
+
+    def __post_init__(self) -> None:
+        """Fail fast on values the frozen schema would reject.
+
+        The CLI already constrains these via argparse ``choices``, but callers
+        that build a SweepConfig directly — ``scripts/run_ablation.py``,
+        ``bench/hf_backend.py``, tests — bypassed that entirely. Without this the
+        first sign of a typo'd device is ``validate_rows`` raising *after* the
+        whole sweep has run, which at 262K context is an expensive way to find
+        out. Checked here rather than in ``run_sweep`` so the object cannot exist
+        in an invalid state.
+        """
+        valid_devices = {d.value for d in Device}
+        valid_engines = {e.value for e in Engine}
+        if self.device not in valid_devices:
+            raise ValueError(f"device must be one of {sorted(valid_devices)}, got {self.device!r}")
+        if self.engine_gdn not in valid_engines:
+            raise ValueError(
+                f"engine_gdn must be one of {sorted(valid_engines)}, got {self.engine_gdn!r}"
+            )
+        if self.engine_full_attention not in valid_engines:
+            raise ValueError(
+                f"engine_full_attention must be one of {sorted(valid_engines)}, "
+                f"got {self.engine_full_attention!r}"
+            )
+        if self.repeat_count < 5:
+            raise ValueError(
+                "repeat_count must be >= 5 (METRICS.md section 7: 'never report N < 5'), "
+                f"got {self.repeat_count}"
+            )
+
     # Prompt source (ob-mrd.2): "synthetic" generates filler text,
     # "needle"/"ruler" load from the committed corpus (ob-del).
     prompt_type: str = "synthetic"
@@ -762,8 +795,12 @@ def print_summary(summaries: list[MetricSummary], config: SweepConfig) -> None:
 # CLI
 # ---------------------------------------------------------------------------
 
-_ENGINE_CHOICES = ["npu", "gpu_vulkan", "gpu_opencl", "cpu", "cuda_reference"]
-_DEVICE_CHOICES = ["o6", "generic_aarch64", "x86_reference"]
+# Derived from the frozen schema rather than restated. These were hardcoded
+# literal lists duplicating schema.Device/schema.Engine; they happened to agree,
+# but nothing kept them in step, so a schema change would have silently left the
+# CLI accepting a value the CSV validator then rejects at the end of a sweep.
+_ENGINE_CHOICES = [e.value for e in Engine]
+_DEVICE_CHOICES = [d.value for d in Device]
 
 
 def build_parser() -> argparse.ArgumentParser:

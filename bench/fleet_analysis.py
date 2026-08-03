@@ -157,7 +157,7 @@ def plot_cross_device(device_data, output_path):
     specs = []
     cores_labels = []
 
-    for name, _, spec, cores, isa in DEVICES:
+    for name, _, spec, cores, _isa in DEVICES:
         d = device_data[name]
         sc = get_gibs(d["rows"], "Qwen3.5-4B", "gdn_gated_scan")
         if sc is None:
@@ -185,7 +185,7 @@ def plot_cross_device(device_data, output_path):
     ax1.set_ylabel("Achieved GiB/s (scan, 4B, seq=64)")
     ax1.set_title("GDN Scan Throughput by Device")
     ax1.set_ylim(0, max(achieved) * 1.3)
-    for bar, val, cl in zip(bars, achieved, cores_labels):
+    for bar, val, cl in zip(bars, achieved, cores_labels, strict=True):
         ax1.text(
             bar.get_x() + bar.get_width() / 2.0,
             bar.get_height() + 0.03,
@@ -272,7 +272,7 @@ def generate_report(output_path):
     lines.append("")
     lines.append("| Device | Cores | ISA | Spec BW (GiB/s) |")
     lines.append("|--------|-------|-----|-----------------|")
-    for name, _, spec, cores, isa in DEVICES:
+    for name, _, spec, cores, _isa in DEVICES:
         lines.append(f"| {name} | {cores} | {isa} | {spec:.1f} |")
     lines.append(
         f"| **Orion O6** | 4x A720 big + 4x A720 mid + 4x A520 | Armv9.2-A | **{O6_SPEC_GIBS:.1f}** |"
