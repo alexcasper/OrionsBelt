@@ -146,12 +146,37 @@ Full target layout and rationale are in [`PLAN.md`](./PLAN.md) §10. Highlights:
 
 ## Reproducing
 
-Setup documentation is being written and is **not complete yet**:
+### Portable Edge AI track (any aarch64 device)
 
-- `docs/SETUP_O6.md` (Orion O6 bring-up, NPU SDK, Python 3.8 toolchain) — **pending**
-- `docs/SETUP_PORTABLE.md` (generic aarch64 hedge-target setup) — **pending**
+Full step-by-step guide: [`docs/SETUP_PORTABLE.md`](./docs/SETUP_PORTABLE.md).
 
-Once those land, this section will give a step-by-step, clean-clone reproduction path, verified by rehearsal (tracked in beads as the reproduction-rehearsal task) before submission. We are not fabricating setup commands ahead of that work; check back closer to submission, or see [`scripts/README.md`](./scripts/README.md) for the entry points as they are added.
+Quick start:
+
+```bash
+# 1. Build the static benchmark binaries (native gcc or cross-compiler)
+./scripts/build_device_bench.sh
+
+# 2. Set CPU governor to performance for valid numbers
+for c in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do \
+  echo performance | sudo tee "$c" >/dev/null; done
+
+# 3. Run the benchmark (pick the binary matching your core's ISA)
+./dist/bench_gdn_jetson_a57 --repeats 30 --csv > results/raw/my-device.csv
+
+# 4. Capture provenance manifest
+python3 bench/manifest.py > results/manifests/my-device.json
+
+# 5. Generate comparison tables and figures
+python3 -m bench.plots results/raw/ --text-only --output-dir results/figures
+```
+
+No GPU, NPU, or proprietary SDK is required. Runs on Pi 5, Jetson Nano,
+RK3588, Graviton, or any 64-bit Arm board. See
+[`scripts/README.md`](./scripts/README.md) for all script entry points.
+
+### Physical AI track (Orion O6 + NPU)
+
+- `docs/SETUP_O6.md` (Orion O6 bring-up, NPU SDK, CIX NOE Compiler) — **pending hardware**
 
 ## License
 
