@@ -674,3 +674,33 @@ seq=1 vs 1.16 GiB/s at seq=64 — a 4× speedup because the single-token
 recurrence fits entirely in L1 cache. This is the architectural property
 that makes GDN viable on edge silicon: O(1) recurrent state means the
 decode path becomes cache-resident regardless of context length.
+
+## Memory decomposition: GDN O(1) state vs full-attention O(n) KV cache (2026-08-03)
+
+The central claim of this project, quantified with verified architecture
+data from `src/orionsbelt/model/gdn_layer_info.py` (Qwen3.5-4B, 32 layers:
+24 GDN + 8 full-attention, pattern 8×(3 GDN → 1 full)).
+
+| Context | Weights | KV cache (FA) | GDN state | Conv state | Total |
+|---|---|---|---|---|---|
+| 4K | 11182 MB | 134 MB | 50 MB | 3 MB | 11370 MB |
+| 32K | 11182 MB | 1074 MB | 50 MB | 3 MB | 12309 MB |
+| 128K | 11182 MB | 4295 MB | 50 MB | 3 MB | 15531 MB |
+| 256K | 11182 MB | 8590 MB | 50 MB | 3 MB | 19826 MB |
+
+**Scaling (relative to 4K baseline):**
+
+| Context | Weights | KV cache | GDN state | Total |
+|---|---|---|---|---|
+| 4K | 1.0× | 1.0× | 1.0× | 1.0× |
+| 32K | 1.0× | 8.0× | 1.0× | 1.1× |
+| 128K | 1.0× | 32.0× | 1.0× | 1.4× |
+| 256K | 1.0× | 64.0× | 1.0× | 1.7× |
+
+**Key insight:** At 256K context, the GDN recurrent state is 50 MB
+(constant regardless of context length) while the full-attention KV cache
+balloons to 8.6 GB — a **171× difference**. GDN saves 8.5 GB of memory
+at this context length, which is the difference between fitting in 8 GB
+edge DRAM and not. Weights (11.2 GB at FP16) dominate at all context
+lengths, which is why INT4 weight quantization (PLAN.md §6, ADR 0004)
+is the complementary half of the story.
