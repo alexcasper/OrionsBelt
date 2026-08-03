@@ -664,6 +664,13 @@ OpenMP 4-thread parallelism** enabled at build time. Same ISA, same governor
 (`performance`), same active fan cooling, same 30-repeat protocol. The only
 variable is thread count.
 
+> **File naming note:** Both `jetson-j1.csv` and `jetson-j2.csv` (canonical)
+> are single-threaded and reproducible from the committed source. The OpenMP
+> results below come from `jetson-j2-omp-full.csv`, built with a parallelized
+> variant of the kernel (pragmas not yet in the mainline source). The ST
+> numbers between the two units agree within ±7%, confirming hardware
+> consistency.
+
 ### Prefill (seq=64) — Qwen3.5-4B
 
 | Kernel | J1 ST (GiB/s) | J2 OMP-4T (GiB/s) | Speedup |
