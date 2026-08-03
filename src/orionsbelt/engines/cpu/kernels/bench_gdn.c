@@ -146,11 +146,11 @@ static double flops_per_call(kernel_id k, size_t seq, size_t ch) {
     return 0.0;
 }
 
-/* ---- Sustained-load mode (ob-mrd.2) ----
- * Runs gdn_gated_scan on the largest config continuously for N seconds,
- * sampling throughput and CPU temperature every ~5 seconds to reveal
- * thermal throttling.  PLAN.md risk R7: burst numbers that cannot be
- * sustained are misleading on passively-cooled edge hardware. */
+/* ---- Sustained-load mode (ob-mrd.2, extended ob-mrd.7) ----
+ * Runs a selectable kernel continuously for N seconds, sampling throughput
+ * and CPU temperature every ~5 seconds to reveal thermal throttling.
+ * PLAN.md risk R7: burst numbers that cannot be sustained are misleading
+ * on passively-cooled edge hardware. */
 
 static double read_thermal_millideg(void) {
     FILE *f = fopen("/sys/class/thermal/thermal_zone0/temp", "r");
@@ -161,26 +161,51 @@ static double read_thermal_millideg(void) {
     return val;                       /* millidegrees Celsius, or -1 */
 }
 
-static void run_sustained(int seconds, int csv_mode) {
-    /* Heaviest workload: Qwen3.5-4B gated_scan at seq=64 */
-    size_t seq = 64, ch = 32 * 128, n = seq * ch;
+static kernel_id parse_kernel(const char *s) {
+    if (!strcmp(s, "cumdecay"))      return K_DECAY;
+    if (!strcmp(s, "gated_scan"))    return K_SCAN;
+    if (!strcmp(s, "dwconv1d"))      return K_CONV;
+    if (!strcmp(s, "cumdecay_bf16")) return K_DECAY_BF16;
+    if (!strcmp(s, "gated_scan_bf16")) return K_SCAN_BF16;
+    if (!strcmp(s, "cumdecay_f16"))  return K_DECAY_F16;
+    if (!strcmp(s, "gated_scan_f16")) return K_SCAN_F16;
+    return K_MAX;  /* invalid */
+}
 
-    float *g  = malloc(n * sizeof(float));
-    float *x  = malloc(n * sizeof(float));
-    float *o  = malloc(n * sizeof(float));
-    float *st = malloc(ch * sizeof(float));
-    if (!g || !x || !o || !st) {
+static void run_sustained(int seconds, int csv_mode,
+                          kernel_id kid, const char *model_name,
+                          size_t seq, size_t ch, size_t gdn_layers) {
+    size_t n = seq * ch;
+
+    /* Allocate all buffers (some kernels don't use all of them, but the
+     * allocation is tiny relative to the run time and keeps the code simple). */
+    float *a   = malloc(n * sizeof(float));
+    float *out = malloc(n * sizeof(float));
+    float *g   = malloc(n * sizeof(float));
+    float *x   = malloc(n * sizeof(float));
+    float *state = malloc(ch * sizeof(float));
+    float *w   = malloc(4 * ch * sizeof(float));
+    float *hist = malloc(3 * ch * sizeof(float));
+    uint16_t *decay_narrow = malloc(n * sizeof(uint16_t));
+    uint16_t *state_narrow = malloc(ch * sizeof(uint16_t));
+    if (!a || !out || !g || !x || !state || !w || !hist ||
+        !decay_narrow || !state_narrow) {
         fprintf(stderr, "sustained: allocation failed\n");
         return;
     }
+
+    /* Fill with representative data (same patterns as main benchmark) */
     for (size_t i = 0; i < n; ++i) {
+        a[i] = 0.90f + 0.09f * (float)((i * 2654435761u) % 1000) / 1000.0f;
         g[i] = 0.50f + 0.40f * (float)((i * 40503u) % 1000) / 1000.0f;
         x[i] = (float)((i * 69069u) % 2000) / 1000.0f - 1.0f;
     }
-    for (size_t i = 0; i < ch; ++i) st[i] = 0.0f;
+    for (size_t i = 0; i < ch; ++i) { state[i] = 0.0f; state_narrow[i] = 0; }
+    for (size_t i = 0; i < 4 * ch; ++i) w[i] = 0.1f;
+    for (size_t i = 0; i < 3 * ch; ++i) hist[i] = 0.0f;
 
-    double bpc = bytes_per_call(K_SCAN, seq, ch);
-    double sample_int = 5.0;          /* seconds between samples */
+    double bpc = bytes_per_call(kid, seq, ch);
+    double sample_int = 5.0;
     double t0 = now_s();
     double deadline = t0 + (double)seconds;
     double next_sample = t0 + sample_int;
@@ -190,7 +215,8 @@ static void run_sustained(int seconds, int csv_mode) {
     int window_idx = 0;
 
     if (!csv_mode) {
-        printf("Sustained-load: gdn_gated_scan, Qwen3.5-4B (seq=64), %d seconds\n", seconds);
+        printf("Sustained-load: %s, %s (seq=%zu), %d seconds\n",
+               kernel_name(kid), model_name, seq, seconds);
         printf("  dispatch path: %s\n\n", DISPATCH_PATH);
         printf("  elapsed  throughput   thermal   vs_first\n");
         printf("   (sec)    (GiB/s)     (C)        (%%)\n");
@@ -201,7 +227,16 @@ static void run_sustained(int seconds, int csv_mode) {
     }
 
     while (now_s() < deadline) {
-        gdn_gated_scan_f32(g, x, o, st, seq, ch);
+        switch (kid) {
+            case K_DECAY:      gdn_cumdecay_f32(a, out, seq, ch); break;
+            case K_SCAN:       gdn_gated_scan_f32(g, x, out, state, seq, ch); break;
+            case K_CONV:       gdn_causal_dwconv1d_f32(x, w, out, hist, seq, ch); break;
+            case K_DECAY_BF16: gdn_cumdecay_bf16(a, decay_narrow, seq, ch); break;
+            case K_SCAN_BF16:  gdn_gated_scan_bf16(g, x, out, state_narrow, seq, ch); break;
+            case K_DECAY_F16:  gdn_cumdecay_f16(a, decay_narrow, seq, ch); break;
+            case K_SCAN_F16:   gdn_gated_scan_f16(g, x, out, state_narrow, seq, ch); break;
+            case K_MAX:        break;
+        }
         calls_in_window++;
 
         double now = now_s();
@@ -217,8 +252,9 @@ static void run_sustained(int seconds, int csv_mode) {
                 vs_first = (gibs - first_window_gibs) / first_window_gibs * 100.0;
 
             if (csv_mode) {
-                printf("Qwen3.5-4B,gdn_gated_scan,%s,%.1f,%.2f,%.1f,%.1f\n",
-                       DISPATCH_PATH, now - t0, gibs, temp, vs_first);
+                printf("%s,%s,%s,%.1f,%.2f,%.1f,%.1f\n",
+                       model_name, kernel_name(kid), DISPATCH_PATH,
+                       now - t0, gibs, temp, vs_first);
             } else {
                 printf("  %6.1f   %8.2f   %7.1f   %+6.1f\n",
                        now - t0, gibs, temp, vs_first);
@@ -236,19 +272,48 @@ static void run_sustained(int seconds, int csv_mode) {
         printf("  Steady-state visible in throughput column — look for decay.\n");
     }
 
-    free(g); free(x); free(o); free(st);
+    free(a); free(out); free(g); free(x); free(state);
+    free(w); free(hist); free(decay_narrow); free(state_narrow);
 }
 
 int main(int argc, char **argv) {
     int csv = 0, repeats = 15, sustained = 0;
+    kernel_id sus_kernel = K_SCAN;
+    const char *sus_model = "Qwen3.5-4B";
+    size_t sus_seq = 64, sus_ch = 32 * 128, sus_layers = 24;
+
     for (int i = 1; i < argc; ++i) {
         if (!strcmp(argv[i], "--csv")) csv = 1;
         else if (!strcmp(argv[i], "--repeats") && i + 1 < argc) repeats = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--sustained") && i + 1 < argc) sustained = atoi(argv[++i]);
+        else if (!strcmp(argv[i], "--sustained-kernel") && i + 1 < argc) {
+            sus_kernel = parse_kernel(argv[++i]);
+            if (sus_kernel == K_MAX) {
+                fprintf(stderr, "unknown kernel: %s\n  valid: cumdecay gated_scan dwconv1d "
+                        "cumdecay_bf16 gated_scan_bf16 cumdecay_f16 gated_scan_f16\n", argv[i]);
+                return 1;
+            }
+        }
+        else if (!strcmp(argv[i], "--sustained-model") && i + 1 < argc) {
+            const char *m = argv[++i];
+            if (!strcmp(m, "4B")) { sus_model = "Qwen3.5-4B"; sus_ch = 32*128; sus_layers = 24; }
+            else if (!strcmp(m, "0.8B")) { sus_model = "Qwen3.5-0.8B"; sus_ch = 16*128; sus_layers = 18; }
+            else { fprintf(stderr, "unknown model: %s (use 4B or 0.8B)\n", m); return 1; }
+        }
+        else if (!strcmp(argv[i], "--sustained-seq") && i + 1 < argc) {
+            sus_seq = (size_t)atoi(argv[++i]);
+        }
         else if (!strcmp(argv[i], "--help")) {
-            printf("usage: %s [--csv] [--repeats N] [--sustained SECONDS]\n", argv[0]);
-            printf("\n  --sustained N   Run gdn_gated_scan for N seconds, sampling\n");
-            printf("                  throughput and thermal every 5 s to reveal throttling.\n");
+            printf("usage: %s [--csv] [--repeats N] [--sustained SECONDS] \\\n", argv[0]);
+            printf("         [--sustained-kernel NAME] [--sustained-model 4B|0.8B] [--sustained-seq N]\n");
+            printf("\n  --sustained N       Run a kernel for N seconds, sampling\n");
+            printf("                      throughput and thermal every 5 s to reveal throttling.\n");
+            printf("  --sustained-kernel  Kernel for sustained mode (default: gated_scan)\n");
+            printf("                      Valid: cumdecay gated_scan dwconv1d\n");
+            printf("                             cumdecay_bf16 gated_scan_bf16\n");
+            printf("                             cumdecay_f16 gated_scan_f16\n");
+            printf("  --sustained-model   Model config: 4B or 0.8B (default: 4B)\n");
+            printf("  --sustained-seq     Sequence length: 64=prefill, 1=decode (default: 64)\n");
             return 0;
         }
     }
@@ -258,7 +323,8 @@ int main(int argc, char **argv) {
     /* Sustained-load mode: runs gdn_gated_scan for N seconds and exits.
      * Separate code path from the p50/p95 burst benchmark above. */
     if (sustained > 0) {
-        run_sustained(sustained, csv);
+        run_sustained(sustained, csv, sus_kernel, sus_model,
+                      sus_seq, sus_ch, sus_layers);
         return 0;
     }
 
