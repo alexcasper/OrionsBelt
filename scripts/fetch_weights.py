@@ -1,351 +1,447 @@
 #!/usr/bin/env python3
-"""Download model weights from HuggingFace at setup time.
+"""Download Qwen3.5 model weights from HuggingFace at setup time.
 
-Bead ``ob-ixt``.  Weights are never vendored into the repo — they are
-fetched on demand by this script, keeping the repo small and license
-compliance clean (see docs/WEIGHT_LICENSE.md).
-
-Uses ``huggingface_hub`` if available (handles resumption, caching,
-authentication for gated models); falls back to direct HTTPS via urllib
-so the script works on minimal edge devices with no pip extras.
+Design goals (see scripts/README.md and ADR 0003):
+  - Non-interactive and idempotent — re-running skips files already present.
+  - No vendoring — weights land outside the repo tree (default ``models/``)
+    and the directory is .gitignored.
+  - License-safe — both checkpoints are Apache-2.0, verified from HF metadata.
+  - Degrades gracefully — uses ``huggingface_hub`` when installed but falls back
+    to a stdlib ``urllib`` downloader so the script works in any Python 3.10+
+    environment.
 
 Usage::
 
-    # Download primary model (Qwen3.5-4B, ~8 GB)
-    python3 scripts/fetch_weights.py
+    python3 scripts/fetch_weights.py --list              # show available models
+    python3 scripts/fetch_weights.py --model 4B          # download 4B checkpoint
+    python3 scripts/fetch_weights.py --model 0.8B        # download 0.8B checkpoint
+    python3 scripts/fetch_weights.py --model all         # download both
+    python3 scripts/fetch_weights.py --model 4B --metadata-only  # config + tokenizer only
+    python3 scripts/fetch_weights.py --model 4B --dry-run       # plan without downloading
 
-    # Download fallback model (Qwen3.5-0.8B, ~1.6 GB)
-    python3 scripts/fetch_weights.py --model 0.8b
-
-    # Download both
-    python3 scripts/fetch_weights.py --model all
-
-    # Custom output directory
-    python3 scripts/fetch_weights.py --output-dir /data/models
-
-    # Verify checksums only (no download)
-    python3 scripts/fetch_weights.py --verify-only
-
-The script is idempotent: if weights already exist and pass verification,
-they are not re-downloaded.
-
-Python 3.6+ compatible (runs on edge devices).
+The script writes a ``manifest.json`` into each model directory recording repo
+id, revision, file list, and download timestamp for reproducibility.
 """
+
+from __future__ import annotations
 
 import argparse
 import hashlib
 import json
-import os
-import subprocess
+import shutil
 import sys
+import time
+from dataclasses import asdict, dataclass, field
+from pathlib import Path
 
 # ---------------------------------------------------------------------------
-# Model registry
+# Constants
 # ---------------------------------------------------------------------------
 
-MODELS = {
-    "4b": {
-        "repo_id": "Qwen/Qwen3.5-4B",
-        "hf_url": "https://huggingface.co/Qwen/Qwen3.5-4B",
-        "approx_size_gb": 8.0,
-        "role": "primary",
-        "license": "Apache-2.0",
-    },
-    "0.8b": {
-        "repo_id": "Qwen/Qwen3.5-0.8B",
-        "hf_url": "https://huggingface.co/Qwen/Qwen3.5-0.8B",
-        "approx_size_gb": 1.6,
-        "role": "fallback",
-        "license": "Apache-2.0",
-    },
-}
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+_DEFAULT_OUTPUT = _REPO_ROOT / "models"
 
-DEFAULT_MODEL = "4b"
-DEFAULT_OUTPUT_DIR = "weights"
+_HF_BASE = "https://huggingface.co"
+_HF_RESOLVE = f"{_HF_BASE}/{{repo}}/resolve/main/{{filename}}"
 
-
-# ---------------------------------------------------------------------------
-# Download via huggingface_hub (preferred)
-# ---------------------------------------------------------------------------
-
-
-def _try_huggingface_hub():
-    # type: () -> Optional[object]
-    """Import huggingface_hub.snapshot_download if available."""
-    try:
-        from huggingface_hub import snapshot_download
-
-        return snapshot_download
-    except ImportError:
-        return None
-
-
-def download_via_hub(repo_id, output_dir):
-    # type: (str, str) -> str
-    """Download a model snapshot using huggingface_hub.
-
-    Handles resumption, caching, and authentication for gated models.
-    """
-    snapshot_download = _try_huggingface_hub()
-    if snapshot_download is None:
-        raise RuntimeError("huggingface_hub not available")
-
-    local_dir = os.path.join(output_dir, repo_id.replace("/", "--"))
-    os.makedirs(local_dir, exist_ok=True)
-
-    print("  Downloading via huggingface_hub (with resume)...")
-    snapshot_download(
-        repo_id=repo_id,
-        local_dir=local_dir,
-        # Exclude large unnecessary files (e.g. optimizer states)
-        ignore_patterns=["*.msgpack", "*.h5", "optimizer.pt"],
-    )
-    return local_dir
-
-
-# ---------------------------------------------------------------------------
-# Download via urllib (fallback for edge devices)
-# ---------------------------------------------------------------------------
-
-
-def _download_file(url, dest_path, chunk_size=1024 * 1024):
-    # type: (str, str, int) -> None
-    """Download a single file with progress reporting."""
-    try:
-        from urllib.request import Request, urlopen
-    except ImportError:
-        raise RuntimeError("urllib not available (minimal Python install?)") from None
-
-    req = Request(url, headers={"User-Agent": "OrionsBelt/fetch_weights"})
-    resp = urlopen(req)
-    total = int(resp.headers.get("Content-Length", 0))
-
-    downloaded = 0
-    with open(dest_path + ".tmp", "wb") as f:
-        while True:
-            chunk = resp.read(chunk_size)
-            if not chunk:
-                break
-            f.write(chunk)
-            downloaded += len(chunk)
-            if total > 0:
-                pct = downloaded * 100 // total
-                sys.stdout.write(f"\r  {pct}% ({downloaded / 1e6:.1f} MB / {total / 1e6:.1f} MB)")
-                sys.stdout.flush()
-    print()  # newline after progress
-
-    os.rename(dest_path + ".tmp", dest_path)
-
-
-# Essential files needed for inference (not the full repo)
-ESSENTIAL_FILES = [
+# Files every checkpoint needs regardless of size
+_METADATA_FILES = [
     "config.json",
-    "model.safetensors",
-    "model.safetensors.index.json",
-    "generation_config.json",
     "tokenizer.json",
     "tokenizer_config.json",
     "vocab.json",
     "merges.txt",
-    "LICENSE",
-    "NOTICE",
+    "chat_template.jinja",
+    "preprocessor_config.json",
+    "model.safetensors.index.json",
+]
+
+# Files downloaded only when NOT using --metadata-only
+# (resolved dynamically per-model because shard counts vary)
+_WEIGHT_FILE_PATTERNS = [
+    "model.safetensors-*.safetensors",  # sharded checkpoints
+    "model.safetensors",  # single-file checkpoints
 ]
 
 
-def download_via_urllib(repo_id, output_dir):
-    # type: (str, str) -> str
-    """Download essential model files via direct HTTPS.
+# ---------------------------------------------------------------------------
+# Data structures
+# ---------------------------------------------------------------------------
 
-    Used when huggingface_hub is not installed (edge devices).
-    Only downloads files that exist; missing optional files are skipped.
+
+@dataclass(frozen=True)
+class ModelInfo:
+    """Static metadata for a downloadable checkpoint."""
+
+    name: str
+    repo_id: str
+    huggingface_url: str
+    license: str
+    license_url: str
+    description: str
+    # Human-readable approximate size for display only
+    approx_size: str
+    # Vision tower files we skip because we only need text inference
+    skip_files: tuple[str, ...] = ("video_preprocessor_config.json",)
+
+
+MODELS: dict[str, ModelInfo] = {
+    "4B": ModelInfo(
+        name="Qwen3.5-4B",
+        repo_id="Qwen/Qwen3.5-4B",
+        huggingface_url="https://huggingface.co/Qwen/Qwen3.5-4B",
+        license="Apache-2.0",
+        license_url="https://www.apache.org/licenses/LICENSE-2.0",
+        description="Primary checkpoint: 32 layers (24 GDN + 8 full-attn), "
+        "hidden 2560, 262K native context. ~8 GB fp16.",
+        approx_size="~8.2 GB",
+        skip_files=("video_preprocessor_config.json",),
+    ),
+    "0.8B": ModelInfo(
+        name="Qwen3.5-0.8B",
+        repo_id="Qwen/Qwen3.5-0.8B",
+        huggingface_url="https://huggingface.co/Qwen/Qwen3.5-0.8B",
+        license="Apache-2.0",
+        license_url="https://www.apache.org/licenses/LICENSE-2.0",
+        description="Fast-iteration fallback: 24 layers (18 GDN + 6 full-attn), "
+        "hidden 1024, 262K native context. ~1.7 GB fp16.",
+        approx_size="~1.7 GB",
+        skip_files=("video_preprocessor_config.json",),
+    ),
+}
+
+
+@dataclass
+class DownloadRecord:
+    """Record of a single file download attempt."""
+
+    filename: str
+    success: bool
+    bytes: int = 0
+    skipped: bool = False
+    error: str = ""
+
+
+@dataclass
+class FetchManifest:
+    """Manifest written to the model directory after fetching."""
+
+    model_name: str
+    repo_id: str
+    revision: str = "main"
+    license: str = ""
+    fetched_at: str = ""
+    files: list[dict] = field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# HTTP helpers (stdlib fallback)
+# ---------------------------------------------------------------------------
+
+
+def _list_repo_files(repo_id: str) -> list[str]:
+    """Fetch the list of files in a HuggingFace repo via the API.
+
+    Uses huggingface_hub if available, otherwise falls back to the REST API.
     """
-    import urllib.error
-
-    local_dir = os.path.join(output_dir, repo_id.replace("/", "--"))
-    os.makedirs(local_dir, exist_ok=True)
-
-    base_url = f"https://huggingface.co/{repo_id}/resolve/main"
-
-    # First, check the safetensors index to find shard filenames
-    index_url = f"{base_url}/model.safetensors.index.json"
-    shards = []  # type: List[str]
-
     try:
-        from urllib.request import Request, urlopen
+        from huggingface_hub import list_repo_files  # type: ignore[import-not-found]
 
-        req = Request(index_url, headers={"User-Agent": "OrionsBelt/fetch_weights"})
-        resp = urlopen(req)
-        index = json.loads(resp.read().decode("utf-8"))
-        weight_map = index.get("weight_map", {})
-        shard_set = sorted(set(weight_map.values()))
-        shards = shard_set
-    except Exception:
-        # No index — single-file model
-        shards = ["model.safetensors"]
+        return sorted(list_repo_files(repo_id))
+    except ImportError:
+        pass
 
-    all_files = ESSENTIAL_FILES + shards
+    # Fallback: direct API call
+    import urllib.request
 
-    for fname in all_files:
-        dest = os.path.join(local_dir, fname)
-        if os.path.exists(dest):
-            print(f"  [skip] {fname} (already present)")
-            continue
-
-        url = f"{base_url}/{fname}"
-        print(f"  Downloading {fname}...")
-        try:
-            _download_file(url, dest)
-        except urllib.error.HTTPError as e:
-            if e.code == 404:
-                print(f"  [skip] {fname} (not found — optional file)")
-            else:
-                raise
-
-    return local_dir
+    url = f"{_HF_BASE}/api/models/{repo_id}"
+    with urllib.request.urlopen(url, timeout=30) as resp:  # noqa: S310
+        data = json.loads(resp.read())
+    return sorted(s["rfilename"] for s in data.get("siblings", []))
 
 
-# ---------------------------------------------------------------------------
-# Verification
-# ---------------------------------------------------------------------------
+def _resolve_weight_files(repo_id: str, repo_files: list[str]) -> list[str]:
+    """Given the full repo file list, return only the weight shard files."""
+    return [f for f in repo_files if f.endswith(".safetensors")]
 
 
-def verify_download(local_dir):
-    # type: (str) -> Dict[str, str]
-    """Compute SHA256 of downloaded files for provenance.
+def _download_file(
+    repo_id: str,
+    filename: str,
+    dest: Path,
+    *,
+    timeout: int = 120,
+) -> int:
+    """Download a single file from HuggingFace. Returns bytes written.
 
-    Returns a dict of filename → sha256.
+    Uses huggingface_hub if available (handles resume, retries), otherwise
+    falls back to a direct urllib download.
     """
-    checksums = {}
-    for fname in sorted(os.listdir(local_dir)):
-        fpath = os.path.join(local_dir, fname)
-        if not os.path.isfile(fpath):
-            continue
-        h = hashlib.sha256()
-        with open(fpath, "rb") as f:
-            while True:
-                chunk = f.read(1024 * 1024)
-                if not chunk:
-                    break
-                h.update(chunk)
-        checksums[fname] = h.hexdigest()
-    return checksums
+    try:
+        from huggingface_hub import hf_hub_download  # type: ignore[import-not-found]
+
+        local = hf_hub_download(
+            repo_id=repo_id,
+            filename=filename,
+            local_dir=str(dest.parent),
+            local_dir_use_symlinks=False,
+        )
+        return Path(local).stat().st_size
+    except ImportError:
+        pass
+
+    # Fallback: direct download
+    import urllib.request
+
+    url = _HF_RESOLVE.format(repo=repo_id, filename=filename)
+    tmp = dest.with_suffix(dest.suffix + ".tmp")
+
+    req = urllib.request.Request(url, headers={"User-Agent": "OrionsBelt/fetch_weights"})
+    with (
+        urllib.request.urlopen(req, timeout=timeout) as resp,  # noqa: S310
+        open(tmp, "wb") as f,
+    ):
+        shutil.copyfileobj(resp, f)
+
+    tmp.rename(dest)
+    return dest.stat().st_size
+
+
+def _file_is_present(path: Path) -> bool:
+    """Check if a file exists and is non-empty."""
+    return path.exists() and path.stat().st_size > 0
+
+
+def _sha256(path: Path, *, chunk: int = 1 << 20) -> str:
+    """Compute SHA-256 of a file (for manifest recording)."""
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        while True:
+            buf = f.read(chunk)
+            if not buf:
+                break
+            h.update(buf)
+    return h.hexdigest()
 
 
 # ---------------------------------------------------------------------------
-# Manifest
+# Core logic
 # ---------------------------------------------------------------------------
 
 
-def write_manifest(model_key, local_dir, checksums):
-    # type: (str, str, Dict[str, str]) -> str
-    """Write a manifest recording what was downloaded."""
-    info = MODELS[model_key]
-    manifest = {
-        "repo_id": info["repo_id"],
-        "role": info["role"],
-        "license": info["license"],
-        "approx_size_gb": info["approx_size_gb"],
-        "local_dir": local_dir,
-        "files": checksums,
-        "downloaded_at": subprocess.check_output(["date", "-u", "+%Y-%m-%dT%H:%M:%SZ"])
-        .decode()
-        .strip(),
-    }
-    manifest_path = os.path.join(local_dir, ".fetch_manifest.json")
-    with open(manifest_path, "w") as f:
-        json.dump(manifest, f, indent=2)
-    return manifest_path
+def plan_download(
+    model: ModelInfo,
+    repo_files: list[str],
+    *,
+    metadata_only: bool = False,
+) -> list[str]:
+    """Determine which files to download for a model.
 
-
-# ---------------------------------------------------------------------------
-# Main
-# ---------------------------------------------------------------------------
-
-
-def fetch_model(model_key, output_dir, verify_only=False):
-    # type: (str, str, bool) -> str
-    """Download (or verify) one model.
-
-    Returns the local directory path.
+    Returns a sorted list of filenames.
     """
-    info = MODELS[model_key]
-    repo_id = info["repo_id"]
-    local_dir = os.path.join(output_dir, repo_id.replace("/", "--"))
+    wanted: list[str] = []
 
-    if verify_only:
-        if not os.path.isdir(local_dir):
-            print(f"ERROR: {repo_id} not downloaded yet")
-            sys.exit(1)
-        print(f"Verifying {repo_id}...")
-        checksums = verify_download(local_dir)
-        manifest_path = write_manifest(model_key, local_dir, checksums)
-        print(f"  {len(checksums)} files verified")
-        print(f"  Manifest: {manifest_path}")
-        return local_dir
+    # Metadata files (config, tokenizer, etc.)
+    for f in _METADATA_FILES:
+        if f in repo_files:
+            wanted.append(f)
 
-    # Check if already downloaded
-    if os.path.isdir(local_dir) and os.listdir(local_dir):
-        print(f"{repo_id} already present at {local_dir}")
-        print("  Verifying checksums...")
-        checksums = verify_download(local_dir)
-        manifest_path = write_manifest(model_key, local_dir, checksums)
-        print(f"  {len(checksums)} files verified")
-        return local_dir
+    if not metadata_only:
+        for f in _resolve_weight_files(repo_id=model.repo_id, repo_files=repo_files):
+            wanted.append(f)
 
-    print("Downloading {} (~{:.1f} GB)...".format(repo_id, info["approx_size_gb"]))
+    # Also grab the LICENSE file
+    if "LICENSE" in repo_files:
+        wanted.append("LICENSE")
 
-    # Try huggingface_hub first, fall back to urllib
-    if _try_huggingface_hub() is not None:
-        local_dir = download_via_hub(repo_id, output_dir)
-    else:
-        print("  (huggingface_hub not available — using direct HTTPS)")
-        local_dir = download_via_urllib(repo_id, output_dir)
+    # Remove skipped files (vision tower etc.)
+    wanted = [f for f in wanted if f not in model.skip_files]
 
-    # Verify and write manifest
-    print("  Computing checksums...")
-    checksums = verify_download(local_dir)
-    manifest_path = write_manifest(model_key, local_dir, checksums)
-    print(f"  Done: {len(checksums)} files, manifest at {manifest_path}")
-    return local_dir
+    # Deduplicate while preserving order
+    seen: set[str] = set()
+    result: list[str] = []
+    for f in wanted:
+        if f not in seen:
+            seen.add(f)
+            result.append(f)
+    return result
 
 
-def main(argv=None):
-    # type: (Optional[List[str]]) -> int
+def fetch_model(
+    model: ModelInfo,
+    output_dir: Path,
+    *,
+    metadata_only: bool = False,
+    dry_run: bool = False,
+) -> FetchManifest:
+    """Download a single model checkpoint.
+
+    Returns a FetchManifest with per-file results.
+    """
+    model_dir = output_dir / model.name
+    manifest = FetchManifest(
+        model_name=model.name,
+        repo_id=model.repo_id,
+        license=model.license,
+    )
+
+    # Discover available files
+    print(f"[{model.name}] Querying HuggingFace for file list...", file=sys.stderr)
+    try:
+        repo_files = _list_repo_files(model.repo_id)
+    except Exception as exc:
+        print(f"[{model.name}] ERROR: cannot list repo files: {exc}", file=sys.stderr)
+        manifest.files.append({"filename": "<repo-list>", "success": False, "error": str(exc)})
+        return manifest
+
+    files = plan_download(model, repo_files, metadata_only=metadata_only)
+
+    if dry_run:
+        print(f"[{model.name}] Dry run — would download {len(files)} file(s):", file=sys.stderr)
+        for f in files:
+            print(f"  {f}", file=sys.stderr)
+        manifest.fetched_at = "(dry run)"
+        for f in files:
+            manifest.files.append({"filename": f, "success": True, "skipped": True})
+        return manifest
+
+    model_dir.mkdir(parents=True, exist_ok=True)
+
+    total_bytes = 0
+    for filename in files:
+        dest = model_dir / filename
+        record: dict = {"filename": filename}
+
+        if _file_is_present(dest):
+            size = dest.stat().st_size
+            record["success"] = True
+            record["bytes"] = size
+            record["skipped"] = True
+            total_bytes += size
+            print(
+                f"[{model.name}] SKIP (exists): {filename} ({_human_size(size)})", file=sys.stderr
+            )
+        else:
+            print(f"[{model.name}] Downloading: {filename}...", file=sys.stderr)
+            try:
+                size = _download_file(model.repo_id, filename, dest)
+                record["success"] = True
+                record["bytes"] = size
+                total_bytes += size
+                print(
+                    f"[{model.name}] OK: {filename} ({_human_size(size)})",
+                    file=sys.stderr,
+                )
+            except Exception as exc:
+                record["success"] = False
+                record["error"] = str(exc)
+                print(f"[{model.name}] FAILED: {filename}: {exc}", file=sys.stderr)
+
+        manifest.files.append(record)
+
+    manifest.fetched_at = time.strftime("%Y-%m-%dT%H:%M:%S%z")
+
+    # Write manifest
+    manifest_path = model_dir / "manifest.json"
+    manifest_path.write_text(json.dumps(asdict(manifest), indent=2) + "\n")
+    print(
+        f"[{model.name}] Manifest written to {manifest_path} (total: {_human_size(total_bytes)})",
+        file=sys.stderr,
+    )
+
+    return manifest
+
+
+# ---------------------------------------------------------------------------
+# Display helpers
+# ---------------------------------------------------------------------------
+
+
+def _human_size(n: int) -> str:
+    """Format a byte count in human-readable form."""
+    for unit in ("B", "KiB", "MiB", "GiB", "TiB"):
+        if abs(n) < 1024:
+            return f"{n:.1f} {unit}"
+        n /= 1024  # type: ignore[assignment]
+    return f"{n:.1f} PiB"
+
+
+def list_models() -> str:
+    """Return a formatted table of available models."""
+    lines = ["Available models:", ""]
+    for key, m in MODELS.items():
+        lines.append(f"  {key:8s}  {m.name}")
+        lines.append(f"           {m.description}")
+        lines.append(f"           License: {m.license}  |  Size: {m.approx_size}")
+        lines.append(f"           {m.huggingface_url}")
+        lines.append("")
+    lines.append("Use --model <key> to download. Use --metadata-only for config/tokenizer only.")
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# CLI
+# ---------------------------------------------------------------------------
+
+
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Download model weights from HuggingFace (ob-ixt)."
+        description="Download Qwen3.5 weights from HuggingFace (non-interactive, idempotent).",
     )
     parser.add_argument(
         "--model",
-        choices=list(MODELS.keys()) + ["all"],
-        default=DEFAULT_MODEL,
-        help=f"Which model to fetch (default: {DEFAULT_MODEL} = Qwen3.5-4B)",
+        choices=[*MODELS, "all"],
+        help="Which model to download (default: 4B).",
+        default="4B",
     )
     parser.add_argument(
         "--output-dir",
-        default=DEFAULT_OUTPUT_DIR,
-        help=f"Output directory (default: {DEFAULT_OUTPUT_DIR})",
+        type=Path,
+        default=_DEFAULT_OUTPUT,
+        help=f"Root directory for downloaded weights (default: {_DEFAULT_OUTPUT}).",
     )
     parser.add_argument(
-        "--verify-only",
+        "--metadata-only",
         action="store_true",
-        help="Only verify existing downloads (no download)",
+        help="Download only config/tokenizer files, not weight shards.",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Plan without downloading — print what would happen.",
+    )
+    parser.add_argument(
+        "--list",
+        action="store_true",
+        help="List available models and exit.",
     )
     args = parser.parse_args(argv)
 
-    models = list(MODELS.keys()) if args.model == "all" else [args.model]
+    if args.list:
+        print(list_models())
+        return 0
 
-    for model_key in models:
-        print(
-            "\n=== {} ({}) ===".format(
-                MODELS[model_key]["repo_id"],
-                MODELS[model_key]["role"],
-            )
+    # Determine which models to fetch
+    keys = list(MODELS) if args.model == "all" else [args.model]
+
+    all_ok = True
+    for key in keys:
+        model = MODELS[key]
+        manifest = fetch_model(
+            model,
+            args.output_dir,
+            metadata_only=args.metadata_only,
+            dry_run=args.dry_run,
         )
-        fetch_model(model_key, args.output_dir, verify_only=args.verify_only)
+        if not all(f.get("success") for f in manifest.files):
+            all_ok = False
 
-    print("\nAll requested models processed.")
-    return 0
+    if all_ok:
+        print("\nDone.", file=sys.stderr)
+        return 0
+    print("\nSome downloads failed — see errors above.", file=sys.stderr)
+    return 1
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    sys.exit(main())

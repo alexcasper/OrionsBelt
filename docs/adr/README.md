@@ -29,5 +29,11 @@ parallel agents don't collide. Assigned so far:
 | 0003 | Primary and fallback Qwen3.5 checkpoint | `ob-eae` |
 | 0004 | Descope ladder and trigger dates | `ob-atp` |
 | 0005 | Device fleet as Edge AI hedge target; bandwidth-scaling study | `ob-zh4` follow-on |
+| 0006 | Quantization policy: INT4 weights, FP32 recurrent state and gates | `ob-qpa` |
+
+Note: 0006 was written twice in parallel — on `bench/r5` and `bench/t3` — which is
+exactly the collision this table exists to prevent. Both derivations reached the same
+decision independently, which is corroborating rather than contradictory; r5's text was
+kept and t3's survives in that branch's history.
 
 The template is [`template.md`](./template.md).
