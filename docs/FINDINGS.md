@@ -563,3 +563,46 @@ Determinism verified (bit-identical across repeated runs).
 **New coverage added**: `test_gdn_sve.c` previously tested only `gated_scan` and
 `causal_dwconv1d`; `cumdecay` was declared but never exercised. Added scalar
 references (float and double) and comparison reporting for `cumdecay`.
+
+---
+
+## INA3221 power/energy characterization on Jetson-J1 (ob-agf.1)
+
+The Jetson Nano exposes a TI INA3221 power monitor through IIO sysfs
+(`/sys/devices/.../iio:device0/`), providing real-time power on three rails:
+
+| Rail | Name | Idle | Avg load (sustained scan) | Peak |
+|------|------|------|--------------------------|------|
+| 0 | POM_5V_IN (board total) | 1906 mW | 2831 mW | 3225 mW |
+| 1 | POM_5V_GPU | 0 mW | 0 mW | 0 mW |
+| 2 | POM_5V_CPU | 448 mW | 1067 mW | 1347 mW |
+
+**Sustained gated_scan (Qwen3.5-4B prefill, 10 s):**
+- Delta power: **925 mW** board (619 mW CPU-only)
+- Throughput: 0.74 GiB/s (stable, no thermal decay)
+- Energy per GiB: **~1250 mJ/GiB board** (~837 mJ/GiB CPU-only)
+- Thermal: 51.7°C → 52.0°C (active fan cooling, no throttle)
+
+**Key observations:**
+
+1. **CPU dominates the power budget.** The delta from idle is 619 mW CPU vs 925 mW
+   board total — 67% of the incremental power is CPU. The GPU rail reads 0 mW
+   (not used by the NEON kernel), so the remaining ~33% is memory controller, I/O,
+   and board overhead.
+
+2. **No thermal throttling at sustained load.** Temperature rose only 0.3°C over
+   10 seconds at peak throughput. The Jetson Nano's active fan cooling is
+   effective for this workload. This confirms the sustained-load finding from
+   ob-mrd.2: throughput is flat at 0.74 GiB/s with no decay.
+
+3. **Energy efficiency context.** At 1.25 J/GiB board-wide, the A57 cores deliver
+   competitive energy efficiency for memory-bound linear-attention workloads. For
+   comparison, a Raspberry Pi 5 (Cortex-A76) would move the same data faster but
+   at higher power — the J/GiB comparison across the device fleet will reveal
+   whether newer cores are more or less energy-efficient per unit of memory
+   bandwidth.
+
+The power sampling script (`scripts/power_bench.sh`) wraps any bench_gdn invocation
+with synchronized INA3221 sampling and produces energy-per-GiB metrics without
+requiring perf, ftrace, powertop, or Arm Performix — the Jetson's hardware power
+monitor is sufficient.

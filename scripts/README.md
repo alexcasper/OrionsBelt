@@ -14,6 +14,7 @@ following the documented path verbatim on a clean system.
 | `capture_manifest.sh` | Shell-based provenance capture — same JSON schema as `bench/manifest.py` but no Python dependency. For devices with Python <3.10. | `ob-mrd.4` |
 | `fetch_weights.py` | Download model weights (not vendored in the repo). | `ob-del` |
 | `npu_op_probe.py` | Generate minimal per-operator ONNX probe graphs for the NOE op-coverage audit. | `ob-t3b.2` |
+| `power_bench.sh` | Power-instrumented benchmark wrapper for Jetson Nano. Samples the onboard INA3221 power monitor while `bench_gdn` runs, reports energy-per-GiB alongside throughput. Requires sudo. | `ob-agf.1` |
 | `run_op_probe_audit.py` | Drive the NOE Compiler (cixparse) over the probe graphs and record results. | `ob-t3b.1` |
 
 ## Principles
@@ -21,5 +22,6 @@ following the documented path verbatim on a clean system.
 - Scripts should be non-interactive and idempotent.
 - Device-side scripts (`verify_kernels_native.sh`, `capture_manifest.sh`) must work without
   Python ≥3.10 — many edge devices ship with older Python (e.g. Jetson Nano = 3.6.9).
-- The benchmark binary (`bench_gdn.c`) links statically — one binary copies to any aarch64
-  device and runs with no toolchain, no Python, and no shared libraries.
+- Device-side power monitoring (`power_bench.sh`) uses the Jetson Nano's built-in
+  INA3221 via IIO sysfs — no perf/ftrace/powertop needed, but does require sudo for
+  the IIO entries.
