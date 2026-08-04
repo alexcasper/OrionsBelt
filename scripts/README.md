@@ -12,6 +12,7 @@ following the documented path verbatim on a clean system.
 | `verify_cpu_kernels.sh` | Cross-compile SVE2 kernels and verify numerical correctness under QEMU. The project's core correctness gate — runs in CI. | `ob-8qt.3` |
 | `verify_kernels_native.sh` | Build and run kernel correctness tests natively on the device's real ISA (no QEMU). For fleet devices. | `ob-mrd.3` |
 | `capture_manifest.sh` | Shell-based provenance capture — same JSON schema as `bench/manifest.py` but no Python dependency. For devices with Python <3.10. | `ob-mrd.4` |
+| `detect_isa.sh` | Standalone ISA feature detection for aarch64 — no Python required. Reports active dispatch features (NEON, dotprod, i8mm, SVE/SVE2, bf16) and recommends the correct bench binary. Mirrors `isa_detect.py`. | `ob-ng6` |
 | `fetch_weights.py` | Download model weights (not vendored in the repo). | `ob-del` |
 | `npu_op_probe.py` | Generate minimal per-operator ONNX probe graphs for the NOE op-coverage audit. | `ob-t3b.2` |
 | `power_bench.sh` | Power-instrumented benchmark wrapper for Jetson Nano. Samples the onboard INA3221 power monitor while `bench_gdn` runs, reports energy-per-GiB alongside throughput. Requires sudo. | `ob-agf.1` |
