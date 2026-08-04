@@ -71,11 +71,11 @@
     "probe": "07_loop_dynamic_trip",
     "file": "07_loop_dynamic_trip.onnx",
     "ops": [
-      "Loop",
       "Identity",
+      "Loop",
       "Mul"
     ],
-    "bytes": 443,
+    "bytes": 449,
     "description": "Follow-up added after probe 06 turned out to be statically unrolled: identical recurrence but trip_count is a graph INPUT rather than an initializer. Decides whether Loop is genuinely supported as control flow or only ever unrolled. Result: rejected ('Graph is not DAG', shape inference unreliable for non-const max_count), proving unrolling is the only mechanism."
   }
 ]

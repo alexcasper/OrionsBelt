@@ -318,6 +318,40 @@ def _optional_package_versions() -> dict[str, str | None]:
 # ---------------------------------------------------------------------------
 
 
+def _parallelism() -> dict[str, Any]:
+    """Thread-count environment, because it is now a 4x experimental variable.
+
+    Once the kernels gained OpenMP, a single-threaded and a 4-core run of the
+    *same commit on the same device* differ by 3-4x — and nothing in the manifest
+    recorded which one you were looking at. That is not hypothetical:
+    ``jetson-j1_clean.csv`` was captured as a clean-tree run to answer ob-bf7 and
+    reads 2.9-4.1x its predecessor, which is the OpenMP speedup rather than any
+    provenance effect. Dropping it into the single-threaded fleet table would have
+    inverted the project's central result by making the A57 look faster than the
+    Pi 5.
+
+    ``omp_num_threads`` is the environment variable as set (None if unset, which
+    means OpenMP defaults to one thread per core); ``effective_threads`` is the
+    best available guess at what actually ran.
+    """
+    env = os.environ.get("OMP_NUM_THREADS")
+    threads: int | None = None
+    if env:
+        try:
+            threads = int(env)
+        except ValueError:
+            threads = None
+    return {
+        "omp_num_threads": env,
+        "omp_proc_bind": os.environ.get("OMP_PROC_BIND"),
+        "omp_places": os.environ.get("OMP_PLACES"),
+        # With OMP_NUM_THREADS unset, libgomp defaults to the number of available
+        # CPUs, so record that as the effective count rather than leaving it null.
+        "effective_threads": threads if threads is not None else _safe(_core_count),
+        "threads_source": "OMP_NUM_THREADS" if threads is not None else "core_count_default",
+    }
+
+
 def capture(**caller_fields: Any) -> dict[str, Any]:
     """Capture a complete run manifest as a plain JSON-serializable dict.
 
@@ -351,6 +385,7 @@ def capture(**caller_fields: Any) -> dict[str, Any]:
             "cpu_topology": _safe(_cpufreq_topology),
         },
         "isa_features": _safe(_isa_features),
+        "parallelism": _safe(_parallelism),
         "thermal_zones": _safe(_thermal_zones),
         "memory": _safe(_meminfo),
         "software": {

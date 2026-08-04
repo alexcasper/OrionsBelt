@@ -277,6 +277,63 @@ def probe_loop_recurrence() -> tuple[onnx.ModelProto, str]:
     )
 
 
+def probe_loop_dynamic_trip() -> tuple[onnx.ModelProto, str]:
+    """Probe 06 with a RUNTIME trip count — the negative control for static unrolling.
+
+    Probe 06 compiles, which initially looked like Loop being supported. It is not:
+    the IR showed the body had been statically unrolled, which is only possible
+    because its trip_count is a constant initializer. This probe is identical except
+    ``trip_count`` is a graph INPUT, so no unrolling is available and the compiler has
+    to express the loop as control flow or refuse.
+
+    It refuses ("Graph is not DAG"), which is what makes the operator-coverage finding
+    load-bearing: the NPU can do GDN's per-chunk arithmetic but cannot drive the
+    chunk-to-chunk recurrence. Without this probe, probe 06's rc=0 reads as success.
+    """
+    # trip_count as an input, not an initializer — that single change is the whole probe.
+    trip_in = helper.make_tensor_value_info("trip_count", TensorProto.INT64, [])
+    state_in = _tensor("state_in", [BATCH, KEY_HEAD_DIM])
+    state_out = _tensor("state_out", [BATCH, KEY_HEAD_DIM])
+    cond = helper.make_tensor("cond", TensorProto.BOOL, [], [True])
+
+    it = helper.make_tensor_value_info("iter", TensorProto.INT64, [])
+    keep_in = helper.make_tensor_value_info("keep_in", TensorProto.BOOL, [])
+    body_state = _tensor("l_state", [BATCH, KEY_HEAD_DIM])
+    keep_out = helper.make_tensor_value_info("keep_out", TensorProto.BOOL, [])
+    body_next = _tensor("l_next", [BATCH, KEY_HEAD_DIM])
+    decay = helper.make_tensor("l_decay", TensorProto.FLOAT, [], [0.9])
+    body = helper.make_graph(
+        [
+            helper.make_node("Identity", ["keep_in"], ["keep_out"], name="keep"),
+            helper.make_node("Mul", ["l_state", "l_decay"], ["l_next"], name="decay_state"),
+        ],
+        "loop_body",
+        [it, keep_in, body_state],
+        [keep_out, body_next],
+        initializer=[decay],
+    )
+    node = helper.make_node(
+        "Loop",
+        ["trip_count", "cond", "state_in"],
+        ["state_out"],
+        body=body,
+        name="dynamic_loop",
+    )
+    graph = helper.make_graph(
+        [node], "loop_dynamic_trip", [trip_in, state_in], [state_out], initializer=[cond]
+    )
+    # Description text is reproduced verbatim from the hand-authored artifact this
+    # function replaces, including the shape-inference detail — it is an observation
+    # from the actual cixbuild run and is not re-derivable from the graph.
+    return _model(graph), (
+        "Follow-up added after probe 06 turned out to be statically unrolled: identical "
+        "recurrence but trip_count is a graph INPUT rather than an initializer. Decides "
+        "whether Loop is genuinely supported as control flow or only ever unrolled. "
+        "Result: rejected ('Graph is not DAG', shape inference unreliable for non-const "
+        "max_count), proving unrolling is the only mechanism."
+    )
+
+
 PROBES = {
     "01_causal_conv1d": probe_causal_conv1d,
     "02_decay_cumprod": probe_decay_cumprod,
@@ -284,6 +341,10 @@ PROBES = {
     "04_gate_chain": probe_gate_chain,
     "05_scan_recurrence": probe_scan_recurrence,
     "06_loop_recurrence": probe_loop_recurrence,
+    # 07 was hand-authored during the audit and never added here, so regenerating
+    # silently dropped it from the manifest — and it is the probe the central finding
+    # rests on. See docs/FINDINGS.md section 1.
+    "07_loop_dynamic_trip": probe_loop_dynamic_trip,
 }
 
 

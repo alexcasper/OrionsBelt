@@ -134,17 +134,33 @@ jobs:
           assert manifest, "no probes were generated"
 
           rng = np.random.default_rng(0)
+
+          def make_feed(inp):
+              """Build an input tensor honouring the declared dtype.
+
+              Feeding float32 to everything is wrong: probe 07 takes an int64
+              trip_count (that runtime trip count is the entire point of the probe),
+              and onnxruntime rejects the mismatch with INVALID_ARGUMENT. Control-flow
+              scalars also need sane values, not noise — a trip count of 0 would run
+              zero iterations and verify nothing.
+              """
+              shape = [d if isinstance(d, int) else 1 for d in inp.shape]
+              t = inp.type
+              if "int64" in t:
+                  # Loop/Scan trip counts: a small positive count actually exercises the body.
+                  return np.full(shape or [], 4, dtype=np.int64)
+              if "bool" in t:
+                  return np.ones(shape or [], dtype=bool)
+              # Positive-only floats: probe 02 takes Log(a), which needs a > 0.
+              return rng.uniform(0.1, 2.0, size=shape).astype(np.float32)
+
           for entry in manifest:
               path = f"{out_dir}/{entry['file']}"
               model = onnx.load(path)
               onnx.checker.check_model(model, full_check=True)
 
               sess = ort.InferenceSession(path, providers=["CPUExecutionProvider"])
-              feeds = {}
-              for inp in sess.get_inputs():
-                  shape = [d if isinstance(d, int) else 1 for d in inp.shape]
-                  # Positive-only inputs: probe 02 takes Log(a), which needs a > 0.
-                  feeds[inp.name] = rng.uniform(0.1, 2.0, size=shape).astype(np.float32)
+              feeds = {inp.name: make_feed(inp) for inp in sess.get_inputs()}
               outputs = sess.run(None, feeds)
 
               if not all(np.all(np.isfinite(o)) for o in outputs):

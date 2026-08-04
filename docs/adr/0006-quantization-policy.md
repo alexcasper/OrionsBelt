@@ -55,7 +55,7 @@ quality is worth it.
 | Option | Why not |
 |---|---|
 | **INT8 weights everywhere, no carve-outs** | 2× decode speedup instead of 4×; still viable if INT4 fails the oracle |
-| **BF16 recurrent state** | Saves ~2–3% of decode traffic at INT4 weights — negligible throughput gain. Worth doing for memory footprint (ob-8qt.4), not for speed. |
+| **BF16 recurrent state** | Saves ~2–3% of decode traffic at INT4 weights — negligible throughput gain. Worth doing for memory footprint (ob-8qt.4), not for speed. **And on A76-class cores it is the wrong narrow format — see the amendment below.** |
 | **Quantize the state (INT8)** | High risk of accuracy collapse on long-context retrieval; the state is the model's memory, and corrupting it is not recoverable. |
 | **No weight quantization (FP16 baseline)** | Leaves ~4× decode performance on the table — the single largest available optimization. |
 
@@ -69,3 +69,39 @@ quality is worth it.
 INT4 fails the oracle, the policy degrades gracefully: INT8 weights with FP32 state
 is still a 2× speedup, and individual layers can be kept in FP16 if per-layer
 sensitivity analysis identifies outliers.
+
+---
+
+## Amendment (2026-08-04): the narrow format is core-class-dependent
+
+Measured on RK3588 (Cortex-A76 big / A55 little) — the first cross-device data for
+the narrow-format question, since everything prior was Cortex-A57 only. The RK3588
+has **hardware fp16 (`asimdhp`) but no hardware bf16** (that needs Armv8.6-A), so
+it exercises the software bf16 conversion path on a fast core, which is the case
+most of the installed Armv8.2 base is in. Single-threaded, governor `performance`,
+thermals flat (bead `ob-8qt.4`, raw data in
+`results/raw/rk3588-t4_{big,little}_singlethread.csv`).
+
+| cumdecay output format | Jetson A57 | RK3588 A76 | RK3588 A55 |
+|---|---:|---:|---:|
+| fp16 | 1.45× | **1.58×** | 1.53× |
+| bf16 | 1.42× | **1.10×** | 1.47× |
+
+**Prefer FP16 over BF16 for narrowed state and output on A76-class cores.** On the
+A76, software bf16 conversion drops the gain to 1.10× at 4B and goes *negative* at
+0.8B (129.5 µs against 124.0 fp32, spreads 1.1%/2.6% — real, not noise): the
+integer-NEON round-to-nearest-even conversion costs about what the saved bytes buy.
+On the slower A55 and A57 the bandwidth saving still dominates and bf16 keeps 1.42–1.47×.
+
+So the fastest core in the fleet is the one where bf16 stops paying. BF16 is worth
+it only with **hardware** support — Armv8.6-A and later, which includes the O6's
+Cortex-A720 — or on a core slow enough to amortise the conversion.
+
+This does not change the headline decision (INT4 weights, FP32 recurrent state,
+FP16 gates); it constrains the *implementation* of the narrow-format carve-out.
+A dispatcher that picks a narrow format must key off the ISA at runtime rather
+than compiling one choice in — `src/orionsbelt/engines/cpu/isa_detect.py` already
+reports `bf16` and `asimdhp` for exactly this.
+
+Unchanged and still the dominant lever: weight quantization, at ~95–99% of decode
+bandwidth. Narrow state remains a memory-footprint optimisation, not a throughput one.
