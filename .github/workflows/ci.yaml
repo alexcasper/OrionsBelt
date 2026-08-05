@@ -1,0 +1,172 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+# Cancel superseded runs on the same ref (e.g. a branch getting re-pushed) so we're
+# not burning runner time on commits nobody cares about anymore.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # lint — ruff check + ruff format --check, per pyproject.toml [tool.ruff].
+  # ---------------------------------------------------------------------------
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install dev tooling (ruff)
+        run: pip install -e ".[dev]"
+
+      - name: ruff check
+        run: ruff check .
+
+      - name: ruff format --check
+        run: ruff format --check .
+
+  # ---------------------------------------------------------------------------
+  # test — pytest on the Python unit-test suite (tests/). pyproject.toml pins
+  # requires-python >= 3.10, so we test the floor (3.10) and a current version
+  # (3.13) to make sure the floor actually still holds.
+  # ---------------------------------------------------------------------------
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install package + dev tooling
+        run: pip install -e ".[dev]"
+
+      - name: pytest
+        run: pytest
+
+  # ---------------------------------------------------------------------------
+  # kernels — cross-compile the Armv9.2 GDN kernels and verify them numerically
+  # under QEMU, exactly as scripts/verify_cpu_kernels.sh does. This is the
+  # project's core correctness claim (SVE/NEON/scalar dispatch paths agree) and
+  # would otherwise silently rot with no way to notice.
+  #
+  # Stays on an ubuntu-latest x86 runner: aarch64-linux-gnu-gcc cross-compiles,
+  # qemu-aarch64 emulates the target ISA. No self-hosted or arm64 runner needed
+  # or requested.
+  #
+  # IMPORTANT: GCC 13 (Ubuntu's aarch64-linux-gnu cross-gcc) does NOT accept
+  # -mcpu=cortex-a720 (that flag was added in GCC 14). The script deliberately
+  # uses the equivalent arch-level flag -march=armv9.2-a+sve2+i8mm+bf16 instead
+  # (see docs/FINDINGS.md §3.1). Do not "fix" this to a -mcpu flag.
+  # ---------------------------------------------------------------------------
+  kernels:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install aarch64 cross-compiler and QEMU user-mode emulation
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends gcc-aarch64-linux-gnu qemu-user
+
+      - name: Cross-compile and verify GDN kernels under QEMU
+        run: bash scripts/verify_cpu_kernels.sh
+
+  # ---------------------------------------------------------------------------
+  # onnx-probes — regenerate the NPU operator probe graphs and assert they
+  # still pass onnx.checker (full check) and execute cleanly under
+  # onnxruntime, producing finite outputs.
+  #
+  # NOTE — deliberately NOT run here: cixparse / cixbuild (the CIX NOE
+  # Compiler frontend/builder used in docs/FINDINGS.md §1 to actually audit
+  # NPU operator coverage). The CIX NOE SDK is a licensed, ~461MB proprietary
+  # download that cannot be redistributed or fetched in CI. Don't try to wire
+  # that up here — there's no legal way to get the SDK onto a CI runner.
+  # ---------------------------------------------------------------------------
+  onnx-probes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install onnx + onnxruntime
+        run: pip install onnx onnxruntime numpy
+
+      - name: Regenerate NPU operator probe graphs
+        run: python3 scripts/npu_op_probe.py --out artifacts/npu_op_probe
+
+      - name: Verify probes pass onnx.checker and execute under onnxruntime
+        run: |
+          python3 - <<'PY'
+          import json
+          import sys
+
+          import numpy as np
+          import onnx
+          import onnxruntime as ort
+
+          out_dir = "artifacts/npu_op_probe"
+          manifest = json.loads(open(f"{out_dir}/manifest.json").read())
+          assert manifest, "no probes were generated"
+
+          rng = np.random.default_rng(0)
+
+          def make_feed(inp):
+              """Build an input tensor honouring the declared dtype.
+
+              Feeding float32 to everything is wrong: probe 07 takes an int64
+              trip_count (that runtime trip count is the entire point of the probe),
+              and onnxruntime rejects the mismatch with INVALID_ARGUMENT. Control-flow
+              scalars also need sane values, not noise — a trip count of 0 would run
+              zero iterations and verify nothing.
+              """
+              shape = [d if isinstance(d, int) else 1 for d in inp.shape]
+              t = inp.type
+              if "int64" in t:
+                  # Loop/Scan trip counts: a small positive count actually exercises the body.
+                  return np.full(shape or [], 4, dtype=np.int64)
+              if "bool" in t:
+                  return np.ones(shape or [], dtype=bool)
+              # Positive-only floats: probe 02 takes Log(a), which needs a > 0.
+              return rng.uniform(0.1, 2.0, size=shape).astype(np.float32)
+
+          for entry in manifest:
+              path = f"{out_dir}/{entry['file']}"
+              model = onnx.load(path)
+              onnx.checker.check_model(model, full_check=True)
+
+              sess = ort.InferenceSession(path, providers=["CPUExecutionProvider"])
+              feeds = {inp.name: make_feed(inp) for inp in sess.get_inputs()}
+              outputs = sess.run(None, feeds)
+
+              if not all(np.all(np.isfinite(o)) for o in outputs):
+                  print(f"FAIL: {entry['probe']} produced non-finite output", file=sys.stderr)
+                  sys.exit(1)
+              print(f"OK: {entry['probe']} (checker + onnxruntime, finite outputs)")
+
+          print(f"\n{len(manifest)} probes verified.")
+          PY
