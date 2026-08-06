@@ -10,6 +10,35 @@ Licensed under **Apache-2.0** — see [`LICENSE`](./LICENSE).
 
 ---
 
+## Headline results
+
+Three GDN CPU kernels (gated cumulative decay, gated delta-rule scan, causal depthwise Conv1D), benchmarked on RK3588 Cortex-A76 at verified Qwen3.5-4B shapes:
+
+| Kernel | GiB/s | % of 34 GB/s spec | Spread |
+|---|---:|---:|---:|
+| Cumulative decay | 21.7 | 64% | 5.2% |
+| Causal Conv1D | 21.6 | 63% | 4.3% |
+| Gated delta-rule scan | 11.1 | 33% | 6.2% |
+
+> Decay and Conv1D achieve **~64% of theoretical DRAM bandwidth** — near the memory ceiling.
+> Scan runs at 33% because its sequential recurrence is **instruction-overhead-bound**, not
+> bandwidth-bound. fp16 state gives **1.6×** on decay; scan is compute-bound and shows no
+> bandwidth benefit. (Commit `553a96e`, dirty=false, governor=performance, 30 repeats.
+> Full table with cross-device validation: [`comparison_table.md`](./results/figures/comparison_table.md).)
+
+**Memory advantage at long context** — GDN's O(1) recurrent state vs attention's O(n) KV cache:
+
+| Context | GDN state | KV cache (8 attn layers) | Savings vs all-attention |
+|---:|---:|---:|---:|
+| 32K | 51 MiB | 1.0 GiB | 2.95 GiB |
+| 128K | 51 MiB | 4.0 GiB | 11.95 GiB |
+| 262K | 51 MiB | 8.0 GiB | **23.95 GiB** |
+
+> At 262K, the KV cache alone (8.0 GiB) **exceeds the fp16 weight footprint** (7.83 GiB).
+> The recurrent state never grows. ([`memory_comparison.md`](./results/figures/memory_comparison.md))
+
+---
+
 ## Table of contents
 
 - [What Gated DeltaNet is, and why it matters on edge silicon](#what-gated-deltanet-is-and-why-it-matters-on-edge-silicon)
@@ -141,7 +170,7 @@ All figures above are verified against primary sources (Radxa product page and d
 | Per-layer engine mapping (NPU/GPU/CPU) | Hypothesis only — pending measurements |
 | Full inference results (tokens/sec, TTFT, memory) | **Not started — needs hardware** |
 
-> **Results so far:** 37 CSVs from the device fleet, 17 provenance manifests, 12 generated figures/tables.
+> **Results so far:** 36 CSVs from the device fleet, 22 provenance manifests, 33 generated figures/tables.
 >
 > ```
 > results/
@@ -158,6 +187,7 @@ Full target layout and rationale are in [`PLAN.md`](./PLAN.md) §10. Highlights:
 
 - [`PLAN.md`](./PLAN.md) — the implementation plan: workstreams, milestones, risk register, descope ladder.
 - [`docs/CLAIM_VERIFICATION.md`](./docs/CLAIM_VERIFICATION.md) — every quantitative claim in this README traced to a primary source, corrected, or dropped. Ground truth for numbers.
+- [`docs/DEVPOST_SUBMISSION.md`](./docs/DEVPOST_SUBMISSION.md) — the Devpost write-up, mapped section-by-section to the judging rubric.
 - [`docs/BEADS.md`](./docs/BEADS.md) — how issue tracking works on this project.
 - [`docs/adr/`](./docs/adr/) — architecture decision records for irreversible forks (track selection, hedge target, layer→engine mapping, GDN-2 scope).
 - [`bench/`](./bench/README.md) — measurement harness: context sweep, metrics, provenance manifests, plotting.
