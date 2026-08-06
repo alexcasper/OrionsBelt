@@ -11,7 +11,7 @@ Decisions already scheduled (see PLAN.md):
 | Bead | Decision |
 |---|---|
 | `t-descope-ladder` | Descope ladder and trigger dates |
-| `t-track-decision` | **Physical AI vs Mobile AI track — hard date 2026-08-09** |
+| `t-track-decision` | **Physical AI vs Edge AI track — hard date 2026-08-09** |
 | `t-hedge-select` | Portable aarch64 hedge target |
 | `t-model-select` | Primary and fallback Qwen3.5 checkpoint |
 | `t-mapping-adr` | Layer-to-engine assignment across NPU/GPU/CPU |
@@ -37,5 +37,9 @@ Note: 0006 was written twice in parallel — on `bench/r5` and `bench/t3` — wh
 exactly the collision this table exists to prevent. Both derivations reached the same
 decision independently, which is corroborating rather than contradictory; r5's text was
 kept and t3's survives in that branch's history.
+
+0007 was also written twice — by `bench/t3` and `bench/t4` — for the same decision
+(`ob-imb`). t3's version (`0007-commit-to-edge-ai-track.md`) was kept as the canonical
+text; t4's (`0007-track-selection-edge-ai.md`) is removed.
 
 The template is [`template.md`](./template.md).

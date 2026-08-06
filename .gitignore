@@ -15,7 +15,13 @@ dist/
 
 # Downloaded model weights — never committed (license compliance, repo size)
 weights/
-*.rknn
+models/
+
+# Full reference outputs — regenerable, too large for git (80+ MiB full-vocab logits).
+# The compact summary (no full logits) IS tracked in results/reference/.
+artifacts/reference/
+
+# Agent session artifacts — orchestration scratch, not project source.
 
 # Agent session artifacts — orchestration scratch, not project source.
 # NOTE: .goose-task.md has historically carried a device sudo password; keep it
