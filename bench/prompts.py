@@ -355,7 +355,9 @@ def generate_multikey(
         kv_idx += 1
 
     context = " ".join(output_parts)
-    question = f"\n\nQuestion: What is the value assigned to {query_key}? Answer with only the value."
+    question = (
+        f"\n\nQuestion: What is the value assigned to {query_key}? Answer with only the value."
+    )
     prompt = context + question
     est_tokens = _estimate_tokens(prompt)
 
