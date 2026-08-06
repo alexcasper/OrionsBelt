@@ -11,13 +11,7 @@ import math
 
 import numpy as np
 import pytest
-from bench.gdn2_reference import (
-    gdn1_recurrent,
-    gdn2_recurrent,
-    l2_normalize,
-    make_synthetic_input,
-    softplus,
-)
+from bench.gdn2_reference import gdn1_recurrent, gdn2_recurrent, l2_normalize, make_synthetic_input, softplus
 
 # ---------------------------------------------------------------------------
 # softplus
