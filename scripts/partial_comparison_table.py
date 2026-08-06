@@ -164,7 +164,7 @@ def main() -> int:
 
     print("\n" + "=" * 90)
     print("KERNEL FLEET BASELINE (4B/0.8B, seq=64, single-core canonical, fp32) — GiB/s @ p50")
-    print("Device            run_id_sha            dirty   CumDecay  Scan    DWConv1D")
+    print("Device            run_id_sha            dirty   CumDecay  Scan    DWConv1D  GDN2")
     fleet = [
         ("Jetson j1 (canon)", "jetson-j1.csv"),
         ("Jetson j2 (canon)", "jetson-j2.csv"),
@@ -181,11 +181,13 @@ def main() -> int:
         cd = kv(rows, "Qwen3.5-4B", "gdn_cumdecay", 64)
         sc = kv(rows, "Qwen3.5-4B", "gdn_gated_scan", 64)
         cv = kv(rows, "Qwen3.5-4B", "gdn_causal_dwconv1d", 64)
+        g2 = kv(rows, "Qwen3.5-4B", "gdn2_gated_scan", 64)
         ds = "dirty" if dirty else "CLEAN"
         cd_s = f"{cd[0]:<5.2f}" if cd else "  —  "
         sc_s = f"{sc[0]:<5.2f}" if sc else "  —  "
         cv_s = f"{cv[0]:<5.2f}" if cv else "  —  "
-        print(f"  {label:<16} {sha:<20} {ds:<6}  {cd_s}  {sc_s}  {cv_s}")
+        g2_s = f"{g2[0]:<5.2f}" if g2 else "  —  "
+        print(f"  {label:<16} {sha:<20} {ds:<6}  {cd_s}  {sc_s}  {cv_s}  {g2_s}")
     print("  (t4 preferred over t3 per ob-bf7: t3 scan spread=153% contaminated; t4 spread=17%)")
 
     print("\n  --- Fleet sweep (ob-bf7): commit 234807d, clean tree, single-thread ---")
@@ -202,10 +204,12 @@ def main() -> int:
         cd = kv(rows, "Qwen3.5-4B", "gdn_cumdecay", 64)
         sc = kv(rows, "Qwen3.5-4B", "gdn_gated_scan", 64)
         cv = kv(rows, "Qwen3.5-4B", "gdn_causal_dwconv1d", 64)
+        g2 = kv(rows, "Qwen3.5-4B", "gdn2_gated_scan", 64)
         cd_s = f"{cd[0]:<5.2f}" if cd else "  —  "
         sc_s = f"{sc[0]:<5.2f}" if sc else "  —  "
         cv_s = f"{cv[0]:<5.2f}" if cv else "  —  "
-        print(f"  {label:<20} 234807d             CLEAN  {cd_s}  {sc_s}  {cv_s}")
+        g2_s = f"{g2[0]:<5.2f}" if g2 else "  —  "
+        print(f"  {label:<20} 234807d             CLEAN  {cd_s}  {sc_s}  {cv_s}  {g2_s}")
     print("  (All at commit 234807d, dirty=false, OMP_NUM_THREADS=1, governor=performance)")
 
     print("\n" + "=" * 90)
