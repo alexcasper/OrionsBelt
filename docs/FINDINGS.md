@@ -2172,6 +2172,16 @@ dispatch: GDN-2 models are relatively more expensive on little cores.
    penalty on A55 vs 2.0× on A76 means the little cluster is a worse-than-linear fit for GDN-2's
    extra arithmetic.
 
+### Correctness verification
+
+The `gdn2_gated_scan_f32` kernel is verified by `test_gdn2_scan.c` (added Session 14),
+covering 6 categories: precision-matched reference comparison (rel tol 1e-5),
+double-reference accumulation quality, GDN-2→GDN-1 reduction (b=1, w=1), state carry
+across chunks, multi-chunk stability (8 chunks), and determinism. Unlike the GDN-1
+kernels which are bit-identical to their scalar reference, the GDN-2 kernel uses
+relative tolerance because its 2 extra multiplications (g·b, w·x) before the FMA
+prevent exact FMA contraction matching. Wired into `scripts/verify_cpu_kernels.sh`.
+
 ### Reproducing
 
 The data is already in the Phase 1 CSVs — no separate run needed:
@@ -2180,6 +2190,11 @@ The data is already in the Phase 1 CSVs — no separate run needed:
 # GDN-1 vs GDN-2 from existing benchmark data:
 grep -E "gdn_gated_scan|gdn2_gated_scan" results/raw/rk3588-t3_big.csv
 grep -E "gdn_gated_scan|gdn2_gated_scan" results/raw/rk3588-t3_little.csv
+
+# Correctness test (native or cross-compile):
+K=src/orionsbelt/engines/cpu/kernels
+gcc -O3 -march=armv8.2-a+simd -static "$K/gdn_sve.c" "$K/test_gdn2_scan.c" -o /tmp/t2 -lm
+/tmp/t2
 ```
 
 ---
