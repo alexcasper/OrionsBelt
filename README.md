@@ -1,8 +1,8 @@
 # OrionsBelt
 
-**Optimizing a Qwen3.5 Gated DeltaNet hybrid model for Arm edge silicon (Radxa Orion O6 / CIX P1).**
+**Optimizing a Qwen3.5 Gated DeltaNet hybrid model for Arm edge silicon.**
 
-Submission for the [Arm Create: AI Optimization Challenge](https://arm-ai-optimization-challenge.devpost.com/) (deadline 2026-08-14, 16:00 PDT). This repository is the technical home of that submission: an in-progress, hardware-independent measurement harness and optimization effort aimed at the Physical AI and Edge AI tracks.
+Submission for the [Arm Create: AI Optimization Challenge](https://arm-ai-optimization-challenge.devpost.com/) (deadline 2026-08-14, 16:00 PDT). **Committed to the Edge AI track** (ADR [0007](./docs/adr/0007-commit-to-edge-ai-track.md)) — the Orion O6 board has not arrived and its last-useful-arrival date (Aug 8) is imminent. All hardware-independent work — benchmark harness, operator analysis, optimization kernels, GDN-2 research — runs on the portable aarch64 fleet regardless.
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
 
@@ -83,7 +83,16 @@ The GDN fast path depends on two optional packages, `causal_conv1d` and `fla`. W
 
 ## Target hardware
 
-Primary target: **Radxa Orion O6**, built on the **CIX P1** SoC.
+**Edge AI track (committed, [ADR 0007](./docs/adr/0007-commit-to-edge-ai-track.md)):** portable aarch64 device fleet.
+
+| Device | Cores | ISA | Spec BW (GiB/s) |
+|---|---|---|---|
+| Raspberry Pi 5 | 4× Cortex-A76 @ 2.4 GHz | Armv8.2-A + dotprod | 17.0 |
+| RK3588 (big cluster) | 4× Cortex-A76 @ 2.3 GHz | Armv8.2-A + dotprod | 34.0 |
+| RK3588 (little cluster) | 4× Cortex-A55 @ 1.8 GHz | Armv8.2-A | 34.0 |
+| Jetson Nano (j1/j2) | 4× Cortex-A57 @ 1.48 GHz | Armv8.0-A (NEON only) | 25.6 |
+
+**Stretch target (if hardware arrives):** Radxa Orion O6, built on the **CIX P1** SoC.
 
 | Component | Spec |
 |---|---|
@@ -93,15 +102,19 @@ Primary target: **Radxa Orion O6**, built on the **CIX P1** SoC.
 | Combined | Up to 45 TOPS (NPU + CPU + GPU) |
 | Memory | Up to 64GB, 128-bit LPDDR5 @ 5500MT/s (**100GB/s** peak bandwidth) |
 
-All figures above are verified against primary sources (Radxa product page and docs) in [`docs/CLAIM_VERIFICATION.md`](./docs/CLAIM_VERIFICATION.md) §2.2. Note in particular that memory bandwidth is **100GB/s**, not "over" 100GB/s as an early secondary source claimed.
-
-A portable aarch64 target (the **Edge AI** hedge track) is being brought up in parallel and does not depend on O6 hardware access; see [Status](#status).
+All figures above are verified against primary sources (Radxa product page and docs) in [`docs/CLAIM_VERIFICATION.md`](./docs/CLAIM_VERIFICATION.md) §2.2. Note in particular that memory bandwidth is **100GB/s**, not "over" 100GB/s as an early secondary source claimed. The O6 is a stretch target pending board availability; all current results are from the portable aarch64 fleet above.
 
 ## Status
 
-**This is an in-progress research repository as of 2026-08-06.** Neither the Orion O6 board nor CIX Early Bird SDK access is in hand yet — both are externally gated (procurement, vendor approval) and cannot be compressed by effort alone. A hard go/no-go between the Physical AI (O6) and Edge AI (portable aarch64) framing is scheduled for 2026-08-09; the portable hedge track runs from day one regardless of that decision, so hardware-independent work is not blocked on it.
+**This is an in-progress research repository as of 2026-08-06.** The project has committed to the **Edge AI track** ([ADR 0007](./docs/adr/0007-commit-to-edge-ai-track.md)) after the Orion O6 board did not arrive by its last-useful-arrival date. All work continues on the portable aarch64 device fleet.
 
-**Device-fleet microbenchmarks are complete across five Arm devices.** Three GDN CPU kernels (gated cumulative decay, gated delta-rule scan, causal depthwise Conv1D) have been measured at verified Qwen3.5-4B and 0.8B shapes on the full fleet: Jetson Nano (Cortex-A57, NEON), Raspberry Pi 5 (Cortex-A76), and RK3588 (Cortex-A76 big + Cortex-A55 little clusters). Mixed-precision bf16/fp16 variants and 4-core OpenMP scaling have been measured on the Jetson. The key cross-device finding — that these kernels are **instruction-overhead-bound, not DRAM-bandwidth-bound** at seq=64 working-set sizes — is documented in the [fleet bandwidth-scaling analysis](./results/figures/fleet_bandwidth_scaling.md). The full inference harness (end-to-end tokens/sec, TTFT, memory decomposition) is still pending hardware access.
+**Device-fleet microbenchmarks are complete across five Arm devices.** Three GDN CPU kernels (gated cumulative decay, gated delta-rule scan, causal depthwise Conv1D) have been measured at verified Qwen3.5-4B and 0.8B shapes on the full fleet: Jetson Nano (Cortex-A57, NEON), Raspberry Pi 5 (Cortex-A76), and RK3588 (Cortex-A76 big + Cortex-A55 little clusters). The optimization stack (OpenMP parallelization + NEON unrolling + fp16 state) delivers 2.6–5.1× on A76 silicon and 2.6–3.1× on A57. The key cross-device finding — that these kernels are **instruction-overhead-bound, not DRAM-bandwidth-bound** at seq=64 working-set sizes — is documented in the [fleet bandwidth-scaling analysis](./results/figures/fleet_bandwidth_scaling.md).
+
+**Operator analysis findings** ([`docs/FINDINGS.md`](./docs/FINDINGS.md), 10 sections):
+- CIX NOE and Rockchip RKNN toolchains both reject GDN's runtime-length recurrence — the limitation generalises beyond one vendor (§1, §7)
+- KleidiAI packed GEMM wins 1.7–3.6× on matmul but packing cost dominates at decode; dual-path strategy recommended (§8)
+- big.LITTLE affinity: pinning to A76 big cores is 2–3× faster than default scheduler placement (§9)
+- GDN-2 vs GDN-1: gates are free at decode, cost 2× at prefill, 3.1× penalty on little cores (§10)
 
 | Item | Status |
 |---|---|
@@ -110,20 +123,25 @@ A portable aarch64 target (the **Edge AI** hedge track) is being brought up in p
 | Repository skeleton, Apache-2.0 license | Done |
 | Results schema (`docs/RESULTS_SCHEMA.md`) | Done |
 | Benchmark harness (`bench/`) + device microbenchmark (`bench_gdn.c`) | Producing data |
-| CI: lint + unit tests (721 tests) | Done — `.github/workflows/ci.yaml` |
+| CI: lint + unit tests (681 tests) | Done — `.github/workflows/ci.yaml` |
 | Device-fleet microbenchmarks (5 devices) | Done — [fleet analysis](./results/figures/fleet_bandwidth_scaling.md) |
 | Ablation matrix (6 configs, synthetic) | Done — [comparison table](./results/figures/ablation_comparison.md) |
 | Memory decomposition (analytical) | Done — [figures](./results/figures/) |
-| Architecture decision records (`docs/adr/`) | 6 ADRs recorded |
+| Architecture decision records (`docs/adr/`) | 8 ADRs recorded |
 | CPU GDN kernels (NEON/SVE/scalar) | Verified, benchmarked across fleet |
 | Mixed-precision state kernels (bf16/fp16) | Implemented, benchmarked on Jetson |
+| NPU operator-coverage audit (CIX NOE + RKNN) | Done — [FINDINGS.md](./docs/FINDINGS.md) §1, §7 |
+| KleidiAI matmul evaluation | Done — [FINDINGS.md](./docs/FINDINGS.md) §8 |
+| big.LITTLE affinity policy | Done — [FINDINGS.md](./docs/FINDINGS.md) §9 |
+| GDN-2 vs GDN-1 microbenchmark | Done — [FINDINGS.md](./docs/FINDINGS.md) §10 |
+| Track decision: Edge AI | Done — [ADR 0007](./docs/adr/0007-commit-to-edge-ai-track.md) |
 | Model survey / selection (`docs/MODEL_SURVEY.md`) | In progress |
 | Orion O6 board bring-up | **Pending** — board not yet in hand |
 | CIX Early Bird SDK / NPU toolchain access | **Pending** — not yet approved |
 | Per-layer engine mapping (NPU/GPU/CPU) | Hypothesis only — pending measurements |
 | Full inference results (tokens/sec, TTFT, memory) | **Not started — needs hardware** |
 
-> **Results so far:** 29 CSVs from the device fleet, 15 provenance manifests, 10 generated figures/tables.
+> **Results so far:** 29 CSVs from the device fleet, 17 provenance manifests, 10 generated figures/tables.
 >
 > ```
 > results/
@@ -177,7 +195,7 @@ No GPU, NPU, or proprietary SDK is required. Runs on Pi 5, Jetson Nano,
 RK3588, Graviton, or any 64-bit Arm board. See
 [`scripts/README.md`](./scripts/README.md) for all script entry points.
 
-### Physical AI track (Orion O6 + NPU)
+### Stretch target: Orion O6 + NPU (if hardware arrives)
 
 - `docs/SETUP_O6.md` (Orion O6 bring-up, NPU SDK, CIX NOE Compiler) — **pending hardware**
 
