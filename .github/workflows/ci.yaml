@@ -86,8 +86,7 @@ jobs:
       - name: Install aarch64 cross-compiler and QEMU user-mode emulation
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends gcc-aarch64-linux-gnu qemu-user
-
+          sudo apt-get install -y --no-install-recommends gcc-aarch64-linux-gnu libc6-dev-arm64-cross qemu-user
       - name: Cross-compile and verify GDN kernels under QEMU
         run: bash scripts/verify_cpu_kernels.sh
 
