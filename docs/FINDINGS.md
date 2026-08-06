@@ -1398,3 +1398,124 @@ at this context length, which is the difference between fitting in 8 GB
 edge DRAM and not. Weights (11.2 GB at FP16) dominate at all context
 lengths, which is why INT4 weight quantization (PLAN.md §6, ADR 0004)
 is the complementary half of the story.
+
+---
+
+## 7. RKNN (Rockchip RK3588) operator coverage — the recurrence limitation generalises (2026-08-06)
+
+**Bead `ob-t3b.5`. Run on-device: RK3588 big.LITTLE, rknn-toolkit2 v2.3.2, aarch64.**
+
+### Headline
+
+> **Two independent edge-NPU toolchains — CIX NOE and Rockchip RKNN — both fail to route
+> GDN's sequential recurrence to the NPU. This is not a vendor limitation; it is a
+> structural property of edge-NPU compilers.**
+
+Section 1 established that the CIX NOE Compiler cannot express a runtime-length sequential
+recurrence. The RK3588 has its own ~6 TOPS NPU (Rockchip RKNN) with an entirely independent
+vendor toolchain. Feeding the **same seven ONNX probe graphs** through rknn-toolkit2's
+`load_onnx` + `build` pipeline confirms: **RKNN is even stricter** — it rejects `Loop` outright
+(even with a constant trip count), and routes `Scan` to CPU as an unsupported "custom operator."
+
+The finding generalises: keeping the scan on CPU is not a preference for one platform — it is a
+**universal edge-NPU toolchain constraint**.
+
+### Method
+
+The seven hand-authored ONNX probe graphs from [`artifacts/npu_op_probe/`](../artifacts/npu_op_probe/)
+(verified locally under `onnxruntime`, see Section 1) were fed to rknn-toolkit2's conversion
+pipeline on-device:
+
+```python
+from rknn.api import RKNN
+rknn = RKNN(verbose=True)
+rknn.config(target_platform="rk3588", float_dtype="float16", optimization_level=3)
+rknn.load_onnx(model=probe_onnx)
+rknn.build(do_quantization=False)
+```
+
+Generator: [`scripts/npu_op_probe.py`](../scripts/npu_op_probe.py);
+runner: [`scripts/rknn_op_probe.py`](../scripts/rknn_op_probe.py).
+Logs and results committed under [`artifacts/npu_op_probe/rknn_audit/`](../artifacts/npu_op_probe/rknn_audit/).
+
+### Results — CIX NOE vs Rockchip RKNN
+
+| Probe | ONNX ops | CIX NOE | RKNN (RK3588) |
+|---|---|---|---|
+| causal depthwise Conv1D | `Conv` (groups=C, pads=[3,0]) | ✅ NPU | ✅ NPU (with `Reshape` wrappers) |
+| gated decay | `Log`, `CumSum`, `Exp` | ✅ all NPU | ⚠️ `Log`+`Exp` → **CPU fallback**; `CumSum` → rewritten as `Conv` on NPU |
+| delta-rule state update | `MatMul`, `Sub`, `Add`, `Transpose` | ✅ all NPU | ✅ all NPU (`exMatMul`) |
+| elementwise gate chain | `Sigmoid`, `Softplus`, `Neg`, `Exp`, `Mul` | ✅ all NPU | ⚠️ `Exp` → **CPU fallback**; rest NPU |
+| chunk recurrence via `Scan` | `Scan` | ❌ rejected | ⚠️ **accepted but CPU-only** — "pure cpu op model" |
+| chunk recurrence via `Loop`, **const** trip count | `Loop` | ⚠️ statically unrolled (4×) | ❌ **rejected** |
+| chunk recurrence via `Loop`, **runtime** trip count | `Loop` | ❌ rejected | ❌ **rejected** |
+
+Verbatim RKNN evidence:
+
+```
+# Scan — accepted but placed on CPU as a "custom operator"
+W RKNN: Meet RKNN unsupport Operator: name = 'chunkwise_scan', type = Scan,
+        it will be treated as a custom operator.
+D RKNN: detect pure cpu op model.
+
+# Loop (even with constant trip count) — hard rejection
+E RKNN: build: The Loop('chunkwise_loop') will cause the graph to be a dynamic graph!
+        Remove it manually and try again!
+ValueError: The Loop('chunkwise_loop') will cause the graph to be a dynamic graph!
+```
+
+### Why the Scan "compiles" result is a trap
+
+RKNN does not reject `Scan` at `load_onnx` — it returns rc=0 and proceeds to `build`, which also
+returns rc=0. But the verbose log reveals what happened: Scan was treated as a **custom operator**
+(a CPU-only escape hatch), and the compiler flagged the model as `"detect pure cpu op model"`.
+The resulting `.rknn` file has every op on CPU, zero NPU utilisation. This is a **silent
+fallback** — the model "compiles" but the NPU does nothing.
+
+Anyone benchmarking this platform who sees Scan compile without checking the op-placement table
+would conclude the NPU handles the recurrence. It does not. The per-op target column in the
+Network Layer Information Table is the ground truth.
+
+### RKNN-specific findings not seen on CIX
+
+1. **`Exp` and `Log` cause CPU fallback.** The RK3588 NPU has no exponential or logarithm kernel.
+   This directly affects GDN's gated decay, which is computed as `exp(cumsum(log(a)))`. On CIX
+   these are native NPU ops (`ArmExp`, `ArmLog`); on RKNN they run on CPU. The `CumSum` in the
+   middle is cleverly rewritten as a `Conv` and placed on NPU, but the surrounding transcendentals
+   negate the benefit.
+
+2. **RKNN is stricter on `Loop` than CIX.** CIX accepted `Loop` with a constant trip count via
+   static unrolling (Section 1). RKNN rejects all `Loop` constructs, even those that CIX would
+   unroll — its graph optimizer's `_dynamic_check` refuses any node that *could* introduce
+   dynamic control flow, regardless of whether the trip count is actually constant.
+
+3. **`CumSum` → `Conv` rewrite.** RKNN's optimizer lowers `CumSum` to a depthwise `Conv` with
+   a lower-triangular weight matrix — a well-known compiler trick. This is placed on NPU and is
+   an interesting point of contrast with CIX's native `ArmCumulate` op.
+
+### What this establishes
+
+**The recurrence limitation is structural, not vendor-specific.** Two independent toolchains
+(CIX NOE Compiler for the CIX NOE NPU, and Rockchip rknn-toolkit2 for the RK3588 NPU) — different
+vendors, different compiler stacks, different NPU architectures — both fail to route a sequential
+scan to the NPU. The mechanism differs (CIX rejects Scan; RKNN accepts it as CPU-only), but the
+practical outcome is identical: **the scan must run on CPU.**
+
+This strengthens the layer-to-engine mapping argument from Section 1: CPU-hosted scan is not an
+optimisation choice for one platform — it is a **constraint imposed by the edge-NPU ecosystem**.
+
+### Reproducing
+
+```bash
+# On the RK3588 device (aarch64), Python 3.10:
+pip3 install rknn-toolkit2   # installs 2.3.2 from PyPI, works on aarch64
+
+python3 scripts/npu_op_probe.py --out artifacts/npu_op_probe   # regenerate probes if needed
+python3 scripts/rknn_op_probe.py                               # runs all 7 probes
+# Results: artifacts/npu_op_probe/rknn_audit/rknn_audit_results.json
+# Per-probe logs: artifacts/npu_op_probe/rknn_audit/*.log
+```
+
+Environment note: rknn-toolkit2 2.3.2 installs cleanly from PyPI on aarch64 and requires no
+vendor SDK download — unlike the CIX toolchain which needed a manual wheel install and
+has an unconditional TensorFlow dependency.

@@ -1,0 +1,53 @@
+
+I rknn-toolkit2 version: 2.3.2
+CONFIG_RET=0
+[1;33mW[0m [1;33mload_onnx: onnx.checker.check_model fail: Your model ir_version 13 is higher than the checker's (10).[0m
+[1;33mW[0m [1;33mload_onnx: The config.mean_values is None, zeros will be set for input 1![0m
+[1;33mW[0m [1;33mload_onnx: The config.std_values is None, ones will be set for input 1![0m
+LOAD_RET=0
+D base_optimize ...
+D base_optimize done.
+D 
+D fold_constant ...
+[0;93m2026-08-06 09:36:21.260097927 [W:onnxruntime:Default, device_discovery.cc:164 DiscoverDevicesForPlatform] GPU device discovery failed: device_discovery.cc:89 ReadFileContents Failed to open file: "/sys/class/drm/card1/device/vendor"[m
+[1;31mE[0m [1;31mbuild: The Loop('dynamic_loop') will cause the graph to be a dynamic graph! Remove it manually and try again!
+[0m
+[1;33mW[0m [1;33mbuild: ===================== WARN(3) =====================[0m
+[1;31mE[0m [1;31mrknn-toolkit2 version: 2.3.2[0m
+[1;31mE[0m [1;31mbuild: Traceback (most recent call last):
+  File "rknn/api/rknn_log.py", line 344, in rknn.api.rknn_log.error_catch_decorator.error_catch_wrapper
+  File "rknn/api/rknn_base.py", line 1990, in rknn.api.rknn_base.RKNNBase.build
+  File "rknn/api/graph_optimizer.py", line 897, in rknn.api.graph_optimizer.GraphOptimizer.fold_constant
+  File "rknn/api/graph_optimizer.py", line 372, in rknn.api.graph_optimizer._dynamic_check
+  File "rknn/api/rknn_log.py", line 95, in rknn.api.rknn_log.RKNNLog.e
+ValueError: The Loop('dynamic_loop') will cause the graph to be a dynamic graph! Remove it manually and try again!
+
+[0m
+I ===================== WARN(0) =====================
+[1;31mE[0m [1;31mrknn-toolkit2 version: 2.3.2[0m
+Traceback (most recent call last):
+  File "rknn/api/rknn_log.py", line 344, in rknn.api.rknn_log.error_catch_decorator.error_catch_wrapper
+  File "rknn/api/rknn_base.py", line 1990, in rknn.api.rknn_base.RKNNBase.build
+  File "rknn/api/graph_optimizer.py", line 897, in rknn.api.graph_optimizer.GraphOptimizer.fold_constant
+  File "rknn/api/graph_optimizer.py", line 372, in rknn.api.graph_optimizer._dynamic_check
+  File "rknn/api/rknn_log.py", line 95, in rknn.api.rknn_log.RKNNLog.e
+ValueError: The Loop('dynamic_loop') will cause the graph to be a dynamic graph! Remove it manually and try again!
+
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "<string>", line 21, in <module>
+  File "/home/t3/.local/lib/python3.10/site-packages/rknn/api/rknn.py", line 198, in build
+    return self.rknn_base.build(do_quantization=do_quantization, dataset=dataset, expand_batch_size=rknn_batch_size, auto_hybrid=auto_hybrid)
+  File "rknn/api/rknn_log.py", line 349, in rknn.api.rknn_log.error_catch_decorator.error_catch_wrapper
+  File "rknn/api/rknn_log.py", line 95, in rknn.api.rknn_log.RKNNLog.e
+ValueError: Traceback (most recent call last):
+  File "rknn/api/rknn_log.py", line 344, in rknn.api.rknn_log.error_catch_decorator.error_catch_wrapper
+  File "rknn/api/rknn_base.py", line 1990, in rknn.api.rknn_base.RKNNBase.build
+  File "rknn/api/graph_optimizer.py", line 897, in rknn.api.graph_optimizer.GraphOptimizer.fold_constant
+  File "rknn/api/graph_optimizer.py", line 372, in rknn.api.graph_optimizer._dynamic_check
+  File "rknn/api/rknn_log.py", line 95, in rknn.api.rknn_log.RKNNLog.e
+ValueError: The Loop('dynamic_loop') will cause the graph to be a dynamic graph! Remove it manually and try again!
+
+
