@@ -15,6 +15,7 @@ See ``docs/BACKEND_GUIDE.md`` (ob-xh3.1) for the method-by-method mapping.
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 from typing import Any
@@ -89,8 +90,68 @@ class HFTorchBackend(Backend):
         self._past_key_values = None
         self._seq_len = 0
 
+    # ------------------------------------------------------------------
+    # OOM pre-check (ob-3lq): refuse to load if RAM is insufficient,
+    # rather than letting the kernel OOM killer silently kill the
+    # supervising tmux/goose session.
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _available_memory_bytes() -> int:
+        """Read MemAvailable from /proc/meminfo (Linux only)."""
+        try:
+            with open("/proc/meminfo") as f:
+                for line in f:
+                    if line.startswith("MemAvailable:"):
+                        return int(line.split()[1]) * 1024  # KiB → bytes
+        except (OSError, ValueError, IndexError):
+            pass
+        return 0  # unknown — skip the check
+
+    def _check_memory(self) -> None:
+        """Pre-flight: raise MemoryError if available RAM is insufficient.
+
+        Prevents the kernel OOM killer from killing the entire tmux/goose
+        supervising session (bead ob-3lq). The OOM killer targets the cgroup
+        with the most anon-rss, which is the tmux-spawn process, not just the
+        python benchmark subprocess.
+        """
+        avail = self._available_memory_bytes()
+        if avail == 0:
+            return  # can't check (non-Linux or /proc unreadable) — proceed
+
+        label = self.config.name
+        if "0.8B" in label or "0.8b" in label:
+            weight_est = 3_010_000_000  # 752M params × 4 bytes (fp32 worst case)
+        elif "4B" in label or "4b" in label:
+            weight_est = 8_040_000_000  # ~2B params × 4 bytes
+        else:
+            weight_est = 4_000_000_000  # conservative default
+
+        required = int(weight_est * 1.5)
+
+        if avail < required:
+            raise MemoryError(
+                f"Insufficient memory to load {label}: "
+                f"{avail / 1e9:.1f} GiB available, "
+                f"~{required / 1e9:.1f} GiB required (weights + overhead). "
+                f"This check prevents the kernel OOM killer from killing "
+                f"the supervising session (ob-3lq). "
+                f"Options: (1) free memory on this device, "
+                f"(2) run on a higher-RAM node, "
+                f"(3) use a smaller model."
+            )
+
+        print(
+            f"  [hf] Memory check: {avail / 1e9:.1f} GiB available "
+            f"(need ~{required / 1e9:.1f} GiB) — OK",
+            flush=True,
+        )
+
     def load(self) -> None:
         """Load the model and tokenizer. Excluded from all metrics (METRICS.md §1)."""
+        self._check_memory()
+
         dtype_map = {
             "float16": torch.float16,
             "bfloat16": torch.bfloat16,
