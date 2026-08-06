@@ -402,9 +402,9 @@ def test_bandwidth_analysis():
     This is the core finding for ADR 0001's cost analysis: the state matrix
     read-modify-write dominates, and the extra gate vectors are negligible.
     """
-    H = 16       # heads (paper uses 16-18)
-    d_k = 128    # key dim per head
-    d_v = 128    # value dim per head
+    H = 16  # heads (paper uses 16-18)
+    d_k = 128  # key dim per head
+    d_v = 128  # value dim per head
     bytes_f32 = 4
 
     # State: H × d_k × d_v floats, read + written every token
