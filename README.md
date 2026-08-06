@@ -10,6 +10,35 @@ Licensed under **Apache-2.0** — see [`LICENSE`](./LICENSE).
 
 ---
 
+## Headline results
+
+Three GDN CPU kernels (gated cumulative decay, gated delta-rule scan, causal depthwise Conv1D), benchmarked on RK3588 Cortex-A76 at verified Qwen3.5-4B shapes:
+
+| Kernel | GiB/s | % of 34 GB/s spec | Spread |
+|---|---:|---:|---:|
+| Cumulative decay | 21.7 | 64% | 5.2% |
+| Causal Conv1D | 21.6 | 63% | 4.3% |
+| Gated delta-rule scan | 11.1 | 33% | 6.2% |
+
+> Decay and Conv1D achieve **~64% of theoretical DRAM bandwidth** — near the memory ceiling.
+> Scan runs at 33% because its sequential recurrence is **instruction-overhead-bound**, not
+> bandwidth-bound. fp16 state gives **1.6×** on decay; scan is compute-bound and shows no
+> bandwidth benefit. (Commit `553a96e`, dirty=false, governor=performance, 30 repeats.
+> Full table with cross-device validation: [`comparison_table.md`](./results/figures/comparison_table.md).)
+
+**Memory advantage at long context** — GDN's O(1) recurrent state vs attention's O(n) KV cache:
+
+| Context | GDN state | KV cache (8 attn layers) | Savings vs all-attention |
+|---:|---:|---:|---:|
+| 32K | 51 MiB | 1.0 GiB | 2.95 GiB |
+| 128K | 51 MiB | 4.0 GiB | 11.95 GiB |
+| 262K | 51 MiB | 8.0 GiB | **23.95 GiB** |
+
+> At 262K, the KV cache alone (8.0 GiB) **exceeds the fp16 weight footprint** (7.83 GiB).
+> The recurrent state never grows. ([`memory_comparison.md`](./results/figures/memory_comparison.md))
+
+---
+
 ## Table of contents
 
 - [What Gated DeltaNet is, and why it matters on edge silicon](#what-gated-deltanet-is-and-why-it-matters-on-edge-silicon)
@@ -27,7 +56,7 @@ Licensed under **Apache-2.0** — see [`LICENSE`](./LICENSE).
 
 ## What Gated DeltaNet is, and why it matters on edge silicon
 
-Standard transformer self-attention has a well-known scaling problem at inference time: to generate token *N+1*, the model attends back over every previous token, and it does so by keeping a **KV cache** — a stored key/value vector for every token seen so far. That cache grows linearly with context length. At 4K tokens it's small; at 262K tokens it reaches 8.0 GiB for the 4B checkpoint — the same order as the weights themselves, and **larger than them once the weights are quantized** (~3.1x at INT4, though still below 10.4 GiB FP16 weights). The unbounded growth is the point rather than any single crossover: the cache has no ceiling, while a recurrent state does. On a memory-constrained edge board, a linearly growing cache is the thing that runs you out of RAM, or forces you to shrink your usable context window to fit.
+Standard transformer self-attention has a well-known scaling problem at inference time: to generate token *N+1*, the model attends back over every previous token, and it does so by keeping a **KV cache** — a stored key/value vector for every token seen so far. That cache grows linearly with context length. At 4K tokens it's small; at 262K tokens it reaches 8.0 GiB for the 4B checkpoint — the same order as the weights themselves, and **larger than them once the weights are quantized** (~4.1x at INT4, though still below 7.83 GiB FP16 weights). The unbounded growth is the point rather than any single crossover: the cache has no ceiling, while a recurrent state does. On a memory-constrained edge board, a linearly growing cache is the thing that runs you out of RAM, or forces you to shrink your usable context window to fit.
 
 **Gated DeltaNet (GDN)** is a linear-attention mechanism that avoids this. Instead of an ever-growing cache, each GDN layer carries a **fixed-size recurrent state** — think of it as a compressed summary of everything seen so far, updated in place at every step. Decoding token *N+1* only ever touches that fixed-size state, never the full history. That makes GDN's per-token decode memory **O(1) in context length**, as opposed to full attention's O(context length).
 
@@ -123,7 +152,7 @@ All figures above are verified against primary sources (Radxa product page and d
 | Repository skeleton, Apache-2.0 license | Done |
 | Results schema (`docs/RESULTS_SCHEMA.md`) | Done |
 | Benchmark harness (`bench/`) + device microbenchmark (`bench_gdn.c`) | Producing data |
-| CI: lint + unit tests (985 tests) | Done — `.github/workflows/ci.yaml` |
+| CI: lint + unit tests (733 tests) | Done — `.github/workflows/ci.yaml` |
 | Device-fleet microbenchmarks (5 devices) | Done — [fleet analysis](./results/figures/fleet_bandwidth_scaling.md) |
 | Ablation matrix (6 configs, synthetic) | Done — [comparison table](./results/figures/ablation_comparison.md) |
 | Memory decomposition (analytical) | Done — [figures](./results/figures/) |
@@ -141,7 +170,7 @@ All figures above are verified against primary sources (Radxa product page and d
 | Per-layer engine mapping (NPU/GPU/CPU) | Hypothesis only — pending measurements |
 | Full inference results (tokens/sec, TTFT, memory) | **Not started — needs hardware** |
 
-> **Results so far:** 36 CSVs from the device fleet, 22 provenance manifests, 12 generated figures/tables.
+> **Results so far:** 36 CSVs from the device fleet, 22 provenance manifests, 33 generated figures/tables.
 >
 > ```
 > results/
@@ -158,6 +187,7 @@ Full target layout and rationale are in [`PLAN.md`](./PLAN.md) §10. Highlights:
 
 - [`PLAN.md`](./PLAN.md) — the implementation plan: workstreams, milestones, risk register, descope ladder.
 - [`docs/CLAIM_VERIFICATION.md`](./docs/CLAIM_VERIFICATION.md) — every quantitative claim in this README traced to a primary source, corrected, or dropped. Ground truth for numbers.
+- [`docs/DEVPOST_SUBMISSION.md`](./docs/DEVPOST_SUBMISSION.md) — the Devpost write-up, mapped section-by-section to the judging rubric.
 - [`docs/BEADS.md`](./docs/BEADS.md) — how issue tracking works on this project.
 - [`docs/adr/`](./docs/adr/) — architecture decision records for irreversible forks (track selection, hedge target, layer→engine mapping, GDN-2 scope).
 - [`bench/`](./bench/README.md) — measurement harness: context sweep, metrics, provenance manifests, plotting.
@@ -182,7 +212,8 @@ for c in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do \
   echo performance | sudo tee "$c" >/dev/null; done
 
 # 3. Run the benchmark (pick the binary matching your core's ISA)
-./dist/bench_gdn_jetson_a57 --repeats 30 --csv > results/raw/my-device.csv
+#    e.g. bench_gdn_rk3588_a76, bench_gdn_pi5_a76, bench_gdn_jetson_a57
+./dist/bench_gdn_rk3588_a76 --repeats 30 --csv > results/raw/my-device.csv
 
 # 4. Capture provenance manifest
 python3 bench/manifest.py > results/manifests/my-device.json
