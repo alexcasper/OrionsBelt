@@ -53,9 +53,11 @@ def test_csv_header_from_existing_results():
     containing "_", intending to exclude sustained and power CSVs — but
     jetson-j2-sustained-optimized.csv is hyphen-separated, so it slipped through
     and failed for the right reason in the wrong place. results/raw/ legitimately
-    holds three different shapes, so detect the shape and assert accordingly.
+    holds four different shapes, so detect the shape and assert accordingly.
     """
     import csv
+
+    from bench.schema import COLUMNS as RESULT_ROW_COLUMNS
 
     base = os.path.join(os.path.dirname(__file__), "..", "results", "raw")
     expected = {
@@ -71,9 +73,10 @@ def test_csv_header_from_existing_results():
         "gib_per_s_p50",
         "gflop_per_s_p50",
     }
-    # Markers that identify the other two CSV shapes; see scripts/validate_results.py.
+    # Markers that identify the other three CSV shapes; see scripts/validate_results.py.
     sustained_marker = "sustained_kernel"
     power_marker = "power_in_mw"
+    result_row_columns = set(RESULT_ROW_COLUMNS)
 
     checked = 0
     for fname in sorted(os.listdir(base)):
@@ -83,6 +86,8 @@ def test_csv_header_from_existing_results():
             cols = set(csv.DictReader(f).fieldnames or [])
         if sustained_marker in cols or power_marker in cols:
             continue  # different shape by design, not a conformance failure
+        if result_row_columns <= cols:
+            continue  # model-level ResultRow schema (bench/schema.py), not a microbenchmark CSV
         missing = expected - cols
         assert not missing, f"{fname} missing columns: {sorted(missing)}"
         checked += 1

@@ -17,7 +17,6 @@ Requires rknn-toolkit2 (pip install rknn-toolkit2).
 """
 
 import json
-import os
 import sys
 import traceback
 from pathlib import Path
@@ -121,8 +120,8 @@ def main():
         print(f"ERROR: no .onnx files found in {probe_dir}")
         return 1
 
-    print(f"RKNN operator-coverage probe (ob-t3b.5)")
-    print(f"Toolkit: rknn-toolkit2")
+    print("RKNN operator-coverage probe (ob-t3b.5)")
+    print("Toolkit: rknn-toolkit2")
     print(f"Probes: {len(onnx_files)}")
     print(f"Output: {out_dir}")
     print("=" * 72)

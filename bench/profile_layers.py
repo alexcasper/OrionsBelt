@@ -28,6 +28,7 @@ WEIGHTS = REPO / "weights"
 def load_model(model_label: str):
     """Load model + tokenizer, return (model, tokenizer, cfg, layer_types)."""
     import json
+
     import torch
     from transformers import AutoModelForCausalLM, AutoTokenizer
 
@@ -96,7 +97,7 @@ def run_profiling(model, tokenizer, layer_types, contexts, repeats, decode_token
     linear = {i for i, t in enumerate(layer_types) if t == "linear_attention"}
 
     for ctx in contexts:
-        for rep in range(repeats):
+        for _rep in range(repeats):
             input_ids = tokenize_to_length(tokenizer, ctx)
             input_tensor = torch.tensor([input_ids], dtype=torch.long)
 
