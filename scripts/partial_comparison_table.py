@@ -173,7 +173,7 @@ for label, fname in fleet:
     sc_s = f"{sc[0]:<5.2f}" if sc else "  —  "
     cv_s = f"{cv[0]:<5.2f}" if cv else "  —  "
     print(f"  {label:<16} {sha:<20} {ds:<6}  {cd_s}  {sc_s}  {cv_s}")
-print("  (t4 preferred over t3 per ob-bf7: t3 scan spread=153% contaminated; t4 spread=17%)")
+print("  (t4 used as conservative anchor; t3 re-run clean at 553a96e — 6% spread, 11.07 GiB/s)")
 
 print("\n" + "=" * 90)
 print("OPTIMIZATION LADDER on Jetson (Qwen3.5-4B, seq=64) — GiB/s @ p50 / p50 µs")

@@ -809,9 +809,11 @@ on the O6 (scaling from each fleet device). **This is almost certainly an
 overprediction** because the kernels are instruction-bound, not bandwidth-bound.
 
 A core-performance-based prediction is more honest: scaling from the RK3588 A76
-big cluster (1.96 GiB/s scan) by the expected A720 IPC+clock gain (1.5–2.5×)
-gives **2.9–4.9 GiB/s predicted scan throughput** — ~3–5% of the O6's 93.1 GiB/s
-spec bandwidth. If the board arrives, run
+big cluster (3.29 GiB/s scan, t4 anchor) by the expected A720 IPC+clock gain
+(1.5–2.5×) gives **4.9–8.2 GiB/s** predicted scan throughput — ~5–9% of the O6's
+93.1 GiB/s spec bandwidth. The clean t3 re-run (11.07 GiB/s, 6% spread) would
+give 16.6–27.7 GiB/s instead; the 3.4× gap between same-commit anchors is the
+dominant uncertainty. If the board arrives, run
 `bench_gdn_armv9sve2 --repeats 30 --csv` to check.
 
 ### Optimization impact: j2 single-threaded vs 4-core OpenMP (2026-08-03)
