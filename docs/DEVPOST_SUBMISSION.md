@@ -131,7 +131,7 @@ python3 -m bench.plots results/raw/ --text-only --output-dir results/figures
 python3 scripts/generate_memory_plots.py
 ```
 
-No GPU, NPU, or proprietary SDK required. Full setup guide: [`docs/SETUP_PORTABLE.md`](docs/SETUP_PORTABLE.md).
+No GPU, NPU, or proprietary SDK required. Full setup guide: [`docs/SETUP_PORTABLE.md`](../docs/SETUP_PORTABLE.md).
 
 ### Reproducibility
 
@@ -161,7 +161,7 @@ Specifically:
 
 - **Repository:** https://github.com/alexcasper/OrionsBelt
 - **License:** Apache-2.0
-- **Findings (10 sections, 2175 lines):** [`docs/FINDINGS.md`](docs/FINDINGS.md)
-- **Comparison table:** [`results/figures/comparison_table.md`](results/figures/comparison_table.md)
-- **Fleet bandwidth analysis:** [`results/figures/fleet_bandwidth_scaling.md`](results/figures/fleet_bandwidth_scaling.md)
-- **Memory scaling figures:** [`results/figures/memory_comparison.md`](results/figures/memory_comparison.md)
+- **Findings (10 sections, 2175 lines):** [`docs/FINDINGS.md`](../docs/FINDINGS.md)
+- **Comparison table:** [`results/figures/comparison_table.md`](../results/figures/comparison_table.md)
+- **Fleet bandwidth analysis:** [`results/figures/fleet_bandwidth_scaling.md`](../results/figures/fleet_bandwidth_scaling.md)
+- **Memory scaling figures:** [`results/figures/memory_comparison.md`](../results/figures/memory_comparison.md)

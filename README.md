@@ -174,8 +174,8 @@ All figures above are verified against primary sources (Radxa product page and d
 >
 > ```
 > results/
->   raw/         <- 29 per-run CSVs across 5 devices
->   manifests/   <- 17 provenance manifests (git SHA, governor, thermals)
+>   raw/         <- 36 per-run CSVs across 5 devices
+>   manifests/   <- 22 provenance manifests (git SHA, governor, thermals)
 >   figures/     <- fleet analysis, ablation comparison, kernel/memory plots
 > ```
 >

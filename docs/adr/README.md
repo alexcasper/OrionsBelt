@@ -11,7 +11,7 @@ Decisions already scheduled (see PLAN.md):
 | Bead | Decision |
 |---|---|
 | `t-descope-ladder` | Descope ladder and trigger dates |
-| `t-track-decision` | **Physical AI vs Mobile AI track — hard date 2026-08-09** |
+| `t-track-decision` | **Physical AI vs Edge AI track — hard date 2026-08-09** |
 | `t-hedge-select` | Portable aarch64 hedge target |
 | `t-model-select` | Primary and fallback Qwen3.5 checkpoint |
 | `t-mapping-adr` | Layer-to-engine assignment across NPU/GPU/CPU |
