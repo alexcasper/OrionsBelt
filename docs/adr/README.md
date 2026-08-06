@@ -30,6 +30,7 @@ parallel agents don't collide. Assigned so far:
 | 0004 | Descope ladder and trigger dates | `ob-atp` |
 | 0005 | Device fleet as Edge AI hedge target; bandwidth-scaling study | `ob-zh4` follow-on |
 | 0006 | Quantization policy: INT4 weights, FP32 recurrent state and gates | `ob-qpa` |
+| 0007 | Commit to Edge AI track — O6 has not arrived | `ob-imb` |
 
 Note: 0006 was written twice in parallel — on `bench/r5` and `bench/t3` — which is
 exactly the collision this table exists to prevent. Both derivations reached the same
