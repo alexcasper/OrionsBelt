@@ -406,7 +406,9 @@ def generate_report(output_path):
     lines.append("")
     lines.append("Pi 5 and Jetson were benchmarked single-threaded at pre-optimization commits")
     lines.append("(`28729f3` for Pi 5, later commits for Jetson — all pre-OpenMP). RK3588 is")
-    lines.append("**excluded** from this table (ob-0h0: t4's pre-optimization CSV was overwritten).")
+    lines.append(
+        "**excluded** from this table (ob-0h0: t4's pre-optimization CSV was overwritten)."
+    )
     lines.append("See the optimization-impact section below for RK3588 and j2 OpenMP data.")
     lines.append("")
 
