@@ -243,3 +243,129 @@ class TestMain:
         """Smoke flag doesn't help without torch."""
         rc = main(["--smoke"])
         assert rc == 1
+
+
+# ---------------------------------------------------------------------------
+# _LONG_FILLER constant
+# ---------------------------------------------------------------------------
+class TestLongFiller:
+    def test_importable_and_nonempty(self):
+        from scripts.generate_reference import _LONG_FILLER
+
+        assert isinstance(_LONG_FILLER, str)
+        assert len(_LONG_FILLER) > 500
+
+    def test_mentions_rk3588(self):
+        from scripts.generate_reference import _LONG_FILLER
+
+        assert "RK3588" in _LONG_FILLER
+
+    def test_mentions_gdn_concepts(self):
+        from scripts.generate_reference import _LONG_FILLER
+
+        assert "gated delta" in _LONG_FILLER.lower()
+
+    def test_contains_python_code(self):
+        """Filler includes code snippets for varied logit distributions."""
+        from scripts.generate_reference import _LONG_FILLER
+
+        assert "def " in _LONG_FILLER
+
+    def test_mentions_memory_bandwidth(self):
+        from scripts.generate_reference import _LONG_FILLER
+
+        assert "bandwidth" in _LONG_FILLER.lower()
+
+
+# ---------------------------------------------------------------------------
+# collect_provenance() — mocked torch/transformers
+# ---------------------------------------------------------------------------
+class TestCollectProvenance:
+    @pytest.fixture(autouse=True)
+    def _mock_deps(self, monkeypatch):
+        """Inject mock torch and transformers into the module namespace."""
+        from unittest.mock import MagicMock
+
+        import scripts.generate_reference as gen
+
+        mock_torch = MagicMock()
+        mock_torch.__version__ = "2.4.0"
+        monkeypatch.setattr(gen, "torch", mock_torch, raising=False)
+
+        mock_tf = MagicMock()
+        mock_tf.__version__ = "4.44.0"
+        monkeypatch.setitem(sys.modules, "transformers", mock_tf)
+
+    def test_returns_dict_with_keys(self):
+        """collect_provenance returns a dict with all expected keys."""
+        import scripts.generate_reference as gen
+
+        prov = gen.collect_provenance("/fake/model")
+        assert isinstance(prov, dict)
+        for key in [
+            "timestamp",
+            "git_sha",
+            "git_dirty",
+            "hostname",
+            "platform",
+            "python_version",
+            "torch_version",
+            "transformers_version",
+            "numpy_version",
+            "model_path",
+            "model_repo",
+            "device",
+            "dtype",
+            "cpu_governor",
+            "thermals_pre",
+        ]:
+            assert key in prov, f"Missing key: {key}"
+
+    def test_torch_version_captured(self, monkeypatch):
+        """Override the fixture's mock to test a different version."""
+        from unittest.mock import MagicMock
+
+        import scripts.generate_reference as gen
+
+        mock_torch = MagicMock()
+        mock_torch.__version__ = "99.0.0"
+        monkeypatch.setattr(gen, "torch", mock_torch, raising=False)
+
+        prov = gen.collect_provenance("/fake/model")
+        assert prov["torch_version"] == "99.0.0"
+
+    def test_model_path_echoed(self):
+        import scripts.generate_reference as gen
+
+        prov = gen.collect_provenance("/some/path/model")
+        assert prov["model_path"] == "/some/path/model"
+
+    def test_fixed_fields(self):
+        """Device and dtype are always cpu/float32."""
+        import scripts.generate_reference as gen
+
+        prov = gen.collect_provenance("/fake")
+        assert prov["device"] == "cpu"
+        assert prov["dtype"] == "float32"
+        assert prov["model_repo"] == "Qwen/Qwen3.5-0.8B"
+
+    def test_timestamp_is_iso_format(self):
+        import scripts.generate_reference as gen
+
+        prov = gen.collect_provenance("/fake")
+        # ISO format contains 'T' separator
+        assert "T" in prov["timestamp"]
+
+    def test_numpy_version_captured(self):
+        import scripts.generate_reference as gen
+
+        prov = gen.collect_provenance("/fake")
+        # numpy IS installed on this device
+        assert prov["numpy_version"] is not None
+        assert len(prov["numpy_version"]) > 0
+
+    def test_transformers_version_captured(self):
+        import scripts.generate_reference as gen
+
+        prov = gen.collect_provenance("/fake")
+        assert prov["transformers_version"] == "4.44.0"
