@@ -16,12 +16,16 @@ if _ROOT not in sys.path:
 
 from scripts.validate_results import (  # noqa: E402
     ABSURD_THROUGHPUT,
+    PROFILE_COLS,
+    SCHEMA_COLS,
     STANDARD_COLS,
     Issue,
     check_manifest_exists,
     detect_csv_type,
     expected_columns,
     find_device_spec,
+    validate_profile_row,
+    validate_schema_row,
     validate_standard_row,
     validate_sustained_row,
 )
@@ -75,6 +79,50 @@ def _write_std_csv(path, rows):
             w.writerow(r)
 
 
+def _schema_row(**overrides):
+    """A valid schema-compliant row dict (bench/schema.py format)."""
+    base = {col: "" for col in SCHEMA_COLS}
+    base.update({
+        "run_id": "rk3588-t4_test",
+        "timestamp": "2026-08-06T10:00:00Z",
+        "git_sha": "abc1234",
+        "manifest_ref": "results/manifests/rk3588-t4_test.json",
+        "device": "rk3588-t4",
+        "engine_gdn": "cpu",
+        "engine_full_attention": "cpu",
+        "model_checkpoint": "Qwen3.5-0.8B",
+        "quantization": "fp32",
+        "context_length": "64",
+        "phase": "prefill",
+        "metric_name": "prefill_tokens_per_sec",
+        "metric_component": "",
+        "value": "14.93",
+        "unit": "tokens_per_sec",
+        "repeat_index": "0",
+        "repeat_count": "5",
+        "layer_class": "all",
+    })
+    base.update(overrides)
+    return base
+
+
+def _profile_row(**overrides):
+    """A valid per-layer profiling row dict."""
+    base = {col: "" for col in PROFILE_COLS}
+    base.update({
+        "phase": "decode",
+        "ctx_len": "64",
+        "layer_idx": "0",
+        "layer_type": "linear_attention",
+        "p50_us": "5000.0",
+        "p95_us": "6000.0",
+        "mean_us": "5200.0",
+        "n_samples": "9",
+    })
+    base.update(overrides)
+    return base
+
+
 # ---------------------------------------------------------------------------
 # detect_csv_type
 # ---------------------------------------------------------------------------
@@ -117,6 +165,23 @@ class TestDetectCsvType:
         cols = STD_HEADER + ["layer_class", "extra_col"]
         assert detect_csv_type(cols) == "standard"
 
+    def test_schema_detected(self):
+        """Canonical 19-column schema CSV (bench/schema.py) is detected."""
+        assert detect_csv_type(SCHEMA_COLS) == "schema"
+
+    def test_schema_detected_with_subset(self):
+        """Detection uses key columns, not the full 19."""
+        assert detect_csv_type(
+            ["run_id", "metric_name", "value", "phase", "context_length"]
+        ) == "schema"
+
+    def test_profile_detected(self):
+        assert detect_csv_type(PROFILE_COLS) == "profile"
+
+    def test_schema_takes_precedence_over_standard(self):
+        """Schema CSVs contain many columns — must not misidentify as standard."""
+        assert detect_csv_type(SCHEMA_COLS) == "schema"
+
 
 # ---------------------------------------------------------------------------
 # expected_columns
@@ -135,6 +200,13 @@ class TestExpectedColumns:
 
     def test_unknown_type_returns_empty(self):
         assert expected_columns("unknown") == []
+
+    def test_schema_columns(self):
+        assert "run_id" in expected_columns("schema")
+        assert "metric_name" in expected_columns("schema")
+
+    def test_profile_columns(self):
+        assert "layer_idx" in expected_columns("profile")
 
 
 # ---------------------------------------------------------------------------
@@ -234,6 +306,90 @@ class TestValidateSustainedRow:
         issues = []
         validate_sustained_row(_sustained_row(elapsed_s="0.0"), "test.csv", issues, 2)
         assert any("elapsed" in i.message for i in issues)
+
+
+# ---------------------------------------------------------------------------
+# validate_schema_row
+# ---------------------------------------------------------------------------
+
+
+class TestValidateSchemaRow:
+    def test_valid_row_no_issues(self):
+        issues = []
+        validate_schema_row(_schema_row(), "test.csv", issues, 2)
+        assert issues == []
+
+    def test_negative_value(self):
+        issues = []
+        validate_schema_row(_schema_row(value="-1.5"), "test.csv", issues, 2)
+        assert any("negative" in i.message for i in issues)
+
+    def test_zero_context_length(self):
+        issues = []
+        validate_schema_row(_schema_row(context_length="0"), "test.csv", issues, 2)
+        assert any("context_length" in i.message and i.severity == "ERROR" for i in issues)
+
+    def test_repeat_count_zero(self):
+        issues = []
+        validate_schema_row(_schema_row(repeat_count="0"), "test.csv", issues, 2)
+        assert any("repeat_count" in i.message and i.severity == "ERROR" for i in issues)
+
+    def test_repeat_index_out_of_range(self):
+        issues = []
+        validate_schema_row(_schema_row(repeat_index="5", repeat_count="5"), "test.csv", issues, 2)
+        assert any("repeat_index" in i.message and i.severity == "WARNING" for i in issues)
+
+    def test_unexpected_phase(self):
+        issues = []
+        validate_schema_row(_schema_row(phase="weird"), "test.csv", issues, 2)
+        assert any("phase" in i.message and i.severity == "WARNING" for i in issues)
+
+    def test_high_throughput_warning(self):
+        issues = []
+        validate_schema_row(
+            _schema_row(value="999999", metric_name="prefill_tokens_per_sec"),
+            "test.csv",
+            issues,
+            2,
+        )
+        assert any("high throughput" in i.message for i in issues)
+
+    def test_malformed_value(self):
+        issues = []
+        validate_schema_row(_schema_row(value="not_a_number"), "test.csv", issues, 2)
+        assert any("cannot parse" in i.message for i in issues)
+
+
+# ---------------------------------------------------------------------------
+# validate_profile_row
+# ---------------------------------------------------------------------------
+
+
+class TestValidateProfileRow:
+    def test_valid_row_no_issues(self):
+        issues = []
+        validate_profile_row(_profile_row(), "test.csv", issues, 2)
+        assert issues == []
+
+    def test_p95_less_than_p50(self):
+        issues = []
+        validate_profile_row(_profile_row(p50_us="5000", p95_us="3000"), "test.csv", issues, 2)
+        assert any("p95" in i.message for i in issues)
+
+    def test_non_positive_latency(self):
+        issues = []
+        validate_profile_row(_profile_row(p50_us="0"), "test.csv", issues, 2)
+        assert any("latency" in i.message for i in issues)
+
+    def test_too_few_samples(self):
+        issues = []
+        validate_profile_row(_profile_row(n_samples="0"), "test.csv", issues, 2)
+        assert any("n_samples" in i.message for i in issues)
+
+    def test_malformed_value(self):
+        issues = []
+        validate_profile_row(_profile_row(layer_idx="not_a_number"), "test.csv", issues, 2)
+        assert any("cannot parse" in i.message for i in issues)
 
 
 # ---------------------------------------------------------------------------

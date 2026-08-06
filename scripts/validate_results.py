@@ -59,6 +59,47 @@ POWER_COLS = [
     "temp_milliC",
 ]
 
+# Canonical schema-compliant CSV format (bench/schema.py, frozen by ob-q9i).
+# This is the tidy/long format that end-to-end model-level benchmarks emit.
+# Defined here as a static list (not imported from bench.schema) to keep the
+# validator stdlib-only and compatible with Python 3.6.9 (Jetson Nano).
+SCHEMA_COLS = [
+    "run_id",
+    "timestamp",
+    "git_sha",
+    "manifest_ref",
+    "device",
+    "engine_gdn",
+    "engine_full_attention",
+    "model_checkpoint",
+    "quantization",
+    "context_length",
+    "phase",
+    "metric_name",
+    "metric_component",
+    "value",
+    "unit",
+    "repeat_index",
+    "repeat_count",
+    "layer_class",
+    "notes",
+]
+
+# Subset of SCHEMA_COLS that uniquely identifies the schema-compliant format.
+SCHEMA_KEY_COLS = {"run_id", "metric_name", "value", "phase", "context_length"}
+
+# Per-layer profiling CSV (layer-level latency breakdowns).
+PROFILE_COLS = [
+    "phase",
+    "ctx_len",
+    "layer_idx",
+    "layer_type",
+    "p50_us",
+    "p95_us",
+    "mean_us",
+    "n_samples",
+]
+
 # Device spec bandwidth (GiB/s) for sanity-check upper bounds.
 # From DEVICE_RUNBOOK.md "What we are actually testing".
 DEVICE_SPEC_BW = {
@@ -72,24 +113,32 @@ ABSURD_THROUGHPUT = 200.0  # GiB/s
 
 
 def detect_csv_type(header):
-    """Return 'standard', 'sustained', 'power', or None based on header."""
+    """Return 'standard', 'sustained', 'power', 'schema', 'profile', or None."""
     cols = set(header)
+    if cols >= SCHEMA_KEY_COLS:
+        return "schema"
     if cols >= set(STANDARD_COLS):
         return "standard"
     if cols >= set(SUSTAINED_COLS):
         return "sustained"
     if cols >= set(POWER_COLS):
         return "power"
+    if cols >= {"layer_idx", "layer_type", "p50_us"}:
+        return "profile"
     return None
 
 
 def expected_columns(csv_type):
+    if csv_type == "schema":
+        return SCHEMA_COLS
     if csv_type == "standard":
         return STANDARD_COLS
     if csv_type == "sustained":
         return SUSTAINED_COLS
     if csv_type == "power":
         return POWER_COLS
+    if csv_type == "profile":
+        return PROFILE_COLS
     return []
 
 
@@ -223,6 +272,63 @@ def validate_sustained_row(row, csv_name, issues, row_num):
         issues.append(Issue("ERROR", csv_name, f"row {row_num}: non-positive elapsed_s"))
 
 
+def validate_schema_row(row, csv_name, issues, row_num):
+    """Validate a single row of a schema-compliant CSV (bench/schema.py format)."""
+    try:
+        value = float(row["value"])
+        ctx_len = int(row["context_length"])
+        repeat_index = int(row["repeat_index"])
+        repeat_count = int(row["repeat_count"])
+    except (ValueError, KeyError) as e:
+        issues.append(Issue("ERROR", csv_name, f"row {row_num}: cannot parse numeric fields: {e}"))
+        return
+
+    # Negative values are invalid for all our metrics (throughput, latency, memory)
+    if value < 0:
+        issues.append(Issue("ERROR", csv_name, f"row {row_num}: negative value {value}"))
+
+    # Context length must be positive
+    if ctx_len <= 0:
+        issues.append(Issue("ERROR", csv_name, f"row {row_num}: non-positive context_length {ctx_len}"))
+
+    # Sanity check on repeat indices
+    if repeat_count < 1:
+        issues.append(Issue("ERROR", csv_name, f"row {row_num}: repeat_count={repeat_count} (must be >= 1)"))
+    if repeat_index >= repeat_count:
+        issues.append(Issue("WARNING", csv_name, f"row {row_num}: repeat_index={repeat_index} >= repeat_count={repeat_count}"))
+
+    # Phase must be a known value
+    phase = row.get("phase", "")
+    if phase not in ("prefill", "decode"):
+        issues.append(Issue("WARNING", csv_name, f"row {row_num}: unexpected phase '{phase}'"))
+
+    # Absurd throughput check for tokens_per_sec metrics
+    metric = row.get("metric_name", "")
+    unit = row.get("unit", "")
+    if "tokens_per_sec" in metric and value > 100000:
+        issues.append(Issue("WARNING", csv_name, f"row {row_num}: very high throughput {value} tokens/sec"))
+
+
+def validate_profile_row(row, csv_name, issues, row_num):
+    """Validate a single row of a per-layer profiling CSV."""
+    try:
+        p50 = float(row["p50_us"])
+        p95 = float(row["p95_us"])
+        mean = float(row["mean_us"])
+        n_samples = int(row["n_samples"])
+        layer_idx = int(row["layer_idx"])
+    except (ValueError, KeyError) as e:
+        issues.append(Issue("ERROR", csv_name, f"row {row_num}: cannot parse numeric fields: {e}"))
+        return
+
+    if p50 <= 0:
+        issues.append(Issue("ERROR", csv_name, f"row {row_num}: non-positive latency p50={p50}"))
+    if p95 < p50:
+        issues.append(Issue("ERROR", csv_name, f"row {row_num}: p95 ({p95}) < p50 ({p50})"))
+    if n_samples < 1:
+        issues.append(Issue("WARNING", csv_name, f"row {row_num}: n_samples={n_samples} (too few)"))
+
+
 def validate_csv(path, csv_name, issues):
     """Validate CSV schema and row-level data. Return (csv_type, row_count)."""
     if not os.path.isfile(path):
@@ -260,8 +366,21 @@ def validate_csv(path, csv_name, issues):
                     validate_standard_row(row, csv_name, issues, i)
                 elif csv_type == "sustained":
                     validate_sustained_row(row, csv_name, issues, i)
+                elif csv_type == "schema":
+                    validate_schema_row(row, csv_name, issues, i)
+                elif csv_type == "profile":
+                    validate_profile_row(row, csv_name, issues, i)
 
-            return csv_type, row_count
+            # For schema CSVs, read the manifest_ref from the first data row
+            schema_manifest_ref = None
+            if csv_type == "schema":
+                with open(path, newline="") as f2:
+                    r2 = csv.DictReader(f2)
+                    first = next(r2, None)
+                    if first:
+                        schema_manifest_ref = first.get("manifest_ref", "")
+
+            return csv_type, row_count, schema_manifest_ref
 
     except Exception as e:
         issues.append(Issue("ERROR", csv_name, f"cannot read CSV: {e}"))
@@ -323,7 +442,7 @@ def validate_manifest(csv_name, csv_type, row_count, manifest_path, issues, head
 
     # Check device spec bandwidth vs achieved
     spec_bw = find_device_spec(csv_name)
-    if spec_bw and csv_type == "standard" and row_count > 0:
+    if spec_bw and csv_type in ("standard", "schema") and row_count > 0:
         issues.append(Issue("NOTE", csv_name, f"device spec bandwidth: ~{spec_bw:.0f} GiB/s"))
 
 
@@ -362,9 +481,17 @@ def main():
 
     for csv_name in csv_files:
         csv_path = os.path.join(args.csv_dir, csv_name)
-        csv_type, row_count = validate_csv(csv_path, csv_name, all_issues)
+        csv_type, row_count, schema_manifest_ref = validate_csv(csv_path, csv_name, all_issues)
 
-        manifest_path = check_manifest_exists(csv_name, args.manifest_dir)
+        # For schema CSVs, prefer manifest_ref column; fall back to filename matching
+        if csv_type == "schema" and schema_manifest_ref:
+            manifest_path = schema_manifest_ref
+            if not os.path.isabs(manifest_path):
+                manifest_path = os.path.join(".", manifest_path)
+            if not os.path.isfile(manifest_path):
+                manifest_path = check_manifest_exists(csv_name, args.manifest_dir)
+        else:
+            manifest_path = check_manifest_exists(csv_name, args.manifest_dir)
         validate_manifest(csv_name, csv_type, row_count, manifest_path, all_issues, head_sha)
 
     # Report
