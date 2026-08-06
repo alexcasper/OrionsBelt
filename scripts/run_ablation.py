@@ -144,6 +144,20 @@ def main(argv: list[str] | None = None) -> int:
 
     # Generate the comparison table
     table = generate_comparison(csv_paths)
+
+    # The ablation grid uses SyntheticBackend — the numbers are pipeline
+    # placeholders, not real measurements. Make this explicit so no one
+    # (including judges) mistakes them for empirical results.
+    disclaimer = (
+        "> ⚠ **Synthetic data.** These numbers are produced by `SyntheticBackend`, "
+        "a deterministic analytical model — not measured on real hardware. "
+        "They exist to validate the ablation pipeline end-to-end and to define "
+        "the table structure for `ob-ami` (master comparison table). "
+        "Real numbers require wiring optimized GDN kernels into a Qwen3.5 "
+        "forward pass (`ob-8qt.9`) and running on the target device.\n\n"
+    )
+    table = disclaimer + table
+
     table_path = Path(args.table_output)
     table_path.parent.mkdir(parents=True, exist_ok=True)
     table_path.write_text(table + "\n", encoding="utf-8")

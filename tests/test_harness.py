@@ -163,8 +163,8 @@ class TestSyntheticBackend:
             cfg.num_full_attention_layers
             * 2
             * 256
-            * cfg.fa_n_kv_heads
-            * cfg.fa_head_dim
+            * cfg.num_key_value_heads
+            * cfg.full_attn_head_dim
             * cfg.cache_dtype_bytes
         )
         assert mem["kv_cache"] == expected_kv
@@ -600,8 +600,8 @@ class TestLoadConfigFromDict:
                 },
             }
         )
-        assert cfg.fa_n_kv_heads == 4
-        assert cfg.fa_head_dim == 256
+        assert cfg.num_key_value_heads == 4
+        assert cfg.full_attn_head_dim == 256
 
     def test_maps_ssm_dtype(self):
         cfg = load_config_from_dict(

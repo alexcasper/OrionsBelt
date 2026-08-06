@@ -99,9 +99,9 @@ A portable aarch64 target (the **Edge AI** hedge track) is being brought up in p
 
 ## Status
 
-**This is an in-progress research repository as of 2026-08-03.** Neither the Orion O6 board nor CIX Early Bird SDK access is in hand yet — both are externally gated (procurement, vendor approval) and cannot be compressed by effort alone. A hard go/no-go between the Physical AI (O6) and Edge AI (portable aarch64) framing is scheduled for 2026-08-09; the portable hedge track runs from day one regardless of that decision, so hardware-independent work is not blocked on it.
+**This is an in-progress research repository as of 2026-08-06.** Neither the Orion O6 board nor CIX Early Bird SDK access is in hand yet — both are externally gated (procurement, vendor approval) and cannot be compressed by effort alone. A hard go/no-go between the Physical AI (O6) and Edge AI (portable aarch64) framing is scheduled for 2026-08-09; the portable hedge track runs from day one regardless of that decision, so hardware-independent work is not blocked on it.
 
-**Device microbenchmarks are running on the Jetson Nano (Cortex-A57, NEON).** Three GDN CPU kernels (gated cumulative decay, gated delta-rule scan, causal depthwise Conv1D) plus mixed-precision bf16/fp16 variants have been measured at verified Qwen3.5-4B and 0.8B shapes, in both prefill and decode phases. Results are committed with provenance manifests; see [`docs/FINDINGS.md`](./docs/FINDINGS.md) for analysis and [`results/raw/`](./results/raw/) for CSVs. The full inference harness (end-to-end tokens/sec, TTFT, memory decomposition) is still pending hardware access.
+**Device-fleet microbenchmarks are complete across five Arm devices.** Three GDN CPU kernels (gated cumulative decay, gated delta-rule scan, causal depthwise Conv1D) have been measured at verified Qwen3.5-4B and 0.8B shapes on the full fleet: Jetson Nano (Cortex-A57, NEON), Raspberry Pi 5 (Cortex-A76), and RK3588 (Cortex-A76 big + Cortex-A55 little clusters). Mixed-precision bf16/fp16 variants and 4-core OpenMP scaling have been measured on the Jetson. The key cross-device finding — that these kernels are **instruction-overhead-bound, not DRAM-bandwidth-bound** at seq=64 working-set sizes — is documented in the [fleet bandwidth-scaling analysis](./results/figures/fleet_bandwidth_scaling.md). The full inference harness (end-to-end tokens/sec, TTFT, memory decomposition) is still pending hardware access.
 
 | Item | Status |
 |---|---|
@@ -110,26 +110,29 @@ A portable aarch64 target (the **Edge AI** hedge track) is being brought up in p
 | Repository skeleton, Apache-2.0 license | Done |
 | Results schema (`docs/RESULTS_SCHEMA.md`) | Done |
 | Benchmark harness (`bench/`) + device microbenchmark (`bench_gdn.c`) | Producing data |
+| CI: lint + unit tests (721 tests) | Done — `.github/workflows/ci.yaml` |
+| Device-fleet microbenchmarks (5 devices) | Done — [fleet analysis](./results/figures/fleet_bandwidth_scaling.md) |
+| Ablation matrix (6 configs, synthetic) | Done — [comparison table](./results/figures/ablation_comparison.md) |
+| Memory decomposition (analytical) | Done — [figures](./results/figures/) |
+| Architecture decision records (`docs/adr/`) | 6 ADRs recorded |
+| CPU GDN kernels (NEON/SVE/scalar) | Verified, benchmarked across fleet |
+| Mixed-precision state kernels (bf16/fp16) | Implemented, benchmarked on Jetson |
 | Model survey / selection (`docs/MODEL_SURVEY.md`) | In progress |
-| Architecture decision records (`docs/adr/`) | 5 ADRs recorded |
-| CPU GDN kernels (NEON/SVE/scalar) | Verified, benchmarked on A57 |
-| Mixed-precision state kernels (bf16/fp16) | Implemented, benchmarked on A57 |
 | Orion O6 board bring-up | **Pending** — board not yet in hand |
 | CIX Early Bird SDK / NPU toolchain access | **Pending** — not yet approved |
-| Portable aarch64 hedge target (Pi 5 / RK3588) | Pending |
 | Per-layer engine mapping (NPU/GPU/CPU) | Hypothesis only — pending measurements |
 | Full inference results (tokens/sec, TTFT, memory) | **Not started — needs hardware** |
 
-> **Results so far:** device-fleet microbenchmark data from the Jetson Nano.
+> **Results so far:** 29 CSVs from the device fleet, 15 provenance manifests, 10 generated figures/tables.
 >
 > ```
 > results/
->   raw/         <- per-run CSVs — jetson-j1.csv (28 rows), jetson-j1_sustained.csv
->   manifests/   <- provenance manifests — jetson-j1.json, jetson-j1_sustained.json
->   figures/     <- generated plots — pending plots.py run on a Python 3.10+ host
+>   raw/         <- 29 per-run CSVs across 5 devices
+>   manifests/   <- 15 provenance manifests (git SHA, governor, thermals)
+>   figures/     <- fleet analysis, ablation comparison, kernel/memory plots
 > ```
 >
-> See [`results/README.md`](./results/README.md) for the layout and [`docs/FINDINGS.md`](./docs/FINDINGS.md) for findings.
+> See [`results/README.md`](./results/README.md) for the layout, [`docs/FINDINGS.md`](./docs/FINDINGS.md) for findings, and [`results/figures/fleet_bandwidth_scaling.md`](./results/figures/fleet_bandwidth_scaling.md) for the headline cross-device analysis.
 
 ## Repository layout
 
