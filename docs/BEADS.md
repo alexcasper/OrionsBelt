@@ -4,7 +4,9 @@ This repo tracks all work in [beads](https://beads.gascity.com/) — a dependenc
 tracker built for AI coding agents. Beads replaces markdown TODO lists with a real dependency
 graph, so `bd ready` can tell you exactly what is unblocked right now.
 
-The full plan these issues were generated from is [`PLAN.md`](../PLAN.md).
+These issues were originally generated from [`PLAN.md`](./archive/PLAN.md), now archived (see
+[`docs/archive/README.md`](./archive/README.md)) — `bd ready` and `bd show <epic>` are the
+current plan.
 
 ---
 
@@ -194,9 +196,10 @@ workspace is detected.
 
 **Project-specific rules for agents:**
 
-1. Read [`PLAN.md`](../PLAN.md) before claiming your first bead — the dependency graph only
-   makes sense with the plan's context, especially the two-track (Physical AI / Edge AI)
-   structure and the deadline pressure.
+1. Read [`README.md`](../README.md)'s Status section and [`docs/FINDINGS.md`](./FINDINGS.md)
+   before claiming your first bead. [`docs/archive/PLAN.md`](./archive/PLAN.md) has the original
+   two-track (Physical AI / Edge AI) context if you want the history, but it's superseded —
+   ADR [0007](./adr/0007-commit-to-edge-ai-track.md) already resolved that fork.
 2. `bd ready` showing an `external-gate` bead does **not** mean it is actionable. Those wait
    on third parties. Prefer `portable`-labelled work when hardware is unavailable.
 3. Do not close a benchmark bead without a committed run manifest. A number without
