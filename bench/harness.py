@@ -676,10 +676,11 @@ def build_backend(name: str, **kwargs: Any) -> BenchmarkBackend:
     """Instantiate a backend by name. Currently only 'mock' is built in."""
     if name == "mock":
         return MockBackend(**kwargs)
+    if name == "hf":
+        from hf_backend import HFTorchBackend
+        return HFTorchBackend(**kwargs)
     raise ValueError(
-        f"unknown backend {name!r}; only 'mock' is built in. "
-        "Real backends (transformers, llama.cpp, NPU) will be registered as "
-        "their respective beads land."
+        f"unknown backend {name!r}. Available: 'mock', 'hf'."
     )
 
 
