@@ -113,3 +113,97 @@ class TestUnitConversion:
 
     def test_mib(self, gmp):
         assert abs(gmp._mib(1024**2) - 1.0) < 1e-9
+
+
+# ---------------------------------------------------------------------------
+# Plotting functions (requires matplotlib)
+# ---------------------------------------------------------------------------
+
+_HAS_MPL = importlib.util.find_spec("matplotlib") is not None
+
+
+@pytest.mark.skipif(not _HAS_MPL, reason="matplotlib not available")
+class TestPlotStackedBar:
+    def test_creates_png_4b(self, gmp, tmp_path):
+        """plot_stacked_bar produces a PNG for the 4B checkpoint."""
+        import matplotlib
+
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+
+        out = tmp_path / "stacked_4b.png"
+        result = gmp.plot_stacked_bar("4B", str(out), plt)
+        assert result is True
+        assert out.exists()
+        assert out.stat().st_size > 1000  # real PNG, not empty
+
+    def test_creates_png_08b(self, gmp, tmp_path):
+        import matplotlib
+
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+
+        out = tmp_path / "stacked_08b.png"
+        result = gmp.plot_stacked_bar("0.8B", str(out), plt)
+        assert result is True
+        assert out.exists()
+
+    def test_returns_bool(self, gmp, tmp_path):
+        import matplotlib
+
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+
+        out = tmp_path / "test.png"
+        result = gmp.plot_stacked_bar("4B", str(out), plt)
+        assert isinstance(result, bool)
+
+
+@pytest.mark.skipif(not _HAS_MPL, reason="matplotlib not available")
+class TestPlotDecompositionArea:
+    def test_creates_png_4b(self, gmp, tmp_path):
+        """plot_decomposition_area produces a PNG for the 4B checkpoint."""
+        import matplotlib
+
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+
+        out = tmp_path / "area_4b.png"
+        result = gmp.plot_decomposition_area("4B", str(out), plt)
+        assert result is True
+        assert out.exists()
+        assert out.stat().st_size > 1000
+
+    def test_creates_png_08b(self, gmp, tmp_path):
+        import matplotlib
+
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+
+        out = tmp_path / "area_08b.png"
+        result = gmp.plot_decomposition_area("0.8B", str(out), plt)
+        assert result is True
+        assert out.exists()
+
+    def test_returns_bool(self, gmp, tmp_path):
+        import matplotlib
+
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+
+        out = tmp_path / "test_area.png"
+        result = gmp.plot_decomposition_area("4B", str(out), plt)
+        assert isinstance(result, bool)
+
+
+@pytest.mark.skipif(not _HAS_MPL, reason="matplotlib not available")
+class TestMainFullMode:
+    def test_default_mode_generates_all_files(self, gmp, tmp_path):
+        """Default mode (no --text-only) generates PNG plots + markdown table."""
+        rc = gmp.main(["--output-dir", str(tmp_path)])
+        assert rc == 0
+        # Markdown table should exist
+        assert (tmp_path / "memory_comparison.md").exists()
+        # PNG plots should exist for both checkpoints
+        pngs = list(tmp_path.glob("*.png"))
+        assert len(pngs) >= 2  # at least one per checkpoint
