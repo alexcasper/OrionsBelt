@@ -12,6 +12,8 @@ These functions only need string input/output; no RKNN toolkit required.
 import os
 import sys
 
+import pytest
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 
 from rknn_op_probe import extract_key_evidence, extract_op_table
@@ -269,3 +271,378 @@ class TestExtractKeyEvidence:
         output = "Op type 'Scan' not found in converter"
         evidence = extract_key_evidence(output)
         assert len(evidence) >= 1
+
+
+# ---------------------------------------------------------------------------
+# probe_one() — mocked subprocess.run
+# ---------------------------------------------------------------------------
+
+import json  # noqa: E402
+from unittest.mock import patch  # noqa: E402
+
+import rknn_op_probe  # noqa: E402
+
+
+class _FakeProc:
+    """Minimal stub for subprocess.run return value."""
+
+    def __init__(self, stdout="", stderr="", returncode=0):
+        self.stdout = stdout
+        self.stderr = stderr
+        self.returncode = returncode
+
+
+class TestProbeOne:
+    @pytest.fixture(autouse=True)
+    def _setup_out_dir(self, tmp_path, monkeypatch):
+        """Redirect OUT_DIR to a temp path so log files don't pollute cwd."""
+        monkeypatch.setattr(rknn_op_probe, "OUT_DIR", tmp_path)
+
+    def test_compiled_success(self, tmp_path):
+        """All return codes zero → COMPILED verdict."""
+        stderr = "CONFIG_RET=0\nLOAD_RET=0\nBUILD_RET=0\nEXPORT_RET=0\nRKNN_FILE_SIZE=4567890\n"
+        with patch("rknn_op_probe.subprocess.run") as mock_run:
+            mock_run.return_value = _FakeProc(stderr=stderr, returncode=0)
+            result = rknn_op_probe.probe_one("/fake/model.onnx", "scan_recurrence")
+
+        assert result["verdict"] == "COMPILED"
+        assert result["config_ret"] == 0
+        assert result["load_ret"] == 0
+        assert result["build_ret"] == 0
+        assert result["export_ret"] == 0
+        assert result["rknn_file_size"] == 4567890
+        assert result["log"] == "scan_recurrence.log"
+
+    def test_rejected_at_load(self, tmp_path):
+        """load_ret != 0 → REJECTED_AT_LOAD."""
+        stderr = "CONFIG_RET=0\nLOAD_RET=1\n"
+        with patch("rknn_op_probe.subprocess.run") as mock_run:
+            mock_run.return_value = _FakeProc(stderr=stderr, returncode=0)
+            result = rknn_op_probe.probe_one("/fake/model.onnx", "scan_recurrence")
+
+        assert result["verdict"] == "REJECTED_AT_LOAD"
+        assert result["load_ret"] == 1
+        assert result["build_ret"] is None
+
+    def test_rejected_at_build(self, tmp_path):
+        """load ok but build_ret != 0 → REJECTED_AT_BUILD."""
+        stderr = "CONFIG_RET=0\nLOAD_RET=0\nBUILD_RET=1\n"
+        with patch("rknn_op_probe.subprocess.run") as mock_run:
+            mock_run.return_value = _FakeProc(stderr=stderr, returncode=0)
+            result = rknn_op_probe.probe_one("/fake/model.onnx", "conv_probe")
+
+        assert result["verdict"] == "REJECTED_AT_BUILD"
+        assert result["build_ret"] == 1
+
+    def test_compiled_no_export(self, tmp_path):
+        """load + build ok but export_ret != 0 → COMPILED_NO_EXPORT."""
+        stderr = "CONFIG_RET=0\nLOAD_RET=0\nBUILD_RET=0\nEXPORT_RET=1\n"
+        with patch("rknn_op_probe.subprocess.run") as mock_run:
+            mock_run.return_value = _FakeProc(stderr=stderr, returncode=0)
+            result = rknn_op_probe.probe_one("/fake/model.onnx", "conv_probe")
+
+        assert result["verdict"] == "COMPILED_NO_EXPORT"
+
+    def test_missing_return_codes_are_none(self, tmp_path):
+        """When cixparse doesn't emit _RET= lines, the fields are None."""
+        with patch("rknn_op_probe.subprocess.run") as mock_run:
+            mock_run.return_value = _FakeProc(stdout="some output\n", returncode=0)
+            result = rknn_op_probe.probe_one("/fake/model.onnx", "conv_probe")
+
+        assert result["config_ret"] is None
+        assert result["load_ret"] is None
+        assert result["build_ret"] is None
+        assert result["export_ret"] is None
+        assert result["rknn_file_size"] is None
+        # No return codes → load_ret is None, which is != 0 → REJECTED_AT_LOAD
+        assert result["verdict"] == "REJECTED_AT_LOAD"
+
+    def test_log_file_written(self, tmp_path):
+        """The combined stdout+stderr is saved to {probe_name}.log."""
+        stdout_text = "stdout line\n"
+        stderr_text = "stderr line\nLOAD_RET=0\nBUILD_RET=0\nEXPORT_RET=0\n"
+        with patch("rknn_op_probe.subprocess.run") as mock_run:
+            mock_run.return_value = _FakeProc(stdout=stdout_text, stderr=stderr_text)
+            rknn_op_probe.probe_one("/fake/model.onnx", "my_probe")
+
+        log_file = tmp_path / "my_probe.log"
+        assert log_file.exists()
+        content = log_file.read_text()
+        assert "stdout line" in content
+        assert "stderr line" in content
+
+    def test_op_table_extracted_from_output(self, tmp_path):
+        """Op table from RKNN output is parsed and included in result."""
+        op_table = """Network Layer Information Table
+---
+ID  Op_Type        Dtype      Target
+---
+0   Conv           float16    NPU
+1   CumSum         float32    CPU
+2   Mul            float16    NPU
+---
+"""
+        stderr_text = f"{op_table}LOAD_RET=0\nBUILD_RET=0\nEXPORT_RET=0\n"
+        with patch("rknn_op_probe.subprocess.run") as mock_run:
+            mock_run.return_value = _FakeProc(stderr=stderr_text)
+            result = rknn_op_probe.probe_one("/fake/model.onnx", "conv_probe")
+
+        assert len(result["op_table"]) == 3
+        # CPU fallback detection
+        assert result["cpu_fallback_ops"] == ["CumSum:1"]
+        assert "Conv:0" in result["npu_ops"]
+        assert "Mul:2" in result["npu_ops"]
+
+    def test_all_npu_no_fallback(self, tmp_path):
+        """All NPU ops → empty cpu_fallback_ops list."""
+        op_table = """Network Layer Information Table
+---
+ID  Op_Type        Dtype      Target
+---
+0   Conv           float16    NPU
+---
+LOAD_RET=0
+BUILD_RET=0
+EXPORT_RET=0
+"""
+        with patch("rknn_op_probe.subprocess.run") as mock_run:
+            mock_run.return_value = _FakeProc(stderr=op_table)
+            result = rknn_op_probe.probe_one("/fake/model.onnx", "conv_probe")
+
+        assert result["cpu_fallback_ops"] == []
+
+    def test_evidence_extracted(self, tmp_path):
+        """Key evidence lines from output are captured."""
+        stderr_text = "LOAD_RET=0\nunsupported op Scan\nBUILD_RET=0\nEXPORT_RET=0\n"
+        with patch("rknn_op_probe.subprocess.run") as mock_run:
+            mock_run.return_value = _FakeProc(stderr=stderr_text)
+            result = rknn_op_probe.probe_one("/fake/model.onnx", "scan_probe")
+
+        assert any("unsupported op Scan" in e for e in result["evidence"])
+
+    def test_cpu_fallback_excludes_io_operators(self, tmp_path):
+        """InputOperator/OutputOperator on CPU should NOT count as fallback."""
+        op_table = """Network Layer Information Table
+---
+ID  Op_Type            Dtype      Target
+---
+0   InputOperator      float16    CPU
+1   Conv               float16    NPU
+2   OutputOperator     float16    CPU
+---
+LOAD_RET=0
+BUILD_RET=0
+EXPORT_RET=0
+"""
+        with patch("rknn_op_probe.subprocess.run") as mock_run:
+            mock_run.return_value = _FakeProc(stderr=op_table)
+            result = rknn_op_probe.probe_one("/fake/model.onnx", "conv_probe")
+
+        assert result["cpu_fallback_ops"] == []
+
+    def test_probe_name_in_result(self, tmp_path):
+        """The probe name is echoed in the result."""
+        with patch("rknn_op_probe.subprocess.run") as mock_run:
+            mock_run.return_value = _FakeProc(stderr="LOAD_RET=0\nBUILD_RET=0\nEXPORT_RET=0\n")
+            result = rknn_op_probe.probe_one("/fake/m.onnx", "special_probe")
+
+        assert result["probe"] == "special_probe"
+
+    def test_subprocess_called_with_python(self, tmp_path):
+        """probe_one invokes subprocess with sys.executable and -c."""
+        with patch("rknn_op_probe.subprocess.run") as mock_run:
+            mock_run.return_value = _FakeProc(stderr="LOAD_RET=0\nBUILD_RET=0\nEXPORT_RET=0\n")
+            rknn_op_probe.probe_one("/fake/m.onnx", "p1")
+
+        call_args = mock_run.call_args[0][0]
+        assert call_args[0] == sys.executable
+        assert call_args[1] == "-c"
+
+
+# ---------------------------------------------------------------------------
+# main() — CLI with mocked probe_one
+# ---------------------------------------------------------------------------
+
+
+class TestMainCLI:
+    def test_reads_manifest_and_calls_probe_one(self, tmp_path, monkeypatch):
+        """main() reads manifest.json and calls probe_one for each entry."""
+        probe_dir = tmp_path / "probes"
+        probe_dir.mkdir()
+        manifest = [
+            {
+                "probe": "conv_probe",
+                "file": "conv.onnx",
+                "ops": ["Conv"],
+                "description": "Conv test",
+            },
+            {
+                "probe": "scan_probe",
+                "file": "scan.onnx",
+                "ops": ["Scan"],
+                "description": "Scan test",
+            },
+        ]
+        manifest_path = probe_dir / "manifest.json"
+        manifest_path.write_text(json.dumps(manifest))
+
+        # Create fake ONNX files so os.path.exists returns True
+        (probe_dir / "conv.onnx").write_text("fake")
+        (probe_dir / "scan.onnx").write_text("fake")
+
+        monkeypatch.setattr(rknn_op_probe, "PROBE_DIR", probe_dir)
+        monkeypatch.setattr(rknn_op_probe, "MANIFEST", manifest_path)
+        monkeypatch.setattr(rknn_op_probe, "OUT_DIR", tmp_path / "audit")
+
+        def fake_probe_one(onnx_path, probe_name):
+            return {
+                "probe": probe_name,
+                "config_ret": 0,
+                "load_ret": 0,
+                "build_ret": 0,
+                "export_ret": 0,
+                "rknn_file_size": 1000,
+                "op_table": [],
+                "evidence": [],
+                "log": f"{probe_name}.log",
+                "verdict": "COMPILED",
+            }
+
+        with patch("rknn_op_probe.probe_one", side_effect=fake_probe_one):
+            rknn_op_probe.main()
+
+        results_file = tmp_path / "audit" / "rknn_audit_results.json"
+        assert results_file.exists()
+        results = json.loads(results_file.read_text())
+        assert len(results) == 2
+        assert all(r["verdict"] == "COMPILED" for r in results)
+
+    def test_missing_file_skipped(self, tmp_path, monkeypatch):
+        """A probe whose ONNX file is missing is skipped with a message."""
+        probe_dir = tmp_path / "probes"
+        probe_dir.mkdir()
+        manifest = [
+            {"probe": "ghost", "file": "ghost.onnx", "ops": ["Ghost"], "description": "no file"}
+        ]
+        (probe_dir / "manifest.json").write_text(json.dumps(manifest))
+
+        monkeypatch.setattr(rknn_op_probe, "PROBE_DIR", probe_dir)
+        monkeypatch.setattr(rknn_op_probe, "MANIFEST", probe_dir / "manifest.json")
+        monkeypatch.setattr(rknn_op_probe, "OUT_DIR", tmp_path / "audit")
+
+        with patch("rknn_op_probe.probe_one") as mock_probe:
+            rknn_op_probe.main()
+
+        mock_probe.assert_not_called()
+        # No results written (empty list)
+        results_file = tmp_path / "audit" / "rknn_audit_results.json"
+        assert results_file.exists()
+        results = json.loads(results_file.read_text())
+        assert len(results) == 0
+
+    def test_cpu_fallback_shown_in_summary(self, tmp_path, monkeypatch, capsys):
+        """Probes with CPU fallbacks get 'silent fallback' note."""
+        probe_dir = tmp_path / "probes"
+        probe_dir.mkdir()
+        manifest = [{"probe": "scan", "file": "scan.onnx", "ops": ["Scan"], "description": "test"}]
+        (probe_dir / "manifest.json").write_text(json.dumps(manifest))
+        (probe_dir / "scan.onnx").write_text("fake")
+
+        monkeypatch.setattr(rknn_op_probe, "PROBE_DIR", probe_dir)
+        monkeypatch.setattr(rknn_op_probe, "MANIFEST", probe_dir / "manifest.json")
+        monkeypatch.setattr(rknn_op_probe, "OUT_DIR", tmp_path / "audit")
+
+        def fake_probe_one(onnx_path, probe_name):
+            return {
+                "probe": probe_name,
+                "config_ret": 0,
+                "load_ret": 0,
+                "build_ret": 0,
+                "export_ret": 0,
+                "rknn_file_size": 1000,
+                "op_table": [],
+                "evidence": [],
+                "log": f"{probe_name}.log",
+                "verdict": "COMPILED",
+                "cpu_fallback_ops": ["CumSum:1"],
+                "npu_ops": ["Conv:0"],
+            }
+
+        with patch("rknn_op_probe.probe_one", side_effect=fake_probe_one):
+            rknn_op_probe.main()
+
+        captured = capsys.readouterr()
+        assert "silent fallback" in captured.out
+        assert "CumSum:1" in captured.out
+
+    def test_all_npu_note(self, tmp_path, monkeypatch, capsys):
+        """Probes compiled with no CPU fallbacks get 'all-NPU' note."""
+        probe_dir = tmp_path / "probes"
+        probe_dir.mkdir()
+        manifest = [{"probe": "conv", "file": "conv.onnx", "ops": ["Conv"], "description": "test"}]
+        (probe_dir / "manifest.json").write_text(json.dumps(manifest))
+        (probe_dir / "conv.onnx").write_text("fake")
+
+        monkeypatch.setattr(rknn_op_probe, "PROBE_DIR", probe_dir)
+        monkeypatch.setattr(rknn_op_probe, "MANIFEST", probe_dir / "manifest.json")
+        monkeypatch.setattr(rknn_op_probe, "OUT_DIR", tmp_path / "audit")
+
+        def fake_probe_one(onnx_path, probe_name):
+            return {
+                "probe": probe_name,
+                "config_ret": 0,
+                "load_ret": 0,
+                "build_ret": 0,
+                "export_ret": 0,
+                "rknn_file_size": 1000,
+                "op_table": [],
+                "evidence": [],
+                "log": f"{probe_name}.log",
+                "verdict": "COMPILED",
+            }
+
+        with patch("rknn_op_probe.probe_one", side_effect=fake_probe_one):
+            rknn_op_probe.main()
+
+        captured = capsys.readouterr()
+        assert "all-NPU" in captured.out
+
+    def test_results_include_onnx_ops_and_description(self, tmp_path, monkeypatch):
+        """Each result entry has onnx_ops and description from manifest."""
+        probe_dir = tmp_path / "probes"
+        probe_dir.mkdir()
+        manifest = [
+            {
+                "probe": "conv",
+                "file": "conv.onnx",
+                "ops": ["Conv", "Add"],
+                "description": "conv + add",
+            },
+        ]
+        (probe_dir / "manifest.json").write_text(json.dumps(manifest))
+        (probe_dir / "conv.onnx").write_text("fake")
+
+        monkeypatch.setattr(rknn_op_probe, "PROBE_DIR", probe_dir)
+        monkeypatch.setattr(rknn_op_probe, "MANIFEST", probe_dir / "manifest.json")
+        monkeypatch.setattr(rknn_op_probe, "OUT_DIR", tmp_path / "audit")
+
+        def fake_probe_one(onnx_path, probe_name):
+            return {
+                "probe": probe_name,
+                "verdict": "COMPILED",
+                "load_ret": 0,
+                "build_ret": 0,
+                "export_ret": 0,
+                "config_ret": 0,
+                "rknn_file_size": None,
+                "op_table": [],
+                "evidence": [],
+                "log": f"{probe_name}.log",
+            }
+
+        with patch("rknn_op_probe.probe_one", side_effect=fake_probe_one):
+            rknn_op_probe.main()
+
+        results = json.loads((tmp_path / "audit" / "rknn_audit_results.json").read_text())
+        assert results[0]["onnx_ops"] == ["Conv", "Add"]
+        assert results[0]["description"] == "conv + add"
