@@ -186,6 +186,7 @@ _SENTENCE_TEMPLATES = [
 # Filler text generation
 # ---------------------------------------------------------------------------
 
+
 def _generate_filler(rng: random.Random, num_words: int) -> str:
     """Generate deterministic English-like filler text of approximately num_words words."""
     words = []
@@ -213,8 +214,10 @@ def _estimate_tokens(text: str) -> int:
 # 1. Needle-in-haystack (NIAH)
 # ---------------------------------------------------------------------------
 
+
 class NIAHResult(NamedTuple):
     """A single needle-in-haystack prompt."""
+
     prompt: str
     needle: str
     expected_answer: str
@@ -283,8 +286,10 @@ def generate_niah(
 # 2. Multi-key (RULER-style)
 # ---------------------------------------------------------------------------
 
+
 class MultiKeyResult(NamedTuple):
     """A multi-key retrieval prompt."""
+
     prompt: str
     query_key: str
     expected_answer: str
@@ -350,10 +355,7 @@ def generate_multikey(
         kv_idx += 1
 
     context = " ".join(output_parts)
-    question = (
-        f"\n\nQuestion: What is the value assigned to {query_key}? "
-        f"Answer with only the value."
-    )
+    question = f"\n\nQuestion: What is the value assigned to {query_key}? Answer with only the value."
     prompt = context + question
     est_tokens = _estimate_tokens(prompt)
 
@@ -370,6 +372,7 @@ def generate_multikey(
 # ---------------------------------------------------------------------------
 # Corpus generation (CLI)
 # ---------------------------------------------------------------------------
+
 
 def generate_corpus(
     output_dir: Path | None = None,
@@ -463,6 +466,7 @@ def _sweep_label(tokens: int) -> str:
 # CLI
 # ---------------------------------------------------------------------------
 
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Generate long-context prompt corpus for GDN benchmark.",
@@ -470,12 +474,21 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--all", action="store_true", help="Generate all corpora")
     parser.add_argument("--niah", action="store_true", help="Generate NIAH prompts only")
     parser.add_argument("--multikey", action="store_true", help="Generate multi-key prompts only")
-    parser.add_argument("--depths", type=str, default=None,
-                        help="Comma-separated NIAH depths (default: 0,10,25,50,75,90,100)")
-    parser.add_argument("--keys", type=str, default=None,
-                        help="Comma-separated multi-key counts (default: 1,3,10,50)")
-    parser.add_argument("--output", type=str, default=None,
-                        help="Output directory (default: bench/prompts_data)")
+    parser.add_argument(
+        "--depths",
+        type=str,
+        default=None,
+        help="Comma-separated NIAH depths (default: 0,10,25,50,75,90,100)",
+    )
+    parser.add_argument(
+        "--keys",
+        type=str,
+        default=None,
+        help="Comma-separated multi-key counts (default: 1,3,10,50)",
+    )
+    parser.add_argument(
+        "--output", type=str, default=None, help="Output directory (default: bench/prompts_data)"
+    )
     args = parser.parse_args(argv)
 
     if not any([args.all, args.niah, args.multikey]):

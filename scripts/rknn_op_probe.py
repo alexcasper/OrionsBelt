@@ -103,11 +103,18 @@ def probe_one(rknn, onnx_path):
 
 def main():
     import argparse
+
     parser = argparse.ArgumentParser(description="RKNN NPU operator-coverage probe (ob-t3b.5)")
-    parser.add_argument("--probe-dir", default="artifacts/npu_op_probe",
-                        help="Directory containing the ONNX probe graphs")
-    parser.add_argument("--out", default="artifacts/npu_op_probe/audit_rknn",
-                        help="Output directory for logs and summary")
+    parser.add_argument(
+        "--probe-dir",
+        default="artifacts/npu_op_probe",
+        help="Directory containing the ONNX probe graphs",
+    )
+    parser.add_argument(
+        "--out",
+        default="artifacts/npu_op_probe/audit_rknn",
+        help="Output directory for logs and summary",
+    )
     args = parser.parse_args()
 
     probe_dir = Path(args.probe_dir)
@@ -132,8 +139,8 @@ def main():
     for onnx_path in onnx_files:
         stem = onnx_path.stem
         print(f"\n--- {stem} ---")
-        print(f"  Ops: {PROBE_DESCRIPTIONS.get(stem, ('?','?'))[0]}")
-        print(f"  Desc: {PROBE_DESCRIPTIONS.get(stem, ('?','?'))[1]}")
+        print(f"  Ops: {PROBE_DESCRIPTIONS.get(stem, ('?', '?'))[0]}")
+        print(f"  Desc: {PROBE_DESCRIPTIONS.get(stem, ('?', '?'))[1]}")
 
         # Each probe needs a fresh RKNN instance
         rknn = RKNN(verbose=False)
@@ -141,13 +148,14 @@ def main():
         # config() must be called before load_onnx()
         # No mean/std — these are not image models (varying channel dims)
         rknn.config(
-            target_platform='rk3588',
-            float_dtype='float16',
+            target_platform="rk3588",
+            float_dtype="float16",
             optimization_level=3,
         )
 
         # Capture stderr from the C library (RKNN prints to stderr)
         import io
+
         old_stderr = sys.stderr
         sys.stderr = captured = io.StringIO()
 
@@ -167,8 +175,12 @@ def main():
             # Extract relevant lines
             for line in result["stderr"].split("\n"):
                 line = line.strip()
-                if line and ("ERROR" in line.upper() or "UNSUPPORT" in line.upper()
-                             or "WARN" in line.upper() or "FAIL" in line.upper()):
+                if line and (
+                    "ERROR" in line.upper()
+                    or "UNSUPPORT" in line.upper()
+                    or "WARN" in line.upper()
+                    or "FAIL" in line.upper()
+                ):
                     print(f"  log: {line[:120]}")
 
         # Write per-probe log
