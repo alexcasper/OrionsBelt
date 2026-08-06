@@ -275,3 +275,362 @@ class TestTokenizeToLength:
         tok = _MockTokenizer(special_id=999, pad_ids=[888])
         result = tokenize_to_length(tok, 5)
         assert result == [999, 888, 888, 888, 888]
+
+
+# ---------------------------------------------------------------------------
+# write_csv — empty samples edge case
+# ---------------------------------------------------------------------------
+
+
+class TestWriteCsvEmptySamples:
+    def test_empty_samples_skipped(self, tmp_path):
+        """Entries with empty sample lists are skipped in CSV output."""
+        times = defaultdict(list)
+        times[(0, "prefill", 64)] = [10.0, 20.0]
+        times[(1, "prefill", 64)] = []  # empty → skipped
+        out = tmp_path / "profile.csv"
+        write_csv(times, set(), {0, 1}, str(out))
+        _, rows = _read_csv(out)
+        assert len(rows) == 1
+        assert rows[0]["layer_idx"] == "0"
+
+
+# ---------------------------------------------------------------------------
+# load_model() — mocked torch/transformers + fake config
+# ---------------------------------------------------------------------------
+
+
+class TestLoadModelMocked:
+    """Test load_model() with mocked torch/transformers and a fake config."""
+
+    def test_load_model_returns_tuple(self, monkeypatch, tmp_path):
+        """load_model returns (model, tokenizer, cfg, layer_types)."""
+        import json
+        from unittest.mock import MagicMock
+
+        import bench.profile_layers as pl
+
+        # Create fake weights directory
+        fake_weights = tmp_path / "weights"
+        fake_model_dir = fake_weights / "Qwen--Qwen3.5-0.8B"
+        fake_model_dir.mkdir(parents=True)
+        config = {
+            "num_hidden_layers": 4,
+            "layer_types": [
+                "linear_attention",
+                "full_attention",
+                "linear_attention",
+                "full_attention",
+            ],
+        }
+        (fake_model_dir / "config.json").write_text(json.dumps(config))
+
+        monkeypatch.setattr(pl, "WEIGHTS", fake_weights)
+
+        # Inject mock torch and transformers into sys.modules for inner imports
+        mock_torch = MagicMock()
+        mock_torch.float32 = "float32"
+        monkeypatch.setitem(sys.modules, "torch", mock_torch)
+
+        mock_tf = MagicMock()
+        mock_tokenizer = MagicMock()
+        mock_tokenizer.pad_token = None
+        mock_tokenizer.eos_token = "<eos>"
+        mock_tf.AutoTokenizer.from_pretrained.return_value = mock_tokenizer
+
+        mock_model = MagicMock()
+        mock_tf.AutoModelForCausalLM.from_pretrained.return_value = mock_model
+        monkeypatch.setitem(sys.modules, "transformers", mock_tf)
+
+        model, tokenizer, cfg, layer_types = pl.load_model("Qwen3.5-0.8B")
+
+        assert model is mock_model
+        assert tokenizer is mock_tokenizer
+        assert cfg["num_hidden_layers"] == 4
+        assert len(layer_types) == 4
+        # pad_token should be set to eos_token
+        assert tokenizer.pad_token == "<eos>"
+        mock_model.eval.assert_called_once()
+
+    def test_load_model_extracts_text_config(self, monkeypatch, tmp_path):
+        """load_model uses text_config if present in config.json."""
+        import json
+        from unittest.mock import MagicMock
+
+        import bench.profile_layers as pl
+
+        fake_weights = tmp_path / "weights"
+        fake_model_dir = fake_weights / "Qwen--Qwen3.5-0.8B"
+        fake_model_dir.mkdir(parents=True)
+        config = {
+            "text_config": {
+                "num_hidden_layers": 2,
+                "layer_types": ["linear_attention", "full_attention"],
+            },
+        }
+        (fake_model_dir / "config.json").write_text(json.dumps(config))
+
+        monkeypatch.setattr(pl, "WEIGHTS", fake_weights)
+        monkeypatch.setitem(sys.modules, "torch", MagicMock(float32="float32"))
+
+        mock_tf = MagicMock()
+        mock_tf.AutoTokenizer.from_pretrained.return_value = MagicMock(pad_token="x")
+        mock_tf.AutoModelForCausalLM.from_pretrained.return_value = MagicMock()
+        monkeypatch.setitem(sys.modules, "transformers", mock_tf)
+
+        _, _, cfg, layer_types = pl.load_model("Qwen3.5-0.8B")
+        assert cfg["num_hidden_layers"] == 2
+        assert layer_types == ["linear_attention", "full_attention"]
+
+
+# ---------------------------------------------------------------------------
+# run_profiling() — mocked model + torch
+# ---------------------------------------------------------------------------
+
+
+class TestRunProfilingMocked:
+    """Test run_profiling() with mocked model and torch."""
+
+    def test_run_profiling_returns_times_and_sets(self, monkeypatch):
+        """run_profiling returns (all_times, full_attn, linear) tuple."""
+        from unittest.mock import MagicMock
+
+        import bench.profile_layers as pl
+
+        # Mock torch
+        mock_torch = MagicMock()
+
+        class _NoGradCtx:
+            def __enter__(self):
+                return None
+
+            def __exit__(self, *a):
+                return False
+
+        mock_torch.no_grad.return_value = _NoGradCtx()
+        mock_torch.tensor.return_value = MagicMock()
+        monkeypatch.setitem(sys.modules, "torch", mock_torch)
+
+        # Mock model with layers
+        mock_model = MagicMock()
+        mock_layers = [MagicMock() for _ in range(4)]
+        mock_model.model.layers = mock_layers
+
+        for layer in mock_layers:
+            layer.register_forward_pre_hook.return_value = MagicMock()
+            layer.register_forward_hook.return_value = MagicMock()
+
+        mock_out = MagicMock()
+        mock_out.past_key_values = MagicMock()
+        mock_model.return_value = mock_out
+
+        tok = _MockTokenizer()
+        layer_types = [
+            "linear_attention",
+            "full_attention",
+            "linear_attention",
+            "full_attention",
+        ]
+
+        all_times, full_attn, linear = pl.run_profiling(
+            mock_model, tok, layer_types, contexts=[32], repeats=1, decode_tokens=2
+        )
+
+        assert isinstance(all_times, dict)
+        assert full_attn == {1, 3}
+        assert linear == {0, 2}
+        for layer in mock_layers:
+            layer.register_forward_pre_hook.assert_called_once()
+            layer.register_forward_hook.assert_called_once()
+
+    def test_run_profiling_handles_multiple_contexts(self, monkeypatch):
+        """run_profiling iterates over all context lengths."""
+        from unittest.mock import MagicMock
+
+        import bench.profile_layers as pl
+
+        mock_torch = MagicMock()
+
+        class _NoGradCtx:
+            def __enter__(self):
+                return None
+
+            def __exit__(self, *a):
+                return False
+
+        mock_torch.no_grad.return_value = _NoGradCtx()
+        mock_torch.tensor.return_value = MagicMock()
+        monkeypatch.setitem(sys.modules, "torch", mock_torch)
+
+        mock_model = MagicMock()
+        mock_model.model.layers = [MagicMock() for _ in range(2)]
+        mock_out = MagicMock()
+        mock_out.past_key_values = MagicMock()
+        mock_model.return_value = mock_out
+
+        tok = _MockTokenizer()
+        layer_types = ["linear_attention", "full_attention"]
+
+        all_times, full_attn, linear = pl.run_profiling(
+            mock_model, tok, layer_types, contexts=[32, 64, 128], repeats=1, decode_tokens=1
+        )
+
+        assert full_attn == {1}
+        assert linear == {0}
+
+
+# ---------------------------------------------------------------------------
+# main() — mocked internals
+# ---------------------------------------------------------------------------
+
+
+class TestMainMocked:
+    """Test main() with mocked load_model + run_profiling."""
+
+    def test_main_writes_csv(self, monkeypatch, tmp_path, capsys):
+        """main() calls load_model, run_profiling, write_csv."""
+        from collections import defaultdict
+        from unittest.mock import MagicMock
+
+        import bench.profile_layers as pl
+
+        mock_model = MagicMock()
+        mock_tokenizer = MagicMock()
+        mock_cfg = {"num_hidden_layers": 4}
+        mock_layer_types = ["linear_attention", "full_attention"] * 2
+        monkeypatch.setattr(
+            pl,
+            "load_model",
+            MagicMock(return_value=(mock_model, mock_tokenizer, mock_cfg, mock_layer_types)),
+        )
+
+        fake_times = defaultdict(list)
+        fake_times[(0, "prefill", 32)] = [10.0, 12.0]
+        monkeypatch.setattr(
+            pl,
+            "run_profiling",
+            MagicMock(return_value=(fake_times, {1, 3}, {0, 2})),
+        )
+
+        monkeypatch.setattr(pl, "write_csv", MagicMock())
+
+        output_file = str(tmp_path / "profile.csv")
+        monkeypatch.setattr(
+            sys,
+            "argv",
+            ["profile_layers.py", "--model", "Qwen3.5-0.8B", "--output", output_file],
+        )
+
+        pl.main()
+
+        pl.load_model.assert_called_once_with("Qwen3.5-0.8B")
+        pl.run_profiling.assert_called_once()
+        pl.write_csv.assert_called_once()
+
+    def test_main_default_output_path(self, monkeypatch, tmp_path):
+        """main() uses default output path when --output not given."""
+        from collections import defaultdict
+        from unittest.mock import MagicMock
+
+        import bench.profile_layers as pl
+
+        monkeypatch.setattr(
+            pl,
+            "load_model",
+            MagicMock(
+                return_value=(
+                    MagicMock(),
+                    MagicMock(),
+                    {"num_hidden_layers": 2},
+                    ["linear_attention"],
+                )
+            ),
+        )
+        fake_times = defaultdict(list)
+        monkeypatch.setattr(
+            pl,
+            "run_profiling",
+            MagicMock(return_value=(fake_times, set(), {0})),
+        )
+        monkeypatch.setattr(pl, "write_csv", MagicMock())
+        monkeypatch.setattr(pl, "REPO", tmp_path)
+        monkeypatch.setattr(sys, "argv", ["profile_layers.py"])
+
+        pl.main()
+
+        pl.write_csv.assert_called_once()
+        output_arg = pl.write_csv.call_args[0][3]
+        assert "rk3588-t4_layer_profile.csv" in str(output_arg)
+
+
+# ---------------------------------------------------------------------------
+# Hook callbacks — verify timing capture logic
+# ---------------------------------------------------------------------------
+
+
+class TestHookCallbacks:
+    """Verify that the forward hooks actually record timing when fired."""
+
+    def test_hooks_record_elapsed_time(self, monkeypatch):
+        """Manually firing captured hooks records elapsed time in all_times."""
+        from unittest.mock import MagicMock
+
+        import bench.profile_layers as pl
+
+        mock_torch = MagicMock()
+
+        class _NoGradCtx:
+            def __enter__(self):
+                return None
+
+            def __exit__(self, *a):
+                return False
+
+        mock_torch.no_grad.return_value = _NoGradCtx()
+        mock_torch.tensor.return_value = MagicMock()
+        monkeypatch.setitem(sys.modules, "torch", mock_torch)
+
+        mock_model = MagicMock()
+        mock_layer = MagicMock()
+        mock_model.model.layers = [mock_layer]
+
+        captured_pre: list = []
+        captured_post: list = []
+
+        def cap_pre(cb):
+            captured_pre.append(cb)
+            return MagicMock()
+
+        def cap_post(cb):
+            captured_post.append(cb)
+            return MagicMock()
+
+        mock_layer.register_forward_pre_hook.side_effect = cap_pre
+        mock_layer.register_forward_hook.side_effect = cap_post
+
+        mock_out = MagicMock()
+        mock_out.past_key_values = MagicMock()
+        mock_model.return_value = mock_out
+
+        tok = _MockTokenizer()
+        layer_types = ["linear_attention"]
+
+        all_times, _, _ = pl.run_profiling(
+            mock_model,
+            tok,
+            layer_types,
+            contexts=[32],
+            repeats=1,
+            decode_tokens=1,
+        )
+
+        assert len(captured_pre) == 1
+        assert len(captured_post) == 1
+
+        # Fire pre then post to simulate a forward pass
+        captured_pre[0](mock_layer, (MagicMock(),))
+        captured_post[0](mock_layer, (MagicMock(),), MagicMock())
+
+        # Timing should have been recorded (phase will be "decode" — last set value)
+        any_recorded = any(len(v) > 0 for v in all_times.values())
+        assert any_recorded
