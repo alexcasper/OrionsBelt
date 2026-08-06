@@ -12,14 +12,15 @@ and the challenge brief.
 
 | Track | Status | Evidence |
 |---|---|---|
-| Physical AI | ☐ Candidate | O6 board not yet acquired (ob-axq) |
-| Edge AI | ☐ Candidate | Hedge track ready, Jetson data collected (ob-8ms.3) |
+| Physical AI | ☐ Not pursued | O6 board not yet acquired (ob-axq); last-useful-arrival date passed |
+| Edge AI | ✓ **Selected** | [ADR 0007](./adr/0007-commit-to-edge-ai-track.md) — committed 2026-08-06 |
 | Cloud AI | ☐ N/A | Not targeted |
 
-**Decision due:** 2026-08-09 (ob-imb, hard go/no-go). Both tracks remain open
-pending hardware availability.
+**Decision:** Edge AI track selected ([ADR 0007](./adr/0007-commit-to-edge-ai-track.md)).
+The Orion O6 board did not arrive by its last-useful-arrival date, so all work
+continues on the portable aarch64 device fleet.
 
-**⚠ Action needed:** Track must be selected on the Devpost submission form before
+**⚠ Action needed:** Select "Edge AI" on the Devpost submission form before
 the deadline.
 
 ## 2. Public repository
@@ -113,19 +114,18 @@ requested by the challenge brief. Add as opportunistic if hardware arrives.
 
 | # | Item | Status |
 |---|---|---|
-| 1 | Track selection | ⚠ Deferred to go/no-go (Aug 9) |
+| 1 | Track selection | ✓ Edge AI selected ([ADR 0007](./adr/0007-commit-to-edge-ai-track.md)) |
 | 2 | Public repo | ⚠ **Maintainer action required** |
 | 3 | License visible in About | ⚠ **Maintainer action required** (set description) |
 | 4 | Write-up sections | ⚠ 2 of 3 complete, 1 partial |
 | 5 | Demo video | ✓ Optional — skipping |
 | 6 | Arm Performix | ⚠ Blocked on hardware |
-| 7 | Third-party NOTICE | ⚠ Create NOTICE file |
+| 7 | Third-party NOTICE | ✓ Complete — `NOTICE` in repo root |
 | 8 | Weight compliance | ✓ Complete |
 
 **Items requiring maintainer action before submission:**
 1. Make repo public
 2. Set repo description and topics (About section)
-3. Select Devpost track
+3. Select "Edge AI" on the Devpost submission form
 4. Complete README "Reproducing" section
-5. Create NOTICE file
-6. Generate Arm Performix report (if hardware available)
+5. Generate Arm Performix report (if hardware available)
