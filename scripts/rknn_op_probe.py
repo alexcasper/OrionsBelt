@@ -22,13 +22,13 @@ import traceback
 from pathlib import Path
 
 PROBE_DESCRIPTIONS = {
-    "01_causal_conv1d":      ("Conv",             "GDN depthwise causal Conv1D (asymmetric pads)"),
-    "02_decay_cumprod":      ("Log,CumSum,Exp",   "Gated decay via exp(cumsum(log(a)))"),
-    "03_delta_rule_update":  ("MatMul,Sub,Add",   "Delta-rule state update S←(I−kkᵀ)S+kvᵀ"),
-    "04_gate_chain":         ("Sigmoid,Softplus", "Elementwise gate chain"),
-    "05_scan_recurrence":    ("Scan",             "Chunk-to-chunk recurrence via ONNX Scan"),
-    "06_loop_recurrence":    ("Loop (const)",     "Recurrence via Loop, compile-time trip count"),
-    "07_loop_dynamic_trip":  ("Loop (runtime)",   "Recurrence via Loop, runtime trip count"),
+    "01_causal_conv1d": ("Conv", "GDN depthwise causal Conv1D (asymmetric pads)"),
+    "02_decay_cumprod": ("Log,CumSum,Exp", "Gated decay via exp(cumsum(log(a)))"),
+    "03_delta_rule_update": ("MatMul,Sub,Add", "Delta-rule state update S←(I−kkᵀ)S+kvᵀ"),
+    "04_gate_chain": ("Sigmoid,Softplus", "Elementwise gate chain"),
+    "05_scan_recurrence": ("Scan", "Chunk-to-chunk recurrence via ONNX Scan"),
+    "06_loop_recurrence": ("Loop (const)", "Recurrence via Loop, compile-time trip count"),
+    "07_loop_dynamic_trip": ("Loop (runtime)", "Recurrence via Loop, runtime trip count"),
 }
 
 

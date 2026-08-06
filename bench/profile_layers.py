@@ -11,6 +11,7 @@ Usage:
   ORIONS_FORCE_FP32=1 /tmp/model_venv/bin/python3 bench/profile_layers.py \
     --model Qwen3.5-0.8B --contexts 32,64,128 --repeats 3 --decode-tokens 3
 """
+
 import argparse
 import csv
 import os
@@ -78,9 +79,11 @@ def run_profiling(model, tokenizer, layer_types, contexts, repeats, decode_token
     handles = []
 
     for idx, layer in enumerate(layers):
+
         def make_pre(i):
             def pre(module, inp):
                 start_times[i] = time.perf_counter()
+
             return pre
 
         def make_post(i):
@@ -88,6 +91,7 @@ def run_profiling(model, tokenizer, layer_types, contexts, repeats, decode_token
                 if i in start_times:
                     elapsed = (time.perf_counter() - start_times[i]) * 1e6
                     all_times[(i, current["phase"], current["ctx"])].append(elapsed)
+
             return post
 
         handles.append(layer.register_forward_pre_hook(make_pre(idx)))
@@ -133,37 +137,58 @@ def write_csv(all_times, full_attn, linear, output_path):
         p95 = max(samples) if len(samples) < 20 else sorted(samples)[int(len(samples) * 0.95)]
         mean = statistics.mean(samples)
         ltype = "full_attention" if idx in full_attn else "linear_attention"
-        rows.append({
-            "phase": phase, "ctx_len": ctx, "layer_idx": idx,
-            "layer_type": ltype,
-            "p50_us": f"{p50:.1f}", "p95_us": f"{p95:.1f}",
-            "mean_us": f"{mean:.1f}", "n_samples": len(samples),
-        })
+        rows.append(
+            {
+                "phase": phase,
+                "ctx_len": ctx,
+                "layer_idx": idx,
+                "layer_type": ltype,
+                "p50_us": f"{p50:.1f}",
+                "p95_us": f"{p95:.1f}",
+                "mean_us": f"{mean:.1f}",
+                "n_samples": len(samples),
+            }
+        )
 
     with open(output_path, "w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=[
-            "phase", "ctx_len", "layer_idx", "layer_type",
-            "p50_us", "p95_us", "mean_us", "n_samples",
-        ])
+        writer = csv.DictWriter(
+            f,
+            fieldnames=[
+                "phase",
+                "ctx_len",
+                "layer_idx",
+                "layer_type",
+                "p50_us",
+                "p95_us",
+                "mean_us",
+                "n_samples",
+            ],
+        )
         writer.writeheader()
         writer.writerows(rows)
     print(f"\nWrote {len(rows)} rows to {output_path}")
 
     # Summary by layer type and phase
     print("\n=== Summary (p50 µs, aggregated by layer type) ===")
-    print(f"{'Phase':10s} {'Ctx':>5s} {'Layer Type':18s} "
-          f"{'p50 (total)':>12s} {'p50 (avg/layer)':>15s} {'Layers':>7s}")
+    print(
+        f"{'Phase':10s} {'Ctx':>5s} {'Layer Type':18s} "
+        f"{'p50 (total)':>12s} {'p50 (avg/layer)':>15s} {'Layers':>7s}"
+    )
     print("-" * 75)
     for phase in ["prefill", "decode"]:
         for ctx in sorted({k[2] for k in all_times}):
             for name, lset in [("full_attention", full_attn), ("linear_attention", linear)]:
-                totals = [statistics.median(all_times[(i, phase, ctx)])
-                          for i in sorted(lset)
-                          if (i, phase, ctx) in all_times and all_times[(i, phase, ctx)]]
+                totals = [
+                    statistics.median(all_times[(i, phase, ctx)])
+                    for i in sorted(lset)
+                    if (i, phase, ctx) in all_times and all_times[(i, phase, ctx)]
+                ]
                 if totals:
                     total = sum(totals)
-                    print(f"{phase:10s} {ctx:5d} {name:18s} "
-                          f"{total:12.1f} {total / len(totals):15.1f} {len(totals):7d}")
+                    print(
+                        f"{phase:10s} {ctx:5d} {name:18s} "
+                        f"{total:12.1f} {total / len(totals):15.1f} {len(totals):7d}"
+                    )
 
 
 def main():
@@ -179,15 +204,22 @@ def main():
 
     print(f"Loading {args.model}...", flush=True)
     model, tokenizer, cfg, layer_types = load_model(args.model)
-    print(f"  {cfg['num_hidden_layers']} layers, "
-          f"{sum(1 for t in layer_types if t == 'full_attention')} full-attn, "
-          f"{sum(1 for t in layer_types if t == 'linear_attention')} linear-attn", flush=True)
+    print(
+        f"  {cfg['num_hidden_layers']} layers, "
+        f"{sum(1 for t in layer_types if t == 'full_attention')} full-attn, "
+        f"{sum(1 for t in layer_types if t == 'linear_attention')} linear-attn",
+        flush=True,
+    )
 
-    print(f"\nProfiling: contexts={contexts}, repeats={args.repeats}, "
-          f"decode_tokens={args.decode_tokens}", flush=True)
+    print(
+        f"\nProfiling: contexts={contexts}, repeats={args.repeats}, "
+        f"decode_tokens={args.decode_tokens}",
+        flush=True,
+    )
 
     all_times, full_attn, linear = run_profiling(
-        model, tokenizer, layer_types, contexts, args.repeats, args.decode_tokens)
+        model, tokenizer, layer_types, contexts, args.repeats, args.decode_tokens
+    )
 
     if args.output is None:
         args.output = str(REPO / "results" / "raw" / "rk3588-t4_layer_profile.csv")
