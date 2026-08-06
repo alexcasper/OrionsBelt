@@ -1,0 +1,10 @@
+{
+  "type": "needle_in_haystack",
+  "target_tokens": 131072,
+  "actual_tokens_approx": 131072,
+  "needle": "The calibration constant was set to 0.0042 during the experiment.",
+  "question": "What value was the calibration constant set to?",
+  "expected_answer": "0.0042",
+  "needle_depth_fraction": 0.4993780667414513,
+  "seed": 20260802
+}

@@ -31,6 +31,13 @@ No custom Qwen license, no field-of-use restriction, no scale-gated clause
 register (checkpoint license restricting redistribution) — **not a risk for any
 candidate in this range.**
 
+**Re-verify directly.** The two checkpoints this project actually uses serve their
+license files at stable raw URLs, so a reviewer can confirm the above without
+trusting this document:
+
+- <https://huggingface.co/Qwen/Qwen3.5-4B/raw/main/LICENSE>
+- <https://huggingface.co/Qwen/Qwen3.5-0.8B/raw/main/LICENSE>
+
 ## 3. Redistribution terms
 
 Under Apache-2.0:

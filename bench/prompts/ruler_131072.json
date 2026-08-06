@@ -1,0 +1,21 @@
+{
+  "type": "ruler_multi_key",
+  "target_tokens": 131072,
+  "actual_tokens_approx": 130771,
+  "num_keys": 20,
+  "queried_keys": [
+    "NPR-4643",
+    "PAJ-7442",
+    "UCR-6328",
+    "ESC-3715",
+    "ZFM-6154"
+  ],
+  "expected_answers": {
+    "NPR-4643": "UWV-6957",
+    "PAJ-7442": "QYR-7384",
+    "UCR-6328": "TVR-0110",
+    "ESC-3715": "SZX-8048",
+    "ZFM-6154": "QSR-4821"
+  },
+  "seed": 20260802
+}

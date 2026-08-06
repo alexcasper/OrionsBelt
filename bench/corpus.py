@@ -39,10 +39,7 @@ import hashlib
 import json
 import os
 import random
-import sys
 from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Dict, List, Optional, Tuple
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -86,7 +83,6 @@ FILLER_PASSAGES = [
     "deliberations, when seeking to determine the conditions obtaining in the "
     "field. These are: the moral law, heaven, earth, the commander, and method "
     "and discipline.",
-
     # From "Pride and Prejudice" by Jane Austen (public domain)
     "It is a truth universally acknowledged, that a single man in possession of "
     "a good fortune, must be in want of a wife. However little known the "
@@ -94,7 +90,6 @@ FILLER_PASSAGES = [
     "neighbourhood, this truth is so well fixed in the minds of the "
     "surrounding families, that he is considered as the rightful property of "
     "someone or other of their daughters.",
-
     # From "The Adventures of Sherlock Holmes" by Arthur Conan Doyle (PD)
     "Being a private detective, Sherlock Holmes had extraordinary powers of "
     "observation and deduction. He could tell a man's occupation from the "
@@ -103,7 +98,6 @@ FILLER_PASSAGES = [
     "his conclusions were rarely wrong. He believed that when you have "
     "eliminated the impossible, whatever remains, however improbable, must be "
     "the truth.",
-
     # From "Moby Dick" by Herman Melville (public domain)
     "Call me Ishmael. Some years ago, never mind how long precisely, having "
     "little or no money in my purse, and nothing particular to interest me on "
@@ -112,7 +106,6 @@ FILLER_PASSAGES = [
     "the circulation. Whenever I find myself growing grim about the mouth, "
     "whenever it is a damp, drizzly November in my soul, I account it high "
     "time to get to sea as soon as I can.",
-
     # From "A Tale of Two Cities" by Charles Dickens (public domain)
     "It was the best of times, it was the worst of times, it was the age of "
     "wisdom, it was the age of foolishness, it was the epoch of belief, it was "
@@ -120,14 +113,12 @@ FILLER_PASSAGES = [
     "of Darkness, it was the spring of hope, it was the winter of despair, we "
     "had everything before us, we had nothing before us, we were all going "
     "direct to Heaven, we were all going direct the other way.",
-
     # From "The Time Machine" by H.G. Wells (public domain)
     "The Time Traveller, for so it will be convenient to speak of him, was "
     "expounding a recondite matter to us. His grey eyes shone and twinkled, and "
     "his usually pale face was flushed and animated. The fire burned brightly, "
     "and the soft radiance of the incandescent lights in the lilies of silver "
     "caught the bubbles that flashed and passed in our glasses.",
-
     # From "The Decline and Fall of the Roman Empire" by Edward Gibbon (PD)
     "In the second century of the Christian era, the Empire of Rome "
     "comprehended the fairest part of the earth, and the most civilised "
@@ -135,21 +126,18 @@ FILLER_PASSAGES = [
     "guarded by ancient renown and disciplined valour. The gentle but "
     "powerful influence of laws and manners had gradually cemented the union "
     "of the provinces.",
-
     # From "Walden" by Henry David Thoreau (public domain)
     "I went to the woods because I wished to live deliberately, to front only "
     "the essential facts of life, and see if I could not learn what it had to "
     "teach, and not, when I came to die, discover that I had not lived. I did "
     "not wish to live what was not life, living is so dear, nor did I wish to "
     "practise resignation, unless it was quite necessary.",
-
     # From "The Federalist Papers" No. 10 by James Madison (public domain)
     "A faction is a number of citizens, whether amounting to a majority or a "
     "minority of the whole, who are united and actuated by some common impulse "
     "of passion, or of interest, adversed to the rights of other citizens, or "
     "to the permanent and aggregate interests of the community. The latent "
     "causes of faction are thus sown in the nature of man.",
-
     # From "On the Origin of Species" by Charles Darwin (public domain)
     "It is interesting to contemplate an entangled bank, clothed with many "
     "plants of many kinds, with birds singing on the bushes, with various "
@@ -174,7 +162,7 @@ class PromptItem:
     expected_answer: str  # ground-truth answer
     needle_depth: float  # position fraction (0.0 = start, 1.0 = end)
     seed: int  # deterministic generation seed
-    metadata: Dict = field(default_factory=dict)
+    metadata: dict = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         return {
@@ -206,7 +194,7 @@ def generate_haystack(
     coherent prose that cannot be distinguished from the needle by structure
     alone.
     """
-    chunks: List[str] = []
+    chunks: list[str] = []
     current_len = 0
     passage_idx = rng.randint(0, len(FILLER_PASSAGES) - 1)
 
@@ -236,21 +224,31 @@ def generate_haystack(
 # Needle templates — the "magic number" pattern from the NIAH literature,
 # varied so the model cannot memorise a single answer.
 NIAH_TEMPLATES = [
-    ("The magic number stored in the registry is {number}.",
-     "What is the magic number stored in the registry?",
-     "{number}"),
-    ("The password for the north gate has been set to {number}.",
-     "What is the password for the north gate?",
-     "{number}"),
-    ("According to the log entry, the calibration code is {number}.",
-     "What is the calibration code mentioned in the log?",
-     "{number}"),
-    ("The treasure chest identifier is {number}.",
-     "What is the treasure chest identifier?",
-     "{number}"),
-    ("Dr. Watson noted that the patient ID is {number}.",
-     "What is the patient ID that Dr. Watson noted?",
-     "{number}"),
+    (
+        "The magic number stored in the registry is {number}.",
+        "What is the magic number stored in the registry?",
+        "{number}",
+    ),
+    (
+        "The password for the north gate has been set to {number}.",
+        "What is the password for the north gate?",
+        "{number}",
+    ),
+    (
+        "According to the log entry, the calibration code is {number}.",
+        "What is the calibration code mentioned in the log?",
+        "{number}",
+    ),
+    (
+        "The treasure chest identifier is {number}.",
+        "What is the treasure chest identifier?",
+        "{number}",
+    ),
+    (
+        "Dr. Watson noted that the patient ID is {number}.",
+        "What is the patient ID that Dr. Watson noted?",
+        "{number}",
+    ),
 ]
 
 
@@ -328,25 +326,72 @@ def generate_niah_single(
 # are random strings that the model must recall exactly.
 
 MULTIKEY_KEY_PREFIXES = [
-    "config_alpha", "config_beta", "config_gamma", "config_delta",
-    "config_epsilon", "config_zeta", "config_eta", "config_theta",
-    "config_iota", "config_kappa", "config_lambda", "config_mu",
-    "config_nu", "config_xi", "config_omicron", "config_pi",
-    "config_rho", "config_sigma", "config_tau", "config_upsilon",
+    "config_alpha",
+    "config_beta",
+    "config_gamma",
+    "config_delta",
+    "config_epsilon",
+    "config_zeta",
+    "config_eta",
+    "config_theta",
+    "config_iota",
+    "config_kappa",
+    "config_lambda",
+    "config_mu",
+    "config_nu",
+    "config_xi",
+    "config_omicron",
+    "config_pi",
+    "config_rho",
+    "config_sigma",
+    "config_tau",
+    "config_upsilon",
 ]
 
 MULTIKEY_VALUE_ADJECTIVES = [
-    "crimson", "azure", "emerald", "golden", "silver", "violet",
-    "amber", "coral", "ivory", "jade", "lavender", "magenta",
-    "navy", "obsidian", "pearl", "quartz", "ruby", "sapphire",
-    "teal", "umber",
+    "crimson",
+    "azure",
+    "emerald",
+    "golden",
+    "silver",
+    "violet",
+    "amber",
+    "coral",
+    "ivory",
+    "jade",
+    "lavender",
+    "magenta",
+    "navy",
+    "obsidian",
+    "pearl",
+    "quartz",
+    "ruby",
+    "sapphire",
+    "teal",
+    "umber",
 ]
 
 MULTIKEY_VALUE_NOUNS = [
-    "falcon", "compass", "beacon", "cylinder", "horizon", "marble",
-    "obelisk", "pendulum", "quiver", "rampart", "scepter", "tundra",
-    "vellum", "whirlpool", "zephyr", "anchor", "bridge", "cavern",
-    "delta", "engine",
+    "falcon",
+    "compass",
+    "beacon",
+    "cylinder",
+    "horizon",
+    "marble",
+    "obelisk",
+    "pendulum",
+    "quiver",
+    "rampart",
+    "scepter",
+    "tundra",
+    "vellum",
+    "whirlpool",
+    "zephyr",
+    "anchor",
+    "bridge",
+    "cavern",
+    "delta",
+    "engine",
 ]
 
 
@@ -360,7 +405,7 @@ def _generate_value(rng: random.Random) -> str:
 
 def generate_niah_multikey(
     context_length: int,
-    num_keys: Optional[int] = None,
+    num_keys: int | None = None,
     seed: int = 0,
     chars_per_token: float = DEFAULT_CHARS_PER_TOKEN,
 ) -> PromptItem:
@@ -384,7 +429,7 @@ def generate_niah_multikey(
         num_keys = MULTIKEY_COUNTS.get(context_length, 50)
 
     # Generate unique keys and values
-    pairs: List[Tuple[str, str]] = []
+    pairs: list[tuple[str, str]] = []
     used_keys: set = set()
     used_values: set = set()
 
@@ -421,10 +466,10 @@ def generate_niah_multikey(
 
     # Interleave KV statements into the haystack at roughly equal intervals
     segment_size = len(haystack) // (num_keys + 1)
-    parts: List[str] = []
+    parts: list[str] = []
     cursor = 0
 
-    for i, stmt in enumerate(kv_statements):
+    for stmt in kv_statements:
         insert_pos = cursor + segment_size
         if insert_pos > len(haystack):
             insert_pos = len(haystack)
@@ -468,31 +513,26 @@ def generate_niah_multikey(
 # Batch generation
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class CorpusConfig:
     """Configuration for batch corpus generation."""
 
-    context_lengths: List[int] = field(
-        default_factory=lambda: list(CANONICAL_LENGTHS)
-    )
-    tasks: List[str] = field(
-        default_factory=lambda: ["niah_single", "niah_multikey"]
-    )
-    niah_depths: List[float] = field(
-        default_factory=lambda: list(NIAH_DEPTHS)
-    )
+    context_lengths: list[int] = field(default_factory=lambda: list(CANONICAL_LENGTHS))
+    tasks: list[str] = field(default_factory=lambda: ["niah_single", "niah_multikey"])
+    niah_depths: list[float] = field(default_factory=lambda: list(NIAH_DEPTHS))
     master_seed: int = MASTER_SEED
 
 
 def generate_corpus(
     config: CorpusConfig,
-) -> List[PromptItem]:
+) -> list[PromptItem]:
     """Generate a full evaluation corpus from a config.
 
     For NIAH single: one prompt per (context_length, depth) combination.
     For multi-key: one prompt per context_length (depth is randomised internally).
     """
-    items: List[PromptItem] = []
+    items: list[PromptItem] = []
 
     for ctx_len in config.context_lengths:
         for task in config.tasks:
@@ -500,14 +540,10 @@ def generate_corpus(
                 for depth in config.niah_depths:
                     # Deterministic per-depth seed
                     seed = _depth_seed(config.master_seed, ctx_len, depth)
-                    items.append(
-                        generate_niah_single(ctx_len, depth, seed)
-                    )
+                    items.append(generate_niah_single(ctx_len, depth, seed))
             elif task == "niah_multikey":
                 seed = _task_seed(config.master_seed, ctx_len, "multikey")
-                items.append(
-                    generate_niah_multikey(ctx_len, seed=seed)
-                )
+                items.append(generate_niah_multikey(ctx_len, seed=seed))
 
     return items
 
@@ -531,18 +567,20 @@ def _task_seed(master: int, ctx_len: int, task_tag: str) -> int:
 # ---------------------------------------------------------------------------
 
 
-def save_corpus(items: List[PromptItem], output_dir: str) -> List[str]:
+def save_corpus(items: list[PromptItem], output_dir: str) -> list[str]:
     """Save each PromptItem as a JSON file under ``output_dir``.
 
     Returns the list of written file paths.
     """
     os.makedirs(output_dir, exist_ok=True)
-    paths: List[str] = []
+    paths: list[str] = []
 
     for item in items:
         # Filename: <task>_<ctx>_<depth_or_keys>.json
         if item.task_type == "niah_single":
-            fname = f"{item.task_type}_{item.context_length}_d{int(item.needle_depth * 100):03d}.json"
+            fname = (
+                f"{item.task_type}_{item.context_length}_d{int(item.needle_depth * 100):03d}.json"
+            )
         else:
             nkeys = item.metadata.get("num_keys", 0)
             fname = f"{item.task_type}_{item.context_length}_k{nkeys:04d}.json"
@@ -555,10 +593,10 @@ def save_corpus(items: List[PromptItem], output_dir: str) -> List[str]:
     return paths
 
 
-def save_manifest(items: List[PromptItem], output_dir: str) -> str:
+def save_manifest(items: list[PromptItem], output_dir: str) -> str:
     """Save a manifest summarising all generated prompts."""
     manifest_path = os.path.join(output_dir, "manifest.json")
-    summary: Dict = {
+    summary: dict = {
         "master_seed": MASTER_SEED,
         "total_prompts": len(items),
         "by_task": {},
@@ -581,7 +619,7 @@ def save_manifest(items: List[PromptItem], output_dir: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Generate long-context evaluation prompts (NIAH + multi-key)."
     )
@@ -630,7 +668,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             print(items[0].prompt)
         return 0
 
-    paths = save_corpus(items, args.output_dir)
+    save_corpus(items, args.output_dir)
     manifest = save_manifest(items, args.output_dir)
 
     print(f"Generated {len(items)} prompts in {args.output_dir}/")

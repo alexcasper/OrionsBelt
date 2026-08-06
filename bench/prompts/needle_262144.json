@@ -1,0 +1,10 @@
+{
+  "type": "needle_in_haystack",
+  "target_tokens": 262144,
+  "actual_tokens_approx": 262144,
+  "needle": "The designated meeting room is Cambridge-3B on the fourth floor.",
+  "question": "Which meeting room was designated?",
+  "expected_answer": "Cambridge-3B",
+  "needle_depth_fraction": 0.4997567893910579,
+  "seed": 20260802
+}

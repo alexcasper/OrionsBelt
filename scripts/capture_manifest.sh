@@ -204,6 +204,25 @@ fi
 
 # --- output JSON ---
 
+# --- parallelism -----------------------------------------------------------
+# Thread count became a 4x experimental variable when the kernels gained OpenMP:
+# a 1-thread and a 4-core run of the SAME commit on the SAME device differ 3-4x,
+# and nothing recorded which one a CSV came from. jetson-j1_clean.csv is exactly
+# that trap -- captured to answer ob-bf7, it reads 2.9-4.1x its predecessor
+# because it is a 4-core run, not because the tree was clean.
+if [ -n "${OMP_NUM_THREADS:-}" ]; then
+  OMP_THREADS_JSON="\"$OMP_NUM_THREADS\""
+  EFFECTIVE_THREADS="$OMP_NUM_THREADS"
+  THREADS_SOURCE="OMP_NUM_THREADS"
+else
+  OMP_THREADS_JSON="null"
+  # libgomp defaults to one thread per available CPU when the var is unset.
+  EFFECTIVE_THREADS="$CORE_COUNT"
+  THREADS_SOURCE="core_count_default"
+fi
+[ -n "${OMP_PROC_BIND:-}" ] && OMP_BIND_JSON="\"$OMP_PROC_BIND\"" || OMP_BIND_JSON="null"
+[ -n "${OMP_PLACES:-}" ] && OMP_PLACES_JSON="\"$OMP_PLACES\"" || OMP_PLACES_JSON="null"
+
 cat <<JSONEOF
 {
   "manifest_version": 1,
@@ -224,6 +243,13 @@ cat <<JSONEOF
     "cpu_topology": $TOPOLOGY_JSON
   },
   "isa_features": $ISA_JSON,
+  "parallelism": {
+    "omp_num_threads": $OMP_THREADS_JSON,
+    "omp_proc_bind": $OMP_BIND_JSON,
+    "omp_places": $OMP_PLACES_JSON,
+    "effective_threads": $EFFECTIVE_THREADS,
+    "threads_source": "$THREADS_SOURCE"
+  },
   "thermal_zones": $THERMAL_JSON,
   "memory": {
     "mem_total_kb": $MEM_TOTAL,

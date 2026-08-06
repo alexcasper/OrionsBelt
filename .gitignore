@@ -15,8 +15,11 @@ dist/
 
 # Downloaded model weights — never committed (license compliance, repo size)
 weights/
-*.rknn
 
-# Agent task files — contain device credentials, must not be committed
-.goose-task.md
+# Agent session artifacts — orchestration scratch, not project source.
+# NOTE: .goose-task.md has historically carried a device sudo password; keep it
+# untracked so credentials never re-enter git.
 .goose-loop.log
+.goose-session-created
+.goose-task.md
+.gitignore.repo

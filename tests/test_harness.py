@@ -1,415 +1,433 @@
-"""Unit tests for bench/harness.py — the benchmark runner CLI (ob-ljh).
+"""Tests for the benchmark harness (ob-ljh).
 
-Tests validate:
-  - Schema conformance of every CSV produced
-  - Timing boundary correctness (prefill/decode/TTFT per METRICS.md)
-  - Percentile computation (nearest-rank)
-  - Per-context-point CSV independence
-  - Memory breakdown three-component attribution
-  - CLI argument parsing and sweep orchestration
-
-Uses the MockBackend so tests run without any model or hardware.
+Exercises the timing protocol (METRICS.md sections 1-5), schema conformance
+(RESULTS_SCHEMA.md), statistical protocol (section 7), and CLI. Uses only the
+SyntheticBackend so these run anywhere without model weights.
 """
 
-import os
+from __future__ import annotations
+
+import math
 import sys
-import time
+from pathlib import Path
 
 import pytest
 
-# Make bench/ importable
-_BENCH = os.path.join(os.path.dirname(__file__), "..", "bench")
-_BENCH = os.path.abspath(_BENCH)
-if _BENCH not in sys.path:
-    sys.path.insert(0, _BENCH)
+# Ensure repo root is importable when pytest hasn't already done so.
+_ROOT = str(Path(__file__).resolve().parent.parent)
+if _ROOT not in sys.path:
+    sys.path.insert(0, _ROOT)
 
-import harness  # noqa: E402
-import schema  # noqa: E402
+from bench.harness import (  # noqa: E402
+    QWEN35_4B,
+    RepeatTimings,
+    SweepConfig,
+    SyntheticBackend,
+    _rows_from_timing,
+    compute_summaries,
+    generate_prompt,
+    load_config_from_dict,
+    main,
+    run_one_repeat,
+    run_sweep,
+)
+from bench.metrics import percentile, summarize  # noqa: E402
+from bench.schema import read_csv, validate_rows  # noqa: E402
 
 # ---------------------------------------------------------------------------
-# Percentile helpers
+# metrics.py
 # ---------------------------------------------------------------------------
 
 
 class TestPercentile:
+    def test_p50_odd(self):
+        assert percentile([3, 1, 2], 50) == 2
+
+    def test_p50_even(self):
+        # nearest-rank: ceil(50/100 * 4) = rank 2, value = sorted[1]
+        assert percentile([4, 1, 3, 2], 50) == 2
+
+    def test_p95(self):
+        # 10 values, p95: ceil(95/100 * 10) = ceil(9.5) = rank 10
+        vals = list(range(1, 11))
+        assert percentile(vals, 95) == 10
+
+    def test_p95_clamped(self):
+        # With 3 values, rank = ceil(2.85) = 3, clamped to 3
+        assert percentile([1, 2, 3], 95) == 3
+
+    def test_empty_raises(self):
+        with pytest.raises(ValueError, match="empty"):
+            percentile([], 50)
+
+    def test_out_of_range_raises(self):
+        with pytest.raises(ValueError):
+            percentile([1, 2, 3], 101)
+
     def test_single_value(self):
-        assert harness.percentile([42.0], 50) == 42.0
-        assert harness.percentile([42.0], 95) == 42.0
+        assert percentile([42], 50) == 42
+        assert percentile([42], 95) == 42
 
-    def test_two_values(self):
-        data = [1.0, 2.0]
-        # p50 → rank=ceil(0.5*2)=1 → sorted[0]=1.0
-        assert harness.percentile(data, 50) == 1.0
 
-    def test_ten_values_p50(self):
-        data = list(range(1, 11))  # 1..10
-        # p50 → rank=ceil(0.5*10)=5 → sorted[4]=5
-        assert harness.percentile(data, 50) == 5
+class TestSummarize:
+    def test_basic(self):
+        s = summarize([10, 20, 30, 40, 50])
+        assert s.n == 5
+        assert s.p50 == 30
+        assert s.spread == s.p95 - s.p50
 
-    def test_ten_values_p95(self):
-        data = list(range(1, 11))  # 1..10
-        # p95 → rank=ceil(0.95*10)=10 → sorted[9]=10
-        assert harness.percentile(data, 95) == 10
+    def test_normalized_spread(self):
+        s = summarize([10, 20, 30, 40, 50])
+        assert s.normalized_spread == pytest.approx((s.p95 - s.p50) / s.p50)
 
-    def test_thirty_values_p50(self):
-        data = list(range(1, 31))
-        # p50 → rank=ceil(0.5*30)=15 → sorted[14]=15
-        assert harness.percentile(data, 50) == 15
-
-    def test_thirty_values_p95(self):
-        data = list(range(1, 31))
-        # p95 → rank=ceil(0.95*30)=ceil(28.5)=29 → sorted[28]=29
-        assert harness.percentile(data, 95) == 29
+    def test_zero_p50(self):
+        s = summarize([0, 0, 0])
+        assert s.normalized_spread == math.inf
 
     def test_empty_raises(self):
         with pytest.raises(ValueError):
-            harness.percentile([], 50)
-
-    def test_summarise(self):
-        s = harness.summarise([1.0, 2.0, 3.0, 4.0, 5.0])
-        assert s.n == 5
-        # p50 → rank=ceil(0.5*5)=3 → sorted[2]=3
-        assert s.p50 == 3.0
-        # p95 → rank=ceil(0.95*5)=5 → sorted[4]=5
-        assert s.p95 == 5.0
-        assert s.spread == 2.0
+            summarize([])
 
 
 # ---------------------------------------------------------------------------
-# Repeat-count tier logic
+# SyntheticBackend
 # ---------------------------------------------------------------------------
 
 
-class TestRepeatTiers:
-    def test_short_context_default(self):
-        assert harness.repeats_for_context(4096, None) == 30
+class TestSyntheticBackend:
+    def test_tokenize_proportional_to_text_length(self):
+        b = SyntheticBackend(QWEN35_4B)
+        text = "x" * 400
+        ids = b.tokenize(text)
+        assert len(ids) == 100  # ~4 chars per token
 
-    def test_medium_context_default(self):
-        assert harness.repeats_for_context(32768, None) == 30
+    def test_tokenize_minimum_one(self):
+        b = SyntheticBackend(QWEN35_4B)
+        ids = b.tokenize("ab")
+        assert len(ids) == 1
 
-    def test_expensive_context_default(self):
-        assert harness.repeats_for_context(131072, None) == 10
-        assert harness.repeats_for_context(262144, None) == 10
+    def test_prefill_sets_seq_len(self):
+        b = SyntheticBackend(QWEN35_4B)
+        b.prefill(list(range(100)))
+        mem = b.memory_bytes()
+        assert mem["recurrent_state"] > 0
 
-    def test_explicit_override(self):
-        assert harness.repeats_for_context(4096, 10) == 10
-        assert harness.repeats_for_context(131072, 30) == 30
+    def test_decode_increments_seq_len(self):
+        b = SyntheticBackend(QWEN35_4B)
+        b.prefill(list(range(100)))
+        mem_before = b.memory_bytes()["kv_cache"]
+        b.decode_step(0)
+        b.decode_step(0)
+        mem_after = b.memory_bytes()["kv_cache"]
+        assert mem_after > mem_before  # kv_cache grows
 
-    def test_never_below_five(self):
-        assert harness.repeats_for_context(4096, 3) == 5
-        assert harness.repeats_for_context(4096, 1) == 5
+    def test_reset_clears_state(self):
+        b = SyntheticBackend(QWEN35_4B)
+        b.prefill(list(range(100)))
+        b.decode_step(0)
+        b.reset()
+        assert b.memory_bytes()["kv_cache"] == 0
 
+    def test_memory_weights_constant_across_context(self):
+        b = SyntheticBackend(QWEN35_4B)
+        b.prefill(list(range(100)))
+        w1 = b.memory_bytes()["weights"]
+        b.reset()
+        b.prefill(list(range(1000)))
+        w2 = b.memory_bytes()["weights"]
+        assert w1 == w2  # weights are flat (METRICS.md section 5.2)
 
-# ---------------------------------------------------------------------------
-# MockBackend
-# ---------------------------------------------------------------------------
+    def test_memory_recurrent_state_constant_across_context(self):
+        b = SyntheticBackend(QWEN35_4B)
+        b.prefill(list(range(100)))
+        rs1 = b.memory_bytes()["recurrent_state"]
+        b.reset()
+        b.prefill(list(range(1000)))
+        rs2 = b.memory_bytes()["recurrent_state"]
+        assert rs1 == rs2  # O(1) per token (METRICS.md section 5.4)
 
-
-class TestMockBackend:
-    def test_load_is_instant(self):
-        b = harness.MockBackend()
-        b.load()  # must not raise
-
-    def test_tokenize_caps_at_max(self):
-        b = harness.MockBackend()
-        ids = b.tokenize("hello world test", 5)
-        assert len(ids) <= 5
-        assert len(ids) >= 1
-
-    def test_tokenize_large_text(self):
-        b = harness.MockBackend()
-        ids = b.tokenize("x" * 10000, 4096)
-        assert len(ids) == 4096
-
-    def test_memory_flat_weights(self):
-        """Weights must be flat across context length (METRICS.md section 5.2)."""
-        b = harness.MockBackend()
-        m1 = b.memory_breakdown(100)
-        m2 = b.memory_breakdown(100000)
-        assert m1.weights == m2.weights
-
-    def test_memory_kv_grows(self):
-        """KV cache must grow with seq_len (METRICS.md section 5.3)."""
-        b = harness.MockBackend()
-        m1 = b.memory_breakdown(100)
-        m2 = b.memory_breakdown(10000)
-        assert m2.kv_cache > m1.kv_cache
-
-    def test_memory_recurrent_flat(self):
-        """Recurrent state must be O(1) regardless of context (METRICS.md section 5.4)."""
-        b = harness.MockBackend()
-        m1 = b.memory_breakdown(100)
-        m2 = b.memory_breakdown(100000)
-        assert m1.recurrent_state == m2.recurrent_state
-
-    def test_prefill_does_work(self):
-        """Prefill should produce measurable elapsed time."""
-        b = harness.MockBackend(prefill_work=500)
-        ids = list(range(100))
-        t0 = time.perf_counter()
-        b.prefill(ids)
-        elapsed = time.perf_counter() - t0
-        # Should be fast but non-zero (not instant)
-        assert elapsed >= 0.0  # at minimum, no negative time
-
-
-# ---------------------------------------------------------------------------
-# Single-repeat measurement timing boundaries
-# ---------------------------------------------------------------------------
-
-
-class TestRepeatMeasurement:
-    def test_timing_boundaries(self):
-        """Verify the METRICS.md timing events produce valid results."""
-        b = harness.MockBackend(prefill_work=100, decode_work=50)
-        b.load()
-        r = harness.run_one_repeat(b, context_length=256, decode_tokens=10)
-
-        assert r.prompt_token_count > 0
-        assert r.prefill_elapsed > 0, "prefill must produce non-zero elapsed"
-        assert r.ttft_elapsed > 0, "ttft must include tokenization + prefill + sample"
-        assert r.decode_elapsed > 0, "decode must produce non-zero elapsed"
-        assert r.decode_token_count == 9, "decode tokens = N-1 (token 1 is prefill)"
-
-    def test_ttft_includes_tokenization(self):
-        """TTFT must be >= prefill elapsed (it includes tokenization + sampling)."""
-        b = harness.MockBackend(prefill_work=100)
-        b.load()
-        r = harness.run_one_repeat(b, context_length=128, decode_tokens=5)
-        # TTFT includes: tokenization + prefill + sampling
-        # prefill_elapsed is just the forward pass
-        assert r.ttft_elapsed >= r.prefill_elapsed * 0.9  # allow clock jitter
-
-    def test_decode_proportional_to_tokens(self):
-        """More decode tokens → longer decode elapsed time."""
-        b1 = harness.MockBackend(decode_work=200)
-        b1.load()
-        r1 = harness.run_one_repeat(b1, context_length=64, decode_tokens=10)
-
-        b2 = harness.MockBackend(decode_work=200)
-        b2.load()
-        r2 = harness.run_one_repeat(b2, context_length=64, decode_tokens=50)
-
-        # 49 decode steps vs 9 — should be meaningfully longer
-        assert r2.decode_elapsed > r1.decode_elapsed * 2
-
-    def test_memory_captured_at_phase_end(self):
-        """Memory breakdown should reflect the seq_len at each phase-end."""
-        b = harness.MockBackend(kv_cache_bytes_per_token=1024)
-        b.load()
-        r = harness.run_one_repeat(b, context_length=100, decode_tokens=10)
-
-        # Prefill-end: seq_len = prompt tokens
-        # Decode-end: seq_len = prompt tokens + decode tokens
-        assert r.mem_decode_kv > r.mem_prefill_kv
-        assert r.mem_prefill_weights == r.mem_decode_weights
-
-
-# ---------------------------------------------------------------------------
-# Context-point runner → schema conformance
-# ---------------------------------------------------------------------------
-
-
-class TestContextPointSchema:
-    def test_produces_valid_rows(self):
-        b = harness.MockBackend(prefill_work=50, decode_work=30)
-        b.load()
-        rows = harness.run_context_point(
-            b,
-            context_length=256,
-            run_id="test_run_abc1234",
-            manifest_ref="results/manifests/test.json",
-            git_sha="abc1234",
-            device="generic_aarch64",
-            engine_gdn="cpu",
-            engine_full_attention="cpu",
-            model_checkpoint="Qwen/Qwen3.5-4B",
-            quantization="fp16",
-            warmup=1,
-            repeat_count=5,
-            decode_tokens=10,
+    def test_memory_values_match_formula(self):
+        cfg = QWEN35_4B
+        b = SyntheticBackend(cfg)
+        b.prefill(list(range(256)))
+        mem = b.memory_bytes()
+        expected_rs = (
+            cfg.num_gdn_layers
+            * cfg.linear_num_value_heads
+            * cfg.linear_key_head_dim
+            * cfg.linear_value_head_dim
+            * cfg.state_dtype_bytes
         )
-        # Validate every row against the schema
-        schema.validate_rows(rows)
-
-    def test_row_count_per_repeat(self):
-        """Each repeat produces exactly 9 rows: 3 throughput + 6 memory."""
-        b = harness.MockBackend(prefill_work=10)
-        b.load()
-        rows = harness.run_context_point(
-            b,
-            context_length=64,
-            run_id="test_run",
-            manifest_ref="results/manifests/test.json",
-            git_sha="abc1234",
-            device="generic_aarch64",
-            engine_gdn="cpu",
-            engine_full_attention="cpu",
-            model_checkpoint="test",
-            quantization="fp16",
-            warmup=1,
-            repeat_count=5,
-            decode_tokens=5,
+        assert mem["recurrent_state"] == expected_rs
+        expected_kv = (
+            cfg.num_full_attention_layers
+            * 2
+            * 256
+            * cfg.num_key_value_heads
+            * cfg.full_attn_head_dim
+            * cfg.cache_dtype_bytes
         )
-        # 5 repeats × (1 prefill_tps + 1 ttft + 1 decode_tps + 6 memory) = 45
-        assert len(rows) == 5 * 9
+        assert mem["kv_cache"] == expected_kv
 
-    def test_repeat_indices(self):
-        b = harness.MockBackend(prefill_work=10)
-        b.load()
-        rows = harness.run_context_point(
-            b,
-            context_length=64,
-            run_id="test_run",
-            manifest_ref="results/manifests/test.json",
-            git_sha="abc1234",
-            device="generic_aarch64",
-            engine_gdn="cpu",
-            engine_full_attention="cpu",
-            model_checkpoint="test",
-            quantization="fp16",
-            warmup=1,
-            repeat_count=5,
-            decode_tokens=5,
+    def test_sample_deterministic(self):
+        b = SyntheticBackend(QWEN35_4B)
+        assert b.sample(None) == 42
+
+    def test_decode_step_advances(self):
+        b = SyntheticBackend(QWEN35_4B)
+        t1 = b.decode_step(42)
+        assert t1 == 43
+
+
+# ---------------------------------------------------------------------------
+# Timing protocol (METRICS.md sections 1-5)
+# ---------------------------------------------------------------------------
+
+
+class TestTimingProtocol:
+    def test_token1_belongs_to_prefill(self):
+        """METRICS.md section 1: token 1 is counted toward prefill, not decode."""
+        b = SyntheticBackend(QWEN35_4B)
+        text = generate_prompt(64)
+        t = run_one_repeat(b, text, decode_length=10)
+        # decode_token_count = N - 1 (token 1 excluded)
+        assert t.decode_token_count == 9
+
+    def test_prompt_token_count_from_tokenizer(self):
+        """METRICS.md section 2: numerator is len(input_ids), not context_length."""
+        b = SyntheticBackend(QWEN35_4B)
+        text = generate_prompt(64)
+        t = run_one_repeat(b, text, decode_length=10)
+        assert t.prompt_token_count == len(b.tokenize(text))
+
+    def test_all_durations_positive(self):
+        b = SyntheticBackend(QWEN35_4B)
+        text = generate_prompt(64)
+        t = run_one_repeat(b, text, decode_length=10)
+        assert t.prefill_duration >= 0
+        assert t.ttft_duration >= 0
+        assert t.decode_duration >= 0
+
+    def test_memory_sampled_at_correct_phases(self):
+        """METRICS.md section 5.1: prefill memory at t_prefill_logits, decode at t_N."""
+        b = SyntheticBackend(QWEN35_4B)
+        text = generate_prompt(64)
+        t = run_one_repeat(b, text, decode_length=10)
+        # kv_cache should be larger at decode end (prompt + decode tokens)
+        assert t.mem_decode["kv_cache"] > t.mem_prefill["kv_cache"]
+        # recurrent_state is O(1) — same at both phases
+        assert t.mem_decode["recurrent_state"] == t.mem_prefill["recurrent_state"]
+        # weights are flat
+        assert t.mem_decode["weights"] == t.mem_prefill["weights"]
+
+
+# ---------------------------------------------------------------------------
+# Row generation + schema validation
+# ---------------------------------------------------------------------------
+
+
+class TestRowGeneration:
+    @staticmethod
+    def _make_timing():
+        return RepeatTimings(
+            prompt_token_count=4096,
+            prefill_duration=0.5,
+            ttft_duration=0.55,
+            decode_duration=1.0,
+            decode_token_count=256,
+            mem_prefill={"weights": 8e9, "kv_cache": 1e6, "recurrent_state": 5e5},
+            mem_decode={"weights": 8e9, "kv_cache": 2e6, "recurrent_state": 5e5},
         )
-        indices = {r.repeat_index for r in rows}
-        assert indices == {0, 1, 2, 3, 4}
-        for r in rows:
-            assert r.repeat_count == 5
 
-    def test_all_metric_names_present(self):
-        b = harness.MockBackend(prefill_work=10)
-        b.load()
-        rows = harness.run_context_point(
-            b,
-            context_length=64,
+    def test_nine_rows_per_repeat(self):
+        """3 throughput/latency + 6 memory (3 components x 2 phases)."""
+        config = SweepConfig(context_lengths=[4096])
+        rows = _rows_from_timing(
+            self._make_timing(),
             run_id="test_run",
-            manifest_ref="results/manifests/test.json",
             git_sha="abc1234",
-            device="generic_aarch64",
-            engine_gdn="cpu",
-            engine_full_attention="cpu",
-            model_checkpoint="test",
-            quantization="fp16",
-            warmup=1,
-            repeat_count=5,
-            decode_tokens=5,
+            manifest_ref_str="results/manifests/test_run.json",
+            config=config,
+            context_length=4096,
+            repeat_idx=0,
         )
-        names = {r.metric_name for r in rows}
-        assert schema.MetricName.PREFILL_TOKENS_PER_SEC.value in names
-        assert schema.MetricName.DECODE_TOKENS_PER_SEC.value in names
-        assert schema.MetricName.TTFT_SECONDS.value in names
-        assert schema.MetricName.PEAK_MEMORY_BYTES.value in names
+        assert len(rows) == 9
 
-    def test_memory_component_required(self):
-        """peak_memory_bytes rows must have metric_component set (METRICS.md §5)."""
-        b = harness.MockBackend(prefill_work=10)
-        b.load()
-        rows = harness.run_context_point(
-            b,
-            context_length=64,
+    def test_all_rows_validate(self):
+        config = SweepConfig(context_lengths=[4096])
+        rows = _rows_from_timing(
+            self._make_timing(),
             run_id="test_run",
-            manifest_ref="results/manifests/test.json",
             git_sha="abc1234",
-            device="generic_aarch64",
-            engine_gdn="cpu",
-            engine_full_attention="cpu",
-            model_checkpoint="test",
-            quantization="fp16",
-            warmup=1,
-            repeat_count=5,
-            decode_tokens=5,
+            manifest_ref_str="results/manifests/test_run.json",
+            config=config,
+            context_length=4096,
+            repeat_idx=0,
+        )
+        validate_rows(rows)  # raises if invalid
+
+    def test_prefill_throughput_value(self):
+        config = SweepConfig(context_lengths=[4096])
+        rows = _rows_from_timing(
+            self._make_timing(),
+            run_id="test_run",
+            git_sha="abc1234",
+            manifest_ref_str="results/manifests/test_run.json",
+            config=config,
+            context_length=4096,
+            repeat_idx=0,
+        )
+        prefill_row = [r for r in rows if r.metric_name == "prefill_tokens_per_sec"][0]
+        assert prefill_row.value == pytest.approx(4096 / 0.5)
+
+    def test_decode_throughput_value(self):
+        config = SweepConfig(context_lengths=[4096])
+        rows = _rows_from_timing(
+            self._make_timing(),
+            run_id="test_run",
+            git_sha="abc1234",
+            manifest_ref_str="results/manifests/test_run.json",
+            config=config,
+            context_length=4096,
+            repeat_idx=0,
+        )
+        decode_row = [r for r in rows if r.metric_name == "decode_tokens_per_sec"][0]
+        assert decode_row.value == pytest.approx(256 / 1.0)
+
+    def test_memory_component_required_for_memory_metric(self):
+        config = SweepConfig(context_lengths=[4096])
+        rows = _rows_from_timing(
+            self._make_timing(),
+            run_id="test_run",
+            git_sha="abc1234",
+            manifest_ref_str="results/manifests/test_run.json",
+            config=config,
+            context_length=4096,
+            repeat_idx=0,
+        )
+        mem_rows = [r for r in rows if r.metric_name == "peak_memory_bytes"]
+        for r in mem_rows:
+            assert r.metric_component in ("weights", "kv_cache", "recurrent_state")
+
+    def test_throughput_metrics_have_no_component(self):
+        config = SweepConfig(context_lengths=[4096])
+        rows = _rows_from_timing(
+            self._make_timing(),
+            run_id="test_run",
+            git_sha="abc1234",
+            manifest_ref_str="results/manifests/test_run.json",
+            config=config,
+            context_length=4096,
+            repeat_idx=0,
         )
         for r in rows:
-            if r.metric_name == schema.MetricName.PEAK_MEMORY_BYTES.value:
-                assert r.metric_component in (
-                    schema.MemoryComponent.WEIGHTS.value,
-                    schema.MemoryComponent.KV_CACHE.value,
-                    schema.MemoryComponent.RECURRENT_STATE.value,
-                )
+            if r.metric_name != "peak_memory_bytes":
+                assert not r.metric_component
 
-    def test_throughput_rows_have_no_component(self):
-        """Throughput/TTFT rows must NOT have metric_component (METRICS.md §5.0)."""
-        b = harness.MockBackend(prefill_work=10)
-        b.load()
-        rows = harness.run_context_point(
-            b,
-            context_length=64,
-            run_id="test_run",
-            manifest_ref="results/manifests/test.json",
-            git_sha="abc1234",
-            device="generic_aarch64",
-            engine_gdn="cpu",
-            engine_full_attention="cpu",
-            model_checkpoint="test",
-            quantization="fp16",
-            warmup=1,
+
+# ---------------------------------------------------------------------------
+# Full sweep
+# ---------------------------------------------------------------------------
+
+
+class TestSweep:
+    def test_basic_sweep_validates(self):
+        b = SyntheticBackend(QWEN35_4B)
+        config = SweepConfig(
+            context_lengths=[64, 128],
+            warmup_count=2,
             repeat_count=5,
-            decode_tokens=5,
+            decode_length=10,
         )
-        for r in rows:
-            if r.metric_name != schema.MetricName.PEAK_MEMORY_BYTES.value:
-                assert r.metric_component is None or r.metric_component == ""
+        rows = run_sweep(b, config)
+        validate_rows(rows)  # raises if any invalid
+        # 2 context lengths x 5 repeats x 9 rows = 90
+        assert len(rows) == 90
+
+    def test_warmup_not_in_output(self):
+        """METRICS.md section 7: warmup repeats are discarded."""
+        b = SyntheticBackend(QWEN35_4B)
+        config = SweepConfig(
+            context_lengths=[64],
+            warmup_count=3,
+            repeat_count=5,
+            decode_length=10,
+        )
+        rows = run_sweep(b, config)
+        # Only repeat_count (5) repeats should appear, not warmup + measured (8)
+        repeat_indices = {r.repeat_index for r in rows}
+        assert repeat_indices == {0, 1, 2, 3, 4}
+
+    def test_two_context_lengths_distinct(self):
+        b = SyntheticBackend(QWEN35_4B)
+        config = SweepConfig(
+            context_lengths=[64, 128],
+            warmup_count=1,
+            repeat_count=5,
+            decode_length=10,
+        )
+        rows = run_sweep(b, config)
+        ctx_values = {r.context_length for r in rows}
+        assert ctx_values == {64, 128}
+
+    def test_summaries_grouped_correctly(self):
+        b = SyntheticBackend(QWEN35_4B)
+        config = SweepConfig(
+            context_lengths=[64],
+            warmup_count=1,
+            repeat_count=5,
+            decode_length=10,
+        )
+        rows = run_sweep(b, config)
+        summaries = compute_summaries(rows)
+        # Groups: 2 ctx x (3 throughput + 3 mem_prefill + 3 mem_decode) = 9 groups
+        assert len(summaries) == 9
+        for ms in summaries:
+            assert ms.summary.n == 5
+
+    def test_run_id_format(self):
+        """RESULTS_SCHEMA.md section 2: <device>_<timestamp>_<sha>."""
+        b = SyntheticBackend(QWEN35_4B)
+        config = SweepConfig(context_lengths=[64], device="generic_aarch64")
+        rows = run_sweep(b, config)
+        run_id = rows[0].run_id
+        assert run_id.startswith("generic_aarch64_")
+
+    def test_all_rows_share_manifest_ref(self):
+        b = SyntheticBackend(QWEN35_4B)
+        config = SweepConfig(context_lengths=[64])
+        rows = run_sweep(b, config)
+        refs = {r.manifest_ref for r in rows}
+        assert len(refs) == 1  # all rows from one run share one manifest
 
 
 # ---------------------------------------------------------------------------
-# Full sweep → CSV files on disk
+# CSV round-trip
 # ---------------------------------------------------------------------------
 
 
-class TestSweepIntegration:
-    @pytest.fixture
-    def sweep_result(self, tmp_path):
-        b = harness.MockBackend(prefill_work=20, decode_work=10)
-        config = harness.SweepConfig(
-            device="generic_aarch64",
-            contexts=(64, 128),
-            warmup=1,
-            repeats=5,
-            decode_tokens=5,
-            output_dir=str(tmp_path / "raw"),
-            manifests_dir=str(tmp_path / "manifests"),
-            write_manifest=True,
-            print_summary=False,
+class TestCsvRoundTrip:
+    def test_write_and_read_back(self, tmp_path):
+        from bench.schema import write_csv
+
+        b = SyntheticBackend(QWEN35_4B)
+        config = SweepConfig(
+            context_lengths=[64],
+            warmup_count=1,
+            repeat_count=5,
+            decode_length=10,
         )
-        return harness.run_sweep(b, config)
+        rows = run_sweep(b, config)
+        csv_path = str(tmp_path / "test.csv")
+        write_csv(rows, csv_path)
+        read_back = read_csv(csv_path)
 
-    def test_one_csv_per_context(self, sweep_result, tmp_path):
-        assert len(sweep_result.csv_paths) == 2
-        for p in sweep_result.csv_paths:
-            assert os.path.exists(p)
-
-    def test_csvs_are_schema_valid(self, sweep_result):
-        for p in sweep_result.csv_paths:
-            rows = schema.read_csv(p, validate=True)
-            assert len(rows) > 0
-
-    def test_manifest_written(self, sweep_result, tmp_path):
-        manifest_path = tmp_path / "manifests" / f"{sweep_result.run_id}.json"
-        assert manifest_path.exists()
-        import json
-
-        with open(manifest_path) as f:
-            m = json.load(f)
-        assert m["run_id"] == sweep_result.run_id
-        assert "host" in m
-
-    def test_each_csv_has_single_context_length(self, sweep_result):
-        """Each CSV covers exactly one context_length (RESULTS_SCHEMA.md §2)."""
-        for p in sweep_result.csv_paths:
-            rows = schema.read_csv(p, validate=False)
-            ctx_values = {r.context_length for r in rows}
-            assert len(ctx_values) == 1, f"CSV {p} has multiple context lengths: {ctx_values}"
-
-    def test_context_in_filename(self, sweep_result):
-        for p in sweep_result.csv_paths:
-            assert "ctx" in os.path.basename(p)
-
-    def test_summaries_computed(self, sweep_result):
-        assert len(sweep_result.summaries) == 2  # one per context
-        for _ctx, summaries in sweep_result.summaries.items():
-            # Should have prefill_tps, decode_tps, ttft, and 6 memory metrics
-            assert len(summaries) >= 4
+        assert len(read_back) == len(rows)
+        for original, read_row in zip(rows, read_back, strict=True):
+            assert original.run_id == read_row.run_id
+            assert original.context_length == read_row.context_length
+            assert original.metric_name == read_row.metric_name
+            assert original.value == pytest.approx(read_row.value)
 
 
 # ---------------------------------------------------------------------------
@@ -418,141 +436,233 @@ class TestSweepIntegration:
 
 
 class TestCLI:
-    def test_smoke_run(self, tmp_path):
-        """End-to-end CLI invocation with the mock backend."""
-        rc = harness.main(
+    def test_minimal_invocation(self, tmp_path, monkeypatch):
+        """End-to-end: harness CLI writes valid CSV + manifest."""
+        monkeypatch.chdir(tmp_path)
+        rc = main(
             [
                 "--backend",
-                "mock",
-                "--contexts",
-                "64",
-                "--repeats",
-                "5",
-                "--warmup",
-                "1",
-                "--decode-tokens",
-                "5",
-                "--output-dir",
-                str(tmp_path / "raw"),
-                "--manifests-dir",
-                str(tmp_path / "manifests"),
-                "--quiet",
-            ]
-        )
-        assert rc == 0
-        csvs = list((tmp_path / "raw").glob("*.csv"))
-        assert len(csvs) == 1
-        # Validate
-        rows = schema.read_csv(str(csvs[0]), validate=True)
-        assert len(rows) > 0
-
-    def test_multi_context_sweep(self, tmp_path):
-        rc = harness.main(
-            [
-                "--backend",
-                "mock",
-                "--contexts",
+                "synthetic",
+                "--model",
+                "0.8b",
+                "--context-lengths",
                 "64,128",
+                "--warmup",
+                "1",
                 "--repeats",
                 "5",
-                "--warmup",
-                "1",
-                "--decode-tokens",
-                "5",
-                "--output-dir",
-                str(tmp_path / "raw"),
-                "--manifests-dir",
-                str(tmp_path / "manifests"),
-                "--quiet",
+                "--decode-length",
+                "10",
+                "--device",
+                "generic_aarch64",
+                "--allow-missing-sha",
             ]
         )
         assert rc == 0
-        csvs = list((tmp_path / "raw").glob("*.csv"))
-        assert len(csvs) == 2
-
-    def test_default_repeats_tier(self, tmp_path):
-        """Without --repeats, 4K gets 30 and 128K gets 10 (METRICS.md §7)."""
-        rc = harness.main(
-            [
-                "--backend",
-                "mock",
-                "--contexts",
-                "4096",
-                "--warmup",
-                "1",
-                "--decode-tokens",
-                "3",
-                "--output-dir",
-                str(tmp_path / "raw"),
-                "--manifests-dir",
-                str(tmp_path / "manifests"),
-                "--quiet",
-            ]
-        )
-        assert rc == 0
-        csvs = list((tmp_path / "raw").glob("*ctx4096*.csv"))
+        # CSV should exist
+        csvs = list((tmp_path / "results" / "raw").glob("*.csv"))
         assert len(csvs) == 1
-        rows = schema.read_csv(str(csvs[0]), validate=False)
-        # 30 repeats × 9 rows = 270
-        assert len(rows) == 270
+        # Manifest should exist
+        manifests = list((tmp_path / "results" / "manifests").glob("*.json"))
+        assert len(manifests) == 1
+        # CSV should validate on read-back
+        rows = read_csv(str(csvs[0]))
+        validate_rows(rows)
 
-    def test_no_manifest_flag(self, tmp_path):
-        rc = harness.main(
+    def test_no_csv_flag(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        rc = main(
             [
                 "--backend",
-                "mock",
-                "--contexts",
-                "32",
-                "--repeats",
-                "5",
+                "synthetic",
+                "--context-lengths",
+                "64",
                 "--warmup",
                 "1",
-                "--no-manifest",
-                "--output-dir",
-                str(tmp_path / "raw"),
-                "--manifests-dir",
-                str(tmp_path / "manifests"),
-                "--quiet",
+                "--repeats",
+                "5",
+                "--decode-length",
+                "10",
+                "--no-csv",
+                "--allow-missing-sha",
             ]
         )
         assert rc == 0
-        # No manifest should be written
-        manifests = list((tmp_path / "manifests").glob("*.json"))
-        assert len(manifests) == 0
+        csvs = list((tmp_path / "results" / "raw").glob("*.csv"))
+        assert len(csvs) == 0
 
+    def test_refuses_unattributable_run_by_default(self, tmp_path, monkeypatch):
+        """Outside a git repo the sweep must refuse rather than stamp a fake SHA.
 
-# ---------------------------------------------------------------------------
-# CSV round-trip
-# ---------------------------------------------------------------------------
+        The frozen schema validates git_sha as 7-40 hex, so a placeholder like
+        "0000000" would validate clean and produce a CSV that looks publishable
+        with no provenance at all (PLAN.md section 9).
+        """
+        monkeypatch.chdir(tmp_path)
+        with pytest.raises(RuntimeError, match="un-attributable"):
+            main(
+                [
+                    "--backend",
+                    "synthetic",
+                    "--context-lengths",
+                    "64",
+                    "--warmup",
+                    "1",
+                    "--repeats",
+                    "5",
+                    "--decode-length",
+                    "10",
+                    "--no-csv",
+                ]
+            )
 
-
-class TestCSVRoundTrip:
-    def test_write_then_read(self, tmp_path):
-        b = harness.MockBackend(prefill_work=10)
-        b.load()
-        rows = harness.run_context_point(
-            b,
-            context_length=64,
-            run_id="roundtrip_test",
-            manifest_ref="results/manifests/test.json",
-            git_sha="abc1234",
-            device="generic_aarch64",
-            engine_gdn="cpu",
-            engine_full_attention="cpu",
-            model_checkpoint="test",
-            quantization="fp16",
-            warmup=1,
+    def test_allow_missing_sha_stamps_every_row(self, tmp_path, monkeypatch):
+        """With the override the run proceeds, but the caveat rides in the CSV."""
+        monkeypatch.chdir(tmp_path)
+        cfg = SweepConfig(
+            context_lengths=[64],
+            warmup_count=1,
             repeat_count=5,
-            decode_tokens=5,
+            decode_length=10,
+            allow_missing_sha=True,
+            notes="pre-existing note",
         )
-        path = str(tmp_path / "test.csv")
-        schema.write_csv(rows, path)
+        rows = run_sweep(SyntheticBackend(QWEN35_4B), cfg)
+        assert rows
+        assert all("UNATTRIBUTABLE" in r.notes for r in rows)
+        # The operator's own note must survive alongside the marker.
+        assert all("pre-existing note" in r.notes for r in rows)
 
-        # Read back and validate
-        read_back = schema.read_csv(path, validate=True)
-        assert len(read_back) == len(rows)
-        for orig, read in zip(rows, read_back, strict=True):
-            assert orig.run_id == read.run_id
-            assert orig.metric_name == read.metric_name
-            assert orig.value == pytest.approx(read.value)
-            assert orig.repeat_index == read.repeat_index
+    def test_cli_choices_are_derived_from_the_frozen_schema(self):
+        """The CLI's device/engine choices must not drift from schema.py.
+
+        These were hardcoded literal lists duplicating the schema enums. They
+        agreed, but nothing enforced it, so a schema change would have left the
+        CLI accepting a value that validate_rows rejects only after a full sweep.
+        """
+        from bench.harness import _DEVICE_CHOICES, _ENGINE_CHOICES
+        from bench.schema import Device, Engine
+
+        assert set(_DEVICE_CHOICES) == {d.value for d in Device}
+        assert set(_ENGINE_CHOICES) == {e.value for e in Engine}
+
+    def test_rejects_below_minimum_repeats(self):
+        with pytest.raises(SystemExit):
+            main(
+                [
+                    "--context-lengths",
+                    "64",
+                    "--repeats",
+                    "3",  # below minimum of 5
+                    "--no-csv",
+                ]
+            )
+
+    def test_help_exits_cleanly(self):
+        with pytest.raises(SystemExit) as exc_info:
+            main(["--help"])
+        assert exc_info.value.code == 0
+
+
+class TestLoadConfigFromDict:
+    """Tests for load_config_from_dict (ob-xh3.2)."""
+
+    def test_extracts_gdn_and_fa_counts(self):
+        cfg = load_config_from_dict(
+            {
+                "text_config": {"layer_types": ["linear_attention"] * 3 + ["full_attention"]},
+            }
+        )
+        assert cfg.num_gdn_layers == 3
+        assert cfg.num_full_attention_layers == 1
+
+    def test_extracts_linear_dimensions(self):
+        cfg = load_config_from_dict(
+            {
+                "text_config": {
+                    "layer_types": ["linear_attention", "full_attention"],
+                    "linear_num_value_heads": 32,
+                    "linear_key_head_dim": 128,
+                    "linear_value_head_dim": 128,
+                },
+            }
+        )
+        assert cfg.linear_num_value_heads == 32
+        assert cfg.linear_key_head_dim == 128
+
+    def test_extracts_fa_dimensions(self):
+        cfg = load_config_from_dict(
+            {
+                "text_config": {
+                    "layer_types": ["full_attention"],
+                    "num_key_value_heads": 4,
+                    "head_dim": 256,
+                },
+            }
+        )
+        assert cfg.num_key_value_heads == 4
+        assert cfg.full_attn_head_dim == 256
+
+    def test_maps_ssm_dtype(self):
+        cfg = load_config_from_dict(
+            {
+                "text_config": {"layer_types": [], "mamba_ssm_dtype": "float32"},
+            }
+        )
+        assert cfg.state_dtype_bytes == 4
+
+    def test_no_text_config_nest(self):
+        """Config without text_config wrapper should still work."""
+        cfg = load_config_from_dict(
+            {
+                "layer_types": ["linear_attention", "full_attention"],
+            }
+        )
+        assert cfg.num_gdn_layers == 1
+        assert cfg.num_full_attention_layers == 1
+
+
+class TestSweepConfigValidation:
+    """SweepConfig rejects schema-invalid values at construction.
+
+    The CLI constrains these through argparse, but callers that build a config
+    directly — scripts/run_ablation.py, bench/hf_backend.py, tests — bypassed
+    that. Without validation here the first symptom of a typo'd device is
+    validate_rows raising *after* the sweep, which at 262K context is expensive.
+    """
+
+    def _cfg(self, **overrides):
+        kwargs = dict(context_lengths=[64], repeat_count=5)
+        kwargs.update(overrides)
+        return SweepConfig(**kwargs)
+
+    def test_valid_config_constructs(self):
+        cfg = self._cfg()
+        assert cfg.device in {
+            d.value for d in __import__("bench.schema", fromlist=["Device"]).Device
+        }
+
+    def test_rejects_unknown_device(self):
+        with pytest.raises(ValueError, match="device must be one of"):
+            self._cfg(device="raspberry-pi-9")
+
+    def test_rejects_unknown_engine_gdn(self):
+        with pytest.raises(ValueError, match="engine_gdn must be one of"):
+            self._cfg(engine_gdn="tpu")
+
+    def test_rejects_unknown_engine_full_attention(self):
+        with pytest.raises(ValueError, match="engine_full_attention must be one of"):
+            self._cfg(engine_full_attention="tpu")
+
+    def test_rejects_repeat_count_below_five(self):
+        with pytest.raises(ValueError, match="never report N < 5"):
+            self._cfg(repeat_count=4)
+
+    def test_accepts_every_schema_enum_value(self):
+        """Whatever the schema allows, the config must allow — no second list."""
+        from bench.schema import Device, Engine
+
+        for d in Device:
+            assert self._cfg(device=d.value).device == d.value
+        for e in Engine:
+            assert self._cfg(engine_gdn=e.value).engine_gdn == e.value

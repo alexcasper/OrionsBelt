@@ -1,143 +1,107 @@
-# ADR 0006: Quantization policy — INT4 weights with FP16 carve-outs and fp32 recurrent state
+# ADR 0006: Quantize weights to INT4, carve out recurrent state and gates
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-08-02
 - **Bead:** `ob-qpa`
-- **Deciders:** maintainer + agent (rk3588-t4)
-- **Supersedes nothing.** Depends on [ADR 0003](./0003-model-checkpoint-selection.md) (checkpoint
-  selection), [ADR 0004](./0004-descope-ladder.md) (descope tiers), and the ground-truth layer
-  audit ([`docs/GDN_LAYER_AUDIT.md`](../GDN_LAYER_AUDIT.md), `ob-37v`).
+- **Depends on:** [ADR 0003](./0003-model-checkpoint-selection.md) (checkpoint dimensions), [ob-37v](../FINDINGS.md#6) (confirmed state layout), [METRICS.md §9](../METRICS.md) (traffic breakdown)
+- **Policy document:** [`docs/QUANTIZATION_POLICY.md`](../QUANTIZATION_POLICY.md)
 
 ## Context
 
-Decode on this hardware is **weight-bandwidth-bound** (METRICS.md §9 appendix). At batch=1, every
-weight byte is re-fetched from DRAM per token because there is no cross-token amortization. The
-numbers for Qwen3.5-4B at the verified 100 GB/s LPDDR5 bandwidth:
+Weight streaming is 95–99% of decode bandwidth on this class of hardware
+(METRICS.md §9 appendix). At the O6's 100 GB/s, FP16 weights for the 4B checkpoint
+(7.5 GiB) impose a decode ceiling of ~12.5 tok/s. INT4 weights (1.9 GiB) raise that
+to ~50 tok/s — a 4× improvement from weight quantization alone. No kernel rewrite
+of the recurrent scan changes this, because the scan's 96 MiB of state traffic is
+~5% of the INT4-weight total.
 
-| Precision | Weight traffic/token | Ceiling tok/s | GDN state share |
-|---|---:|---:|---:|
-| fp16 (baseline) | 7.56 GiB | ~13 | 1.3% |
-| INT8 weights | 3.78 GiB | ~26 | 2.6% |
-| **INT4 weights** | **1.89 GiB** | **~53** | **5.1%** |
-
-(INT4 = 4-bit weight-only, W4A16: weights stored compressed, dequantized to fp16 before the GEMV.
-Compute stays fp16 throughout — only storage and traffic are reduced.)
-
-Weight quantization is the single highest-value optimization lever in the project
-(`ob-qpa` notes): INT4 takes the 4B from ~13 to ~53 tok/s by this model — a genuine 4× win.
-The GDN state at 48 MiB fp32 is real traffic but is only ~5% of INT4 decode traffic and is
-fixed by the recurrence definition, so it cannot be moved by weight quantization.
-
-The question this ADR answers is **not whether** to quantize weights (that is settled by the
-bandwidth arithmetic) but **which tensors are safe to quantize and which must stay high-precision**.
-Unlike a conventional KV cache where quantization error is local to the cached token, GDN
-recurrent state is **fed back through every decode step**, so errors compound over the sequence.
-The audit (`ob-37v`) identified the precision-sensitive tensors; this ADR turns that into a
-concrete per-tensor policy.
-
-### Evidence base
-
-All per-tensor parameter counts below are computed analytically from the checkpoint config
-(`bench/metrics.py`, `ob-vfp`) and cross-checked against the modeling-code audit (`ob-37v`). The
-4B checkpoint has `tie_word_embeddings: false`.
-
-**GDN layer parameter breakdown** (one of 24 GDN layers, 4B):
-
-| Tensor | Params | Share of GDN layer | Precision sensitivity |
-|---|---:|---:|---|
-| `in_proj_qkv` (2560→8192) | 20,971,520 | 49.8% | Low — dense matmul, no feedback |
-| `in_proj_z` (2560→4096) | 10,485,760 | 24.9% | Low — output gate projection |
-| `out_proj` (4096→2560) | 10,485,760 | 24.9% | Low — dense matmul |
-| `in_proj_b` (2560→32) | 81,920 | 0.2% | **High** — write gate β controls delta-rule strength |
-| `in_proj_a` (2560→32) | 81,920 | 0.2% | **High** — decay gate input, compounds via exp(g) |
-| `conv1d` (dw, 4-tap) | 32,768 | 0.1% | Medium — gates QKV before delta rule |
-| `A_log` | 32 | ~0% | **Critical** — decay magnitude, exp() applied |
-| `dt_bias` | 32 | ~0% | **High** — added to decay gate input |
-| norm weight | 4,096 | ~0% | Medium — RMSNorm on value head dim |
-| layernorms (×2) | 5,120 | ~0% | Medium — RMSNorm before/after |
-
-**Aggregate** (across all 32 layers + embeddings):
-
-| Component | Params | Share of total |
-|---|---:|---:|
-| Quantizable weights (all large projections + MLP + lm_head) | 3,777,542,656 | **99.87%** |
-| FP16 carve-outs (gates + conv + norms + embeddings) | 4,941,312 | **0.13%** |
-| **Total** | **3,782,483,968** | 100% |
-
-The carve-out is under 5M params (10 MiB fp16) — **0.13% of the model**. Keeping it in fp16 costs
-negligible decode bandwidth but protects every precision-sensitive signal path.
+The question is not *whether* to quantize weights, but *what must be carved out*
+to preserve model quality — and specifically whether the GDN recurrent state and
+gating signals can survive quantization.
 
 ## Decision
 
-**INT4 weight-only (W4A16) for all large weight matrices, with three FP16 carve-out classes and an
-unchangeable fp32 floor on recurrent state.**
+**Quantize all projection weights to INT4** (INT8 as a conservative fallback).
+**Keep the recurrent state in FP32 and the decay gate parameters in FP16/FP32.**
 
-### Per-tensor assignment
+| Tensor | Precision | Why |
+|---|---|---|
+| All projection weights | **INT4** | Dominant decode-bandwidth term; 4× reduction |
+| Recurrent state S | **FP32** | Accumulates error across sequence; 48 MiB total (cheap to keep) |
+| Decay gate (A_log, dt_bias) | **FP32** | Exponential decay compounds multiplicatively |
+| Beta gate (b) | **FP16** | Bounded sigmoid, recomputed per token |
+| KV cache | **FP16** | Standard; INT8 is a future option gated on oracle |
 
-| Tier | Tensors | Precision | Rationale |
-|---|---|---|---|
-| **INT4 (W4A16)** | `in_proj_qkv`, `in_proj_z`, `out_proj` (GDN); `q_proj`, `k_proj`, `v_proj`, `o_proj` (attention); `gate_proj`, `up_proj`, `down_proj` (MLP); `lm_head` | 4-bit weight, fp16 compute | 99.87% of params. These are dense GEMVs with no feedback path — quantization error is local to the projection output, not accumulated across tokens. KleidiAI provides 109 A720-usable INT4/i8mm GEMV micro-kernels for these (FINDINGS.md §3.3). |
-| **FP16 carve-out** | `in_proj_a`, `in_proj_b`, `A_log`, `dt_bias` (GDN gates); `conv1d` weights; all RMSNorm weights; `embed_tokens` | fp16 | Gates directly control the recurrence: `g = -A_log.exp() × softplus(a + dt_bias)` — errors in `A_log` or `a` compound through every token via the exponential. Conv1d gates QKV before the delta rule. At 0.13% of params, the bandwidth cost of keeping fp16 is ~0.024 GiB/token — rounding error. `embed_tokens` is a lookup table, not a GEMV at decode (one row read = 5 KB), so quantizing it gains nothing and risks semantic precision loss. |
-| **fp32 floor** | Recurrent state (`S` matrices); decay accumulator; attention softmax | fp32 | `mamba_ssm_dtype = 'float32'` in config — the rank-1 delta-rule updates accumulate over the full sequence and would lose precision in fp16/bf16. A decay of 0.5 compounded over 64 steps is ~5e-20, which underflows fp16 entirely (FINDINGS.md §4). The decay accumulator is kept fp32 even when the surrounding state could theoretically be narrowed. This is not a decision — it is a constraint imposed by the model definition. |
+See [`docs/QUANTIZATION_POLICY.md`](../QUANTIZATION_POLICY.md) for the full
+per-tensor table, KleidiAI mapping, and validation gate specification.
 
-### Deployment path
+## Why the recurrent state is a carve-out
 
-1. **Primary:** KleidiAI INT4 GEMV micro-kernels (109 A720-usable, FINDINGS.md §3.3) for batch=1
-   decode. These are the only production-quality INT4/i8mm GEMV library for non-SME Armv9.
-2. **Prefill:** KleidiAI INT8/i8mm GEMM kernels for the chunkwise matmuls (batch>1 within chunks).
-3. **Carve-outs:** Standard fp16 NEON/SVE matmuls for the tiny gate projections.
-4. **NPU path:** When the Orion O6 is available, the same per-tensor policy applies to NOE export
-   (`ob-onz`): NPU-resident subgraphs use INT8 (NOE's INT4 path quality is unverified), with the
-   same FP16 carve-outs and fp32 state.
+The delta-rule update `S_t = S_{t-1} * exp(g_t) + k_t ⊗ (v_t - S_{t-1}@k_t) * beta_t`
+feeds S back through every token. A quantization error in S is not local — it
+propagates forward and compounds, because the same corrupted state is used to
+compute every subsequent retrieval `S @ q`. This is fundamentally different from a
+KV-cache entry, which is read once and never modified. FINDINGS.md §4 documents
+that "the decay accumulator is fp32 even when surrounding state is fp16," and the
+upstream code (`mamba_ssm_dtype: "float32"` in config) confirms the model itself
+keeps the state in FP32.
 
-### Validation protocol
-
-The x86/CUDA reference (`ob-aqv`) is the correctness oracle. Quantization quality is validated by:
-
-1. **Token-level cosine similarity** between INT4-dequantized and fp16 reference outputs at each
-   projection, for prompt lengths 4K, 32K, 128K.
-2. **Perplexity** on a held-out eval set, reported with the minimum reportable difference rule from
-   METRICS.md §7.
-3. **Long-sequence drift test:** decode 256 tokens at 32K context, compare output-token
-   distribution to fp16 reference at tokens 1, 64, 128, 256 — this catches accumulation errors that
-   short-sequence tests miss.
-
-If any tier-1 tensor fails the acceptance threshold (perplexity within 2× the METRICS.md §7
-minimum reportable difference, or cosine > 0.995 at all sampled positions), the fallback is to
-drop that tensor (or layer-class) to INT8, not to abandon quantization.
+The cost of this carve-out is negligible: 48 MiB of state traffic against 1.9 GiB
+of INT4 weight traffic is ~5% — well within the margin where preserving model
+quality is worth it.
 
 ## Alternatives considered
 
-| Option | Why not | What would change our mind |
-|---|---|---|
-| **INT8 weights only (W8A16)** | Only 2× traffic reduction (3.78 GiB → ~26 tok/s). Leaves a 2× performance gap on the table vs INT4 for a model where the projections are dense GEMVs — exactly the operation INT4 GEMV handles well. | If INT4 quality regression proves unacceptable even with per-layer fallback, INT8 becomes the ceiling. It is the automatic fallback before any tensor is allowed to stay fp16. |
-| **fp16 everywhere (no quantization)** | 7.56 GiB/token → ~13 tok/s ceiling at 100 GB/s. This is the baseline, not the target. Acceptable for correctness validation but not for the headline number or a credible Physical AI demo. | Never — fp16 is the reference, not the deployment. |
-| **INT4 for gates too** | Gates are 0.2% of params and feed directly into the exponential decay path. An INT4 error of ±0.1 in `a` produces exp(±0.1) ≈ ±10% in the decay factor — compounding over 64 tokens means the state could drift arbitrarily. The bandwidth saving is ~0.005 GiB/token. | Only if empirical testing shows the gated scan is insensitive — but the theoretical argument is strong enough that we should not spend experiment time confirming it. |
-| **bf16 recurrent state** | `mamba_ssm_dtype` is explicitly fp32 in config. bf16 halves the 48 MiB state but saves only ~2.4% of INT4 decode traffic (METRICS.md §9 appendix). The state accumulates rank-1 updates over the full sequence — bf16 has only 8 mantissa bits vs fp16's 11, making accumulation error worse. | Re-evaluated under `ob-8qt.4` as a memory optimization (halving resident state for long-context fitting), not a throughput one. Lower priority than INT4 weights. |
-| **fp16 recurrent state** | Same as bf16 but even worse mantissa (10 bits). fp16 cannot represent decay factors below ~6e-8 — the recurrence would silently saturate to zero or one. | Never. This is the one tensor where precision is a hard constraint, not a trade-off. |
-| **Per-layer mixed INT4/INT8 (sensitivity-ranked)** | Requires a calibration pass we cannot run without a loaded model and the x86 oracle. Adds complexity for marginal gain when the FP16 carve-outs already protect the sensitive tensors. | If the validation protocol (§) reveals specific INT4-sensitive large projections, a per-layer sensitivity ranking becomes worthwhile. This is the escalation path, not the starting point. |
+| Option | Why not |
+|---|---|
+| **INT8 weights everywhere, no carve-outs** | 2× decode speedup instead of 4×; still viable if INT4 fails the oracle |
+| **BF16 recurrent state** | Saves ~2–3% of decode traffic at INT4 weights — negligible throughput gain. Worth doing for memory footprint (ob-8qt.4), not for speed. **And on A76-class cores it is the wrong narrow format — see the amendment below.** |
+| **Quantize the state (INT8)** | High risk of accuracy collapse on long-context retrieval; the state is the model's memory, and corrupting it is not recoverable. |
+| **No weight quantization (FP16 baseline)** | Leaves ~4× decode performance on the table — the single largest available optimization. |
 
 ## Consequences
 
-**Accepted costs.** INT4 introduces accuracy risk in 99.87% of weights. The validation protocol
-above is mandatory before any INT4 result is reported as a headline number. INT4 dequantization
-adds a small compute overhead per GEMV, but decode is bandwidth-bound (0.25 FLOP/byte,
-METRICS.md §9), so the extra FLOPs are absorbed by slack compute capacity.
+**Accepted:** INT4 weight quantization requires KleidiAI INT4/i8mm GEMV micro-kernels
+(ob-8qt.2) or an equivalent dequantize-on-the-fly path. The correctness oracle
+(ob-3uh) gates every quantized configuration before its numbers enter a results table.
 
-**Follow-on work.**
-- `ob-onz` — NPU-resident subgraph export with the same per-tensor policy (unblocked by this ADR).
-- `ob-8qt.4` — bf16 state variant, re-scoped as a memory optimization (not throughput).
-- `ob-aqv` — x86/CUDA reference inference must be running before INT4 validation can proceed.
-- New bead suggested: implement the INT4 quantization calibration pipeline once `ob-aqv` is live.
+**Reversal cost:** Low. Each tensor's precision is independently configurable. If
+INT4 fails the oracle, the policy degrades gracefully: INT8 weights with FP32 state
+is still a 2× speedup, and individual layers can be kept in FP16 if per-layer
+sensitivity analysis identifies outliers.
 
-**Reversal cost.** Low-medium. The per-tensor assignment is a policy file (PLAN.md line 388:
-`quant/` directory), not baked into the kernel code. Switching a tier from INT4 to INT8 is a
-config change plus a re-calibration. Switching the entire model back to fp16 is a config flag.
-The one irreversible decision is the KleidiAI dependency for INT4 GEMV — but KleidiAI is
-upstream-able and replaceable with a custom kernel if needed, so even that is not truly locked in.
+---
 
-**Trigger for re-evaluation.** If the validation protocol shows perplexity regression beyond the
-METRICS.md §7 minimum reportable difference at any sampled position, the specific failing tensor(s)
-drop to INT8. If INT8 also fails for a tensor, it joins the FP16 carve-out list. The carve-out
-list is expected to stay small (gates, norms, conv, embeddings) — if it grows past 2% of params,
-that indicates a structural problem with INT4 on this model, not a per-tensor fix.
+## Amendment (2026-08-04): the narrow format is core-class-dependent
+
+Measured on RK3588 (Cortex-A76 big / A55 little) — the first cross-device data for
+the narrow-format question, since everything prior was Cortex-A57 only. The RK3588
+has **hardware fp16 (`asimdhp`) but no hardware bf16** (that needs Armv8.6-A), so
+it exercises the software bf16 conversion path on a fast core, which is the case
+most of the installed Armv8.2 base is in. Single-threaded, governor `performance`,
+thermals flat (bead `ob-8qt.4`, raw data in
+`results/raw/rk3588-t4_{big,little}_singlethread.csv`).
+
+| cumdecay output format | Jetson A57 | RK3588 A76 | RK3588 A55 |
+|---|---:|---:|---:|
+| fp16 | 1.45× | **1.58×** | 1.53× |
+| bf16 | 1.42× | **1.10×** | 1.47× |
+
+**Prefer FP16 over BF16 for narrowed state and output on A76-class cores.** On the
+A76, software bf16 conversion drops the gain to 1.10× at 4B and goes *negative* at
+0.8B (129.5 µs against 124.0 fp32, spreads 1.1%/2.6% — real, not noise): the
+integer-NEON round-to-nearest-even conversion costs about what the saved bytes buy.
+On the slower A55 and A57 the bandwidth saving still dominates and bf16 keeps 1.42–1.47×.
+
+So the fastest core in the fleet is the one where bf16 stops paying. BF16 is worth
+it only with **hardware** support — Armv8.6-A and later, which includes the O6's
+Cortex-A720 — or on a core slow enough to amortise the conversion.
+
+This does not change the headline decision (INT4 weights, FP32 recurrent state,
+FP16 gates); it constrains the *implementation* of the narrow-format carve-out.
+A dispatcher that picks a narrow format must key off the ISA at runtime rather
+than compiling one choice in — `src/orionsbelt/engines/cpu/isa_detect.py` already
+reports `bf16` and `asimdhp` for exactly this.
+
+Unchanged and still the dominant lever: weight quantization, at ~95–99% of decode
+bandwidth. Narrow state remains a memory-footprint optimisation, not a throughput one.
