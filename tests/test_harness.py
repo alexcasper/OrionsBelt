@@ -23,6 +23,9 @@ from bench.harness import (  # noqa: E402
     RepeatTimings,
     SweepConfig,
     SyntheticBackend,
+    _busy_sleep,
+    _fmt_bytes,
+    _fmt_value,
     _rows_from_timing,
     compute_summaries,
     generate_prompt,
@@ -666,3 +669,74 @@ class TestSweepConfigValidation:
             assert self._cfg(device=d.value).device == d.value
         for e in Engine:
             assert self._cfg(engine_gdn=e.value).engine_gdn == e.value
+
+
+# ---------------------------------------------------------------------------
+# _fmt_bytes + _fmt_value + _busy_sleep
+# ---------------------------------------------------------------------------
+
+
+class TestFmtBytes:
+    def test_bytes(self):
+        assert _fmt_bytes(512) == "512.0 B"
+
+    def test_kib(self):
+        assert _fmt_bytes(2048) == "2.0 KiB"
+
+    def test_gib(self):
+        assert _fmt_bytes(3 * 1024**3) == "3.0 GiB"
+
+    def test_pib_overflow(self):
+        assert _fmt_bytes(1024**5) == "1.0 PiB"
+
+
+class TestFmtValue:
+    def test_per_sec_format(self):
+        result = _fmt_value("tokens_per_sec", 800.5)
+        assert "800.50" in result
+
+    def test_ttft_format(self):
+        result = _fmt_value("ttft_seconds", 0.025)
+        assert "25.00ms" in result
+
+    def test_memory_format(self):
+        result = _fmt_value("peak_memory_bytes", 2048)
+        assert "KiB" in result
+
+    def test_generic_format(self):
+        result = _fmt_value("some_metric", 3.14159)
+        assert "3.142" in result
+
+
+class TestBusySleep:
+    def test_returns_after_elapsed(self):
+        import time
+
+        start = time.perf_counter_ns()
+        _busy_sleep(2_000_000)  # 2ms
+        elapsed = time.perf_counter_ns() - start
+        assert elapsed >= 1_500_000  # at least ~2ms (allow scheduling slack)
+
+    def test_zero_is_instant(self):
+        import time
+
+        start = time.perf_counter_ns()
+        _busy_sleep(0)
+        elapsed = time.perf_counter_ns() - start
+        assert elapsed < 1_000_000  # less than 1ms
+
+
+class TestSyntheticBackendTiming:
+    """Test prefill/decode with simulated timing."""
+
+    def test_prefill_with_timing(self):
+        b = SyntheticBackend(QWEN35_4B, prefill_ns_per_token=1000)
+        b.prefill(list(range(50)))
+        assert b._seq_len == 50
+
+    def test_decode_with_timing(self):
+        b = SyntheticBackend(QWEN35_4B, decode_ns_per_step=1000)
+        b.prefill(list(range(10)))
+        token = b.decode_step(5)
+        assert token == 6
+        assert b._seq_len == 11
