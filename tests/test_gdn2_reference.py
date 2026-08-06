@@ -95,7 +95,9 @@ class TestGDN2Recurrent:
         w_gate = np.array([[[0.7, 0.6]]], dtype=np.float64)
         scale = 1.0 / math.sqrt(K)
 
-        o, S = gdn2.gdn2_recurrent(q, k_vec, v_vec, g, b_gate, w_gate, scale=scale, use_qk_l2norm=False)
+        o, S = gdn2.gdn2_recurrent(
+            q, k_vec, v_vec, g, b_gate, w_gate, scale=scale, use_qk_l2norm=False
+        )
 
         # With S=0: erase=0, v_new = [0.7, 1.2]
         # S = outer(k, v_new) = [[0.56, 0.96], [0.42, 0.72]]
@@ -150,10 +152,20 @@ class TestGDN2Recurrent:
 
         # Split run: first half, then continue with returned state
         o_a, S_a = gdn2.gdn2_recurrent(
-            q[:2], k[:2], v[:2], g[:2], b_gate[:2], w_gate[:2],
+            q[:2],
+            k[:2],
+            v[:2],
+            g[:2],
+            b_gate[:2],
+            w_gate[:2],
         )
         o_b, S_b = gdn2.gdn2_recurrent(
-            q[2:], k[2:], v[2:], g[2:], b_gate[2:], w_gate[2:],
+            q[2:],
+            k[2:],
+            v[2:],
+            g[2:],
+            b_gate[2:],
+            w_gate[2:],
             initial_state=S_a,
         )
 

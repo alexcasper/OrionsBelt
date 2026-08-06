@@ -11,7 +11,6 @@ import random
 from pathlib import Path
 
 import pytest
-
 from bench.correctness import (
     CorrectnessReport,
     ToleranceConfig,
@@ -410,9 +409,7 @@ class TestCompareReference:
         cand = _make_ref_entry(topk_window=[cand_window])
         cfg = ToleranceConfig(topk=5, topk_min_accuracy=0.8)
         report = compare_reference(ref, cand, cfg)
-        overlap_metric = next(
-            (m for m in report.metrics if "topk_window_overlap" in m.name), None
-        )
+        overlap_metric = next((m for m in report.metrics if "topk_window_overlap" in m.name), None)
         assert overlap_metric is not None
         assert overlap_metric.value == pytest.approx(0.6)  # 3/5
         assert not overlap_metric.passed  # 0.6 < 0.8
@@ -423,9 +420,7 @@ class TestCompareReference:
         cand = _make_ref_entry(generated_token_ids=[1, 2, 9, 4, 5])  # 4/5 match
         cfg = ToleranceConfig(argmax_accuracy_threshold=0.8)
         report = compare_reference(ref, cand, cfg)
-        gen_metric = next(
-            (m for m in report.metrics if m.name == "generated_token_accuracy"), None
-        )
+        gen_metric = next((m for m in report.metrics if m.name == "generated_token_accuracy"), None)
         assert gen_metric is not None
         assert gen_metric.value == pytest.approx(0.8)
         assert gen_metric.passed  # exactly at threshold
