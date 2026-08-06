@@ -92,7 +92,7 @@ Of the 7 replicate runs with a manifest, **3 recorded `dirty: true`** at capture
 
 **1 have no manifest at all** (jetson-j2_single) — PLAN.md section 9: a number without a manifest is not a result.
 
-This limits the section above more than the spread itself does. `dirty: true` means the recorded SHA does **not** identify the code that produced the numbers, so two runs labelled with the same commit may have executed genuinely different binaries. The RK3588 gap therefore cannot be attributed to environment rather than to code — both explanations stay open and neither is settleable from the committed data. Any re-run for `ob-bf7` must be taken from a clean tree.
+This limits the section above more than the spread itself does. `dirty: true` means the recorded SHA does **not** identify the code that produced the numbers, so two runs labelled with the same commit may have executed genuinely different binaries. The Pi 5 and Jetson replicate gaps cannot be attributed to environment rather than to code — both explanations stay open. The RK3588 pair is now fully clean (both t3 and t4 at `dirty=false` with optimized kernels), so their ~5% big-cluster agreement is a genuine environmental measurement. Any re-run for `ob-bf7` on the remaining devices must be taken from a clean tree.
 
 This report uses `t4` for RK3588 (clean, optimized at `fe32f1c`) and `r5` for the Pi 5. t3 confirms the RK3588 result on independent silicon.
 **Treat the predictions as order-of-magnitude, not as a fit.** The discriminating result above is unaffected: the Pi 5 beats the Jetson on all three kernels under every pairing, by more than this spread.

@@ -325,7 +325,7 @@ def _provenance_audit_lines():
     This is the caveat that limits the replicate-spread analysis above. A manifest
     with ``dirty: true`` means the recorded SHA does not identify the code that ran,
     so two runs labelled with the same commit may have executed different binaries
-    — which is why the RK3588 gap cannot be pinned on environment.
+    — which is why dirty-tree replicate gaps cannot be pinned on environment.
     """
     dirty, clean, missing = [], [], []
     for _cls, runs in REPLICATES:
@@ -370,9 +370,11 @@ def _provenance_audit_lines():
         "This limits the section above more than the spread itself does. `dirty: true` means the "
         "recorded SHA does **not** identify the code that produced the numbers, so two runs "
         "labelled with the same commit may have executed genuinely different binaries. The "
-        "RK3588 gap therefore cannot be attributed to environment rather than to code — both "
-        "explanations stay open and neither is settleable from the committed data. Any re-run "
-        "for `ob-bf7` must be taken from a clean tree."
+        "Pi 5 and Jetson replicate gaps cannot be attributed to environment rather than to "
+        "code — both explanations stay open. The RK3588 pair is now fully clean (both t3 and "
+        "t4 at `dirty=false` with optimized kernels), so their ~5% big-cluster agreement is a "
+        "genuine environmental measurement. Any re-run for `ob-bf7` on the remaining devices "
+        "must be taken from a clean tree."
     )
     out.append("")
     return out
