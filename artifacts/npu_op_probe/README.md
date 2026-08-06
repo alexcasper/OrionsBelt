@@ -45,7 +45,7 @@ verified locally, so a failure is a NOE coverage gap rather than a malformed inp
 - `01_causal_conv1d` is verified **genuinely causal**: perturbing the final timestep leaves every
   earlier output bit-identical (max delta 0.0) while changing the last one
 
-## Running the audit once the SDK is installed
+## CIX NOE audit (completed)
 
 In the NOE SDK's Python 3.10 environment (`cixbuild -v` should work first):
 
@@ -70,3 +70,18 @@ A negative result is the finding, not a failure. "The NOE Compiler has no kernel
 recurrent scan" is precisely the empirical justification the mapping ADR needs for routing the
 sequential scan to GPU/CPU while keeping dense per-chunk math on the NPU. It is also the most
 reusable thing this project can hand to anyone else porting a GDN-class model to this silicon.
+
+## RKNN audit (completed 2026-08-06, bead ob-t3b.5)
+
+The same seven probes were fed to Rockchip's rknn-toolkit2 v2.3.2 on the RK3588 device itself.
+RKNN is an entirely independent vendor toolchain (Rockchip vs CIX), so agreement on the recurrence
+limitation generalises the finding beyond one vendor.
+
+```bash
+# On the RK3588 (aarch64), Python 3.10:
+pip3 install rknn-toolkit2
+python3 scripts/rknn_op_probe.py
+```
+
+Results are in `rknn_audit/` with per-probe logs and `rknn_audit_results.json`.
+Written up in `docs/FINDINGS.md` §7.

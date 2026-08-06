@@ -238,10 +238,10 @@ class TestRegistryIntegrity:
         assert len(paths) == len(set(paths)), f"Duplicate CSV paths: {paths}"
 
     def test_replicates_structure(self):
-        """Each replicate group is (class, note, [(label, path), ...])."""
-        for cls, note, runs in fa.REPLICATES:
+        """Each replicate group is (class, [(label, path), ...]). Notes are generated
+        dynamically from manifest provenance (ob-9t0.3), not hardcoded."""
+        for cls, runs in fa.REPLICATES:
             assert isinstance(cls, str) and cls
-            assert isinstance(note, str) and note
             assert isinstance(runs, list) and len(runs) >= 2
             for label, path in runs:
                 assert isinstance(label, str) and label
@@ -400,7 +400,7 @@ class TestProvenanceAudit:
         manifest_dir.mkdir(parents=True, exist_ok=True)
 
         # Create dirty manifests for all replicate paths
-        for _cls, _note, runs in fa.REPLICATES:
+        for _cls, runs in fa.REPLICATES:
             for _label, csv_path in runs:
                 base = os.path.basename(csv_path).replace(".csv", "")
                 # Handle _big/_little suffix mapping
@@ -444,7 +444,7 @@ class TestProvenanceAudit:
         manifest_dir.mkdir(parents=True, exist_ok=True)
 
         # Make first replicate group's manifests clean, rest dirty
-        for i, (_cls, _note, runs) in enumerate(fa.REPLICATES):
+        for i, (_cls, runs) in enumerate(fa.REPLICATES):
             for _label, csv_path in runs:
                 base = os.path.basename(csv_path).replace(".csv", "")
                 candidates = [base]

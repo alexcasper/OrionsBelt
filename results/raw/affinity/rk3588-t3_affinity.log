@@ -1,0 +1,7 @@
+# big.LITTLE affinity study (ob-dqu)
+# device: RK3588 (4xA76@2.3GHz + 4xA55@1.8GHz)
+# repeats: 30
+# thermal_before: 38846
+# governor: performance
+# thermal_after: 41615
+# thermal_delta: 2769

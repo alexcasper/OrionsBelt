@@ -65,24 +65,24 @@ class TestCentralClaim:
         ratio = b.kv_cache_bytes / b.recurrent_state_bytes
         assert ratio > 100  # expected ~170x
 
-    def test_kv_vs_weights_at_262k_is_precision_dependent(self):
-        """At 262K the KV cache is large but does NOT exceed FP16 weights.
+    def test_kv_exceeds_fp16_weights_at_262k(self):
+        """At 262K the KV cache exceeds even FP16 text-model weights.
 
-        Corrected 2026-08-03. The original assertion (`kv_cache_bytes > weights_bytes`)
-        was simply false for this checkpoint and the test failed on main. Verified
-        independently: KV at 262K is 8.00 GiB (8 full-attention layers x K+V x 4 KV heads
-        x head_dim 256 x 262144 x 2 bytes), while FP16 weights are 10.41 GiB for the full
-        checkpoint including the vision tower and MTP head.
+        Corrected 2026-08-06. The previous test assumed FP16 weights of 10.41 GiB
+        (based on wrong intermediate_size=12288 and double-counted tied embeddings).
+        The actual HuggingFace config.json has intermediate_size=9216 and
+        tie_word_embeddings=True, giving FP16 text-model weights of 7.83 GiB.
 
-        So "the KV cache dwarfs the weights" is PRECISION-DEPENDENT, not absolute:
-        false at FP16 (0.8x), true at INT4 (~3.1x). The honest framing, and the one the
-        README now uses, is that the cache grows without bound while the recurrent state
-        does not -- which is the architectural claim and holds at every precision.
+        KV cache at 262K = 8.00 GiB (8 full-attention layers x K+V x 4 KV heads
+        x head_dim 256 x 262144 x 2 bytes).
+
+        So the KV cache at 262K now EXCEEDS the FP16 text-model weights — a
+        stronger result than before. The recurrent state remains flat at 48 MiB
+        regardless of context length. This is the architectural O(1) vs O(n) claim.
         """
         b = predict_breakdown("4B", 262144)
-        assert b.kv_cache_bytes < b.weights_bytes, "FP16 weights still exceed KV at 262K"
-        # But the cache is the same order as the weights, which is the real point:
-        assert b.kv_cache_bytes > 0.5 * b.weights_bytes
+        # KV cache now exceeds FP16 text-model weights:
+        assert b.kv_cache_bytes > b.weights_bytes, "KV at 262K should exceed FP16 text weights"
         # And it utterly dominates the recurrent state, which is the claim that matters.
         assert b.kv_cache_bytes > 100 * b.recurrent_state_bytes
 

@@ -1,231 +1,263 @@
 #!/usr/bin/env python3
-"""Feed the NPU operator-coverage ONNX probes to the Rockchip RKNN toolkit.
+"""
+RKNN operator-coverage probe — the RK3588/RKNN counterpart to the CIX NOE audit.
 
-Bead ``ob-t3b.5``. The same seven probe graphs that were driven through the CIX
-NOE Compiler (``ob-t3b.1``, see ``docs/FINDINGS.md`` §1) are now fed to the
-entirely independent Rockchip RKNN toolchain on the RK3588.  If RKNN rejects
-the same control-flow operators (Scan, runtime-length Loop), the finding
-generalises from "a CIX limitation" to "edge NPU toolchains generally cannot
-host a linear-attention recurrence".
+Feeds the same seven ONNX probe graphs from artifacts/npu_op_probe/ through
+rknn-toolkit2's load_onnx + build pipeline and records what it accepts,
+silently falls back on, or rejects.
 
-Usage::
-
-    python3 scripts/rknn_op_probe.py --probe-dir artifacts/npu_op_probe --out artifacts/npu_op_probe/audit_rknn
-
-Outputs one log file per probe plus a summary JSON.
-Requires rknn-toolkit2 (pip install rknn-toolkit2).
+Bead: ob-t3b.5
 """
 
 import json
+import os
+import re
+import subprocess
 import sys
-import traceback
 from pathlib import Path
 
-PROBE_DESCRIPTIONS = {
-    "01_causal_conv1d": ("Conv", "GDN depthwise causal Conv1D (asymmetric pads)"),
-    "02_decay_cumprod": ("Log,CumSum,Exp", "Gated decay via exp(cumsum(log(a)))"),
-    "03_delta_rule_update": ("MatMul,Sub,Add", "Delta-rule state update S←(I−kkᵀ)S+kvᵀ"),
-    "04_gate_chain": ("Sigmoid,Softplus", "Elementwise gate chain"),
-    "05_scan_recurrence": ("Scan", "Chunk-to-chunk recurrence via ONNX Scan"),
-    "06_loop_recurrence": ("Loop (const)", "Recurrence via Loop, compile-time trip count"),
-    "07_loop_dynamic_trip": ("Loop (runtime)", "Recurrence via Loop, runtime trip count"),
-}
+PROBE_DIR = Path("artifacts/npu_op_probe")
+OUT_DIR = Path("artifacts/npu_op_probe/rknn_audit")
+MANIFEST = PROBE_DIR / "manifest.json"
 
 
-def probe_one(rknn, onnx_path):
-    """Run a single ONNX probe through the RKNN pipeline.
+def extract_op_table(output: str) -> list:
+    """Parse the 'Network Layer Information Table' from RKNN verbose output."""
+    ops = []
+    in_table = False
+    for line in output.split("\n"):
+        # Strip RKNN log prefix: "D RKNN: [HH:MM:SS.mmm] actual content"
+        clean = re.sub(r"^[DIEW]\s+RKNN:\s*\[[\d:.]+\]\s*", "", line.strip())
+        # Also strip ANSI color codes
+        clean = re.sub(r"\x1b\[[0-9;]*m", "", clean)
 
-    Returns a dict with stage results.
-    """
+        if "Network Layer Information Table" in clean:
+            in_table = True
+            continue
+        if in_table:
+            if clean.startswith("---") and len(ops) > 0:
+                break
+            if clean.startswith("---"):
+                continue
+            # Skip header row
+            if clean.startswith("ID"):
+                continue
+            parts = clean.split()
+            if len(parts) >= 4 and parts[0].isdigit():
+                op_id = parts[0]
+                op_type = parts[1]
+                dtype = parts[2]
+                target = parts[3]
+                ops.append(
+                    {
+                        "id": int(op_id),
+                        "op_type": op_type,
+                        "dtype": dtype,
+                        "target": target,
+                    }
+                )
+    return ops
+
+
+def extract_key_evidence(output: str) -> list:
+    """Extract the most informative lines for the results table."""
+    keywords = [
+        "unsupported",
+        "UNSUPPORTED",
+        "not support",
+        "not found",
+        "fallback",
+        "FALLBACK",
+        "error",
+        "ERROR",
+        "_RET=",
+        "RKNN_FILE_SIZE=",
+        "Graph is not DAG",
+        "cannot",
+        "failed",
+    ]
+    lines = []
+    for line in output.split("\n"):
+        stripped = line.strip()
+        # Strip ANSI color codes
+        clean = re.sub(r"\x1b\[[0-9;]*m", "", stripped)
+        for kw in keywords:
+            if kw.lower() in clean.lower():
+                lines.append(clean[:200])
+                break
+    return lines[:30]
+
+
+def probe_one(onnx_path: str, probe_name: str) -> dict:
+    """Run one ONNX probe through RKNN toolkit2 with full verbose capture."""
+
+    script = f'''
+import sys, os
+os.environ["RKNN_LOG_LEVEL"] = "3"
+from rknn.api import RKNN
+
+rknn = RKNN(verbose=True)
+
+ret = rknn.config(
+    mean_values=[],
+    std_values=[],
+    target_platform="rk3588",
+    float_dtype="float16",
+    optimization_level=3,
+)
+print(f"CONFIG_RET={{ret}}", file=sys.stderr)
+
+ret = rknn.load_onnx(model="{onnx_path}")
+print(f"LOAD_RET={{ret}}", file=sys.stderr)
+
+if ret == 0:
+    ret = rknn.build(do_quantization=False)
+    print(f"BUILD_RET={{ret}}", file=sys.stderr)
+
+    if ret == 0:
+        ret = rknn.export_rknn("/tmp/{probe_name}.rknn")
+        print(f"EXPORT_RET={{ret}}", file=sys.stderr)
+        import os as _os
+        if _os.path.exists("/tmp/{probe_name}.rknn"):
+            print(f"RKNN_FILE_SIZE={{_os.path.getsize('/tmp/{probe_name}.rknn')}}", file=sys.stderr)
+            _os.remove("/tmp/{probe_name}.rknn")
+
+rknn.release()
+'''
+
+    proc = subprocess.run(
+        [sys.executable, "-c", script],
+        capture_output=True,
+        text=True,
+        timeout=120,
+        errors="replace",  # RKNN may emit non-UTF-8 bytes on rejection
+    )
+
+    combined = proc.stdout + "\n" + proc.stderr
+
+    # Save full log
+    log_path = OUT_DIR / f"{probe_name}.log"
+    with open(log_path, "w") as f:
+        f.write(combined)
+
+    # Parse results
+    config_ret = re.search(r"CONFIG_RET=(\d+)", combined)
+    load_ret = re.search(r"LOAD_RET=(\d+)", combined)
+    build_ret = re.search(r"BUILD_RET=(\d+)", combined)
+    export_ret = re.search(r"EXPORT_RET=(\d+)", combined)
+    file_size = re.search(r"RKNN_FILE_SIZE=(\d+)", combined)
+
     result = {
-        "probe": Path(onnx_path).stem,
-        "onnx_ops": PROBE_DESCRIPTIONS.get(Path(onnx_path).stem, ("?", "?"))[0],
-        "description": PROBE_DESCRIPTIONS.get(Path(onnx_path).stem, ("?", "?"))[1],
-        "load_onnx": None,
-        "build": None,
-        "export": None,
-        "verdict": None,
-        "error": None,
-        "stderr": None,
+        "probe": probe_name,
+        "config_ret": int(config_ret.group(1)) if config_ret else None,
+        "load_ret": int(load_ret.group(1)) if load_ret else None,
+        "build_ret": int(build_ret.group(1)) if build_ret else None,
+        "export_ret": int(export_ret.group(1)) if export_ret else None,
+        "rknn_file_size": int(file_size.group(1)) if file_size else None,
+        "op_table": extract_op_table(combined),
+        "evidence": extract_key_evidence(combined),
+        "log": f"{probe_name}.log",
     }
 
-    # Stage 1: load_onnx
-    try:
-        ret = rknn.load_onnx(model=str(onnx_path))
-        if ret != 0:
-            result["load_onnx"] = f"FAILED (rc={ret})"
-            result["verdict"] = "rejected"
-            result["error"] = f"load_onnx returned {ret}"
-            return result
-        result["load_onnx"] = "OK"
-    except Exception as e:
-        msg = str(e)
-        result["load_onnx"] = f"EXCEPTION: {msg[:200]}"
-        result["verdict"] = "rejected"
-        result["error"] = traceback.format_exc()[-500:]
-        return result
+    # Determine verdict
+    if result["load_ret"] != 0:
+        result["verdict"] = "REJECTED_AT_LOAD"
+    elif result["build_ret"] != 0:
+        result["verdict"] = "REJECTED_AT_BUILD"
+    elif result["export_ret"] != 0:
+        result["verdict"] = "COMPILED_NO_EXPORT"
+    else:
+        result["verdict"] = "COMPILED"
 
-    # Stage 2: build (no quantization — we are testing operator coverage)
-    try:
-        ret = rknn.build(do_quantization=False)
-        if ret != 0:
-            result["build"] = f"FAILED (rc={ret})"
-            result["verdict"] = "rejected"
-            result["error"] = f"build returned {ret}"
-            return result
-        result["build"] = "OK"
-    except Exception as e:
-        msg = str(e)
-        result["build"] = f"EXCEPTION: {msg[:200]}"
-        result["verdict"] = "rejected"
-        result["error"] = traceback.format_exc()[-500:]
-        return result
-
-    # Stage 3: export (confirms a valid RKNN model was produced)
-    try:
-        export_path = str(onnx_path).replace(".onnx", ".rknn")
-        ret = rknn.export_rknn(export_path)
-        if ret != 0:
-            result["export"] = f"FAILED (rc={ret})"
-            # Build succeeded but export failed — still counts as "compiles"
-            result["verdict"] = "compiles (export failed)"
-            return result
-        result["export"] = "OK"
-        result["verdict"] = "compiles"
-    except Exception as e:
-        msg = str(e)
-        result["export"] = f"EXCEPTION: {msg[:200]}"
-        result["verdict"] = "compiles (export failed)"
-        return result
+    # Check for CPU fallbacks in op table
+    if result["op_table"]:
+        cpu_ops = [
+            op
+            for op in result["op_table"]
+            if op["target"] == "CPU" and op["op_type"] not in ("InputOperator", "OutputOperator")
+        ]
+        npu_ops = [op for op in result["op_table"] if op["target"] == "NPU"]
+        result["cpu_fallback_ops"] = [f"{op['op_type']}:{op['id']}" for op in cpu_ops]
+        result["npu_ops"] = [f"{op['op_type']}:{op['id']}" for op in npu_ops]
 
     return result
 
 
 def main():
-    import argparse
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
 
-    parser = argparse.ArgumentParser(description="RKNN NPU operator-coverage probe (ob-t3b.5)")
-    parser.add_argument(
-        "--probe-dir",
-        default="artifacts/npu_op_probe",
-        help="Directory containing the ONNX probe graphs",
-    )
-    parser.add_argument(
-        "--out",
-        default="artifacts/npu_op_probe/audit_rknn",
-        help="Output directory for logs and summary",
-    )
-    args = parser.parse_args()
-
-    probe_dir = Path(args.probe_dir)
-    out_dir = Path(args.out)
-    out_dir.mkdir(parents=True, exist_ok=True)
-
-    # Find all .onnx files (sorted)
-    onnx_files = sorted(probe_dir.glob("*.onnx"))
-    if not onnx_files:
-        print(f"ERROR: no .onnx files found in {probe_dir}")
-        return 1
-
-    print("RKNN operator-coverage probe (ob-t3b.5)")
-    print("Toolkit: rknn-toolkit2")
-    print(f"Probes: {len(onnx_files)}")
-    print(f"Output: {out_dir}")
-    print("=" * 72)
-
-    from rknn.api import RKNN
+    with open(MANIFEST) as f:
+        manifest = json.load(f)
 
     results = []
-    for onnx_path in onnx_files:
-        stem = onnx_path.stem
-        print(f"\n--- {stem} ---")
-        print(f"  Ops: {PROBE_DESCRIPTIONS.get(stem, ('?', '?'))[0]}")
-        print(f"  Desc: {PROBE_DESCRIPTIONS.get(stem, ('?', '?'))[1]}")
 
-        # Each probe needs a fresh RKNN instance
-        rknn = RKNN(verbose=False)
+    for entry in manifest:
+        probe_name = entry["probe"]
+        onnx_file = entry["file"]
+        onnx_path = str(PROBE_DIR / onnx_file)
+        ops = entry["ops"]
 
-        # config() must be called before load_onnx()
-        # No mean/std — these are not image models (varying channel dims)
-        rknn.config(
-            target_platform="rk3588",
-            float_dtype="float16",
-            optimization_level=3,
+        print(f"\n{'=' * 70}")
+        print(f"Probe: {probe_name} ({onnx_file})")
+        print(f"  ONNX ops: {', '.join(ops)}")
+        print(f"{'=' * 70}")
+
+        if not os.path.exists(onnx_path):
+            print("  SKIP: file not found")
+            continue
+
+        result = probe_one(onnx_path, probe_name)
+        result["onnx_ops"] = ops
+        result["description"] = entry["description"]
+
+        print(f"  Verdict: {result['verdict']}")
+        print(
+            f"  load_ret={result['load_ret']} build_ret={result['build_ret']} export_ret={result['export_ret']}"
         )
 
-        # Capture stderr from the C library (RKNN prints to stderr)
-        import io
+        if result.get("op_table"):
+            print("  Op placement:")
+            for op in result["op_table"]:
+                marker = (
+                    " ← CPU FALLBACK"
+                    if op["target"] == "CPU"
+                    and op["op_type"] not in ("InputOperator", "OutputOperator")
+                    else ""
+                )
+                print(f"    [{op['target']:3s}] {op['op_type']:<20s} {op['dtype']}{marker}")
 
-        old_stderr = sys.stderr
-        sys.stderr = captured = io.StringIO()
+        if result.get("cpu_fallback_ops"):
+            print(f"  CPU FALLBACKS: {', '.join(result['cpu_fallback_ops'])}")
 
-        result = probe_one(rknn, onnx_path)
-
-        sys.stderr = old_stderr
-        result["stderr"] = captured.getvalue()[-2000:] if captured.getvalue() else None
-
-        rknn.release()
-
-        # Print results
-        print(f"  load_onnx: {result['load_onnx']}")
-        print(f"  build:     {result['build']}")
-        print(f"  export:    {result['export']}")
-        print(f"  VERDICT:   {result['verdict']}")
-        if result["stderr"]:
-            # Extract relevant lines
-            for line in result["stderr"].split("\n"):
-                line = line.strip()
-                if line and (
-                    "ERROR" in line.upper()
-                    or "UNSUPPORT" in line.upper()
-                    or "WARN" in line.upper()
-                    or "FAIL" in line.upper()
-                ):
-                    print(f"  log: {line[:120]}")
-
-        # Write per-probe log
-        log_path = out_dir / f"{stem}.rknn.log"
-        with open(log_path, "w") as f:
-            f.write(f"Probe: {stem}\n")
-            f.write(f"ONNX ops: {result['onnx_ops']}\n")
-            f.write(f"Description: {result['description']}\n")
-            f.write(f"load_onnx: {result['load_onnx']}\n")
-            f.write(f"build: {result['build']}\n")
-            f.write(f"export: {result['export']}\n")
-            f.write(f"verdict: {result['verdict']}\n")
-            if result["error"]:
-                f.write(f"\n--- Error/Traceback ---\n{result['error']}\n")
-            if result["stderr"]:
-                f.write(f"\n--- Captured stderr ---\n{result['stderr']}\n")
-        print(f"  log saved: {log_path}")
+        if result["evidence"]:
+            print("  Key evidence:")
+            for e in result["evidence"][:8]:
+                print(f"    {e}")
 
         results.append(result)
 
-    # Write summary JSON
-    summary_path = out_dir / "summary.json"
-    summary = {
-        "toolkit": "rknn-toolkit2",
-        "version": "2.3.2",
-        "device": "rk3588-t4",
-        "probe_count": len(results),
-        "results": results,
-    }
-    with open(summary_path, "w") as f:
-        json.dump(summary, f, indent=2)
+    # Write results JSON
+    results_path = OUT_DIR / "rknn_audit_results.json"
+    with open(results_path, "w") as f:
+        json.dump(results, f, indent=2)
 
-    # Print summary table
-    print("\n" + "=" * 72)
-    print("SUMMARY")
-    print("=" * 72)
-    print(f"{'Probe':<30s} {'ONNX ops':<22s} {'Verdict'}")
-    print("-" * 72)
+    # Summary
+    print(f"\n{'=' * 70}")
+    print(f"SUMMARY: {len(results)} probes completed")
+    print(f"Results written to: {results_path}")
+    print(f"{'=' * 70}\n")
+
+    print(f"{'Probe':<25} {'Verdict':<20} {'CPU Fallbacks':<30} {'Notes'}")
+    print("-" * 100)
     for r in results:
-        print(f"{r['probe']:<30s} {r['onnx_ops']:<22s} {r['verdict']}")
-    print("-" * 72)
-    print(f"\nSummary JSON: {summary_path}")
-
-    return 0
+        fallbacks = ", ".join(r.get("cpu_fallback_ops", [])) or "—"
+        notes = ""
+        if r["verdict"] == "COMPILED" and not r.get("cpu_fallback_ops"):
+            notes = "all-NPU"
+        elif r["verdict"] == "COMPILED":
+            notes = "silent fallback"
+        print(f"{r['probe']:<25} {r['verdict']:<20} {fallbacks:<30} {notes}")
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    main()
