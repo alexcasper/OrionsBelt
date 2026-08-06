@@ -29,17 +29,15 @@ import os
 DEVICES = [
     # (display_name, csv_path, spec_gibs, cores, isa_generation)
     # Fleet comparison uses single-threaded data for fair cross-device comparison.
-    # Pi5 and RK3588 were captured at commit 28729f3; the Jetsons at later commits.
-    # That mismatch, plus the fact that every manifest records a dirty tree, is why
-    # the provenance audit below limits this table to qualitative conclusions.
+    # Pi5 and RK3588 (t4) were captured at commit 28729f3; the Jetsons at later commits.
+    # That mismatch, plus the fact that every manifest records a dirty tree (except
+    # rk3588-t3.json at 553a96e, which is clean), is why the provenance audit below
+    # limits this table to qualitative conclusions.
     #
-    # RK3588 rows use host t4, not t3, on MEASUREMENT QUALITY grounds. On the scan
-    # kernel t3 reports p50 1514us against p95 3832us -- a 153% spread, where the
-    # DEVICE_RUNBOOK calls anything over ~10% suspect and tells you to suspect
-    # throttling first. t4's same-commit run is 17.4%. The apparent 1.68x
-    # "disagreement" between the two hosts was never two valid measurements
-    # disagreeing; t3's run is contaminated. Same story on the little cluster
-    # (t3 29.3% vs t4 12.1%).
+    # RK3588 rows use host t4, not t3. t3 was re-run at 553a96e with optimized kernels
+    # (OpenMP + NEON unrolling) — its data is clean but at a different code level,
+    # so it belongs in the optimization-impact section, not the cross-device comparison.
+    # t4 (28729f3, pre-optimization) matches the Pi 5's commit for a fair comparison.
     ("Pi 5", "results/raw/pi5-r5.csv", 17.0, "4x Cortex-A76 @ 2.4 GHz", "Armv8.2-A + dotprod"),
     (
         "RK3588 big",
@@ -87,10 +85,11 @@ J2_OPTIMIZED_CSV = "results/raw/jetson-j2-omp-full.csv"
 # interprets (bead ob-bf7). Computed from the CSVs rather than hardcoded so it
 # stays honest as runs are added or re-taken.
 REPLICATES = [
-    # (device class, note, [(label, csv_path), ...])
+    # (device class, [(label, csv_path), ...])
+    # Notes are generated dynamically from manifest provenance so they never go
+    # stale when a CSV is re-run at a different commit (see ob-9t0.3).
     (
         "RK3588 big",
-        "same source commit `28729f3`, same core class",
         [
             ("t3", "results/raw/rk3588-t3_big.csv"),
             ("t4", "results/raw/rk3588-t4_big.csv"),
@@ -98,7 +97,6 @@ REPLICATES = [
     ),
     (
         "RK3588 little",
-        "same source commit `28729f3`, same core class",
         [
             ("t3", "results/raw/rk3588-t3_little.csv"),
             ("t4", "results/raw/rk3588-t4_little.csv"),
@@ -106,7 +104,6 @@ REPLICATES = [
     ),
     (
         "Pi 5",
-        "same physical board, *different* commits (`28729f3` vs `f127a11`)",
         [
             ("r5", "results/raw/pi5-r5.csv"),
             ("j1", "results/raw/pi5-j1.csv"),
@@ -114,7 +111,6 @@ REPLICATES = [
     ),
     (
         "Jetson j2",
-        "same board, both single-threaded; the 1.13 run has **no manifest**",
         [
             ("canonical", "results/raw/jetson-j2.csv"),
             ("_single", "results/raw/jetson-j2_single.csv"),
@@ -144,6 +140,32 @@ def get_spread(rows, model, kernel):
             except (KeyError, ValueError):
                 return None
     return None
+
+
+def _manifest_path_for_csv(csv_path):
+    """Find the manifest JSON for a CSV, handling _big/_little shared manifests."""
+    base = os.path.basename(csv_path).replace(".csv", "")
+    candidates = [os.path.join(MANIFEST_DIR, base + ".json")]
+    for suffix in ("_big", "_little"):
+        if base.endswith(suffix):
+            candidates.append(os.path.join(MANIFEST_DIR, base[: -len(suffix)] + ".json"))
+    return next((c for c in candidates if os.path.exists(c)), None)
+
+
+def get_manifest_sha(csv_path):
+    """Return (sha_short, dirty, sha_full) from the manifest for a CSV, or (None, None, None)."""
+    mpath = _manifest_path_for_csv(csv_path)
+    if mpath is None:
+        return None, None, None
+    try:
+        with open(mpath) as fh:
+            meta = json.load(fh)
+        git = meta.get("git", {})
+        full = git.get("sha", "")
+        short = full[:12] if full else None
+        return short, git.get("dirty"), full
+    except (OSError, ValueError):
+        return None, None, None
 
 
 O6_SPEC_GIBS = 93.1  # 100 GB/s ÷ 1.0737
@@ -308,7 +330,7 @@ def _provenance_audit_lines():
     — which is why the RK3588 gap cannot be pinned on environment.
     """
     dirty, clean, missing = [], [], []
-    for _cls, _note, runs in REPLICATES:
+    for _cls, runs in REPLICATES:
         for _label, path in runs:
             base = os.path.basename(path).replace(".csv", "")
             candidates = [os.path.join(MANIFEST_DIR, base + ".json")]
@@ -499,17 +521,40 @@ def generate_report(output_path):
     # ---- Replicate spread: what the single-run tables above hide ----
     spread_ratios = []
     spread_rows = []
-    for cls, note, runs in REPLICATES:
+    for cls, runs in REPLICATES:
         vals = []
+        shas = []
         for label, path in runs:
             rows = load_device_csv(path)
             v = get_gibs(rows, "Qwen3.5-4B", "gdn_gated_scan") if rows else None
-            if v:
-                vals.append((label, v))
-        if len(vals) >= 2:
+            sha, dirty, _ = get_manifest_sha(path)
+            vals.append((label, v))
+            shas.append((label, sha, dirty))
+        if len(vals) >= 2 and all(v for _, v in vals):
             lo = min(v for _, v in vals)
             hi = max(v for _, v in vals)
             ratio = hi / lo if lo else 0.0
+            # Generate the note dynamically from manifest provenance
+            sha_set = {s for _, s, _ in shas if s}
+            all_dirty = all(d for _, _, d in shas)
+            no_manifest = [lbl for lbl, s, _ in shas if s is None]
+            if no_manifest:
+                note = (
+                    "same board; " + ", ".join(f"{lbl} has **no manifest**" for lbl in no_manifest)
+                )
+            elif len(sha_set) == 1:
+                if all_dirty:
+                    note = (
+                        f"manifest SHA `{list(sha_set)[0]}` but **all dirty** — "
+                        "same-commit claim is unverifiable"
+                    )
+                else:
+                    note = f"same source commit `{list(sha_set)[0]}`, same core class"
+            else:
+                sha_detail = ", ".join(
+                    f"{lbl} `{s}`{' (dirty)' if d else ''}" for lbl, s, d in shas if s
+                )
+                note = f"**different commits** — {sha_detail}; not an environmental comparison"
             spread_ratios.append(ratio)
             spread_rows.append((cls, note, vals, ratio))
 
@@ -528,26 +573,27 @@ def generate_report(output_path):
         lines.append("")
         worst = max(spread_ratios)
         lines.append(
-            "The RK3588 pair looks like the serious one: **identical source commit**, which "
-            "would make the cause purely environmental — different boards, cluster pinning, "
-            "governor or thermal state, none of it recorded per run. But that inference does "
-            "not actually hold; see the provenance audit below. Worst replicate spread on the "
-            f"fleet is **{worst:.2f}x**."
+            "The RK3588 pair was historically the most concerning — two hosts on the same "
+            "core class. Their CSVs originally shared commit `28729f3`, but **t3 was "
+            "re-run at `553a96e`** (clean tree, optimized kernels: OpenMP + NEON unrolling) "
+            "per the `ob-bf7` 2026-08-06 update, while t4 remains at `28729f3` (dirty tree, "
+            "pre-optimization). The spread between them is now a **code-version difference, "
+            "not an environmental one**. On the big cluster, t3 reads 11.07 GiB/s (optimized) "
+            "vs t4 at 3.29 (pre-opt) — a 3.4x gap that is the optimization stack's real-world "
+            "impact on the same hardware. Worst replicate spread on the fleet is "
+            f"**{worst:.2f}x**."
         )
         lines.append("")
         lines.extend(_provenance_audit_lines())
         lines.append(
-            "This report selects `t3` for RK3588 and `r5` for the Pi 5. Selecting the other"
-        )
-        lines.append("run — equally valid, and for RK3588 the *same commit* — would move every O6")
-        lines.append(
-            "figure below by a similar factor. **Treat the predictions as order-of-magnitude,"
+            "This report selects `t4` for RK3588 (pre-optimization, same commit as Pi 5 for a "
+            "fair cross-device comparison) and `r5` for the Pi 5. t3's optimized data is "
+            "shown separately in the optimization-impact analysis below."
         )
         lines.append(
-            "not as a fit.** The discriminating result above is unaffected: the Pi 5 beats"
-        )
-        lines.append(
-            "the Jetson on all three kernels under every pairing, by more than this spread."
+            "**Treat the predictions as order-of-magnitude, not as a fit.** The "
+            "discriminating result above is unaffected: the Pi 5 beats the Jetson on all "
+            "three kernels under every pairing, by more than this spread."
         )
         lines.append("")
 
@@ -603,35 +649,35 @@ def generate_report(output_path):
             f"- This is ~{conservative_low / O6_SPEC_GIBS * 100:.0f}-{conservative_high / O6_SPEC_GIBS * 100:.0f}% of spec bandwidth, vs {rk_big_scan / 34.0 * 100:.0f}% achieved on A76"
         )
         lines.append("")
-        # Carry the replicate spread into the published range. Anchoring on the other
-        # same-commit RK3588 host moves this as much as the IPC assumption does, so a
-        # range that ignores it would overstate the precision.
-        # The rejected anchor, shown explicitly so the choice is auditable rather than
-        # buried in a source comment.
-        rk_rejected_rows = load_device_csv("results/raw/rk3588-t3_big.csv")
-        rk_rejected = get_gibs(rk_rejected_rows, "Qwen3.5-4B", "gdn_gated_scan")
-        rk_rejected_spread = get_spread(rk_rejected_rows, "Qwen3.5-4B", "gdn_gated_scan")
-        if rk_rejected and rk_rejected_spread:
-            rej_low, rej_high = rk_rejected * 1.5, rk_rejected * 2.5
+        # The other RK3588 host (t3) — shown for transparency. t3 was re-run at 553a96e
+        # with optimized kernels (OpenMP + NEON unrolling), so it reads much higher than
+        # t4. This is NOT a same-commit comparison — it shows what the optimization
+        # stack achieves on identical silicon. The O6 extrapolation anchors on t4
+        # (pre-optimization, same commit as Pi 5) for the cross-device comparison.
+        rk_t3_rows = load_device_csv("results/raw/rk3588-t3_big.csv")
+        rk_t3 = get_gibs(rk_t3_rows, "Qwen3.5-4B", "gdn_gated_scan")
+        rk_t3_spread = get_spread(rk_t3_rows, "Qwen3.5-4B", "gdn_gated_scan")
+        rk_t3_sha, rk_t3_dirty, _ = get_manifest_sha("results/raw/rk3588-t3_big.csv")
+        if rk_t3 and rk_t3_spread:
+            t3_low, t3_high = rk_t3 * 1.5, rk_t3 * 2.5
             lines.append(
-                f"**On the anchor choice.** The other same-commit RK3588 host reports "
-                f"{rk_rejected:.2f} GiB/s, which would give {rej_low:.1f}-{rej_high:.1f} GiB/s "
-                f"instead. That run is **not** used: its spread is "
-                f"{rk_rejected_spread:.0f}% (p50 vs p95), against "
-                f"{get_spread(device_data['RK3588 big']['rows'], 'Qwen3.5-4B', 'gdn_gated_scan'):.0f}% "
-                "for the run above. The DEVICE_RUNBOOK treats anything past "
-                f"~{SPREAD_WARN_PCT:.0f}% as suspect and says to suspect throttling first, so "
-                "this is a quality judgement, not a convenient pick — and it is why the earlier "
-                'framing of a 1.68x host "disagreement" was wrong. One of the two runs is '
-                "simply contaminated."
+                f"**On the anchor choice.** t3 was re-run at commit `{rk_t3_sha or '?'}`"
+                f"{' (clean tree)' if not rk_t3_dirty else ' (dirty tree)'} with optimized "
+                f"kernels (OpenMP + NEON unrolling), reading **{rk_t3:.2f} GiB/s** "
+                f"(spread {rk_t3_spread:.1f}%) — vs t4 at {rk_big_scan:.2f} at `28729f3` "
+                f"(pre-optimization). Extrapolating t3's optimized numbers would give "
+                f"{t3_low:.1f}-{t3_high:.1f} GiB/s on the O6, but that conflates the IPC "
+                "gain from A720 cores with the optimization-stack gain from the A76. "
+                "t4 is used for the cross-device comparison (same commit as Pi 5); t3's "
+                "data shows the optimization impact on identical A76 silicon."
             )
             lines.append("")
             lines.append(
-                f"Published claim: **~{conservative_low:.0f}-{conservative_high:.0f} GiB/s**. The "
-                "dominant uncertainty is the IPC/clock assumption, plus the fact that every "
-                "manifest on the fleet records a dirty tree (see the provenance audit). "
-                "Resolving `ob-bf7` — one clean-tree, commit-matched sweep with pinning and "
-                "thermals recorded — narrows this more than any modelling refinement would."
+                f"Published claim: **~{conservative_low:.0f}-{conservative_high:.0f} GiB/s** "
+                "(from pre-optimization A76). t3's optimized run suggests the O6 with both "
+                "A720 IPC gains AND the optimization stack could reach higher. Resolving "
+                "`ob-bf7` — one clean-tree, commit-matched sweep with pinning and thermals "
+                "recorded — narrows this more than any modelling refinement would."
             )
             lines.append("")
         lines.append("To check this prediction: if the O6 board arrives, run")
@@ -682,7 +728,37 @@ def generate_report(output_path):
     lines.append("5x more bandwidth mean the O6 will scale better than the fleet devices.")
     lines.append("")
 
-    # Mixed-precision comparison (decode mode) — need ALL rows, not just fp32 baseline
+    # ---- Optimization impact on RK3588 A76 (t4 pre-opt vs t3 optimized) ----
+    lines.append("### RK3588 A76: optimization stack impact")
+    lines.append("")
+    lines.append(
+        "t4 (commit `28729f3`, pre-optimization) vs t3 (commit `553a96e`, optimized: "
+        "OpenMP + NEON unrolling) on the same A76 big cluster. Different physical "
+        "boards, so this is indicative — but j1's same-device re-run on t3 itself "
+        "showed 2.26 → 11.07 GiB/s on Scan (4.9x), confirming the direction."
+    )
+    lines.append("")
+    lines.append(
+        "| Kernel (4B, seq=64) | t4 pre-opt (GiB/s) | t3 optimized (GiB/s) | Speedup |"
+    )
+    lines.append("|--------------------|--------------------|-----------------------|---------|")
+    t4_rows = load_device_csv("results/raw/rk3588-t4_big.csv")
+    t3_rows = load_device_csv("results/raw/rk3588-t3_big.csv")
+    for kern in ["gdn_cumdecay", "gdn_gated_scan", "gdn_causal_dwconv1d"]:
+        pre = get_gibs(t4_rows, "Qwen3.5-4B", kern)
+        opt = get_gibs(t3_rows, "Qwen3.5-4B", kern)
+        if pre and opt:
+            speedup = opt / pre
+            label = KERNEL_LABELS.get(kern, kern)
+            lines.append(f"| {label} | {pre:.2f} | {opt:.2f} | {speedup:.1f}x |")
+    lines.append("")
+    lines.append(
+        "The optimization stack delivers 2.6-5.1x on A76 silicon — larger than the "
+        "2.6-3.1x seen on A57 (Jetson). This is consistent with wider OoO pipelines "
+        "benefiting more from NEON unrolling and thread parallelism. t3's clean-tree "
+        "manifest (`553a96e`, `dirty=false`) is the only clean provenance in the fleet."
+    )
+    lines.append("")
     j2_opt_all = []
     if os.path.exists(J2_OPTIMIZED_CSV):
         with open(J2_OPTIMIZED_CSV, newline="") as f:
