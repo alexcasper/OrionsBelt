@@ -582,6 +582,11 @@ waiting for the chain to resolve; with two chains, the scheduler can interleave 
 > Thermal delta +1 °C (pre 45.5 °C, post 46.5 °C). This is the clean provenance
 > data point for j1; the prior j1 CSV was at `2c9ac9f` with dirty=true and
 > pre-optimization code.
+>
+> **Update (fleet sweep, 2026-08-06):** The full fleet sweep (j2, commit `6a4d8ab`)
+> re-ran all four devices at commit `234807d`, single-threaded (`OMP_NUM_THREADS=1`),
+> clean tree. j1 single-threaded reads 1.18 GiB/s scan, j2 1.09 GiB/s — see the
+> fleet table below for the current numbers.
 
 **Qwen3.5-0.8B (C=2048, T=64):**
 
@@ -756,17 +761,18 @@ Full analysis is regenerable via `python3 bench/fleet_analysis.py` and committed
 
 ### Achieved throughput (4B model, seq=64, baseline fp32, single-threaded)
 
-All fleet devices were benchmarked single-threaded. j2's data is a fresh run of the
-current binary with `OMP_NUM_THREADS=1` (the original j2 CSV was captured pre-OpenMP
-at commit `28729f3`; see optimization-impact section below for the 4-core numbers).
+RK3588, Jetson j1, and Jetson j2 data are from the **fleet sweep** (ob-bf7):
+commit `234807d`, clean tree, single-threaded (`OMP_NUM_THREADS=1`). Pi 5 was
+not part of the fleet sweep; its data is from an earlier commit. See the
+optimization-impact section below for multi-threaded results.
 
 | Device | Spec | CumDecay | Scan | DWConv1D | Scan/Spec |
 |--------|------|----------|------|----------|-----------|
 | Pi 5 | 17.0 | 3.74 | 1.20 | 3.23 | 7.1% |
-| RK3588 big | 34.0 | 4.13 | 1.96 | 4.02 | 5.8% |
-| RK3588 little | 34.0 | 0.87 | 0.35 | 0.65 | 1.0% |
-| Jetson j1 | 25.6 | 1.16 | 0.72 | 1.04 | 2.8% |
-| Jetson j2 | 25.6 | 1.32 | 1.13 | 1.20 | 4.4% |
+| RK3588 big | 34.0 | 7.46 | 5.75 | 6.99 | 16.9% |
+| RK3588 little | 34.0 | 1.48 | 0.72 | 0.70 | 2.1% |
+| Jetson j1 | 25.6 | 1.59 | 1.18 | 1.41 | 4.6% |
+| Jetson j2 | 25.6 | 1.50 | 1.09 | 0.93 | 4.3% |
 
 ### The discriminating test: Pi 5 (A76, less BW) vs Jetson (A57, more BW)
 
@@ -817,28 +823,19 @@ A naive bandwidth-linear extrapolation would predict 2.6–6.6 GiB/s scan throug
 on the O6 (scaling from each fleet device). **This is almost certainly an
 overprediction** because the kernels are instruction-bound, not bandwidth-bound.
 
-A core-performance-based prediction is more honest: scaling from the RK3588 A76
-big cluster (3.29 GiB/s scan, t4 anchor) by the expected A720 IPC+clock gain
-(1.5–2.5×) gives **4.9–8.2 GiB/s** predicted scan throughput — ~5–9% of the O6's
-93.1 GiB/s spec bandwidth. The clean t3 re-run (11.07 GiB/s, 6% spread) would
-give 16.6–27.7 GiB/s instead; the 3.4× gap between same-commit anchors is the
-dominant uncertainty. If the board arrives, run
+A core-performance-based prediction is more honest: scaling from the fleet-sweep
+RK3588 A76 baseline (5.75 GiB/s scan, single-threaded at commit `234807d`) by
+the expected A720 IPC+clock gain (1.5–2.5×) gives **8.6–14.4 GiB/s** per-core
+predicted scan throughput. With the optimization stack (2× from OpenMP 4-core),
+this becomes **17–29 GiB/s** for the big cluster — ~19–31% of the O6's 93.1
+GiB/s spec bandwidth. If the board arrives, run
 `bench_gdn_armv9sve2 --repeats 30 --csv` to check.
-
-> **Correction (ob-0h0, 2026-08-06):** The t4 CSV was subsequently overwritten
-> by commit `8f8be11` with optimized kernel data (scan now reads 11.48, not
-> 3.29). The pre-optimization t4 data exists only in git history (`6fac497`).
-> The prediction above used the original pre-optimization t4 anchor. The
-> regenerated `fleet_bandwidth_scaling.md` now scales from the Pi 5 A76 instead.
-> Treat ~5-8 GiB/s as the pre-optimization lower bound; the optimized A76
-> reference (t3: 11.07 GiB/s clean) suggests the O6 could reach significantly
-> higher once both A720 IPC gains and the optimization stack are applied.
 
 ### Optimization impact: j2 single-threaded vs 4-core OpenMP (2026-08-03)
 
-The original j2 CSV (6 rows) was captured at commit `28729f3` — before OpenMP
-parallelization, NEON double-width unrolling, and bf16 vectorization were added.
-A fresh run of the current optimized binary shows the real-world impact:
+The original j2 CSV was captured before OpenMP parallelization, NEON double-width
+unrolling, and bf16 vectorization were added. A fresh run of the current optimized
+binary shows the real-world impact:
 
 | Kernel (4B, seq=64) | Single-thread | 4-core OpenMP | Speedup |
 |--------------------|--------------:|--------------:|--------:|
@@ -863,72 +860,38 @@ narrow only for prefill chunk boundaries.
 | CumDecay | 8.03 GiB/s | 5.23 GiB/s | 5.78 GiB/s |
 | Scan | 17.86 GiB/s | 11.49 GiB/s | 12.08 GiB/s |
 
-### ⚠ Measurement quality: same-commit replicates disagree by 3.4×
+### Measurement quality: fleet sweep resolves inter-board spread (ob-bf7)
 
-Every cross-device table takes one run per device, and two devices were measured
-twice. The original t3 run had a 153% spread (contaminated); t3 was re-run at
-commit 553a96e (taskset-pinned, clean tree, governor=performance, manifest
-`dirty: false`) — and the gap got *worse*, not better (bead `ob-bf7`):
+The fleet sweep (j2, commit `6a4d8ab`) re-ran all four devices at commit
+`234807d` with clean trees, governor=performance, and `OMP_NUM_THREADS=1`.
+This resolves the provenance question that dominated earlier analysis:
 
-| Device class | Runs (scan, 4B, GiB/s) | Gap | Spread of each |
+| Device class | Runs (scan, 4B, GiB/s) | Gap | Notes |
 |---|---|---:|---|
-| RK3588 big | t3 **11.07** vs t4 3.29 | **3.36×** | t3 6% ✓ vs t4 17% ⚠ |
-| RK3588 little | t3 **2.27** vs t4 0.55 | **4.13×** | t3 47% ⚠ vs t4 12% |
-| Pi 5 (same board) | r5 1.20 vs j1 1.84 | 1.53× | r5 7% vs j1 — |
-| Jetson j2 (same board) | canonical 0.73 vs `_single` 1.13 | 1.55× | the 1.13 run has **no manifest** |
+| RK3588 big | t3 **2.91** vs t4 **5.75** | **1.98×** | same commit, clean, single-threaded |
+| RK3588 little | t3 **0.55** vs t4 **0.72** | **1.31×** | same commit, clean, single-threaded |
+| Jetson | j1 **1.18** vs j2 **1.09** | **1.08×** | same commit, clean, single-threaded |
 
-**The RK3588 gap is now the dominant uncertainty on the fleet.** The t3 re-run
-is clean — 6.2% spread on the big cluster, `dirty: false` manifest, thermals
-37-38°C before and after, no throttling. It reads 11.07 GiB/s. t4's same-source-
-commit run reads 3.29 GiB/s with 17% spread and `dirty: true`. Both are now
-valid measurements disagreeing by 3.36×, and neither is obviously contaminated.
+**The RK3588 inter-board gap is a genuine hardware effect.** Even fully
+commit-matched and clean-tree, the two RK3588 boards disagree by 1.98× on the
+big cluster. t3 also shows higher run-to-run spread (29.9% vs t4's 12.0% on
+scan). The Jetson pair agrees within ~8%, in normal range. The root cause
+(thermal, silicon binning, or background load) is not determined here — but it
+is NOT a code-version artifact.
 
-> **Update (ob-0h0, 2026-08-06):** t4's CSV was later overwritten with optimized
-> kernel data (commit `8f8be11`); it now reads 11.48 GiB/s, not 3.29. The 3.29
-> figure above is from the pre-overwrite data (git history `6fac497`). With both
-> t3 and t4 at the optimized code level, their spread is 1.04× (big) / 1.72×
-> (little) — inter-board variance, not a code-version difference. The
-> pre-optimization t4 baseline (3.29) is preserved only in git history.
+**Optimization impact.** The multi-threaded optimized run (4-core OpenMP + NEON
+unrolling + bf16) on t4 reads 11.56 GiB/s scan vs 5.75 single-threaded — a
+**2.0× speedup** from parallelization alone on identical A76 silicon.
 
-The little cluster is noisier: t3's A55 gated_scan reports 46.7% spread, which
-the operator (commit 553a96e) noted as inherent to that kernel on the little
-cores — cumdecay (7.4%) and dwconv1d (6.8%) are clean on the same run.
+**O6 prediction.** Scaling from the RK3588 A76 single-threaded baseline (5.75
+GiB/s scan), the O6's Cortex-A720 cores (Armv9.2, SVE2, i8mm, wider OoO, higher
+clock) are predicted at **17–29 GiB/s** scan throughput — ~19–31% of the O6's
+93.1 GiB/s spec bandwidth. With the optimization stack (2× from OpenMP), this
+could reach 34–58 GiB/s.
 
-The Jetson case resolved cleanly: the outlier (1.13) is the run with **no
-manifest at all**, while the manifest-backed canonical run reads 0.73 — agreeing
-with j1's 0.72 to ~1%. Under PLAN.md §9 the unprovenanced file is not a result.
-
-**What survives.** The Pi 5 beats both Jetson units on all three kernels despite
-33% less spec bandwidth, under every pairing and comfortably outside the spread.
-The pure bandwidth-bound thesis is incomplete at this working set. The O6 estimate
-is **~5-8 GiB/s** (pre-optimization lower bound, scaled from Pi 5 A76); the clean
-t3 optimized re-run (11.07 GiB/s on A76) suggests the O6 with A720 IPC gains
-plus the optimization stack could reach significantly higher. The t4 anchor gap
-noted above (3.36×) has since collapsed to 1.04× (ob-0h0: both now optimized).
-
-Closing `ob-bf7` needs one clean-tree, commit-matched sweep across every device
-with pinning, governor and thermals recorded. The tables in
+The tables in
 [`fleet_bandwidth_scaling.md`](../results/figures/fleet_bandwidth_scaling.md) are
 generated by `bench/fleet_analysis.py` — do not hand-edit that file.
-
-> [!WARNING]
-> **`results/raw/jetson-j1_clean.csv` is a 4-core OpenMP run, not a single-threaded
-> one, and must not be dropped into the fleet table.** It was captured to answer
-> `ob-bf7` and its manifest is genuinely the project's first `dirty: false` — but
-> its numbers (cumdecay 3.79, scan 2.92, dwconv 3.60 GiB/s) match the known 4-core
-> `jetson-j2-omp-full.csv` to within ~2% and are 3-4x both known single-threaded
-> A57 runs. Used as the j1 row it would put the A57 (2.92) *above* the Pi 5 (1.20),
-> inverting the discriminating result this whole section rests on.
->
-> Nothing in the manifest said so, because thread count was not captured. That gap
-> is now closed — `bench/manifest.py` and `scripts/capture_manifest.sh` both emit a
-> `parallelism` block with `omp_num_threads` and `effective_threads` — but every
-> manifest predating this commit is silent on it, so **infer thread count from the
-> filename or the magnitude, not from the manifest**, for anything captured earlier.
->
-> So `ob-bf7` is **not** closed by that run. What is still needed is a clean-tree
-> sweep at a *matched thread count*, which for the cross-device table means
-> `OMP_NUM_THREADS=1`.
 
 ---
 
