@@ -19,12 +19,15 @@ from scripts.validate_results import (  # noqa: E402
     PROFILE_COLS,
     SCHEMA_COLS,
     STANDARD_COLS,
+    SUSTAINED_COLS,
     Issue,
     check_manifest_exists,
     detect_csv_type,
     expected_columns,
     find_device_spec,
+    get_git_head_sha,
     load_manifest,
+    main,
     validate_csv,
     validate_manifest,
     validate_profile_row,
@@ -643,7 +646,6 @@ class TestValidateCsv:
         assert row_count == 1
 
     def test_sustained_csv_validated(self, tmp_path):
-        from scripts.validate_results import SUSTAINED_COLS
 
         header = ",".join(SUSTAINED_COLS)
         row = "Qwen3.5-4B,gdn_gated_scan,neon,10.0,2.5,55.0,-5.0"
@@ -699,3 +701,207 @@ class TestValidateManifestExtra:
         issues = []
         validate_manifest("test.csv", "standard", 6, str(path), issues, "abc123")
         assert any("invalid JSON" in i.message for i in issues)
+
+
+# ---------------------------------------------------------------------------
+# get_git_head_sha — exception handler (lines 174-175)
+# ---------------------------------------------------------------------------
+
+
+class TestGetGitHeadSha:
+    def test_returns_none_on_subprocess_error(self):
+        """When git rev-parse fails, returns None."""
+        import scripts.validate_results as vr
+
+        with (
+            __import__("unittest.mock").mock.patch.object(
+                vr.subprocess,
+                "check_output",
+                side_effect=FileNotFoundError("no git"),
+            ),
+        ):
+            assert get_git_head_sha() is None
+
+    def test_returns_sha_on_success(self):
+        """When git rev-parse succeeds, returns stripped sha."""
+        import scripts.validate_results as vr
+
+        with __import__("unittest.mock").mock.patch.object(
+            vr.subprocess,
+            "check_output",
+            return_value=b"abc123def456\n",
+        ):
+            assert get_git_head_sha() == "abc123def456"
+
+
+# ---------------------------------------------------------------------------
+# validate_sustained_row — parse error path (lines 263-265)
+# ---------------------------------------------------------------------------
+
+
+class TestValidateSustainedRowParseError:
+    def test_non_numeric_elapsed(self):
+        issues = []
+        validate_sustained_row(
+            {**_sustained_row(), "elapsed_s": "not_a_number"},
+            "test.csv",
+            issues,
+            2,
+        )
+        assert any("cannot parse" in i.message for i in issues)
+        assert issues[-1].severity == "ERROR"
+
+    def test_missing_key(self):
+        issues = []
+        row = _sustained_row()
+        del row["throughput_gibs"]
+        validate_sustained_row(row, "test.csv", issues, 1)
+        assert any("cannot parse" in i.message for i in issues)
+
+
+# ---------------------------------------------------------------------------
+# validate_csv — missing columns + exception handler
+# ---------------------------------------------------------------------------
+
+
+class TestValidateCsvMissingColumns:
+    def test_schema_missing_non_key_columns(self, tmp_path):
+        """Schema CSV with key cols but missing some non-key schema cols → ERROR."""
+        # Include all SCHEMA_KEY_COLS but omit some non-key ones
+        from scripts.validate_results import SCHEMA_KEY_COLS
+
+        partial = sorted(SCHEMA_KEY_COLS | {"run_id", "metric_name"})
+        path = tmp_path / "partial_schema.csv"
+        path.write_text(",".join(partial) + "\n" + ",".join(["x"] * len(partial)) + "\n")
+        issues = []
+        csv_type, row_count, _ = validate_csv(str(path), "partial_schema.csv", issues)
+        assert csv_type == "schema"
+        assert any("missing required columns" in i.message for i in issues)
+
+
+class TestValidateCsvException:
+    def test_read_error_returns_none(self, tmp_path):
+        """If CSV reader raises, returns (None, 0) with ERROR."""
+        from unittest.mock import patch
+
+        path = tmp_path / "bad.csv"
+        path.write_text(",".join(STANDARD_COLS) + "\n")
+        issues = []
+        with patch("csv.DictReader", side_effect=OSError("io error")):
+            result = validate_csv(str(path), "bad.csv", issues)
+        assert result == (None, 0)
+        assert any("cannot read CSV" in i.message for i in issues)
+
+
+# ---------------------------------------------------------------------------
+# main() — additional edge cases
+# ---------------------------------------------------------------------------
+
+
+class TestMainExtras:
+    def _run_main(self, csv_dir, manifest_dir, quiet=True):
+        """Run main() with patched sys.argv, return exit code."""
+        argv = [
+            "validate_results.py",
+            "--csv-dir",
+            str(csv_dir),
+            "--manifest-dir",
+            str(manifest_dir),
+        ]
+        if quiet:
+            argv.append("--quiet")
+        orig_argv = sys.argv
+        sys.argv = argv
+        try:
+            return main()
+        finally:
+            sys.argv = orig_argv
+
+    def test_quiet_empty_dir_no_output(self, tmp_path, capsys):
+        """Empty CSV dir + --quiet exits 0 with no stdout."""
+        csv_dir = tmp_path / "raw"
+        csv_dir.mkdir()
+        man_dir = tmp_path / "manifests"
+        man_dir.mkdir()
+        rc = self._run_main(csv_dir, man_dir, quiet=True)
+        assert rc == 0
+        captured = capsys.readouterr()
+        assert captured.out == ""
+
+    def test_non_quiet_reports_errors_and_warnings(self, tmp_path, capsys):
+        """Non-quiet mode prints errors, warnings, and notes."""
+        csv_dir = tmp_path / "raw"
+        csv_dir.mkdir()
+        man_dir = tmp_path / "manifests"
+        man_dir.mkdir()
+        # CSV with an error (p95 < p50) and no manifest → warning too
+        _write_std_csv(csv_dir / "jetson-j1.csv", [_std_row(p50_us="1000", p95_us="500")])
+        self._run_main(csv_dir, man_dir, quiet=False)
+        captured = capsys.readouterr()
+        assert "error(s)" in captured.out
+        assert "issue(s) found" in captured.out
+
+    def test_non_quiet_reports_warnings_only(self, tmp_path, capsys):
+        """Non-quiet mode with only warnings shows warning count and exits 1."""
+        csv_dir = tmp_path / "raw"
+        csv_dir.mkdir()
+        man_dir = tmp_path / "manifests"
+        man_dir.mkdir()
+        # Valid row but no manifest → WARNING only
+        _write_std_csv(csv_dir / "jetson-j1.csv", [_std_row()])
+        rc = self._run_main(csv_dir, man_dir, quiet=False)
+        assert rc == 1
+        captured = capsys.readouterr()
+        assert "warning(s)" in captured.out
+
+    def test_non_quiet_reports_notes(self, tmp_path, capsys):
+        """Non-quiet mode prints informational notes."""
+        csv_dir = tmp_path / "raw"
+        csv_dir.mkdir()
+        man_dir = tmp_path / "manifests"
+        man_dir.mkdir()
+        # A valid CSV with manifest → no errors/warnings, but may have notes
+        _write_std_csv(csv_dir / "jetson-j1.csv", [_std_row()])
+        (man_dir / "jetson-j1.json").write_text('{"git": {"sha": "abc", "dirty": false}}')
+        rc = self._run_main(csv_dir, man_dir, quiet=False)
+        assert rc == 0
+        captured = capsys.readouterr()
+        assert "CSV(s) checked" in captured.out
+
+    def test_schema_csv_manifest_ref_relative_path(self, tmp_path):
+        """Schema CSV with relative manifest_ref resolves to manifest_dir."""
+        csv_dir = tmp_path / "raw"
+        csv_dir.mkdir()
+        man_dir = tmp_path / "manifests"
+        man_dir.mkdir()
+        # Write schema CSV with a manifest_ref that doesn't exist as a file
+        header = ",".join(SCHEMA_COLS)
+        row = (
+            "run1,2026-01-01,a1b2c3d,manifests/run1.json,rk3588,cpu,cpu,"
+            "Qwen3.5-4B,fp16,4096,prefill,prefill_tokens_per_sec,,800.0,"
+            "tokens_per_sec,0,5,all,"
+        )
+        (csv_dir / "schema.csv").write_text(f"{header}\n{row}\n")
+        # Run and check the exit code is non-zero (no manifest found)
+        rc = self._run_main(csv_dir, man_dir, quiet=True)
+        # Should exit with at least 1 (warning about missing manifest)
+        assert rc >= 1
+
+    def test_schema_csv_manifest_ref_absolute_path(self, tmp_path):
+        """Schema CSV with absolute manifest_ref uses it directly."""
+        csv_dir = tmp_path / "raw"
+        csv_dir.mkdir()
+        man_dir = tmp_path / "manifests"
+        man_dir.mkdir()
+        # Create the manifest at an absolute path
+        man_file = tmp_path / "custom_manifest.json"
+        man_file.write_text('{"git": {"sha": "abc1234", "dirty": false}}')
+        header = ",".join(SCHEMA_COLS)
+        row = (
+            f"run1,2026-01-01,a1b2c3d,{man_file},rk3588,cpu,cpu,"
+            "Qwen3.5-4B,fp16,4096,prefill,prefill_tokens_per_sec,,800.0,"
+            "tokens_per_sec,0,5,all,"
+        )
+        (csv_dir / "schema.csv").write_text(f"{header}\n{row}\n")
+        rc = self._run_main(csv_dir, man_dir, quiet=True)
+        assert rc == 0
