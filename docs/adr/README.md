@@ -38,4 +38,8 @@ exactly the collision this table exists to prevent. Both derivations reached the
 decision independently, which is corroborating rather than contradictory; r5's text was
 kept and t3's survives in that branch's history.
 
+Similarly, 0007 was written by both the t3 and t4 agents on the same day. Both reached
+the same decision independently. The t3 version (`0007-commit-to-edge-ai-track.md`) is
+kept here as the more detailed canonical text; the t4 version survives in git history.
+
 The template is [`template.md`](./template.md).
