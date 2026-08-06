@@ -29,8 +29,15 @@ class TestWeightsFlat:
             w1 = weights_bytes(cfg)
             assert weights_bytes(cfg) == w1  # idempotent
 
-    def test_4b_weights_fp16(self):
-        assert weights_bytes(QWEN35_4B) == 4_000_000_000 * 2  # 8 GB fp16
+    def test_4b_weights_analytical(self):
+        """Weights are now config-derived (ob-7m6, ported from t4), not a round
+        assumed num_params. The exact figure comes from the analytical formula
+        over the verified 4B config dimensions (GDN_LAYER_AUDIT.md §8)."""
+        w = weights_bytes(QWEN35_4B)
+        # Exact analytical value: GDN + FA + MLP + embedding(248K×2560, tied) + final norm
+        assert w == 8_411_693_056  # ≈ 7.83 GiB at fp16
+        # Sanity: in the ~8 GiB band for a ~4B-parameter fp16 checkpoint
+        assert 7e9 < w < 9e9
 
 
 class TestKVCacheLinear:

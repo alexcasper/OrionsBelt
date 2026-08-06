@@ -37,6 +37,7 @@ if _ROOT not in sys.path:
 
 from bench.manifest import capture, manifest_ref  # noqa: E402
 from bench.manifest import write as write_manifest  # noqa: E402
+from bench.memory import ModelConfig  # noqa: E402
 from bench.metrics import Summary, summarize  # noqa: E402
 from bench.schema import (  # noqa: E402
     Device,
@@ -50,61 +51,54 @@ from bench.schema import (  # noqa: E402
 # ---------------------------------------------------------------------------
 # Model configuration (for analytic memory attribution, METRICS.md section 5)
 # ---------------------------------------------------------------------------
-
-
-@dataclass(frozen=True)
-class ModelConfig:
-    """Checkpoint dimensions needed for analytic memory attribution.
-
-    GDN recurrent-state dimensions (``linear_*``) are verified in
-    ``docs/CLAIM_VERIFICATION.md`` section 2.3 and ``docs/METRICS.md`` section 9.
-    Full-attention dimensions (``fa_*``) are read from the checkpoint config --
-    the defaults below are typical Qwen3 values and should be overridden when
-    the real config is available.
-    """
-
-    name: str
-    num_gdn_layers: int  # count of "linear_attention" in layer_types
-    num_full_attention_layers: int  # count of "full_attention"
-    # GDN recurrent state dimensions (METRICS.md section 5.4)
-    linear_num_value_heads: int  # H in the state formula
-    linear_key_head_dim: int  # d_k
-    linear_value_head_dim: int  # d_v
-    # Full-attention KV cache dimensions (METRICS.md section 5.3)
-    fa_n_kv_heads: int
-    fa_head_dim: int
-    # Precision (bytes per element at runtime)
-    state_dtype_bytes: int = 4  # fp32 state (METRICS.md section 9)
-    cache_dtype_bytes: int = 2  # fp16 cache
-    weight_dtype_bytes: int = 2  # fp16 weights
-    num_params: int = 0  # total parameter count
-    vocab_size: int = 151936  # Qwen3 vocab
+#
+# ``ModelConfig`` and the config-driven ``from_hf_config`` constructor live in
+# ``bench/memory.py`` and are re-exported here for back-compat (backends, tests,
+# and scripts import them from ``bench.harness``). The predicted
+# ``peak_memory_bytes`` columns are computed by ``bench/memory.py`` via the
+# analytical weights/KV/state formulas ported from ``origin/bench/t4`` — that
+# module is the single source of truth for those columns (ob-7m6).
 
 
 # Verified presets for the two checkpoints this project targets (ADR 0003,
-# CLAIM_VERIFICATION.md section 2.3, METRICS.md section 9 appendix).
+# GDN_LAYER_AUDIT.md, QUANTIZATION_POLICY.md §"248K vocabulary"). Dimensions
+# read from the real ``config.json`` ``text_config``; layer counts (24/8 and
+# 18/6) are *derived* by the ``full_attention_interval=4`` → 3:1 derivation in
+# ``ModelConfig.layer_types``, never hardcoded.
 QWEN35_4B = ModelConfig(
     name="Qwen/Qwen3.5-4B",
-    num_gdn_layers=24,
-    num_full_attention_layers=8,  # 32 total at 3:1
+    hidden_size=2560,
+    num_hidden_layers=32,
+    num_attention_heads=16,
+    num_key_value_heads=4,  # GQA, verified from config.json (ob-37v)
+    full_attn_head_dim=256,  # verified from config.json head_dim (ob-37v)
     linear_num_value_heads=32,
+    linear_num_key_heads=16,
     linear_key_head_dim=128,
     linear_value_head_dim=128,
-    fa_n_kv_heads=4,  # GQA, verified from config.json (ob-37v)
-    fa_head_dim=256,  # verified from config.json head_dim (ob-37v)
-    num_params=4_000_000_000,
+    linear_conv_kernel_dim=4,
+    intermediate_size=9216,
+    vocab_size=248320,  # 248K vocabulary (QUANTIZATION_POLICY.md)
+    tie_word_embeddings=True,
+    full_attention_interval=4,
 )
 
 QWEN35_08B = ModelConfig(
     name="Qwen/Qwen3.5-0.8B",
-    num_gdn_layers=18,
-    num_full_attention_layers=6,  # 24 total at 3:1
+    hidden_size=1024,
+    num_hidden_layers=24,
+    num_attention_heads=8,
+    num_key_value_heads=2,  # GQA, verified from config.json (ob-37v)
+    full_attn_head_dim=256,  # verified from config.json head_dim (ob-37v)
     linear_num_value_heads=16,
+    linear_num_key_heads=16,
     linear_key_head_dim=128,
     linear_value_head_dim=128,
-    fa_n_kv_heads=2,  # GQA, verified from config.json (ob-37v)
-    fa_head_dim=256,  # verified from config.json head_dim (ob-37v)
-    num_params=800_000_000,
+    linear_conv_kernel_dim=4,
+    intermediate_size=2816,
+    vocab_size=248320,
+    tie_word_embeddings=True,
+    full_attention_interval=4,
 )
 
 
@@ -128,41 +122,18 @@ _MODEL_PRESETS: dict[str, ModelConfig] = {
     "0.8b": QWEN35_08B,
 }
 
-_DTYPE_BYTES = {"float32": 4, "fp32": 4, "bfloat16": 2, "bf16": 2, "float16": 2, "fp16": 2}
-
 
 def load_config_from_dict(data: dict, name: str = "") -> ModelConfig:
-    """Generate a ModelConfig from a raw Qwen3.5 ``config.json`` dict.
+    """Build a :class:`ModelConfig` from a raw Qwen3.5 ``config.json`` dict.
 
-    Reads ``layer_types`` to count GDN vs full-attention layers, extracts
-    the linear and full-attention dimension fields, and maps
+    Thin wrapper over ``ModelConfig.from_hf_config`` (ported from
+    ``origin/bench/t4``). Resolves the layer structure — explicit
+    ``layer_types`` array translated to the equivalent interval, else
+    ``full_attention_interval`` read from the config — and maps
     ``mamba_ssm_dtype`` to ``state_dtype_bytes``. Verified against both
     Qwen3.5-4B and Qwen3.5-0.8B configs from HuggingFace (ob-37v, ob-xh3.2).
     """
-    # The real config nests text params under "text_config" for multimodal checkpoints.
-    tc = data.get("text_config", data)
-
-    layer_types: list[str] = tc.get("layer_types", [])
-    num_gdn = layer_types.count("linear_attention")
-    num_fa = layer_types.count("full_attention")
-
-    state_dtype = tc.get("mamba_ssm_dtype", "float32")
-    state_dtype_bytes = _DTYPE_BYTES.get(state_dtype, 4)
-
-    return ModelConfig(
-        name=name or data.get("model_type", "unknown"),
-        num_gdn_layers=num_gdn,
-        num_full_attention_layers=num_fa,
-        linear_num_value_heads=tc.get("linear_num_value_heads", 0),
-        linear_key_head_dim=tc.get("linear_key_head_dim", 0),
-        linear_value_head_dim=tc.get("linear_value_head_dim", 0),
-        fa_n_kv_heads=tc.get("num_key_value_heads", 0),
-        fa_head_dim=tc.get("head_dim", 0),
-        state_dtype_bytes=state_dtype_bytes,
-        cache_dtype_bytes=2,
-        weight_dtype_bytes=2,
-        vocab_size=tc.get("vocab_size", 151936),
-    )
+    return ModelConfig.from_hf_config(data, name=name)
 
 
 # ---------------------------------------------------------------------------
