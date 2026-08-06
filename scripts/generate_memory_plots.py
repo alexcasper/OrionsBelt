@@ -45,7 +45,7 @@ from orionsbelt.model.gdn_layer_info import LAYER_INFO  # noqa: E402
 # ---------------------------------------------------------------------------
 
 CONTEXT_LENGTHS = [4096, 32768, 131072, 262144]
-CONTEXT_LABELS = {4096: "4K", 32768: "32K", 131072: "128K", 262144: "256K"}
+CONTEXT_LABELS = {4096: "4K", 32768: "32K", 131072: "128K", 262144: "262K"}
 
 # Palette (consistent with original plots.py)
 C_WEIGHTS = "#2c3e50"
@@ -291,7 +291,7 @@ def generate_comparison_table() -> str:
     total_state_262k = b4b_262k.recurrent_state_bytes + b4b_262k.conv_state_bytes
     lines.append("## Key insight\n")
     lines.append(
-        f"At **256K context** on the 4B checkpoint, the GDN hybrid saves "
+        f"At **262K context** on the 4B checkpoint, the GDN hybrid saves "
         f"**{savings_262k:.1f} GiB** versus a hypothetical all-attention model. "
         f"The recurrent state is **{_mib(total_state_262k):.0f} MiB** "
         f"regardless of context length, while the KV cache alone reaches "

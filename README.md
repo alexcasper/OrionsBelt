@@ -141,7 +141,7 @@ All figures above are verified against primary sources (Radxa product page and d
 | Per-layer engine mapping (NPU/GPU/CPU) | Hypothesis only — pending measurements |
 | Full inference results (tokens/sec, TTFT, memory) | **Not started — needs hardware** |
 
-> **Results so far:** 37 CSVs from the device fleet, 17 provenance manifests, 10 generated figures/tables.
+> **Results so far:** 37 CSVs from the device fleet, 17 provenance manifests, 12 generated figures/tables.
 >
 > ```
 > results/

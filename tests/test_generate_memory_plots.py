@@ -67,7 +67,7 @@ class TestComparisonTable:
 
     def test_table_has_all_context_lengths(self, gmp):
         table = gmp.generate_comparison_table()
-        for label in ["4K", "32K", "128K", "256K"]:
+        for label in ["4K", "32K", "128K", "262K"]:
             assert label in table
 
     def test_table_has_key_insight(self, gmp):

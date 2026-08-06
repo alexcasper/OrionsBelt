@@ -11,7 +11,7 @@ _24 GDN + 8 full-attention layers (3:1 hybrid), hidden_size=2560_
 | 4K | 10.42 GiB | 0.12 GiB | 51.0 MiB | 10.60 GiB | 10.92 GiB | 0.33 GiB |
 | 32K | 10.42 GiB | 1.00 GiB | 51.0 MiB | 11.47 GiB | 14.42 GiB | 2.95 GiB |
 | 128K | 10.42 GiB | 4.00 GiB | 51.0 MiB | 14.47 GiB | 26.42 GiB | 11.95 GiB |
-| 256K | 10.42 GiB | 8.00 GiB | 51.0 MiB | 18.47 GiB | 42.42 GiB | 23.95 GiB |
+| 262K | 10.42 GiB | 8.00 GiB | 51.0 MiB | 18.47 GiB | 42.42 GiB | 23.95 GiB |
 
 ## Qwen3.5-0.8B
 
@@ -22,8 +22,8 @@ _18 GDN + 6 full-attention layers (3:1 hybrid), hidden_size=1024_
 | 4K | 2.06 GiB | 0.05 GiB | 19.7 MiB | 2.12 GiB | 2.25 GiB | 0.12 GiB |
 | 32K | 2.06 GiB | 0.38 GiB | 19.7 MiB | 2.45 GiB | 3.56 GiB | 1.11 GiB |
 | 128K | 2.06 GiB | 1.50 GiB | 19.7 MiB | 3.58 GiB | 8.06 GiB | 4.48 GiB |
-| 256K | 2.06 GiB | 3.00 GiB | 19.7 MiB | 5.08 GiB | 14.06 GiB | 8.98 GiB |
+| 262K | 2.06 GiB | 3.00 GiB | 19.7 MiB | 5.08 GiB | 14.06 GiB | 8.98 GiB |
 
 ## Key insight
 
-At **256K context** on the 4B checkpoint, the GDN hybrid saves **24.0 GiB** versus a hypothetical all-attention model. The recurrent state is **51 MiB** regardless of context length, while the KV cache alone reaches **8.0 GiB** — 77% of the weight footprint.
+At **262K context** on the 4B checkpoint, the GDN hybrid saves **24.0 GiB** versus a hypothetical all-attention model. The recurrent state is **51 MiB** regardless of context length, while the KV cache alone reaches **8.0 GiB** — 77% of the weight footprint.
