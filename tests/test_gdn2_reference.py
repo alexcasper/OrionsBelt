@@ -9,9 +9,9 @@ so they work on every fleet device and in CI.
 
 import math
 
+import bench.gdn2_reference as gdn2
 import numpy as np
 import pytest
-from bench.gdn2_reference import gdn1_recurrent, gdn2_recurrent, l2_normalize, make_synthetic_input, softplus
 
 # ---------------------------------------------------------------------------
 # softplus
@@ -19,27 +19,27 @@ from bench.gdn2_reference import gdn1_recurrent, gdn2_recurrent, l2_normalize, m
 
 class TestSoftplus:
     def test_known_values(self):
-        """softplus(0) = ln(2), softplus(large) ≈ x, softplus(-large) ≈ 0."""
-        assert softplus(np.array(0.0)) == pytest.approx(math.log(2))
-        assert softplus(np.array(100.0)) == pytest.approx(100.0)
-        assert softplus(np.array(-100.0)) == pytest.approx(0.0)
+        """gdn2.softplus(0) = ln(2), gdn2.softplus(large) ≈ x, gdn2.softplus(-large) ≈ 0."""
+        assert gdn2.softplus(np.array(0.0)) == pytest.approx(math.log(2))
+        assert gdn2.softplus(np.array(100.0)) == pytest.approx(100.0)
+        assert gdn2.softplus(np.array(-100.0)) == pytest.approx(0.0)
 
     def test_array(self):
         x = np.array([-2.0, -1.0, 0.0, 1.0, 2.0])
-        result = softplus(x)
+        result = gdn2.softplus(x)
         expected = np.log1p(np.exp(x))
         np.testing.assert_allclose(result, expected, atol=1e-12)
 
     def test_monotonic(self):
         """softplus is monotonically increasing."""
         x = np.linspace(-5, 5, 100)
-        result = softplus(x)
+        result = gdn2.softplus(x)
         assert np.all(np.diff(result) > 0)
 
     def test_no_overflow(self):
         """Large positive values must not overflow to inf."""
         x = np.array([500.0, 1000.0])
-        result = softplus(x)
+        result = gdn2.softplus(x)
         assert not np.any(np.isinf(result))
         assert not np.any(np.isnan(result))
 
@@ -51,14 +51,14 @@ class TestSoftplus:
 class TestL2Normalize:
     def test_unit_norm(self):
         x = np.array([3.0, 4.0])
-        result = l2_normalize(x)
+        result = gdn2.l2_normalize(x)
         norm = np.sqrt(np.sum(result * result))
         assert norm == pytest.approx(1.0, abs=1e-5)
 
     def test_preserves_direction(self):
         """Normalization scales but doesn't change direction."""
         x = np.array([1.0, 2.0, 3.0])
-        result = l2_normalize(x)
+        result = gdn2.l2_normalize(x)
         # Ratios of components should be preserved
         ratio_orig = x[1] / x[0]
         ratio_norm = result[1] / result[0]
@@ -67,12 +67,12 @@ class TestL2Normalize:
     def test_eps_for_zero_vector(self):
         """Zero vector should not produce NaN (eps prevents div by zero)."""
         x = np.zeros(5)
-        result = l2_normalize(x)
+        result = gdn2.l2_normalize(x)
         assert not np.any(np.isnan(result))
 
     def test_known_value(self):
         x = np.array([1.0, 0.0, 0.0])
-        result = l2_normalize(x)
+        result = gdn2.l2_normalize(x)
         np.testing.assert_allclose(result, [1.0, 0.0, 0.0], atol=1e-6)
 
 
@@ -92,7 +92,7 @@ class TestGDN2Recurrent:
         w_gate = np.array([[[0.7, 0.6]]], dtype=np.float64)
         scale = 1.0 / math.sqrt(K)
 
-        o, S = gdn2_recurrent(
+        o, S = gdn2.gdn2_recurrent(
             q, k_vec, v_vec, g, b_gate, w_gate,
             scale=scale, use_qk_l2norm=False,
         )
@@ -108,8 +108,8 @@ class TestGDN2Recurrent:
     def test_output_shape(self):
         """Output has correct shape [T, HV, V]."""
         T, H, HV, K, V = 4, 2, 2, 8, 8
-        q, k, v, g, b_gate, w_gate, _, _ = make_synthetic_input(T, H, K, V)
-        o, S = gdn2_recurrent(q, k, v, g, b_gate, w_gate)
+        q, k, v, g, b_gate, w_gate, _, _ = gdn2.make_synthetic_input(T, H, K, V)
+        o, S = gdn2.gdn2_recurrent(q, k, v, g, b_gate, w_gate)
         assert o.shape == (T, HV, V)
         assert S.shape == (HV, K, V)
 
@@ -124,7 +124,7 @@ class TestGDN2Recurrent:
         b_gate = np.ones((T, HV, K), dtype=np.float32) * 0.5
         w_gate = np.ones((T, HV, V), dtype=np.float32) * 0.5
 
-        o, S = gdn2_recurrent(q, k_arr, v, g, b_gate, w_gate)
+        o, S = gdn2.gdn2_recurrent(q, k_arr, v, g, b_gate, w_gate)
         assert o.shape == (T, HV, V)
         assert S.shape == (HV, K, V)
         # With replicated q/k, groups of heads should produce identical output
@@ -133,26 +133,26 @@ class TestGDN2Recurrent:
 
     def test_deterministic(self):
         """Same inputs produce same outputs."""
-        inputs = make_synthetic_input(T=4, H=2, K=8, V=8, seed=42)
+        inputs = gdn2.make_synthetic_input(T=4, H=2, K=8, V=8, seed=42)
         q, k, v, g, b_gate, w_gate, _, _ = inputs
-        o1, S1 = gdn2_recurrent(q, k, v, g, b_gate, w_gate)
-        o2, S2 = gdn2_recurrent(q, k, v, g, b_gate, w_gate)
+        o1, S1 = gdn2.gdn2_recurrent(q, k, v, g, b_gate, w_gate)
+        o2, S2 = gdn2.gdn2_recurrent(q, k, v, g, b_gate, w_gate)
         np.testing.assert_array_equal(o1, o2)
         np.testing.assert_array_equal(S1, S2)
 
     def test_initial_state_continuity(self):
         """Passing the final state as initial_state for a second run is
         equivalent to one long run (state threading)."""
-        q, k, v, g, b_gate, w_gate, _, _ = make_synthetic_input(T=4, H=1, K=4, V=4, seed=7)
+        q, k, v, g, b_gate, w_gate, _, _ = gdn2.make_synthetic_input(T=4, H=1, K=4, V=4, seed=7)
 
         # Full run
-        o_full, S_full = gdn2_recurrent(q, k, v, g, b_gate, w_gate)
+        o_full, S_full = gdn2.gdn2_recurrent(q, k, v, g, b_gate, w_gate)
 
         # Split run: first half, then continue with returned state
-        o_a, S_a = gdn2_recurrent(
+        o_a, S_a = gdn2.gdn2_recurrent(
             q[:2], k[:2], v[:2], g[:2], b_gate[:2], w_gate[:2],
         )
-        o_b, S_b = gdn2_recurrent(
+        o_b, S_b = gdn2.gdn2_recurrent(
             q[2:], k[2:], v[2:], g[2:], b_gate[2:], w_gate[2:],
             initial_state=S_a,
         )
@@ -168,11 +168,11 @@ class TestGDN2Recurrent:
 class TestGDN1Recurrent:
     def test_output_shape(self):
         T, H, K, V = 4, 2, 8, 8
-        q, k, v, _, _, _, _, _ = make_synthetic_input(T, H, K, V)
+        q, k, v, _, _, _, _, _ = gdn2.make_synthetic_input(T, H, K, V)
         rng = np.random.RandomState(99)
         alpha = rng.uniform(0.5, 1.0, (T, H)).astype(np.float32)
         beta = rng.uniform(0.1, 0.5, (T, H)).astype(np.float32)
-        o, S = gdn1_recurrent(q, k, v, alpha, beta)
+        o, S = gdn2.gdn1_recurrent(q, k, v, alpha, beta)
         assert o.shape == (T, H, V)
         assert S.shape == (H, K, V)
 
@@ -185,17 +185,17 @@ class TestGDN1Recurrent:
         v = rng.randn(T, H, V).astype(np.float32)
         alpha = np.ones((T, H), dtype=np.float32)
         beta = np.zeros((T, H), dtype=np.float32)
-        o, S = gdn1_recurrent(q, k_arr, v, alpha, beta)
+        o, S = gdn2.gdn1_recurrent(q, k_arr, v, alpha, beta)
         np.testing.assert_allclose(o, 0.0, atol=1e-12)
 
     def test_deterministic(self):
         T, H, K, V = 4, 2, 8, 8
-        q, k, v, _, _, _, _, _ = make_synthetic_input(T, H, K, V)
+        q, k, v, _, _, _, _, _ = gdn2.make_synthetic_input(T, H, K, V)
         rng = np.random.RandomState(99)
         alpha = rng.uniform(0.5, 1.0, (T, H)).astype(np.float32)
         beta = rng.uniform(0.1, 0.5, (T, H)).astype(np.float32)
-        o1, _ = gdn1_recurrent(q, k, v, alpha, beta)
-        o2, _ = gdn1_recurrent(q, k, v, alpha, beta)
+        o1, _ = gdn2.gdn1_recurrent(q, k, v, alpha, beta)
+        o2, _ = gdn2.gdn1_recurrent(q, k, v, alpha, beta)
         np.testing.assert_array_equal(o1, o2)
 
 
@@ -206,7 +206,7 @@ class TestGDN1Recurrent:
 class TestMakeSyntheticInput:
     def test_shapes(self):
         T, H, K, V = 8, 2, 8, 8
-        q, k, v, g, b_gate, w_gate, A_log, dt_bias = make_synthetic_input(T, H, K, V)
+        q, k, v, g, b_gate, w_gate, A_log, dt_bias = gdn2.make_synthetic_input(T, H, K, V)
         assert q.shape == (T, H, K)
         assert k.shape == (T, H, K)
         assert v.shape == (T, H, V)
@@ -218,7 +218,7 @@ class TestMakeSyntheticInput:
 
     def test_gate_ranges(self):
         """Gates should be in valid ranges."""
-        _, _, _, g, b_gate, w_gate, _, _ = make_synthetic_input()
+        _, _, _, g, b_gate, w_gate, _, _ = gdn2.make_synthetic_input()
         # g is log-space decay, should be negative
         assert np.all(g < 0), "Decay g should be negative (log-space)"
         # b_gate and w_gate are sigmoid'd, so in [0, 1]
@@ -227,12 +227,12 @@ class TestMakeSyntheticInput:
 
     def test_reproducible(self):
         """Same seed produces same inputs."""
-        a = make_synthetic_input(seed=123)
-        b = make_synthetic_input(seed=123)
+        a = gdn2.make_synthetic_input(seed=123)
+        b = gdn2.make_synthetic_input(seed=123)
         for x, y in zip(a, b, strict=True):
             np.testing.assert_array_equal(x, y)
 
     def test_different_seeds_differ(self):
-        a = make_synthetic_input(seed=1)
-        b = make_synthetic_input(seed=2)
+        a = gdn2.make_synthetic_input(seed=1)
+        b = gdn2.make_synthetic_input(seed=2)
         assert not np.array_equal(a[0], b[0])
