@@ -55,6 +55,9 @@ build jetson_a57  "-mcpu=cortex-a57"
 build pi5_a76     "-mcpu=cortex-a76"
 build rk3588_a76  "-mcpu=cortex-a76"
 build rk3588_a55  "-mcpu=cortex-a55"
+# Orion O6 uses Cortex-A720 (Armv9.2-A, SVE2 128-bit, i8mm, dotprod, bf16).
+# Requires GCC 14+ or clang 17+. Falls back to armv9sve2 on older toolchains.
+build orion_a720  "-mcpu=cortex-a720"
 
 cat <<'NOTE'
 
@@ -69,6 +72,7 @@ For the known fleet, use the core-tuned build:
     RK3588 big cores  -> bench_gdn_rk3588_a76   (pin with taskset -c 4-7 on most RK3588 boards)
     RK3588 little     -> bench_gdn_rk3588_a55   (taskset -c 0-3)
     Jetson Nano       -> bench_gdn_jetson_a57
+    Orion O6 (A720)   -> bench_gdn_orion_a720    (or armv9sve2 if GCC < 14)
 
 To find out what an unknown device supports:
 
