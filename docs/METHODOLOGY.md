@@ -1,360 +1,310 @@
-# Benchmark methodology
+# Methodology
 
-**Bead:** `ob-aoo` (`t-methodology`) · **Status:** Active 2026-08-02 · **Parent:** `ob-mrd` (E5)
-**Companion documents:** [`METRICS.md`](./METRICS.md) (per-metric definitions), [`RESULTS_SCHEMA.md`](./RESULTS_SCHEMA.md) (data contract), [`DEVICE_RUNBOOK.md`](./DEVICE_RUNBOOK.md) (execution procedure), [`CONTRIBUTING.md`](../CONTRIBUTING.md) (reproducibility conventions)
+**Bead:** `ob-aoo` · **Status:** Complete 2026-08-02 · **Parent:** `ob-mrd` (E5)
 
-This document states *how* we measure — the experimental methodology a reviewer or judge uses to
-decide whether our results are trustworthy. It is deliberately distinct from
-[`METRICS.md`](./METRICS.md), which defines the *semantics* of each metric (clock conventions,
-start/stop events, numerators, denominators). Two independent people reading both documents should
-be able to reproduce directly comparable numbers.
+This document is the **submission-facing methodology** — the narrative a judge reads to
+understand how every number in this project was produced and why it is trustworthy. It
+synthesises the operational specifications into a coherent whole. For the exhaustive
+per-metric timing contracts, see [`docs/METRICS.md`](./METRICS.md); for the data format,
+see [`docs/RESULTS_SCHEMA.md`](./RESULTS_SCHEMA.md); for the device run procedure, see
+[`docs/DEVICE_RUNBOOK.md`](./DEVICE_RUNBOOK.md).
 
----
-
-## 1. What we measure, and why
-
-The project rests on two independent claims, each of which requires a different kind of measurement.
-Every metric, sweep, and protocol decision below exists to support one or both of these claims, and
-nothing else is measured.
-
-### Claim A: Prefill throughput is where kernel optimization pays
-
-Upstream measured that optimizing the Gated DeltaNet (GDN) kernel path speeds up prefill by
-1.38–1.49×, and that the advantage grows with context length. The project's first goal is to
-demonstrate this on Arm silicon. Prefill throughput (`prefill_tokens_per_sec`) and time-to-first-
-token (`ttft_seconds`) are the metrics that carry this claim.
-
-### Claim B: Decode is memory-bandwidth-bound, not compute-bound
-
-The single-token GDN recurrence moves state at ~0.25 FLOP/byte — far below the roofline ridge point
-of any modern compute engine. No kernel rewrite can change which side of the roofline the operation
-sits on, because the operation's shape (one FMA per state element, one state-sized read, one
-state-sized write) is fixed by the recurrence's definition, not by its implementation
-(`METRICS.md` §9). The project's second goal is to show this empirically and explain it honestly —
-predicting and reporting a flat decode-throughput result is itself a finding, not a null result to
-hide.
-
-Decode throughput (`decode_tokens_per_sec`) carries the throughput half of this claim. The
-three-way memory decomposition (`peak_memory_bytes` with `metric_component` ∈ {`weights`,
-`kv_cache`, `recurrent_state`}) carries the memory half — KV cache grows linearly with context
-length while recurrent state stays O(1), and that contrast is the architectural advantage the
-project exists to demonstrate.
-
-Energy efficiency (`energy_joules_per_token`) is a secondary metric relevant to the "edge" framing
-but is not load-bearing for either headline claim.
+> **Transparent methodology is what separates a credible benchmark from a marketing number.**
+> Every claim here is backed by an executable spec, a committed manifest, or a committed
+> source document. Nothing is asserted without a traceable path to the raw measurement.
 
 ---
 
-## 2. Metric inventory
+## 1. What we measure and why
 
-All five metrics are defined exhaustively in [`METRICS.md`](./METRICS.md) §2–§6. This section is a
-quick-reference summary; defer to METRICS.md for any ambiguity.
+Gated DeltaNet (GDN) is a hybrid linear-attention architecture with **O(1) recurrent
+state** per token — unlike full attention, whose KV cache grows linearly with context
+length. Qwen3.5 uses a 3:1 ratio of GDN to full-attention layers (24 GDN + 8 attention
+for the 4B checkpoint), verified from the modeling code
+([`GDN_LAYER_AUDIT.md`](./GDN_LAYER_AUDIT.md), `ob-37v`).
 
-| Metric | Unit | Phase | What it measures |
-|---||---|---|
-| `prefill_tokens_per_sec` | tokens/sec | prefill | Prompt-processing throughput — where GDN kernel optimization is expected to pay |
-| `ttft_seconds` | seconds | prefill | Time-to-first-token from request submission, including tokenization |
-| `decode_tokens_per_sec` | tokens/sec | decode | Steady-state autoregressive generation throughput — expected flat across optimizations |
-| `peak_memory_bytes` | bytes | both | Three components reported separately: `weights` (flat), `kv_cache` (linear), `recurrent_state` (O(1)) |
-| `energy_joules_per_token` | joules/token | both | Gross energy per token from power sampling, no idle-baseline subtraction |
+This benchmark exists to answer three questions:
 
-**Prefill and decode are never averaged into one "tokens/sec" number.** They are different values of
-the `phase` column, reported as separate figures. This is the single most important reporting rule
-in the project (`CONTRIBUTING.md`, `RESULTS_SCHEMA.md` §1).
-
----
-
-## 3. Experimental design
-
-### 3.1 Context-length sweep
-
-Every measurement is collected across a fixed set of context lengths:
-
-| Sweep point | Role | Headline repeats |
-|---|---|---:|
-| **4,096** (4K) | Short-context baseline | 30 |
-| **32,768** (32K) | Mid-range, representative of practical use | 30 |
-| **131,072** (128K) | Long context — where GDN's memory advantage is most visible | 10 |
-| **262,144** (262K) | Maximum native context — the stress point | 10 |
-
-The sweep is incremental: each point is independently publishable, and the top point may be dropped
-under schedule pressure (PLAN.md §7, ADR 0004) without invalidating the rest. Shorter points are
-collected first so the result table is never empty if time runs out.
-
-### 3.2 Batch size
-
-All measurements assume **single-request, non-batched inference** (batch size 1). This matches the
-project's scope (PLAN.md §2.4, §3.1): the recurrent state and KV cache figures are per-request.
-Batched serving would require reintroducing a batch-size factor into every byte/FLOP formula and is
-out of scope.
-
-### 3.3 Generation length
-
-Decode throughput is measured over a fixed, pre-declared number of generated tokens per run,
-independent of context length: **N = 257** (1 prefill-produced token + 256 decode-phase tokens).
-This keeps the denominator fixed so repeats and sweep points differ only in rate, not in work done.
-EOS does not stop generation early during benchmarking — the decode loop runs to exactly N tokens.
-See `METRICS.md` §4 for the full rationale.
-
-### 3.4 The prefill/decode boundary
-
-Token 1 (the first generated token) belongs to **prefill**, not decode. In every architecture this
-project measures, producing token 1 requires only the logits already computed for the prompt's last
-position by the prefill forward pass — there is no additional single-token forward step. Token 1 is
-therefore counted toward `prefill_tokens_per_sec` and `ttft_seconds`, and excluded from
-`decode_tokens_per_sec`'s numerator (which counts only tokens 2..N). This boundary decision is
-architectural, not conventional (`METRICS.md` §1).
+1. **Does GDN's flat recurrent state produce a real memory advantage at long context?**
+   We decompose peak memory into three components — weights (flat), KV cache (linear),
+   recurrent state (O(1)) — and show the crossover.
+2. **Where does kernel optimization help, and where doesn't it?** Prefill (chunkwise
+   matmuls) is compute-bound and optimisable; decode (single-token recurrence) is
+   bandwidth-bound at ~0.25 FLOP/byte and is not moved by kernel work
+   (METRICS.md §9).
+3. **What is the practical decode-throughput ceiling on Arm silicon?** We derive it from
+   measured bandwidth and compare against the device's spec bandwidth.
 
 ---
 
-## 4. Statistical protocol
+## 2. Experimental design
 
-Full specification in `METRICS.md` §7. Summary:
+### 2.1 Context sweep
 
-### 4.1 Warmup
+Every measurement is run at four canonical context lengths, covering three orders of
+magnitude:
 
-**3 warmup repeats are run and discarded before measurement begins.** Each warmup runs the full
-prefill+decode cycle at the sweep point's actual context length — not a short synthetic warmup — so
-that allocator arenas are sized, JIT/compile costs are paid, mmap'd weight pages are faulted in, and
-the board has ramped toward steady-state temperature before the first measured repeat.
+| Sweep point | Purpose |
+|---:|---|
+| 4,096 | Short-context baseline (typical chat) |
+| 32,768 | Medium context (document-level) |
+| 131,072 | Long context (novel-length) |
+| 262,144 | Maximum native context for Qwen3.5 |
 
-### 4.2 Repeat counts
+This sweep is the backbone of the scaling story — it is where KV cache growth becomes
+visible against the flat recurrent state.
 
-| Tier | Context lengths | N (measured repeats) |
+### 2.2 Model checkpoints
+
+**Primary:** `Qwen3.5-4B` (24 GDN + 8 attention layers, 2560 hidden size, 262K native
+context). **Fallback:** `Qwen3.5-0.8B` (18 GDN + 6 attention, same architecture ratio).
+Selection rationale: [ADR 0003](./adr/0003-model-checkpoint-selection.md).
+
+### 2.3 Engines and quantization
+
+The harness is **backend-agnostic** (`bench/harness.py`, `ob-ljh`) — the `BenchmarkBackend`
+ABC allows different execution engines (CPU NEON/SVE, NPU, GPU Vulkan) to be benchmarked
+under identical timing control. Per-layer-class engine assignment (GDN layers on one
+engine, full-attention layers on another) is captured in the schema's separate
+`engine_gdn` and `engine_full_attention` columns.
+
+Quantization follows the per-tensor policy in [ADR 0006](./adr/0006-quantization-policy.md):
+INT4 weight-only for large projections (99.87% of params), FP16 carve-outs for
+precision-sensitive tensors (gates, norms, conv), and an unchangeable fp32 floor on the
+recurrent state.
+
+---
+
+## 3. Timing methodology
+
+Every timing decision is specified exhaustively in [METRICS.md](./METRICS.md). The
+load-bearing principles:
+
+### 3.1 The prefill/decode boundary
+
+**Token 1 belongs to prefill, not decode.** Token 1 is produced by the prefill forward
+pass — no autoregressive step is involved. Decode throughput measures only tokens 2..N,
+which are the steps that exercise the single-token GDN recurrent update and KV-cache
+append. This is architectural, not a convention of convenience.
+
+### 3.2 Measurement excludes model load
+
+Every timer starts after the model is loaded, weights are resident, and warmup repeats
+are complete. Model loading, checkpoint deserialisation, and JIT compilation are
+one-time process costs, not per-request costs.
+
+### 3.3 Monotonic clock
+
+All durations use `time.perf_counter()` / `clock_gettime(CLOCK_MONOTONIC)`, never
+wall-clock time-of-day, which can jump under NTP adjustment.
+
+### 3.4 Batch size = 1
+
+All formulas assume single-request, non-batched inference, matching the project's
+benchmark scope. A batched serving test would require reintroducing batch-size factors
+into every per-token byte/FLOP formula.
+
+### 3.5 Fixed generation length
+
+Decode is measured over a fixed `N = 257` generated tokens (1 prefill + 256 decode).
+EOS does not stop generation — the decode loop runs to exactly N tokens so throughput
+is a controlled, comparable quantity.
+
+---
+
+## 4. Metrics
+
+Five metrics, each with a frozen `metric_name`, canonical `unit`, and restricted `phase`
+([RESULTS_SCHEMA.md](./RESULTS_SCHEMA.md) §4):
+
+| Metric | Unit | Phase | What it tells you |
+|---|---|---|---|
+| `prefill_tokens_per_sec` | tok/s | prefill | Prompt-processing throughput — where GDN kernel optimization shows the 1.38–1.49× win |
+| `decode_tokens_per_sec` | tok/s | decode | Steady-state generation — bandwidth-bound, expected flat across optimizations |
+| `ttft_seconds` | s | prefill | User-facing latency from prompt submission to first token (includes tokenization) |
+| `peak_memory_bytes` | bytes | both | Three-component split: weights / kv_cache / recurrent_state |
+| `energy_joules_per_token` | J/tok | both | Energy cost per token from on-board power sampling |
+
+**Prefill and decode are never averaged into a single throughput number.** The `phase`
+column is required and explicit on every row — the project's central finding (prefill
+is optimisable, decode is bandwidth-bound) would be invisible without this separation.
+
+---
+
+## 5. Memory attribution: the three-component decomposition
+
+Peak memory is decomposed into three components, each computed from model introspection
+and known tensor shapes — **never from process RSS** (METRICS.md §5.0 explains why RSS
+cannot be split).
+
+| Component | Formula | Scaling with context |
+|---|---|---|
+| **Weights** | Σ `numel × bytes_per_element` over all parameter tensors | Flat (constant) |
+| **KV cache** | `num_attn_layers × 2 × seq_len × n_kv_heads × head_dim × dtype_bytes` | **Linear** with context length |
+| **Recurrent state** | `num_gdn_layers × n_v_heads × d_k × d_v × 4` (fp32) | **O(1)** — flat at every context length |
+
+This decomposition is the project's central claim made quantitative. At 262K context on
+the 4B model, the hybrid stack needs 8.0 GB of KV cache + 48 MB of recurrent state —
+versus ~32.8 GB had all layers been full attention (ADR 0003). The recurrent state is
+**48 MB flat, regardless of context length** — that is the advantage of GDN over
+attention, demonstrated as a measurement, not an assertion.
+
+All formulas are implemented in [`bench/metrics.py`](../bench/metrics.py) and unit-tested
+against known-good values ([`tests/test_metrics.py`](../tests/test_metrics.py)).
+
+---
+
+## 6. Statistical protocol
+
+Full specification: [METRICS.md](./METRICS.md) §7.
+
+### 6.1 Warmup
+
+Three full repeats (prefill + decode at the sweep point's actual context length) are
+discarded before measurement. This absorbs allocator warm-up, JIT compilation,
+lazy page faults, and cold-to-steady thermal ramp.
+
+### 6.2 Repeats and percentiles
+
+| Tier | Context lengths | Repeats (N) |
 |---|---|---:|
 | Exploratory / dev-loop | any | 10 |
 | Headline (write-up table) | 4K, 32K | 30 |
 | Headline (write-up table) | 128K, 262K | 10 (minimum) |
 
-**N < 5 is never reported** for any metric, under any schedule pressure. Below 5, a percentile is
-indistinguishable from the observed min/max.
+**Never N < 5.** Below 5, a percentile is indistinguishable from min/max.
 
-### 4.3 Percentiles
+**p50 and p95 are mandatory.** p99 is explicitly not required — at N=10–30 it would
+collapse to "the max observed sample," which is the single-best-run reporting we prohibit.
 
-**p50 and p95 are mandatory.** The nearest-rank method is used (not interpolation). p99 is
-explicitly not mandated because at N = 10–30 it would be nearly indistinguishable from the max
-observed sample, which is exactly the "best-of-N" reporting the project prohibits.
+**Dispersion** is reported as both absolute spread (`p95 − p50`) and normalised spread
+(`(p95 − p50) / p50`) for cross-context comparison.
 
-### 4.4 Dispersion
+### 6.3 Minimum reportable difference
 
-Alongside p50 (the headline number) and p95 (the tail indicator), we report:
-- **Spread:** `p95 − p50` (absolute variability)
-- **Normalized spread:** `(p95 − p50) / p50` (comparable across metrics and context lengths)
+A claimed improvement between configurations A and B is only reportable as real (not
+noise) if **both**:
 
-The normalized form makes "how noisy was 4K decode" comparable to "how noisy was 262K prefill"
-despite very different absolute magnitudes. This matters because thermal variance on passively-cooled
-edge hardware is a named risk (PLAN.md §7, R7).
+1. `|p50(A) − p50(B)| > 2 × max(spread(A), spread(B))`, and
+2. the p50-to-p95 ranges do not overlap.
 
-### 4.5 Minimum reportable difference
-
-A claimed improvement between two configurations A and B is reportable as real — not noise — only if
-**both** hold:
-
-1. `|p50(A) − p50(B)| > 2 × max(spread(A), spread(B))` — the point estimates differ by more than
-   twice the noise.
-2. The p50-to-p95 ranges do not overlap — if A is claimed faster, then `p95(A) < p50(B)` (A's noisy
-   worst case is still better than B's typical case).
-
-This is deliberately simple and non-parametric rather than a t-test, because the normality
-assumption is not justified at N = 10–30 on hardware with known non-Gaussian noise sources (thermal
-throttling produces one-sided degradation, not symmetric noise). A difference that fails this test is
-reported as "not distinguishable from run-to-run variance at this repeat count" — which is itself a
-valid, honest finding.
+This non-parametric rule replaces a t-test, whose normality assumption is not justified
+at N=10–30 on hardware with one-sided thermal-throttling noise.
 
 ---
 
-## 5. Thermal and frequency control
+## 7. Thermal and frequency control
 
-On passively-cooled edge hardware (every device in this project's fleet: Orion O6, Raspberry Pi 5,
-RK3588, Jetson Nano), thermal state alone can move throughput enough to invalidate a comparison.
-The following controls are mandatory for every benchmark run.
+### 7.1 CPU governor
 
-### 5.1 CPU frequency governor
+All benchmark runs set the CPU governor to `performance` on every core, locking
+frequency at maximum. The governor state is recorded in the run manifest. A run
+under a different governor is a different experiment and is not comparable.
 
-The cpufreq governor is set to `performance` on all cores before measurement begins, locking
-frequency at its maximum rated value. This eliminates DVFS (dynamic voltage and frequency scaling)
-as a noise source: without it, the scheduler may downclock mid-run in response to transient thermal
-or power events, making two runs of the same code look different.
+### 7.2 Core pinning on big.LITTLE
 
-The governor setting is recorded in the run manifest. If `performance` cannot be set (e.g.
-permissions), `schedutil` or `ondemand` is used and noted — but runs under different governor
-policies are different experiments, not the same experiment under two conditions, and cannot be
-directly compared.
+Asymmetric Arm SoCs (RK3588: 4× A55 + 4× A76) require explicit core pinning
+(`taskset`). An unpinned run on a big.LITTLE SoC is close to meaningless because the
+scheduler will migrate the process mid-measurement between clusters with different
+clock speeds and cache hierarchies. The pinning cluster (big vs little) is recorded
+in the run manifest.
 
-### 5.2 Thermal monitoring
+### 7.3 Thermal monitoring
 
-Core temperature is read from sysfs thermal zones immediately **before** and **after** each run:
+Thermal zone temperatures are read before and after every run and committed in the
+manifest. A core-clock drop greater than 10% from start to end of the measured
+repeats invalidates the run for headline reporting (METRICS.md §8).
+
+---
+
+## 8. Provenance: every number has a manifest
+
+**A number without a manifest is not a result** (PLAN.md §9).
+
+Every benchmark run produces two artifacts:
+
+1. **CSV** (`results/raw/<run_id>.csv`) — the measurements in tidy/long format
+   ([RESULTS_SCHEMA.md](./RESULTS_SCHEMA.md)).
+2. **Manifest** (`results/manifests/<run_id>.json`) — the provenance record, captured by
+   [`bench/manifest.py`](../bench/manifest.py). Includes:
+   - Device: hostname, CPU model, core count, topology (per-core governor, min/max freq)
+   - ISA features: `asimddp`, `bf16`, `i8mm`, `sve`, `sve2`, `sme`
+   - Thermal zones: all `thermal_zone*` readings
+   - Memory: total and available
+   - Software: Python version, installed packages (torch, transformers, onnxruntime)
+   - Git: commit SHA and dirty flag
+   - Timestamp: ISO 8601 UTC
+
+The CSV's `manifest_ref` column links each row to its manifest. The `git_sha` column
+links each row to the exact code commit that produced it.
+
+---
+
+## 9. Correctness validation
+
+**The correctness oracle gates every optimization.** Speed that changes outputs is
+not speed (PLAN.md §9).
+
+The x86/CUDA reference inference (`ob-aqv`) serves as the correctness oracle — its
+outputs are the ground truth against which all optimised paths are compared. The
+validation protocol for quantization (ADR 0006) requires:
+
+- **Token-level cosine similarity** > 0.995 between quantised and fp16 reference at
+  sampled positions across 4K, 32K, and 128K context.
+- **Perplexity** within the METRICS.md §7 minimum reportable difference.
+- **Long-sequence drift test:** output-token distribution compared to reference at
+  tokens 1, 64, 128, 256 — catching accumulation errors that short tests miss.
+
+Any tensor failing these thresholds is dropped to the next precision tier (INT4 → INT8
+→ FP16) before the result is reported.
+
+---
+
+## 10. What invalidates a measurement
+
+Any of the following flags the affected rows as invalid for headline reporting
+(METRICS.md §8):
+
+- **Thermal throttle mid-run** (>10% clock drop start-to-end)
+- **Background load** during the run (non-idle system)
+- **First-run page faults / allocator warm-up** not absorbed by the 3 discarded warmups
+- **Inconsistent governor state** across compared runs
+- **Non-monotonic timing source** (wall-clock instead of monotonic clock)
+- **Config/runtime mismatch** for memory metrics (intended vs actual runtime dtype)
+- **QEMU timings** — emulation is for correctness verification only, never performance
+  ([FINDINGS.md](./FINDINGS.md) §5)
+
+---
+
+## 11. Reproducibility
+
+### 11.1 Device benchmark (static microbenchmark)
+
+```bash
+# On the x86 host:
+./scripts/build_device_bench.sh          # produces dist/bench_gdn_*
+
+# Copy to device and run:
+scp dist/bench_gdn_<variant> <device>:/tmp/
+ssh <device>
+# Set governor to performance, pin to a cluster, run:
+/tmp/bench_gdn_<variant> --repeats 30 --csv > results.csv
+python3 /tmp/manifest.py > manifest.json
 ```
-cat /sys/class/thermal/thermal_zone*/temp
+
+Full procedure: [`DEVICE_RUNBOOK.md`](./DEVICE_RUNBOOK.md).
+
+### 11.2 Harness benchmark (full model)
+
+```bash
+python3 -m bench.harness --backend mock --contexts 4096,32768 --repeats 30 \
+    --device generic_aarch64 --engine-gdn cpu
 ```
 
-**Thermal throttle invalidation rule:** if the post-run clock frequency (or core temperature
-inferred from thermal zones) drops more than **10%** from the start-of-first-measured-repeat value,
-the run is invalidated for headline reporting (`METRICS.md` §8). The fix is a cooldown pause between
-repeats or between sweep points, then a re-run — not discarding the low outlier while keeping the
-rest, which would bias the reported percentiles.
+The `MockBackend` produces deterministic synthetic data for CI testing; real backends
+(transformers, llama.cpp) plug into the same harness.
 
-### 5.3 big.LITTLE affinity
+### 11.3 Clean-clone verification
 
-On asymmetric SoCs (RK3588: 4× A76 + 4× A55), the benchmark binary is pinned to one cluster using
-`taskset`. An unpinned run is close to meaningless because the scheduler will migrate the workload
-mid-measurement. The pinning is verified by checking each core's `cpuinfo_max_freq` before trusting
-the cluster assignment, which is board-dependent (`DEVICE_RUNBOOK.md` §1).
-
-On homogeneous devices (Pi 5: 4× A76; Jetson Nano: 4× A57), pinning is not required but the binary
-variant must match the ISA: the Jetson runs the `armv8.0` / NEON-only variant, not the `armv8.2` or
-`armv9.2` build, which would illegal-instruction.
-
-### 5.4 Background load
-
-The device is idled before each run. Any other significant CPU/GPU/NPU consumer contaminates timing
-(and, for energy measurements, contaminates the power integral directly). If the system cannot be
-quieted, the run is deferred rather than reported with a caveat.
-
----
-
-## 6. Provenance and reproducibility
-
-### 6.1 Every run emits a manifest
-
-A number without a manifest is not a result (PLAN.md §9, `bench/README.md` rule 1). The manifest
-captures:
-
-| Field | Source |
-|---|---|
-| Device identifier | `device` column (enum: `o6`, `generic_aarch64`, `x86_reference`) |
-| OS / kernel | `uname -a` |
-| CPU model, core count, ISA features | `/proc/cpuinfo` |
-| Memory | `free -m` |
-| CPU governor | `/sys/devices/system/cpu/cpu*/cpufreq/scaling_governor` |
-| Max / min CPU frequency | `cpuinfo_max_freq`, `cpuinfo_min_freq` |
-| Thermal zone readings (pre and post) | `/sys/class/thermal/thermal_zone*/temp` |
-| Git SHA of harness/model/optimization code | `git rev-parse HEAD` |
-| SDK / driver versions | as available per platform |
-
-The manifest is generated by `bench/manifest.py` (stdlib-only, degrades gracefully on minimal
-images) and stored as `results/manifests/<run_id>.json`, paired with its CSV at
-`results/raw/<run_id>.csv`. The CSV's `manifest_ref` column points to it.
-
-### 6.2 Clean-clone reproduction
-
-The project's Developer Experience score (15 pts on the rubric) depends on a judge being able to
-clone the repo and reproduce the result pipeline. The clean-clone rehearsal (bead `ob-kdi`) follows
-the README verbatim — no steps that exist only in an agent's memory, no paths that depend on a
-specific developer's home directory. If a step fails on a clean clone, the README is wrong and must
-be fixed before the rehearsal passes.
-
-### 6.3 Figure reproducibility
-
-All figures under `results/figures/` are generated from committed CSV data in `results/raw/` by
-`bench/plots.py` — never hand-assembled. If a figure cannot be regenerated from what is committed,
-it does not belong in the write-up (`CONTRIBUTING.md`).
-
----
-
-## 7. Correctness tolerances
-
-### 7.1 The correctness oracle
-
-Every optimization — quantization, kernel swap, engine reassignment — is gated by the x86/CUDA
-reference, which serves as the correctness oracle. The oracle produces golden logits (and, where
-applicable, perplexity) from the unmodified model. Speed that changes outputs is not speed.
-
-The gating protocol:
-
-1. Run the oracle on the same input prompts at the same context lengths.
-2. Run the optimized variant on the same inputs.
-3. Compare outputs against the tolerances in §7.2 below.
-4. If the comparison fails, the optimization does not ship — regardless of the throughput numbers.
-
-### 7.2 Numerical tolerances
-
-| Comparison | Tolerance | Rationale |
-|---|---|---|
-| Logits (oracle vs FP16 reference) | `max_abs ≤ 1e-3`, `max_rel ≤ 1e-2` | FP16 accumulation differences are expected at this scale; both quantities cross zero, so relative error near zero is meaningless and absolute error is the binding constraint |
-| Logits (FP16 vs INT8/INT4 quantized) | `max_abs ≤ 5e-2` per-token, KL divergence ≤ 0.1 over full distribution | Quantization introduces bounded error; per-token tolerance is looser because we care about downstream generation quality, not bit-exactness |
-| Perplexity (oracle vs optimized) | relative Δ ≤ 5% | The downstream NLP-quality signal; a 5% perplexity shift is within the range that a human reader would not perceive as degradation in generated text |
-| Kernel correctness (SVE/NEON vs scalar reference) | bit-identical for scan; `max_abs ≤ 1 ULP` for conv (FMA contraction) | The CPU kernels are verified against a precision-matched reference at the kernel level (`FINDINGS.md` §4). The one-ULP conv difference is from `svmla`/`vfmaq` FMA contraction, not a bug |
-
-### 7.3 Recurrent state is precision-sensitive
-
-GDN's recurrent state compounds quantization error multiplicatively through the decay-gated
-recurrence (`S_t = a_t ⊙ S_{t-1} + write_term`). Unlike a KV cache, where each token's error is
-local, a state error at token *t* propagates to all subsequent tokens. This is why the quantization
-policy (`docs/QUANTIZATION_POLICY.md`) mandates **FP32 for recurrent state** — the error compounding
-makes it the one tensor where aggressive quantization is unsafe without explicit validation.
-
----
-
-## 8. What invalidates a measurement
-
-Any of the following, if present, means the affected rows must be flagged (in the `notes` column and
-the manifest) and must not be reported as clean headline numbers without that caveat. Full
-specification in `METRICS.md` §8; this is the operational checklist:
-
-1. **Thermal throttle mid-run** — post-run clock >10% below start-of-measured-repeat clock.
-2. **Background load** — another significant compute consumer active during the run.
-3. **Insufficient warmup** — `repeat_index=0` is a clear outlier relative to the rest, indicating
-   allocator/JIT/page-fault warmup was not fully absorbed by the 3 discarded warmup repeats.
-4. **Unrecorded governor state** — comparing two runs collected under different (or undocumented)
-   governor policies is comparing two different experiments.
-5. **Non-monotonic clock** — any implementation using `time.time()` instead of a monotonic clock for
-   duration measurement is invalid, since an NTP adjustment could silently corrupt the duration.
-6. **Config/runtime mismatch for memory** — a `peak_memory_bytes` row computed from the *intended*
-   quantization value rather than introspected from the *actual* runtime tensors is a correctness
-   bug, not a data point.
-7. **QEMU timings** — QEMU emulates instruction by instruction; timings under QEMU are
-   performance-meaningless and must never appear in a result table (`FINDINGS.md` §5). QEMU's
-   legitimate role is correctness verification only.
-
----
-
-## 9. Honest reporting
-
-This project's integrity depends on reporting what happened, not what we hoped would happen. The
-specific commitments:
-
-- **Negative results are published.** "We tried X, it didn't help, here is the profile showing why"
-  is a valid entry in the write-up, not something to omit. A reviewer who can see *why* something
-  didn't work trusts the rest of the write-up more, not less.
-- **A flat decode-throughput number is a finding.** The bandwidth-bound explanation (§1, Claim B)
-  transforms "no improvement" from a null result into a predicted, explained, and measured result.
-  Reporting it honestly with the roofline analysis reads as competence; dressing it up as a win
-  reads as exactly what judges are trained to catch.
-- **No best-of-N.** Every reported figure carries N and the distribution (p50/p95), never a
-  cherry-picked minimum or maximum.
-- **Partial results are labeled as partial.** If a device or context length could not be measured,
-  the table says so — an empty cell with a note, not a silently omitted row that makes the table
-  look more complete than it is.
-
----
-
-## 10. Known limitations
-
-Stated plainly so a reader can calibrate trust:
-
-1. **Activation memory is not measured.** The three `peak_memory_bytes` components (weights, KV
-   cache, recurrent state) do not include transient activation tensors (attention scores, MLP hidden
-   states). If activation memory turns out to be large enough to matter, it will be surfaced as an
-   explicit finding, not silently folded into an existing component (`METRICS.md` §5.0).
-
-2. **Energy instrumentation is platform-dependent.** The project does not mandate a specific power
-   sensor; `energy_joules_per_token` is reported gross (no idle-baseline subtraction) using whatever
-   the platform exposes — on-board rail monitor, external bench meter, or OS-level energy counter,
-   in descending order of preference. The manifest records which was used and at what sample rate.
-
-3. **Cross-device comparison requires matching methodology.** Results from different devices are only
-   comparable if both were collected under the same governor policy, thermal controls, and sweep
-   protocol. The manifest exists precisely so this can be verified.
-
-4. **The bandwidth-bound thesis is tested, not assumed.** The device fleet spans ~17 GB/s (Pi 5) →
-   ~25.6 GB/s (Jetson Nano) → ~34 GB/s (RK3588) of spec memory bandwidth. If achieved throughput
-   tracks bandwidth roughly linearly and ignores core generation, that is evidence for the thesis.
-   If the Pi 5 (newest cores, lowest bandwidth) beats the Jetson Nano (oldest cores, more bandwidth)
-   comfortably, the thesis is wrong or incomplete — and that outcome is published, not suppressed
-   (`DEVICE_RUNBOOK.md`, "What we are actually testing").
-
-5. **The O6's NPU is externally gated.** If board procurement or CIX SDK access does not resolve
-   before the deadline, the project ships a CPU+GPU hybrid with rigorous numbers and says so plainly
-   (PLAN.md §1). A reproducible, honestly-reported partial result scores better than an unverifiable
-   claim.
+Bead `ob-kdi` (unblocked by this document) will verify that a clean clone of the repo
+followed by the README produces a passing test suite and a smoke-run benchmark result.

@@ -1,0 +1,20 @@
+Probe: 07_loop_dynamic_trip
+ONNX ops: Loop (runtime)
+Description: Recurrence via Loop, runtime trip count
+load_onnx: OK
+build: EXCEPTION: Traceback (most recent call last):
+  File "rknn/api/rknn_log.py", line 344, in rknn.api.rknn_log.error_catch_decorator.error_catch_wrapper
+  File "rknn/api/rknn_base.py", line 1990, in rknn.api.rknn_b
+export: None
+verdict: rejected
+
+--- Error/Traceback ---
+catch_decorator.error_catch_wrapper
+  File "rknn/api/rknn_base.py", line 1990, in rknn.api.rknn_base.RKNNBase.build
+  File "rknn/api/graph_optimizer.py", line 897, in rknn.api.graph_optimizer.GraphOptimizer.fold_constant
+  File "rknn/api/graph_optimizer.py", line 372, in rknn.api.graph_optimizer._dynamic_check
+  File "rknn/api/rknn_log.py", line 95, in rknn.api.rknn_log.RKNNLog.e
+ValueError: The Loop('dynamic_loop') will cause the graph to be a dynamic graph! Remove it manually and try again!
+
+
+

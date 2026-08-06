@@ -15,6 +15,7 @@ dist/
 
 # Downloaded model weights — never committed (license compliance, repo size)
 weights/
+*.rknn
 
 # Agent session artifacts — orchestration scratch, not project source.
 # NOTE: .goose-task.md has historically carried a device sudo password; keep it

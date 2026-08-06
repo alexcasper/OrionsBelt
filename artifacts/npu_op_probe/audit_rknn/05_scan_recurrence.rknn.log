@@ -1,0 +1,11 @@
+Probe: 05_scan_recurrence
+ONNX ops: Scan
+Description: Chunk-to-chunk recurrence via ONNX Scan
+load_onnx: OK
+build: OK
+export: OK
+verdict: compiles
+
+--- Captured stderr ---
+I OpFusing 0:   0%|                                                         | 0/100 [00:00<?, ?it/s]I OpFusing 0: 100%|###########################################| 100/100 [00:00<00:00, 501711.00it/s]I OpFusing 1 :   0%|                                                        | 0/100 [00:00<?, ?it/s]I OpFusing 1 : 100%|##########################################| 100/100 [00:00<00:00, 211406.45it/s]I OpFusing 2 :   0%|                                                        | 0/100 [00:00<?, ?it/s]I OpFusing 2 : 100%|##########################################| 100/100 [00:00<00:00, 161879.74it/s]I OpFusing 2 : 100%|##########################################| 100/100 [00:00<00:00, 129533.79it/s]
+

@@ -39,6 +39,10 @@ class Device(Enum):
     O6 = "o6"
     GENERIC_AARCH64 = "generic_aarch64"
     X86_REFERENCE = "x86_reference"
+    RK3588_T3 = "rk3588-t3"
+    RK3588_T4 = "rk3588-t4"
+    JETSON_J1 = "jetson-j1"
+    JETSON_J2 = "jetson-j2"
 
 
 class Engine(Enum):
