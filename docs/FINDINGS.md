@@ -929,3 +929,98 @@ pre/post hooks to measure wall-clock time per layer, broken down by type
 
 Data: `results/raw/rk3588-t4_layer_profile.csv`. Script:
 `bench/profile_layers.py` (3 repeats, 3 decode tokens per context length).
+
+### Chunkwise WY Recurrent-Scan Bottleneck Characterization (ob-3ko)
+
+**Question:** Is GDN layer cost dominated by the inherently sequential state
+update (the gated delta-rule scan) or by the chunk-parallel matmul portions
+(input/output projections, FFN)? How does this shift between prefill and decode?
+
+**Answer: Matmuls dominate overwhelmingly. The sequential recurrence is
+computationally negligible — 2.69% of FLOPs in both phases.**
+
+#### FLOP breakdown (Qwen3.5-0.8B, per GDN layer, seq=64 prefill)
+
+| Component | FLOP (seq=64) | Share | Class |
+|---|---:|---:|---|
+| Input projections (QKV+Z+B+A) | 1,078 M | 41.1% | Matmul |
+| FFN (SwiGLU, 3 linear layers) | 1,208 M | 46.0% | Matmul |
+| Output projection | 268 M | 10.2% | Matmul |
+| Delta-rule recurrence (per-token scan) | 67 M | 2.6% | **Sequential** |
+| Causal Conv1D (depthwise, k=4) | 3.1 M | 0.12% | **Sequential** |
+| Cumulative decay (prefix product) | 0.4 M | 0.02% | **Sequential** |
+| **Total** | **2,625 M** | 100% | |
+| **Sequential kernels** | **70.6 M** | **2.69%** | |
+| **Matmul portion** | **2,554 M** | **97.31%** | |
+
+The ratio is phase-independent: at decode (seq=1), the sequential kernels are
+still 2.69% of total FLOPs. The matmul FLOP count scales linearly with seq
+just as the recurrence does, so the ratio is constant.
+
+#### Cross-check with kernel microbenchmarks (A76, optimized NEON)
+
+The standalone C kernels confirm the FLOP analysis empirically. At seq=64,
+channels=2048 (0.8B dimensions), the three sequential GDN kernels total ~205 µs
+(gated_scan: 125 µs, cumdecay: 33 µs, conv1d: 47 µs). The full GDN layer as
+profiled in PyTorch takes ~129,000 µs at ctx=32 — so the sequential kernels are
+under 0.2% of wall-clock layer time (with PyTorch dispatch overhead inflating
+the remainder).
+
+At decode (seq=1), all three sequential kernels complete in ~5.2 µs total on
+A76 — negligible against the ~47,000 µs per-layer decode cost, which is
+dominated by weight-loading for the projection matmuls.
+
+#### Memory traffic analysis (decode)
+
+During decode, the bottleneck is memory bandwidth (loading model weights for a
+single token), not compute. The recurrent state's memory footprint is modest:
+
+| Component | Per-layer (0.8B) | Per-layer (4B) |
+|---|---:|---:|
+| Recurrent state | 1.0 MiB (fp32) | 2.0 MiB |
+| Conv state | 0.094 MiB | 0.125 MiB |
+| Projection weights | ~22 MiB | ~56 MiB |
+| FFN weights | ~24 MiB | ~60 MiB |
+
+The recurrent state (1–2 MiB) is dwarfed by the projection + FFN weight
+traffic (~46–116 MiB per layer per token). Even loading and storing the state
+each token (~2–4 MiB round-trip) is minor compared to the weight traffic.
+
+#### Why the sequential recurrence still matters
+
+Although the sequential scan is not a compute or bandwidth bottleneck, it
+matters for three non-obvious reasons:
+
+1. **Pipeline depth limitation**: The inter-chunk state update creates a
+   loop-carried dependency — chunk *N*'s state depends on chunk *N-1*'s output.
+   This serializes the chunk pipeline even though each chunk's internal
+   computation is parallel. The effect is latency, not throughput: 4 chunks of
+   64 tokens cannot overlap their inter-chunk state updates.
+
+2. **Toolchain incompatibility**: The NPU compiler (NOE) cannot express a
+   runtime-length recurrence at all. This is an architectural mismatch, not a
+   performance issue — the sequential scan is fast on CPU, but the toolchain
+   barrier forces it to stay on CPU regardless of where the matmuls go.
+
+3. **State residency**: The recurrent state must persist across forward calls
+   (unlike attention's KV cache which is read-only). Cross-engine handoff of
+   mutable state is the correctness hazard in any heterogeneous mapping. The
+   state is small (18–48 MiB total across all GDN layers), but it must be
+   coherent and resident.
+
+#### Implication for layer-to-engine mapping (ob-o4g)
+
+The working hypothesis (PLAN.md §3.1) — CPU hosts GDN sequential scan, GPU/NPU
+hosts matmuls — is confirmed by the data, but for a subtler reason than
+expected. It is not that the sequential scan is too slow for an accelerator; it
+is that (a) the scan is trivially cheap on CPU (5 µs/token), so moving it would
+save nothing, (b) the matmuls dominate cost and are exactly what accelerators
+are designed for, and (c) the toolchain cannot express the recurrence on NPU
+anyway.
+
+The optimisation target is unambiguously the **matmul portions** — input
+projections (41% of FLOPs), FFN (46%), and output projection (10%) — not the
+sequential recurrence (2.7%). This holds for both prefill and decode.
+
+Data: `results/raw/rk3588-t4_big.csv` (kernel timings),
+`results/raw/rk3588-t4_layer_profile.csv` (per-layer profiling).
