@@ -123,7 +123,7 @@ All figures above are verified against primary sources (Radxa product page and d
 | Repository skeleton, Apache-2.0 license | Done |
 | Results schema (`docs/RESULTS_SCHEMA.md`) | Done |
 | Benchmark harness (`bench/`) + device microbenchmark (`bench_gdn.c`) | Producing data |
-| CI: lint + unit tests (681 tests) | Done — `.github/workflows/ci.yaml` |
+| CI: lint + unit tests (721 tests) | Done — `.github/workflows/ci.yaml` |
 | Device-fleet microbenchmarks (5 devices) | Done — [fleet analysis](./results/figures/fleet_bandwidth_scaling.md) |
 | Ablation matrix (6 configs, synthetic) | Done — [comparison table](./results/figures/ablation_comparison.md) |
 | Memory decomposition (analytical) | Done — [figures](./results/figures/) |
@@ -141,12 +141,12 @@ All figures above are verified against primary sources (Radxa product page and d
 | Per-layer engine mapping (NPU/GPU/CPU) | Hypothesis only — pending measurements |
 | Full inference results (tokens/sec, TTFT, memory) | **Not started — needs hardware** |
 
-> **Results so far:** 29 CSVs from the device fleet, 17 provenance manifests, 10 generated figures/tables.
+> **Results so far:** 37 CSVs from the device fleet, 17 provenance manifests, 10 generated figures/tables.
 >
 > ```
 > results/
 >   raw/         <- 29 per-run CSVs across 5 devices
->   manifests/   <- 15 provenance manifests (git SHA, governor, thermals)
+>   manifests/   <- 17 provenance manifests (git SHA, governor, thermals)
 >   figures/     <- fleet analysis, ablation comparison, kernel/memory plots
 > ```
 >
@@ -189,6 +189,9 @@ python3 bench/manifest.py > results/manifests/my-device.json
 
 # 5. Generate comparison tables and figures
 python3 -m bench.plots results/raw/ --text-only --output-dir results/figures
+
+# 6. Regenerate memory scaling figures (the O(1) vs O(n) thesis)
+python3 scripts/generate_memory_plots.py
 ```
 
 No GPU, NPU, or proprietary SDK is required. Runs on Pi 5, Jetson Nano,
