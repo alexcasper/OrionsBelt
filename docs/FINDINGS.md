@@ -843,42 +843,40 @@ narrow only for prefill chunk boundaries.
 | CumDecay | 8.03 GiB/s | 5.23 GiB/s | 5.78 GiB/s |
 | Scan | 17.86 GiB/s | 11.49 GiB/s | 12.08 GiB/s |
 
-### ⚠ Measurement quality: the replicate gap was one bad run, not a disagreement
+### ⚠ Measurement quality: same-commit replicates disagree by 3.4×
 
 Every cross-device table takes one run per device, and two devices were measured
-twice. The gaps looked alarming — until the spreads were checked (bead `ob-bf7`):
+twice. The original t3 run had a 153% spread (contaminated); t3 was re-run at
+commit 553a96e (taskset-pinned, clean tree, governor=performance, manifest
+`dirty: false`) — and the gap got *worse*, not better (bead `ob-bf7`):
 
-| Device class | Runs (scan, 4B) | Gap | Spread of each |
+| Device class | Runs (scan, 4B, GiB/s) | Gap | Spread of each |
 |---|---|---:|---|
-| RK3588 big | t3 1.96 vs t4 3.29 | 1.68× | **t3 153%** vs t4 17% |
-| RK3588 little | t3 0.35 vs t4 0.55 | 1.57× | t3 29% vs t4 12% |
+| RK3588 big | t3 **11.07** vs t4 3.29 | **3.36×** | t3 6% ✓ vs t4 17% ⚠ |
+| RK3588 little | t3 **2.27** vs t4 0.55 | **4.13×** | t3 47% ⚠ vs t4 12% |
 | Pi 5 (same board) | r5 1.20 vs j1 1.84 | 1.53× | r5 7% vs j1 — |
 | Jetson j2 (same board) | canonical 0.73 vs `_single` 1.13 | 1.55× | the 1.13 run has **no manifest** |
 
-**The RK3588 "disagreement" is not two valid measurements conflicting.** t3's scan
-run reports p50 1514 µs against p95 3832 µs — a **153% spread**, where
-[`DEVICE_RUNBOOK.md`](./DEVICE_RUNBOOK.md) calls anything past ~10% suspect and
-says to suspect thermal throttling first. t4's same-commit run is 17%. One run is
-simply contaminated, so the fleet tables now anchor on **t4** on quality grounds,
-and `fleet_analysis.py` prints the spread beside every headline number so a noisy
-figure cannot be quoted as a clean one. That is how a 153% row came to anchor the
-O6 prediction in the first place.
+**The RK3588 gap is now the dominant uncertainty on the fleet.** The t3 re-run
+is clean — 6.2% spread on the big cluster, `dirty: false` manifest, thermals
+37-38°C before and after, no throttling. It reads 11.07 GiB/s. t4's same-source-
+commit run reads 3.29 GiB/s with 17% spread and `dirty: true`. Both are now
+valid measurements disagreeing by 3.36×, and neither is obviously contaminated.
 
-The Jetson case resolved the same way: the outlier (1.13) is the run with **no
+The little cluster is noisier: t3's A55 gated_scan reports 46.7% spread, which
+the operator (commit 553a96e) noted as inherent to that kernel on the little
+cores — cumdecay (7.4%) and dwconv1d (6.8%) are clean on the same run.
+
+The Jetson case resolved cleanly: the outlier (1.13) is the run with **no
 manifest at all**, while the manifest-backed canonical run reads 0.73 — agreeing
-with j1's 0.72 to ~1%. Under PLAN.md §9 the unprovenanced file is not a result,
-and dropping it makes the two Jetson units agree rather than conflict.
-
-**A caveat that limits all of it:** every manifest on the fleet records
-`dirty: true`. The stored SHA therefore does not identify the code that ran, so
-"same commit" never guaranteed "same binary" — which is why the environmental
-explanation could not have been established either way.
+with j1's 0.72 to ~1%. Under PLAN.md §9 the unprovenanced file is not a result.
 
 **What survives.** The Pi 5 beats both Jetson units on all three kernels despite
 33% less spec bandwidth, under every pairing and comfortably outside the spread.
 The pure bandwidth-bound thesis is incomplete at this working set. The O6 estimate
-is **~5-8 GiB/s**, with the IPC/clock assumption and the dirty-tree problem as the
-dominant uncertainties rather than anchor choice.
+is **~5-8 GiB/s** (conservative t4 anchor); the clean t3 re-run would give
+~17-28 GiB/s. The 3.4× anchor gap is now the dominant uncertainty, larger than
+the IPC/clock assumption.
 
 Closing `ob-bf7` needs one clean-tree, commit-matched sweep across every device
 with pinning, governor and thermals recorded. The tables in
