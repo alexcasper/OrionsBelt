@@ -253,7 +253,7 @@ pressure later, matching the spirit of the descope ladder in PLAN.md §7.
 
 ## Sources
 
-- [PLAN.md](../../PLAN.md) — §1 two-track structure, §2.4 verified prefill/decode finding, §7 risk register and descope ladder
+- [PLAN.md](../archive/PLAN.md) (archived, see [docs/archive/README.md](../archive/README.md)) — §1 two-track structure, §2.4 verified prefill/decode finding, §7 risk register and descope ladder
 - [docs/CLAIM_VERIFICATION.md](../CLAIM_VERIFICATION.md) — §1.1 Edge AI track correction
 - [Arm Create: AI Optimization Challenge — Rules](https://arm-ai-optimization-challenge.devpost.com/rules)
 - [CIX P1 CPU TRM release note (CNX Software)](https://www.cnx-software.com/2025/12/13/cix-releases-p1-cpu-trm-and-developer-guides-for-gpu-ai-accelerator-os-and-firmware-bios/)
