@@ -751,6 +751,15 @@ All fleet devices were benchmarked single-threaded. j2's data is a fresh run of 
 current binary with `OMP_NUM_THREADS=1` (the original j2 CSV was captured pre-OpenMP
 at commit `28729f3`; see optimization-impact section below for the 4-core numbers).
 
+> **Update (2026-08-06):** RK3588 numbers in this table are from the original
+> pre-optimization fleet sweep (commit `28729f3`). Both t3 and t4 have since been
+> re-benchmarked with optimized kernels (OpenMP + NEON unrolling) at clean-tree
+> commits — RK3588 big Scan now reads **11.56 GiB/s** (t4, `fe32f1c`) and **11.07**
+> (t3, `553a96e`), agreeing within ~5%. See
+> [`fleet_bandwidth_scaling.md`](../results/figures/fleet_bandwidth_scaling.md) for
+> the current optimized fleet comparison. The Pi 5 and Jetson numbers below are
+> unchanged (those devices have not been re-benchmarked).
+
 | Device | Spec | CumDecay | Scan | DWConv1D | Scan/Spec |
 |--------|------|----------|------|----------|-----------|
 | Pi 5 | 17.0 | 3.74 | 1.20 | 3.23 | 7.1% |
@@ -813,6 +822,12 @@ big cluster (1.96 GiB/s scan) by the expected A720 IPC+clock gain (1.5–2.5×)
 gives **2.9–4.9 GiB/s predicted scan throughput** — ~3–5% of the O6's 93.1 GiB/s
 spec bandwidth. If the board arrives, run
 `bench_gdn_armv9sve2 --repeats 30 --csv` to check.
+
+> **Updated prediction (2026-08-06):** with optimized kernels, RK3588 big scan
+> reads 11.56 GiB/s (t4) / 11.07 (t3). The same 1.5–2.5× A720 scaling gives
+> **17–29 GiB/s** — see
+> [`fleet_bandwidth_scaling.md`](../results/figures/fleet_bandwidth_scaling.md)
+> for the current analysis.
 
 ### Optimization impact: j2 single-threaded vs 4-core OpenMP (2026-08-03)
 
