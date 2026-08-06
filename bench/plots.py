@@ -235,7 +235,10 @@ def plot_kernel_bandwidth() -> list[Path]:
 
     Reads all ``results/raw/rk3588-*.csv`` files.
     """
-    csvs = sorted(_RAW_DIR.glob("rk3588-*.csv"))
+    # Only device-microbenchmark CSVs (rk3588-{host}_{big|little}[_singlethread].csv).
+    # Exclude model-level and per-layer profiling CSVs which have different schemas.
+    csvs = sorted(c for c in _RAW_DIR.glob("rk3588-*.csv")
+                  if "_big" in c.stem or "_little" in c.stem)
     if not csvs:
         print("  (no rk3588 microbenchmark CSVs found, skipping)")
         return []
@@ -380,7 +383,8 @@ def generate_table() -> Path:
     ]
 
     # Kernel benchmark table
-    csvs = sorted(_RAW_DIR.glob("rk3588-*.csv"))
+    csvs = sorted(c for c in _RAW_DIR.glob("rk3588-*.csv")
+                  if "_big" in c.stem or "_little" in c.stem)
     if csvs:
         lines.append("| Device | Model | Kernel | Cluster | GiB/s (p50) | GFLOP/s | Spread % |")
         lines.append("|---|---|---|---|---:|---:|---:|")
