@@ -1,8 +1,8 @@
 # OrionsBelt
 
-**Optimizing a Qwen3.5 Gated DeltaNet hybrid model for Arm edge silicon.**
+**Optimizing a Qwen3.5 Gated DeltaNet hybrid model for Arm edge silicon (Radxa Orion O6 / CIX P1).**
 
-Submission for the [Arm Create: AI Optimization Challenge](https://arm-ai-optimization-challenge.devpost.com/) (deadline 2026-08-14, 16:00 PDT), **Edge AI track**. This repository is the technical home of that submission: a hardware-independent measurement harness and optimization effort running on RK3588 (Cortex-A76/A55), Raspberry Pi 5, and Jetson Nano. Track decision: [ADR 0007](./docs/adr/0007-track-selection-edge-ai.md).
+Submission for the [Arm Create: AI Optimization Challenge](https://arm-ai-optimization-challenge.devpost.com/) (deadline 2026-08-14, 16:00 PDT). This repository is the technical home of that submission: an in-progress, hardware-independent measurement harness and optimization effort aimed at the Physical AI and Edge AI tracks.
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
 
@@ -27,7 +27,7 @@ Licensed under **Apache-2.0** — see [`LICENSE`](./LICENSE).
 
 ## What Gated DeltaNet is, and why it matters on edge silicon
 
-Standard transformer self-attention has a well-known scaling problem at inference time: to generate token *N+1*, the model attends back over every previous token, and it does so by keeping a **KV cache** — a stored key/value vector for every token seen so far. That cache grows linearly with context length. At 4K tokens it's small; at 262K tokens it can dwarf the model weights themselves. On a memory-constrained edge board, a linearly growing cache is the thing that runs you out of RAM, or forces you to shrink your usable context window to fit.
+Standard transformer self-attention has a well-known scaling problem at inference time: to generate token *N+1*, the model attends back over every previous token, and it does so by keeping a **KV cache** — a stored key/value vector for every token seen so far. That cache grows linearly with context length. At 4K tokens it's small; at 262K tokens it reaches 8.0 GiB for the 4B checkpoint — the same order as the weights themselves, and **larger than them once the weights are quantized** (~3.1x at INT4, though still below 10.4 GiB FP16 weights). The unbounded growth is the point rather than any single crossover: the cache has no ceiling, while a recurrent state does. On a memory-constrained edge board, a linearly growing cache is the thing that runs you out of RAM, or forces you to shrink your usable context window to fit.
 
 **Gated DeltaNet (GDN)** is a linear-attention mechanism that avoids this. Instead of an ever-growing cache, each GDN layer carries a **fixed-size recurrent state** — think of it as a compressed summary of everything seen so far, updated in place at every step. Decoding token *N+1* only ever touches that fixed-size state, never the full history. That makes GDN's per-token decode memory **O(1) in context length**, as opposed to full attention's O(context length).
 
@@ -99,47 +99,40 @@ A portable aarch64 target (the **Edge AI** hedge track) is being brought up in p
 
 ## Status
 
-**Track decision: Edge AI** ([ADR 0007](./docs/adr/0007-track-selection-edge-ai.md), 2026-08-06).
-The Radxa Orion O6 board has not arrived (externally gated since project start). We committed
-to the **Edge AI** track on the RK3588 three days ahead of the Aug 9 hard date, because the
-hedge work already produces real results and Edge AI is a legitimate prize category. If the O6
-arrives before the deadline, it adds data; the framing does not change.
+**This is an in-progress research repository as of 2026-08-06.** Neither the Orion O6 board nor CIX Early Bird SDK access is in hand yet — both are externally gated (procurement, vendor approval) and cannot be compressed by effort alone. A hard go/no-go between the Physical AI (O6) and Edge AI (portable aarch64) framing is scheduled for 2026-08-09; the portable hedge track runs from day one regardless of that decision, so hardware-independent work is not blocked on it.
 
-**Device-fleet microbenchmarks are running across three platforms:**
-
-| Device | Cores | ISA | Results |
-|---|---|---|---|
-| RK3588 (t3 + t4) | A76 big / A55 little | Armv8.2-A + dotprod | Bandwidth scaling, mixed-precision, cross-vendor NPU probe |
-| Raspberry Pi 5 | A76 | Armv8.2-A + dotprod | Bandwidth scaling |
-| Jetson Nano | A57 | Armv8-A NEON | Bandwidth scaling, sustained-load, power/energy |
-
-Three hand-written GDN CPU kernels (gated cumulative decay, gated delta-rule scan, causal
-depthwise Conv1D) plus mixed-precision bf16/fp16 variants have been measured at verified
-Qwen3.5-4B shapes. Results are committed with provenance manifests; see
-[`docs/FINDINGS.md`](./docs/FINDINGS.md) for analysis and [`results/raw/`](./results/raw/)
-for CSVs.
+**Device-fleet microbenchmarks are complete across five Arm devices.** Three GDN CPU kernels (gated cumulative decay, gated delta-rule scan, causal depthwise Conv1D) have been measured at verified Qwen3.5-4B and 0.8B shapes on the full fleet: Jetson Nano (Cortex-A57, NEON), Raspberry Pi 5 (Cortex-A76), and RK3588 (Cortex-A76 big + Cortex-A55 little clusters). Mixed-precision bf16/fp16 variants and 4-core OpenMP scaling have been measured on the Jetson. The key cross-device finding — that these kernels are **instruction-overhead-bound, not DRAM-bandwidth-bound** at seq=64 working-set sizes — is documented in the [fleet bandwidth-scaling analysis](./results/figures/fleet_bandwidth_scaling.md). The full inference harness (end-to-end tokens/sec, TTFT, memory decomposition) is still pending hardware access.
 
 | Item | Status |
 |---|---|
 | Implementation plan (`PLAN.md`) | Done |
-| Claim verification (`docs/CLAIM_VERIFICATION.md`) | Done |
-| Repository skeleton, Apache-2.0 license, CI scripts | Done |
-| Model selection (Qwen3.5-4B primary, ADR 0003) | Done |
-| GDN layer structure audit from modeling code (`docs/GDN_LAYER_AUDIT.md`) | Done |
-| Architecture decision records (`docs/adr/`) | 7 ADRs (incl. track selection) |
-| CPU GDN kernels (NEON/SVE/scalar) | Verified, benchmarked on A57, A76, A55 |
-| Mixed-precision state kernels (bf16/fp16) | Measured on A76, A55; cross-device comparison |
-| NPU operator-coverage audit (CIX NOE) | Done — Scan rejected, Loop runtime rejected |
-| Cross-vendor NPU probe (Rockchip RKNN) | Done — RKNN accepts Scan, rejects Loop |
-| Weight fetch + license compliance | Done (`scripts/fetch_weights.py`, `docs/WEIGHT_LICENSE.md`) |
-| Device-fleet bandwidth-scaling study | Done (Pi 5, RK3588 ×2, Jetson Nano) |
-| Edge AI track decision | **Decided** — ADR 0007 |
-| Full inference results (tokens/sec, TTFT, memory) | Not started — needs model weights loaded |
-| Orion O6 board bring-up | **Not arrived** — externally gated |
+| Claim verification against primary sources (`docs/CLAIM_VERIFICATION.md`) | Done |
+| Repository skeleton, Apache-2.0 license | Done |
+| Results schema (`docs/RESULTS_SCHEMA.md`) | Done |
+| Benchmark harness (`bench/`) + device microbenchmark (`bench_gdn.c`) | Producing data |
+| CI: lint + unit tests (721 tests) | Done — `.github/workflows/ci.yaml` |
+| Device-fleet microbenchmarks (5 devices) | Done — [fleet analysis](./results/figures/fleet_bandwidth_scaling.md) |
+| Ablation matrix (6 configs, synthetic) | Done — [comparison table](./results/figures/ablation_comparison.md) |
+| Memory decomposition (analytical) | Done — [figures](./results/figures/) |
+| Architecture decision records (`docs/adr/`) | 6 ADRs recorded |
+| CPU GDN kernels (NEON/SVE/scalar) | Verified, benchmarked across fleet |
+| Mixed-precision state kernels (bf16/fp16) | Implemented, benchmarked on Jetson |
+| Model survey / selection (`docs/MODEL_SURVEY.md`) | In progress |
+| Orion O6 board bring-up | **Pending** — board not yet in hand |
+| CIX Early Bird SDK / NPU toolchain access | **Pending** — not yet approved |
+| Per-layer engine mapping (NPU/GPU/CPU) | Hypothesis only — pending measurements |
+| Full inference results (tokens/sec, TTFT, memory) | **Not started — needs hardware** |
 
-> **Results so far:** device-fleet microbenchmark data from four physical devices, plus
-> cross-vendor NPU toolchain analysis. See [`results/raw/`](./results/raw/) for CSVs and
-> [`docs/FINDINGS.md`](./docs/FINDINGS.md) for findings.
+> **Results so far:** 29 CSVs from the device fleet, 15 provenance manifests, 10 generated figures/tables.
+>
+> ```
+> results/
+>   raw/         <- 29 per-run CSVs across 5 devices
+>   manifests/   <- 15 provenance manifests (git SHA, governor, thermals)
+>   figures/     <- fleet analysis, ablation comparison, kernel/memory plots
+> ```
+>
+> See [`results/README.md`](./results/README.md) for the layout, [`docs/FINDINGS.md`](./docs/FINDINGS.md) for findings, and [`results/figures/fleet_bandwidth_scaling.md`](./results/figures/fleet_bandwidth_scaling.md) for the headline cross-device analysis.
 
 ## Repository layout
 
@@ -156,20 +149,37 @@ Full target layout and rationale are in [`PLAN.md`](./PLAN.md) §10. Highlights:
 
 ## Reproducing
 
-Full step-by-step setup for any aarch64 edge device (RK3588, Pi 5, Jetson Nano) is in
-[`docs/SETUP_PORTABLE.md`](./docs/SETUP_PORTABLE.md). The quick path:
+### Portable Edge AI track (any aarch64 device)
+
+Full step-by-step guide: [`docs/SETUP_PORTABLE.md`](./docs/SETUP_PORTABLE.md).
+
+Quick start:
 
 ```bash
-git clone https://github.com/alexcasper/OrionsBelt.git && cd OrionsBelt
-CC=gcc ./scripts/build_device_bench.sh          # static binaries in dist/
-taskset -c 4-7 ./dist/bench_gdn_rk3588_a76 --repeats 30   # eyeball
-taskset -c 4-7 ./dist/bench_gdn_rk3588_a76 --repeats 30 --csv > results/raw/my_run.csv
-python3 bench/manifest.py > results/manifests/my_run.json   # provenance
-bash scripts/verify_kernels_native.sh           # correctness suite
+# 1. Build the static benchmark binaries (native gcc or cross-compiler)
+./scripts/build_device_bench.sh
+
+# 2. Set CPU governor to performance for valid numbers
+for c in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do \
+  echo performance | sudo tee "$c" >/dev/null; done
+
+# 3. Run the benchmark (pick the binary matching your core's ISA)
+./dist/bench_gdn_jetson_a57 --repeats 30 --csv > results/raw/my-device.csv
+
+# 4. Capture provenance manifest
+python3 bench/manifest.py > results/manifests/my-device.json
+
+# 5. Generate comparison tables and figures
+python3 -m bench.plots results/raw/ --text-only --output-dir results/figures
 ```
 
-This path was verified by rehearsal on an RK3588 (Cortex-A76/A55, Ubuntu 24.04) — see
-[`scripts/README.md`](./scripts/README.md) for the full script reference.
+No GPU, NPU, or proprietary SDK is required. Runs on Pi 5, Jetson Nano,
+RK3588, Graviton, or any 64-bit Arm board. See
+[`scripts/README.md`](./scripts/README.md) for all script entry points.
+
+### Physical AI track (Orion O6 + NPU)
+
+- `docs/SETUP_O6.md` (Orion O6 bring-up, NPU SDK, CIX NOE Compiler) — **pending hardware**
 
 ## License
 

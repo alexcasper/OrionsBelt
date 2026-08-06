@@ -1,113 +1,240 @@
-# Setup: portable aarch64 (Edge AI hedge target)
+# Portable aarch64 hedge-target setup (Edge AI track)
 
-Tested on:
-- **Radxa ROCK 5B / Orange Pi 5 (RK3588)** — Cortex-A76 big + Cortex-A55 little, Ubuntu 24.04
-- **Raspberry Pi 5** — Cortex-A76, Raspberry Pi OS / Ubuntu
-- **NVIDIA Jetson Nano** — Cortex-A57, JetPack (Python 3.6)
+**Bead:** `ob-8ms.4` · **Device verified on:** Raspberry Pi 5 Model B Rev 1.0
 
-## Prerequisites
+This guide covers setting up and running the OrionsBelt benchmark suite on a
+generic aarch64 edge device. The Raspberry Pi 5 is the reference implementation —
+every command below was verified on `pi5-r5` during the Phase 1 device benchmark.
 
-- Native `gcc` (cross-compilation also works with `aarch64-linux-gnu-gcc`)
-- `taskset` (from `util-linux`, present by default on most distros)
-- Python 3.6+ (for manifest capture; the benchmark itself has no Python dependency)
-- `git`
+For the full device fleet (Pi 5, RK3588, Jetson Nano), see
+[`docs/DEVICE_RUNBOOK.md`](./DEVICE_RUNBOOK.md) and [ADR 0005](./adr/0005-device-fleet-and-bandwidth-study.md).
 
-## Step-by-step
+---
 
-### 1. Clone
+## 1. Prerequisites
+
+### Hardware
+
+Any 64-bit Arm (aarch64) device. The project's fleet spans:
+
+| Device | SoC | Cores | ISA | Spec BW | Binary |
+|---|---|---|---|---|---|
+| Raspberry Pi 5 | BCM2712 | 4× Cortex-A76 | Armv8.2-A + dotprod | ~17 GB/s | `bench_gdn_pi5_a76` |
+| RK3588 (big) | RK3588 | 4× Cortex-A76 | Armv8.2-A + dotprod | ~34 GB/s | `bench_gdn_rk3588_a76` |
+| RK3588 (little) | RK3588 | 4× Cortex-A55 | Armv8.2-A + dotprod | — | `bench_gdn_rk3588_a55` |
+| Jetson Nano | Tegra X1 | 4× Cortex-A57 | Armv8.0-A (no dotprod) | ~25.6 GB/s | `bench_gdn_jetson_a57` |
+
+### OS and toolchain
+
+The device benchmark needs only a C compiler and Python 3:
 
 ```bash
-git clone https://github.com/alexcasper/OrionsBelt.git
+# Verify the device
+uname -m                    # expect: aarch64
+grep -m1 Features /proc/cpuinfo   # check for asimd (NEON), asimddp (dotprod)
+nproc                       # core count
+free -m | head -2           # memory
+
+# Install toolchain (Raspberry Pi OS / Debian):
+sudo apt-get install -y build-essential python3 python3-pip
+
+# Verify gcc can cross-compile for aarch64 (it's native on these devices):
+gcc --version               # expect: aarch64-linux-gnu-gcc
+```
+
+No GPU drivers, NPU SDK, or ML frameworks are required for the device benchmark.
+The full benchmark harness (with model inference) needs `transformers` + `torch`
+— see [`docs/BACKEND_GUIDE.md`](./BACKEND_GUIDE.md) for that path.
+
+---
+
+## 2. Build the device benchmark binaries
+
+```bash
 cd OrionsBelt
+./scripts/build_device_bench.sh
 ```
 
-### 2. Build the benchmark binaries
+This produces static binaries in `dist/` — one per ISA variant. **Run only the
+binary matching your device's core** (others may illegal-instruction):
 
 ```bash
-CC=gcc ./scripts/build_device_bench.sh
+# Check which binary to use:
+grep -m1 Features /proc/cpuinfo
+#   asimd    → NEON only         → bench_gdn_armv8a
+#   asimddp  → dotprod           → bench_gdn_pi5_a76 (or armv8.2dot)
+#   i8mm     → int8 matmul       → bench_gdn_armv8.6i8mm
+#   sve/sve2 → SVE              → bench_gdn_armv9sve2 (rare on Armv8)
+
+# For the Raspberry Pi 5:
+ls -la dist/bench_gdn_pi5_a76
 ```
 
-This produces **static** binaries in `dist/`, one per ISA variant. No runtime library
-dependencies — copy one to any aarch64 device and run it.
+---
 
-Pick the binary matching your core (run `grep -m1 Features /proc/cpuinfo` to check):
+## 3. Set the CPU governor to performance
 
-| Binary | Target | How to identify |
-|---|---|---|
-| `bench_gdn_armv8a` | Any Armv8-A (NEON only) | `asimd` in cpuinfo |
-| `bench_gdn_armv8.2dot` | Armv8.2-A + dotprod | `asimddp` in cpuinfo |
-| `bench_gdn_armv8.6i8mm` | Armv8.6-A + i8mm | `i8mm` in cpuinfo |
-| `bench_gdn_armv9sve2` | Armv9-A + SVE2 | `sve` + `sve2` in cpuinfo |
-| `bench_gdn_rk3588_a76` | RK3588 big cores (A76) | device-specific tune |
-| `bench_gdn_rk3588_a55` | RK3588 little cores (A55) | device-specific tune |
-| `bench_gdn_pi5_a76` | Raspberry Pi 5 (A76) | device-specific tune |
-| `bench_gdn_jetson_a57` | Jetson Nano (A57) | device-specific tune |
-
-If unsure, use `bench_gdn_armv8a` — it runs on every Armv8+ device.
-
-### 3. Set the CPU governor (for valid benchmark numbers)
+Valid benchmark numbers require the CPU governor set to `performance` — otherwise
+DVFS downclocking will silently halve your figures (see
+[`docs/METHODOLOGY.md`](./METHODOLOGY.md) §3).
 
 ```bash
-# Requires sudo — set all cores to performance mode
+# Set performance governor on all cores (needs sudo):
 for c in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do
-  echo performance | sudo tee "$c" >/dev/null
+    echo performance | sudo tee "$c" >/dev/null
 done
 
-# Record thermals before the run
+# Verify:
+for c in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do
+    echo "$(basename $(dirname $(dirname $c))): $(cat $c)"
+done
+# All cores should show: performance
+
+# Read thermals before the run:
 cat /sys/class/thermal/thermal_zone*/temp
 ```
 
-### 4. Run the benchmark
+---
+
+## 4. Run the benchmark
+
+### Human-readable (eyeball it first)
 
 ```bash
-# Human-readable eyeball (quick check)
-taskset -c 4-7 ./dist/bench_gdn_rk3588_a76 --repeats 30
+./dist/bench_gdn_pi5_a76 --repeats 30
+```
 
-# CSV output (schema-conforming, for results/raw/)
-taskset -c 4-7 ./dist/bench_gdn_rk3588_a76 --repeats 30 --csv > my_big.csv
+Check: dispatch path (should be `neon` on Pi5, not `sve`), tight spreads (p95
+close to p50), no signs of throttling.
 
-# Little cluster
-taskset -c 0-3 ./dist/bench_gdn_rk3588_a55 --repeats 30 --csv > my_little.csv
+### CSV capture
 
-# Record thermals after the run
+```bash
+mkdir -p results/raw results/manifests
+./dist/bench_gdn_pi5_a76 --repeats 30 --csv > results/raw/pi5-r5.csv
+```
+
+### Capture provenance
+
+```bash
+python3 bench/manifest.py > results/manifests/pi5-r5.json
+```
+
+A number without a manifest is not a result (PLAN.md §9).
+
+### Read thermals after the run
+
+```bash
 cat /sys/class/thermal/thermal_zone*/temp
+# Compare to the pre-run reading. A rise > 10% of the starting temp suggests
+# thermal throttling may have affected the numbers.
 ```
 
-On the RK3588, cores 0–3 are Cortex-A55 (little) and cores 4–7 are Cortex-A76 (big).
-Adjust `taskset` ranges for your board's topology.
+---
 
-### 5. Capture provenance
+## 5. Run the Python harness (optional, for full context sweep)
+
+The Python harness sweeps multiple context lengths with warmup and percentiles.
+It uses the `SyntheticBackend` by default (no model weights needed):
 
 ```bash
-python3 bench/manifest.py > results/manifests/my_run.json
+# Create a venv (the Pi5's Python is externally managed):
+python3 -m venv /tmp/ob-venv
+/tmp/ob-venv/bin/pip install pytest ruff matplotlib numpy
+
+# Run a quick smoke test:
+python3 bench/harness.py --backend synthetic --model 0.8b \
+    --context-lengths 64,128 --warmup 1 --repeats 5 --decode-length 10 --no-csv
+
+# Run the test suite:
+/tmp/ob-venv/bin/python -m pytest tests/test_harness.py tests/test_memory.py tests/test_prompts.py -v
+
+# Generate the memory decomposition plot:
+/tmp/ob-venv/bin/python bench/plots.py --memory
 ```
 
-The manifest records git SHA, CPU topology, governor, clock speeds, and thermals.
-**A number without a manifest is not a result** (PLAN.md §9).
+---
 
-### 6. Verify kernel correctness (optional but recommended)
+## 6. Pin to a cluster (RK3588 only)
+
+On big.LITTLE SoCs, pin to the correct cluster — the scheduler will migrate you
+mid-measurement otherwise:
 
 ```bash
-bash scripts/verify_kernels_native.sh
+# Identify the big cluster (higher max freq = big):
+for c in /sys/devices/system/cpu/cpu[0-7]; do
+    echo "$c $(cat $c/cpufreq/cpuinfo_max_freq 2>/dev/null)"
+done
+
+# Pin to big cores (typically cpu4-7 on RK3588):
+taskset -c 4-7 ./dist/bench_gdn_rk3588_a76 --repeats 30 --csv > results/raw/rk3588_big.csv
+
+# Pin to little cores (typically cpu0-3):
+taskset -c 0-3 ./dist/bench_gdn_rk3588_a55 --repeats 30 --csv > results/raw/rk3588_little.csv
 ```
 
-Runs the full numerical correctness suite (fp32 reference vs bf16/fp16 state narrowing,
-drift accumulation check) on the device's real ISA.
+The Pi 5 has homogeneous cores (4× A76), so pinning is unnecessary.
 
-### 7. Download model weights (for the full inference harness)
+---
+
+## 7. Commit and share results
 
 ```bash
-python3 scripts/fetch_weights.py          # Qwen3.5-4B (~8 GB)
-python3 scripts/fetch_weights.py --model 0.8b  # Qwen3.5-0.8B (~1.6 GB)
+git add results/
+git commit -m "<device>: device-fleet bench (ob-8ms.3)"
+git push origin bench/r5
 ```
 
-Weights are not vendored in the repo (see `docs/WEIGHT_LICENSE.md`).
+---
 
 ## Troubleshooting
 
-- **Illegal instruction**: you're running a binary compiled for a newer ISA than your CPU.
-  Fall back to `bench_gdn_armv8a`.
-- **`taskset` not found**: install `util-linux` (`apt install util-linux`).
-- **Python < 3.10**: `bench/manifest.py` and `scripts/fetch_weights.py` are compatible
-  with Python 3.6+. For shell-only provenance, use `scripts/capture_manifest.sh`.
-- **Governor won't change**: some boards need the `cpufreq_userspace` governor module loaded.
+| Symptom | Cause | Fix |
+|---|---|---|
+| `Illegal instruction` | Wrong binary for the core | Check `/proc/cpuinfo` Features; use the matching variant |
+| p95 far above p50 | Thermal throttling | Check thermals; add a cooldown between context lengths |
+| Numbers 2× lower than expected | Governor is `ondemand` or `powersave` | Set to `performance` (§3) |
+| `python3: No module named pytest` | Externally managed Python | Use a venv (§5) |
+| `bd dolt push: divergent histories` | Multiple agents initialized DBs independently | Export to `issues.jsonl` and push via git; do not force-push |
+
+---
+
+## What the device benchmark tells us
+
+The devices span ~17 GB/s (Pi 5) → ~25.6 GB/s (Jetson) → ~34 GB/s (RK3588) of
+spec memory bandwidth. The hypothesis is that GDN kernels are
+memory-bandwidth-bound at ~0.25 FLOP/byte — if so, achieved throughput should
+track bandwidth roughly linearly and **independently of core generation**.
+
+The discriminating case: the Pi 5 has the **newest cores** (A76) but the
+**lowest bandwidth**, while the Jetson Nano has the **oldest cores** (A57) and
+**more bandwidth**. If the Nano beats the Pi 5 on the scan kernel, that is strong
+evidence for bandwidth-boundedness. See [`docs/DEVICE_RUNBOOK.md`](./DEVICE_RUNBOOK.md)
+§"What we are actually testing" for the full analysis.
+
+### Reading the CSV columns
+
+| Column | Meaning |
+|---|---|
+| `gib_per_s_p50` | Achieved memory bandwidth in GiB/s — compare against the device spec |
+| `gflop_per_s_p50` | Achieved compute throughput |
+| `spread_pct` | `(p95 - p50) / p50 × 100` — should be under ~10% for a clean run |
+| `dispatch_path` | `neon`, `sve` or `scalar` — which compiled path actually ran |
+
+### What the fleet measured (2026-08-03)
+
+Sanity-check your own numbers against these, all `gdn_gated_scan`, 4B, seq=64,
+NEON path (see [`FINDINGS.md`](./FINDINGS.md) for the full analysis):
+
+| Device | Spec BW | Achieved | % of spec |
+|---|---:|---:|---:|
+| Jetson Nano (A57) | 25.6 GB/s | 0.72 GiB/s | **3.0%** |
+| Raspberry Pi 5 (A76) | 17.0 GB/s | 1.84 GiB/s | 11.6% |
+| RK3588 big (A76) | 34.0 GB/s | 3.29 GiB/s | 10.4% |
+
+The answer to the discriminating question above turned out to be **split**, so
+do not read a low Jetson number as a broken setup — it is real. Within the A76
+class the kernel does track bandwidth (2.00× the spec gives 1.79× the
+throughput). The A57 does not: it has 1.5× the Pi 5's spec bandwidth and reaches
+0.39× its throughput, sitting at 3% of spec where both A76 parts reach ~11%. On
+that core the bottleneck is the core, not the memory system.

@@ -31,10 +31,10 @@ class TestQwen35_4B:
 
     # --- GDN dims ---
     def test_key_value_dims(self):
-        assert self.info.key_dim == 2048       # 128 * 16
-        assert self.info.value_dim == 4096     # 128 * 32
-        assert self.info.conv_dim == 8192      # 2048*2 + 4096
-        assert self.info.kv_head_ratio == 2    # 32 // 16
+        assert self.info.key_dim == 2048  # 128 * 16
+        assert self.info.value_dim == 4096  # 128 * 32
+        assert self.info.conv_dim == 8192  # 2048*2 + 4096
+        assert self.info.kv_head_ratio == 2  # 32 // 16
 
     def test_recurrent_state_shape(self):
         assert self.info.recurrent_state_shape == (32, 128, 128)
@@ -60,11 +60,15 @@ class TestQwen35_4B:
 
     def test_kv_cache_at_4k(self):
         """8 FA layers, 4KV heads, 256 head_dim, 2 (K+V), FP16."""
-        assert self.info.kv_cache_mib_at_context(4096, dtype_size=2) == pytest.approx(128.0, abs=1.0)
+        assert self.info.kv_cache_mib_at_context(4096, dtype_size=2) == pytest.approx(
+            128.0, abs=1.0
+        )
 
     def test_kv_cache_at_262k(self):
         """At 262K context, KV cache is ~8 GiB in FP16."""
-        assert self.info.kv_cache_mib_at_context(262144, dtype_size=2) == pytest.approx(8192.0, abs=10.0)
+        assert self.info.kv_cache_mib_at_context(262144, dtype_size=2) == pytest.approx(
+            8192.0, abs=10.0
+        )
 
     def test_kv_vs_recurrent_ratio(self):
         """The central claim: at 262K, KV cache dwarfs recurrent state."""
@@ -99,5 +103,10 @@ class TestQwen35_0_8B:
         assert self.info.kv_head_ratio == 1
 
     def test_kv_cache_at_4k(self):
-        """6 FA layers, 2 KV heads, 256 head_dim, FP16."""
-        assert self.info.kv_cache_mib_at_context(4096, dtype_size=2) == pytest.approx(24.0, abs=1.0)
+        """6 FA layers x (K+V) x 2 KV heads x 256 head_dim x 4096 tokens x 2 bytes = 48 MiB.
+
+        Corrected 2026-08-03: the expectation was 24.0 MiB, which omits the factor of 2
+        for storing both K and V. Verified independently against the arithmetic above;
+        the implementation's 48.0 MiB is correct and the test was wrong.
+        """
+        assert self.info.kv_cache_mib_at_context(4096, dtype_size=2) == pytest.approx(48.0, abs=1.0)

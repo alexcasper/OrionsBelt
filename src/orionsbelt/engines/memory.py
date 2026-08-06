@@ -13,13 +13,9 @@ are provided.
 
 from __future__ import annotations
 
-import os
-import re
 from dataclasses import dataclass
 
-from orionsbelt.model.gdn_layer_info import CheckpointLayerInfo, LAYER_INFO
-from orionsbelt.quant.policy import QuantScheme
-
+from orionsbelt.model.gdn_layer_info import LAYER_INFO, CheckpointLayerInfo
 
 # Bytes per element by dtype
 _DTYPE_BYTES = {"fp32": 4, "fp16": 2, "bf16": 2, "int8": 1, "int4": 0.5}
@@ -42,7 +38,12 @@ class MemoryBreakdown:
 
     @property
     def total_bytes(self) -> int:
-        return self.weights_bytes + self.kv_cache_bytes + self.recurrent_state_bytes + self.conv_state_bytes
+        return (
+            self.weights_bytes
+            + self.kv_cache_bytes
+            + self.recurrent_state_bytes
+            + self.conv_state_bytes
+        )
 
     @property
     def total_mib(self) -> float:
@@ -72,33 +73,31 @@ def estimate_weights(
     h = info.hidden_size
     # GDN layers
     gdn_per_layer = (
-        h * (info.key_dim * 2 + info.value_dim)    # in_proj_qkv
-        + h * info.value_dim                        # in_proj_z
-        + h * info.linear_num_value_heads           # in_proj_b
-        + h * info.linear_num_value_heads           # in_proj_a
-        + info.value_dim * h                        # out_proj
+        h * (info.key_dim * 2 + info.value_dim)  # in_proj_qkv
+        + h * info.value_dim  # in_proj_z
+        + h * info.linear_num_value_heads  # in_proj_b
+        + h * info.linear_num_value_heads  # in_proj_a
+        + info.value_dim * h  # out_proj
         + info.conv_dim * info.linear_conv_kernel_dim  # conv1d (depthwise)
-        + info.linear_value_head_dim                # norm weight
+        + info.linear_value_head_dim  # norm weight
     )
     # Full attention layers
     fa_per_layer = (
         h * (info.num_attention_heads * info.full_attn_head_dim * 2)  # q_proj (2x for gate)
-        + h * (info.num_key_value_heads * info.full_attn_head_dim)    # k_proj
-        + h * (info.num_key_value_heads * info.full_attn_head_dim)    # v_proj
-        + (info.num_attention_heads * info.full_attn_head_dim) * h    # o_proj
-        + info.full_attn_head_dim * 2                                 # q_norm + k_norm
+        + h * (info.num_key_value_heads * info.full_attn_head_dim)  # k_proj
+        + h * (info.num_key_value_heads * info.full_attn_head_dim)  # v_proj
+        + (info.num_attention_heads * info.full_attn_head_dim) * h  # o_proj
+        + info.full_attn_head_dim * 2  # q_norm + k_norm
     )
     # MLP/FFN layers (every layer has MLP)
-    # intermediate_size is not in CheckpointLayerInfo; estimate from config
-    # For Qwen3.5: intermediate = hidden * ~4.8 (verified from config)
-    intermediate = int(h * 4.792)  # 2560*12288/2560 = 4.8 for 4B; close enough
+    intermediate = info.intermediate_size
     mlp_per_layer = (
-        h * intermediate   # gate_proj
+        h * intermediate  # gate_proj
         + h * intermediate  # up_proj
         + intermediate * h  # down_proj
     )
     # Embedding + LM head
-    vocab = 248320
+    vocab = info.vocab_size
     embed = vocab * h
     lm_head = vocab * h
 
@@ -132,9 +131,15 @@ def predict_breakdown(
     kv_bytes = _DTYPE_BYTES[kv_cache_dtype]
 
     weights = estimate_weights(info, w_bytes)
-    kv_cache = int(info.kv_cache_bytes_per_token(dtype_size=int(kv_bytes)) * context_length / kv_bytes * info.num_full_attention_layers / info.num_full_attention_layers)
-    # More directly:
-    kv_cache = info.num_key_value_heads * info.full_attn_head_dim * 2 * context_length * info.num_full_attention_layers * kv_bytes
+
+    kv_cache = (
+        info.num_key_value_heads
+        * info.full_attn_head_dim
+        * 2  # K + V
+        * context_length
+        * info.num_full_attention_layers
+        * kv_bytes
+    )
     recurrent_state = info.recurrent_state_elements_per_layer * info.num_gdn_layers * s_bytes
     conv_state = info.conv_state_elements_per_layer * info.num_gdn_layers * s_bytes
 
@@ -169,7 +174,9 @@ def sweep_context(
 def format_breakdown_table(breakdowns: list[MemoryBreakdown]) -> str:
     """Format a sweep as a human-readable table for docs/reports."""
     lines = []
-    lines.append(f"{'ctx':>8}  {'weights':>10}  {'kv_cache':>10}  {'state':>10}  {'conv':>8}  {'total':>10}")
+    lines.append(
+        f"{'ctx':>8}  {'weights':>10}  {'kv_cache':>10}  {'state':>10}  {'conv':>8}  {'total':>10}"
+    )
     lines.append("-" * 68)
     for b in breakdowns:
         lines.append(
@@ -210,7 +217,7 @@ def measure_delta(fn, *args, **kwargs) -> int | None:
     before = _rss_bytes()
     if before is None:
         return None
-    result = fn(*args, **kwargs)
+    fn(*args, **kwargs)
     after = _rss_bytes()
     if after is None:
         return None

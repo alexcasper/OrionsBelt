@@ -1,0 +1,21 @@
+{
+  "type": "ruler_multi_key",
+  "target_tokens": 4096,
+  "actual_tokens_approx": 3975,
+  "num_keys": 8,
+  "queried_keys": [
+    "MWS-4800",
+    "KQZ-1434",
+    "DWG-7971",
+    "TBZ-0714",
+    "WRA-6961"
+  ],
+  "expected_answers": {
+    "MWS-4800": "RST-5354",
+    "KQZ-1434": "ZTR-5705",
+    "DWG-7971": "QYR-5135",
+    "TBZ-0714": "RYY-0396",
+    "WRA-6961": "VQW-7001"
+  },
+  "seed": 20260802
+}

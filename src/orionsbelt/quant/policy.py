@@ -32,11 +32,11 @@ class Precision(str, Enum):
 class QuantScheme(str, Enum):
     """Quantization scheme for a tensor group."""
 
-    WEIGHT_ONLY_INT4 = "int4_w4a16"        # INT4 weights, FP16 activations
-    WEIGHT_ONLY_INT8 = "int8_w8a16"        # INT8 weights, FP16 activations
-    W8A8 = "int8_w8a8"                     # INT8 weights + activations
-    FP16 = "fp16"                          # no quantization, half precision
-    FP32 = "fp32"                          # no quantization, full precision
+    WEIGHT_ONLY_INT4 = "int4_w4a16"  # INT4 weights, FP16 activations
+    WEIGHT_ONLY_INT8 = "int8_w8a16"  # INT8 weights, FP16 activations
+    W8A8 = "int8_w8a8"  # INT8 weights + activations
+    FP16 = "fp16"  # no quantization, half precision
+    FP32 = "fp32"  # no quantization, full precision
 
 
 @dataclass(frozen=True)
@@ -49,7 +49,7 @@ class TensorGroupPolicy:
 
     tensor_group: str
     scheme: QuantScheme
-    precision_runtime: Precision       # precision during forward pass
+    precision_runtime: Precision  # precision during forward pass
     reason: str
 
 
@@ -110,8 +110,7 @@ GDN_POLICIES: list[TensorGroupPolicy] = [
         scheme=QuantScheme.WEIGHT_ONLY_INT4,
         precision_runtime=Precision.FP16,
         reason=(
-            "Output projection. Dense matmul, no recurrence interaction. "
-            "Safe for INT4 weight-only."
+            "Output projection. Dense matmul, no recurrence interaction. Safe for INT4 weight-only."
         ),
     ),
     TensorGroupPolicy(
@@ -296,6 +295,7 @@ def policy_for(tensor_name: str) -> TensorGroupPolicy:
 # Summary metrics
 # ---------------------------------------------------------------------------
 
+
 def estimate_weight_footprint_mib(
     total_params: int,
     int4_fraction: float = 0.85,
@@ -310,9 +310,9 @@ def estimate_weight_footprint_mib(
     Returns a dict with breakdown by precision tier.
     """
     fp16_fraction = 1.0 - int4_fraction - int8_fraction
-    int4_bytes = total_params * int4_fraction * 0.5   # 4 bits = 0.5 bytes
-    int8_bytes = total_params * int8_fraction * 1.0   # 8 bits = 1 byte
-    fp16_bytes = total_params * fp16_fraction * 2.0    # 16 bits = 2 bytes
+    int4_bytes = total_params * int4_fraction * 0.5  # 4 bits = 0.5 bytes
+    int8_bytes = total_params * int8_fraction * 1.0  # 8 bits = 1 byte
+    fp16_bytes = total_params * fp16_fraction * 2.0  # 16 bits = 2 bytes
     total_mib = (int4_bytes + int8_bytes + fp16_bytes) / (1024 * 1024)
     return {
         "int4_mib": int4_bytes / (1024 * 1024),
