@@ -1,167 +1,131 @@
-# Results comparison table
+# Master comparison table
 
-Memory figures regenerable via `scripts/generate_memory_plots.py`. Kernel data from committed CSVs in `results/raw/`.
+_Generated from committed CSVs and manifests. Every measurement states its source commit and spread.
+See per-device tables (`*_table.md`) for full kernel-level detail._
 
-## Static kernel microbenchmark (rk3588-t4)
+## Provenance
 
-| Device | Model | Kernel | Cluster | GiB/s (p50) | GFLOP/s | Spread % |
-|---|---|---|---|---:|---:|---:|
-| rk3588-t3 | Qwen3.5-4B | `gdn_cumdecay` | A76 (big) | 4.13 | 0.55 | 14.7 |
-| rk3588-t3 | Qwen3.5-4B | `gdn_gated_scan` | A76 (big) | 1.96 | 0.35 | 153.1 |
-| rk3588-t3 | Qwen3.5-4B | `gdn_causal_dwconv1d` | A76 (big) | 4.02 | 4.09 | 35.6 |
-| rk3588-t3 | Qwen3.5-0.8B | `gdn_cumdecay` | A76 (big) | 4.92 | 0.66 | 3.1 |
-| rk3588-t3 | Qwen3.5-0.8B | `gdn_gated_scan` | A76 (big) | 4.41 | 0.78 | 5.5 |
-| rk3588-t3 | Qwen3.5-0.8B | `gdn_causal_dwconv1d` | A76 (big) | 5.51 | 5.61 | 3.9 |
-| rk3588-t3 | Qwen3.5-4B | `gdn_cumdecay` | A55 (little) | 0.87 | 0.12 | 57.9 |
-| rk3588-t3 | Qwen3.5-4B | `gdn_gated_scan` | A55 (little) | 0.35 | 0.06 | 29.3 |
-| rk3588-t3 | Qwen3.5-4B | `gdn_causal_dwconv1d` | A55 (little) | 0.65 | 0.66 | 38.7 |
-| rk3588-t3 | Qwen3.5-0.8B | `gdn_cumdecay` | A55 (little) | 1.15 | 0.15 | 1.6 |
-| rk3588-t3 | Qwen3.5-0.8B | `gdn_gated_scan` | A55 (little) | 0.98 | 0.17 | 266.8 |
-| rk3588-t3 | Qwen3.5-0.8B | `gdn_causal_dwconv1d` | A55 (little) | 0.94 | 0.95 | 4.5 |
-| rk3588-t4 | Qwen3.5-4B | `gdn_cumdecay` | A76 (big) | 24.26 | 3.26 | 10.9 |
-| rk3588-t4 | Qwen3.5-4B | `gdn_gated_scan` | A76 (big) | 11.48 | 2.03 | 7.5 |
-| rk3588-t4 | Qwen3.5-4B | `gdn_causal_dwconv1d` | A76 (big) | 21.02 | 21.40 | 3.6 |
-| rk3588-t4 | Qwen3.5-4B | `gdn_cumdecay_f16` | A76 (big) | 34.63 | 6.20 | 2.1 |
-| rk3588-t4 | Qwen3.5-4B | `gdn_gated_scan_f16` | A76 (big) | 11.57 | 2.06 | 9.0 |
-| rk3588-t4 | Qwen3.5-4B | `gdn_cumdecay_bf16` | A76 (big) | 25.11 | 4.49 | 1.5 |
-| rk3588-t4 | Qwen3.5-4B | `gdn_gated_scan_bf16` | A76 (big) | 11.58 | 2.06 | 7.8 |
-| rk3588-t4 | Qwen3.5-4B | `gdn2_gated_scan` | A76 (big) | 10.83 | 2.31 | 4.6 |
-| rk3588-t4 | Qwen3.5-0.8B | `gdn_cumdecay` | A76 (big) | 29.37 | 3.94 | 1.8 |
-| rk3588-t4 | Qwen3.5-0.8B | `gdn_gated_scan` | A76 (big) | 11.88 | 2.10 | 4.4 |
-| rk3588-t4 | Qwen3.5-0.8B | `gdn_causal_dwconv1d` | A76 (big) | 21.80 | 22.19 | 6.2 |
-| rk3588-t4 | Qwen3.5-0.8B | `gdn_cumdecay_f16` | A76 (big) | 41.16 | 7.37 | 1.6 |
-| rk3588-t4 | Qwen3.5-0.8B | `gdn_gated_scan_f16` | A76 (big) | 10.88 | 1.94 | 5.4 |
-| rk3588-t4 | Qwen3.5-0.8B | `gdn_cumdecay_bf16` | A76 (big) | 26.16 | 4.68 | 1.0 |
-| rk3588-t4 | Qwen3.5-0.8B | `gdn_gated_scan_bf16` | A76 (big) | 10.70 | 1.90 | 4.4 |
-| rk3588-t4 | Qwen3.5-0.8B | `gdn2_gated_scan` | A76 (big) | 10.78 | 2.30 | 3.1 |
-| rk3588-t4 | Qwen3.5-4B_decode | `gdn_cumdecay` | A76 (big) | 20.92 | 2.81 | 20.0 |
-| rk3588-t4 | Qwen3.5-4B_decode | `gdn_gated_scan` | A76 (big) | 37.36 | 4.01 | 0.0 |
-| rk3588-t4 | Qwen3.5-4B_decode | `gdn_causal_dwconv1d` | A76 (big) | 42.81 | 10.21 | 0.0 |
-| rk3588-t4 | Qwen3.5-4B_decode | `gdn_cumdecay_f16` | A76 (big) | 13.08 | 2.34 | 0.1 |
-| rk3588-t4 | Qwen3.5-4B_decode | `gdn_gated_scan_f16` | A76 (big) | 34.88 | 4.68 | 16.7 |
-| rk3588-t4 | Qwen3.5-4B_decode | `gdn_cumdecay_bf16` | A76 (big) | 13.07 | 2.34 | 16.6 |
-| rk3588-t4 | Qwen3.5-4B_decode | `gdn_gated_scan_bf16` | A76 (big) | 29.89 | 4.01 | 14.3 |
-| rk3588-t4 | Qwen3.5-4B_decode | `gdn2_gated_scan` | A76 (big) | 45.78 | 7.02 | 0.0 |
-| rk3588-t4 | Qwen3.5-0.8B_decode | `gdn_cumdecay` | A76 (big) | 10.46 | 1.40 | 0.1 |
-| rk3588-t4 | Qwen3.5-0.8B_decode | `gdn_gated_scan` | A76 (big) | 26.15 | 2.81 | 20.0 |
-| rk3588-t4 | Qwen3.5-0.8B_decode | `gdn_causal_dwconv1d` | A76 (big) | 29.43 | 7.02 | 12.5 |
-| rk3588-t4 | Qwen3.5-0.8B_decode | `gdn_cumdecay_f16` | A76 (big) | 7.84 | 1.40 | 20.0 |
-| rk3588-t4 | Qwen3.5-0.8B_decode | `gdn_gated_scan_f16` | A76 (big) | 20.91 | 2.81 | 20.0 |
-| rk3588-t4 | Qwen3.5-0.8B_decode | `gdn_cumdecay_bf16` | A76 (big) | 7.84 | 1.40 | 20.0 |
-| rk3588-t4 | Qwen3.5-0.8B_decode | `gdn_gated_scan_bf16` | A76 (big) | 17.44 | 2.34 | 16.7 |
-| rk3588-t4 | Qwen3.5-0.8B_decode | `gdn2_gated_scan` | A76 (big) | 36.61 | 5.62 | 20.0 |
-| rk3588-t4 | Qwen3.5-4B | `gdn_cumdecay` | A76 (big) | 7.21 | 0.97 | 7.9 |
-| rk3588-t4 | Qwen3.5-4B | `gdn_gated_scan` | A76 (big) | 5.29 | 0.94 | 11.2 |
-| rk3588-t4 | Qwen3.5-4B | `gdn_causal_dwconv1d` | A76 (big) | 6.35 | 6.47 | 8.7 |
-| rk3588-t4 | Qwen3.5-4B | `gdn_cumdecay_f16` | A76 (big) | 8.54 | 1.53 | 2.7 |
-| rk3588-t4 | Qwen3.5-4B | `gdn_gated_scan_f16` | A76 (big) | 5.27 | 0.94 | 23.3 |
-| rk3588-t4 | Qwen3.5-4B | `gdn_cumdecay_bf16` | A76 (big) | 5.93 | 1.06 | 27.9 |
-| rk3588-t4 | Qwen3.5-4B | `gdn_gated_scan_bf16` | A76 (big) | 5.37 | 0.96 | 20.3 |
-| rk3588-t4 | Qwen3.5-4B | `gdn2_gated_scan` | A76 (big) | 4.16 | 0.89 | 11.7 |
-| rk3588-t4 | Qwen3.5-0.8B | `gdn_cumdecay` | A76 (big) | 7.88 | 1.06 | 2.6 |
-| rk3588-t4 | Qwen3.5-0.8B | `gdn_gated_scan` | A76 (big) | 7.11 | 1.26 | 6.3 |
-| rk3588-t4 | Qwen3.5-0.8B | `gdn_causal_dwconv1d` | A76 (big) | 7.85 | 7.99 | 7.1 |
-| rk3588-t4 | Qwen3.5-0.8B | `gdn_cumdecay_f16` | A76 (big) | 9.37 | 1.68 | 2.6 |
-| rk3588-t4 | Qwen3.5-0.8B | `gdn_gated_scan_f16` | A76 (big) | 7.02 | 1.25 | 5.8 |
-| rk3588-t4 | Qwen3.5-0.8B | `gdn_cumdecay_bf16` | A76 (big) | 5.66 | 1.01 | 1.1 |
-| rk3588-t4 | Qwen3.5-0.8B | `gdn_gated_scan_bf16` | A76 (big) | 6.94 | 1.24 | 6.2 |
-| rk3588-t4 | Qwen3.5-0.8B | `gdn2_gated_scan` | A76 (big) | 7.58 | 1.62 | 5.0 |
-| rk3588-t4 | Qwen3.5-4B_decode | `gdn_cumdecay` | A76 (big) | 17.44 | 2.34 | 16.7 |
-| rk3588-t4 | Qwen3.5-4B_decode | `gdn_gated_scan` | A76 (big) | 32.70 | 3.51 | 0.0 |
-| rk3588-t4 | Qwen3.5-4B_decode | `gdn_causal_dwconv1d` | A76 (big) | 19.62 | 4.68 | 4.2 |
-| rk3588-t4 | Qwen3.5-4B_decode | `gdn_cumdecay_f16` | A76 (big) | 11.21 | 2.01 | 0.0 |
-| rk3588-t4 | Qwen3.5-4B_decode | `gdn_gated_scan_f16` | A76 (big) | 20.93 | 2.81 | 0.0 |
-| rk3588-t4 | Qwen3.5-4B_decode | `gdn_cumdecay_bf16` | A76 (big) | 8.72 | 1.56 | 11.1 |
-| rk3588-t4 | Qwen3.5-4B_decode | `gdn_gated_scan_bf16` | A76 (big) | 14.95 | 2.01 | 0.0 |
-| rk3588-t4 | Qwen3.5-4B_decode | `gdn2_gated_scan` | A76 (big) | 36.62 | 5.62 | 10.0 |
-| rk3588-t4 | Qwen3.5-0.8B_decode | `gdn_cumdecay` | A76 (big) | 13.08 | 1.76 | 25.0 |
-| rk3588-t4 | Qwen3.5-0.8B_decode | `gdn_gated_scan` | A76 (big) | 26.15 | 2.81 | 19.9 |
-| rk3588-t4 | Qwen3.5-0.8B_decode | `gdn_causal_dwconv1d` | A76 (big) | 23.54 | 5.62 | 10.0 |
-| rk3588-t4 | Qwen3.5-0.8B_decode | `gdn_cumdecay_f16` | A76 (big) | 7.85 | 1.40 | 0.1 |
-| rk3588-t4 | Qwen3.5-0.8B_decode | `gdn_gated_scan_f16` | A76 (big) | 17.44 | 2.34 | 0.1 |
-| rk3588-t4 | Qwen3.5-0.8B_decode | `gdn_cumdecay_bf16` | A76 (big) | 6.54 | 1.17 | 0.1 |
-| rk3588-t4 | Qwen3.5-0.8B_decode | `gdn_gated_scan_bf16` | A76 (big) | 13.08 | 1.76 | 0.0 |
-| rk3588-t4 | Qwen3.5-0.8B_decode | `gdn2_gated_scan` | A76 (big) | 30.52 | 4.68 | 0.1 |
-| rk3588-t4 | Qwen3.5-4B | `gdn_cumdecay` | A55 (little) | 5.87 | 0.79 | 18.9 |
-| rk3588-t4 | Qwen3.5-4B | `gdn_gated_scan` | A55 (little) | 3.91 | 0.69 | 35.2 |
-| rk3588-t4 | Qwen3.5-4B | `gdn_causal_dwconv1d` | A55 (little) | 5.30 | 5.39 | 7.7 |
-| rk3588-t4 | Qwen3.5-4B | `gdn_cumdecay_f16` | A55 (little) | 6.61 | 1.18 | 10.1 |
-| rk3588-t4 | Qwen3.5-4B | `gdn_gated_scan_f16` | A55 (little) | 3.85 | 0.69 | 23.1 |
-| rk3588-t4 | Qwen3.5-4B | `gdn_cumdecay_bf16` | A55 (little) | 5.89 | 1.05 | 9.3 |
-| rk3588-t4 | Qwen3.5-4B | `gdn_gated_scan_bf16` | A55 (little) | 3.90 | 0.70 | 27.6 |
-| rk3588-t4 | Qwen3.5-4B | `gdn2_gated_scan` | A55 (little) | 2.54 | 0.54 | 11.7 |
-| rk3588-t4 | Qwen3.5-0.8B | `gdn_cumdecay` | A55 (little) | 6.28 | 0.84 | 0.9 |
-| rk3588-t4 | Qwen3.5-0.8B | `gdn_gated_scan` | A55 (little) | 5.78 | 1.02 | 7.9 |
-| rk3588-t4 | Qwen3.5-0.8B | `gdn_causal_dwconv1d` | A55 (little) | 5.90 | 6.01 | 8.4 |
-| rk3588-t4 | Qwen3.5-0.8B | `gdn_cumdecay_f16` | A55 (little) | 7.17 | 1.28 | 2.9 |
-| rk3588-t4 | Qwen3.5-0.8B | `gdn_gated_scan_f16` | A55 (little) | 5.72 | 1.02 | 10.8 |
-| rk3588-t4 | Qwen3.5-0.8B | `gdn_cumdecay_bf16` | A55 (little) | 6.32 | 1.13 | 1.8 |
-| rk3588-t4 | Qwen3.5-0.8B | `gdn_gated_scan_bf16` | A55 (little) | 5.72 | 1.02 | 6.8 |
-| rk3588-t4 | Qwen3.5-0.8B | `gdn2_gated_scan` | A55 (little) | 6.01 | 1.28 | 7.6 |
-| rk3588-t4 | Qwen3.5-4B_decode | `gdn_cumdecay` | A55 (little) | 7.47 | 1.00 | 0.0 |
-| rk3588-t4 | Qwen3.5-4B_decode | `gdn_gated_scan` | A55 (little) | 15.38 | 1.65 | 5.9 |
-| rk3588-t4 | Qwen3.5-4B_decode | `gdn_causal_dwconv1d` | A55 (little) | 12.39 | 2.96 | 5.3 |
-| rk3588-t4 | Qwen3.5-4B_decode | `gdn_cumdecay_f16` | A55 (little) | 5.23 | 0.94 | 13.3 |
-| rk3588-t4 | Qwen3.5-4B_decode | `gdn_gated_scan_f16` | A55 (little) | 10.46 | 1.40 | 5.0 |
-| rk3588-t4 | Qwen3.5-4B_decode | `gdn_cumdecay_bf16` | A55 (little) | 4.36 | 0.78 | 5.5 |
-| rk3588-t4 | Qwen3.5-4B_decode | `gdn_gated_scan_bf16` | A55 (little) | 9.96 | 1.34 | 4.8 |
-| rk3588-t4 | Qwen3.5-4B_decode | `gdn2_gated_scan` | A55 (little) | 12.21 | 1.87 | 3.3 |
-| rk3588-t4 | Qwen3.5-0.8B_decode | `gdn_cumdecay` | A55 (little) | 3.74 | 0.50 | 0.0 |
-| rk3588-t4 | Qwen3.5-0.8B_decode | `gdn_gated_scan` | A55 (little) | 9.34 | 1.00 | 0.0 |
-| rk3588-t4 | Qwen3.5-0.8B_decode | `gdn_causal_dwconv1d` | A55 (little) | 6.73 | 1.60 | 2.9 |
-| rk3588-t4 | Qwen3.5-0.8B_decode | `gdn_cumdecay_f16` | A55 (little) | 2.80 | 0.50 | 7.1 |
-| rk3588-t4 | Qwen3.5-0.8B_decode | `gdn_gated_scan_f16` | A55 (little) | 6.54 | 0.88 | 6.3 |
-| rk3588-t4 | Qwen3.5-0.8B_decode | `gdn_cumdecay_bf16` | A55 (little) | 2.62 | 0.47 | 0.0 |
-| rk3588-t4 | Qwen3.5-0.8B_decode | `gdn_gated_scan_bf16` | A55 (little) | 6.15 | 0.83 | 0.0 |
-| rk3588-t4 | Qwen3.5-0.8B_decode | `gdn2_gated_scan` | A55 (little) | 8.72 | 1.34 | 4.8 |
-| rk3588-t4 | Qwen3.5-4B | `gdn_cumdecay` | A55 (little) | 1.37 | 0.18 | 24.2 |
-| rk3588-t4 | Qwen3.5-4B | `gdn_gated_scan` | A55 (little) | 0.76 | 0.14 | 41.3 |
-| rk3588-t4 | Qwen3.5-4B | `gdn_causal_dwconv1d` | A55 (little) | 1.24 | 1.26 | 49.2 |
-| rk3588-t4 | Qwen3.5-4B | `gdn_cumdecay_f16` | A55 (little) | 1.57 | 0.28 | 81.4 |
-| rk3588-t4 | Qwen3.5-4B | `gdn_gated_scan_f16` | A55 (little) | 0.81 | 0.14 | 32.4 |
-| rk3588-t4 | Qwen3.5-4B | `gdn_cumdecay_bf16` | A55 (little) | 1.51 | 0.27 | 4.7 |
-| rk3588-t4 | Qwen3.5-4B | `gdn_gated_scan_bf16` | A55 (little) | 0.80 | 0.14 | 19.8 |
-| rk3588-t4 | Qwen3.5-4B | `gdn2_gated_scan` | A55 (little) | 0.73 | 0.16 | 4.5 |
-| rk3588-t4 | Qwen3.5-0.8B | `gdn_cumdecay` | A55 (little) | 1.57 | 0.21 | 70.3 |
-| rk3588-t4 | Qwen3.5-0.8B | `gdn_gated_scan` | A55 (little) | 1.45 | 0.26 | 9.6 |
-| rk3588-t4 | Qwen3.5-0.8B | `gdn_causal_dwconv1d` | A55 (little) | 1.54 | 1.57 | 4.5 |
-| rk3588-t4 | Qwen3.5-0.8B | `gdn_cumdecay_f16` | A55 (little) | 1.85 | 0.33 | 7.6 |
-| rk3588-t4 | Qwen3.5-0.8B | `gdn_gated_scan_f16` | A55 (little) | 1.47 | 0.26 | 7.6 |
-| rk3588-t4 | Qwen3.5-0.8B | `gdn_cumdecay_bf16` | A55 (little) | 1.61 | 0.29 | 44.2 |
-| rk3588-t4 | Qwen3.5-0.8B | `gdn_gated_scan_bf16` | A55 (little) | 1.45 | 0.26 | 39.2 |
-| rk3588-t4 | Qwen3.5-0.8B | `gdn2_gated_scan` | A55 (little) | 1.44 | 0.31 | 22.6 |
-| rk3588-t4 | Qwen3.5-4B_decode | `gdn_cumdecay` | A55 (little) | 4.36 | 0.59 | 4.2 |
-| rk3588-t4 | Qwen3.5-4B_decode | `gdn_gated_scan` | A55 (little) | 4.76 | 0.51 | 1.8 |
-| rk3588-t4 | Qwen3.5-4B_decode | `gdn_causal_dwconv1d` | A55 (little) | 2.66 | 0.63 | 1.1 |
-| rk3588-t4 | Qwen3.5-4B_decode | `gdn_cumdecay_f16` | A55 (little) | 3.02 | 0.54 | 11.5 |
-| rk3588-t4 | Qwen3.5-4B_decode | `gdn_gated_scan_f16` | A55 (little) | 4.36 | 0.59 | 2.1 |
-| rk3588-t4 | Qwen3.5-4B_decode | `gdn_cumdecay_bf16` | A55 (little) | 2.38 | 0.43 | 0.0 |
-| rk3588-t4 | Qwen3.5-4B_decode | `gdn_gated_scan_bf16` | A55 (little) | 3.74 | 0.50 | 1.8 |
-| rk3588-t4 | Qwen3.5-4B_decode | `gdn2_gated_scan` | A55 (little) | 3.90 | 0.60 | 2.1 |
-| rk3588-t4 | Qwen3.5-0.8B_decode | `gdn_cumdecay` | A55 (little) | 3.49 | 0.47 | 0.0 |
-| rk3588-t4 | Qwen3.5-0.8B_decode | `gdn_gated_scan` | A55 (little) | 5.94 | 0.64 | 4.5 |
-| rk3588-t4 | Qwen3.5-0.8B_decode | `gdn_causal_dwconv1d` | A55 (little) | 2.45 | 0.59 | 9.4 |
-| rk3588-t4 | Qwen3.5-0.8B_decode | `gdn_cumdecay_f16` | A55 (little) | 2.31 | 0.41 | 0.0 |
-| rk3588-t4 | Qwen3.5-0.8B_decode | `gdn_gated_scan_f16` | A55 (little) | 4.76 | 0.64 | 4.5 |
-| rk3588-t4 | Qwen3.5-0.8B_decode | `gdn_cumdecay_bf16` | A55 (little) | 1.96 | 0.35 | 0.0 |
-| rk3588-t4 | Qwen3.5-0.8B_decode | `gdn_gated_scan_bf16` | A55 (little) | 3.87 | 0.52 | 3.7 |
-| rk3588-t4 | Qwen3.5-0.8B_decode | `gdn2_gated_scan` | A55 (little) | 4.58 | 0.70 | 2.5 |
+| Device | CSV | Git SHA | Dirty | Governor | Manifest |
+|---|---|---|---|---|---|
+| rk3588-t3 (big) | `rk3588-t3_big.csv` | `553a96e` | **false** | performance | `rk3588-t3.json` |
+| rk3588-t3 (little) | `rk3588-t3_little.csv` | `553a96e` | **false** | performance | `rk3588-t3.json` |
+| rk3588-t4 (big) | `rk3588-t4_big.csv` | `28729f3` | true | performance | `rk3588-t4.json` |
+| rk3588-t4 (little) | `rk3588-t4_little.csv` | `28729f3` | true | performance | `rk3588-t4.json` |
+| rk3588-t4 (big, baseline) | `rk3588-t4_big_singlethread.csv` | `28729f3` | true | performance | `rk3588-t4.json` |
 
-## Memory decomposition — Qwen3.5-4B (analytical, from verified config)
+> t3 is the **primary data source** (dirty=false, clean tree at `553a96e`).
+> t4 serves as a **cross-check** on the same hardware class (same RK3588 SoC, different node).
 
-_Regenerable: `python3 scripts/generate_memory_plots.py`. See [`memory_comparison.md`](memory_comparison.md) for full table including 0.8B._
+## 1. Headline: GDN kernel bandwidth — RK3588 Cortex-A76 (big)
 
-| Context | Weights (GiB) | KV cache (GiB) | Recurrent state (MiB) | Total (GiB) | If all-attn (GiB) | Savings |
+Qwen3.5-4B, prefill (seq=64), fp32 baseline, spec bandwidth 34.0 GiB/s.
+
+| Kernel | t3 GiB/s | t3 spread | t4 GiB/s | t4 spread | t3↔t4 agreement |
+|---|---:|---:|---:|---:|---:|
+| gdn_cumdecay | 21.74 | 5.2% | 24.26 | 10.9% | 10% |
+| gdn_gated_scan | 11.07 | 6.2% | 11.48 | 7.5% | 4% |
+| gdn_causal_dwconv1d | 21.60 | 4.3% | 21.02 | 3.6% | 3% |
+
+> Cumulative-decay and Conv1D achieve **64% and 63% of spec bandwidth** respectively — close to the
+> memory-bandwidth ceiling for a single A76 core. Gated scan runs at 33% of spec because its
+> sequential recurrence is instruction-overhead-bound, not DRAM-bandwidth-bound (see
+> [`fleet_bandwidth_scaling.md`](fleet_bandwidth_scaling.md)).
+
+Qwen3.5-0.8B, prefill (seq=64), fp32 baseline:
+
+| Kernel | t3 GiB/s | t3 spread |
+|---|---:|---:|
+| gdn_cumdecay | 27.67 | 7.4% |
+| gdn_gated_scan | 15.38 | 2.7% |
+| gdn_causal_dwconv1d | 29.92 | 2.5% |
+
+## 2. Mixed-precision optimization impact
+
+Qwen3.5-4B, prefill (seq=64), A76 big, t3 (`553a96e`, clean tree).
+
+| Kernel | fp32 GiB/s | fp16 GiB/s | bf16 GiB/s | fp16 speedup | bf16 speedup |
+|---|---:|---:|---:|---:|---:|
+| gdn_cumdecay | 21.74 | 34.87 | 24.62 | **1.60×** | 1.13× |
+| gdn_gated_scan | 11.07 | 10.65 | 10.94 | 0.96× | 0.99× |
+| gdn_causal_dwconv1d | 21.60 | — | — | — | — |
+
+> fp16 halves memory traffic for the decay chain (elementwise gate/decay ops), yielding 1.6× on
+> cumdecay. Gated scan shows **no fp16 benefit** because it is compute-bound on the delta-rule
+> matmul, not bandwidth-bound — consistent with the instruction-overhead finding. bf16 on A76 has
+> no hardware path (software emulation), so it only matches fp32 despite halving traffic.
+
+## 3. Decode-phase kernel performance
+
+Qwen3.5-4B, decode (seq=1), A76 big, t3 (`553a96e`, clean tree).
+
+| Kernel | µs/token | GiB/s | Spread | % of spec BW |
+|---|---:|---:|---:|---:|
+| gdn_cumdecay | 1.166 | 26.17 | 0.1% | 77% |
+| gdn_gated_scan | 1.458 | 52.33 | 0.1% | 154% |
+| gdn_causal_dwconv1d | 2.625 | 52.32 | 11.1% | 154% |
+
+> Decode GiB/s exceeds the 34 GiB/s DRAM spec because at seq=1 the working set (single-token
+> vectors) fits in L1/L2 cache. The **per-token latency** (µs/token) is the load-bearing decode
+> metric — these are the actual costs a decode loop pays per GDN layer per token.
+
+## 4. Per-layer latency: GDN vs full-attention
+
+From t4 per-layer profiling (Qwen3.5-0.8B, Python `transformers`, commit `fb578e1`, dirty=true).
+This is model-level timing through the actual Qwen3.5 forward pass — the closest available
+measurement to end-to-end inference. See [`rk3588-t4_layer_profile.csv`](../raw/rk3588-t4_layer_profile.csv).
+
+| Phase | Context | Layer type | Mean p50 (µs) | Layers | Total (µs) |
+|---|---|---|---:|---:|---:|
+| Decode | 32 | linear_attention (GDN) | 47,492 | 18 | 854,856 |
+| Decode | 32 | full_attention | 42,286 | 6 | 253,716 |
+| Decode | 64 | linear_attention (GDN) | 48,667 | 18 | 876,006 |
+| Decode | 64 | full_attention | 48,737 | 6 | 292,422 |
+| Decode | 128 | linear_attention (GDN) | 51,806 | 18 | 932,508 |
+| Decode | 128 | full_attention | 56,971 | 6 | 341,826 |
+| Prefill | 32 | linear_attention (GDN) | 129,160 | 18 | 2,324,880 |
+| Prefill | 32 | full_attention | 78,081 | 6 | 468,486 |
+| Prefill | 64 | linear_attention (GDN) | 171,120 | 18 | 3,080,160 |
+| Prefill | 64 | full_attention | 112,658 | 6 | 675,948 |
+| Prefill | 128 | linear_attention (GDN) | 238,802 | 18 | 4,298,436 |
+| Prefill | 128 | full_attention | 158,013 | 6 | 948,078 |
+
+> **At decode**, GDN and full-attention layers have similar per-layer cost (~49 ms) and neither
+> grows significantly with context — GDN because its state is fixed-size, full-attention because
+> the KV cache at ctx≤128 is still small.
+>
+> **At prefill**, GDN layers are 1.5–1.7× slower per-layer than full-attention, and both scale
+> roughly linearly with context. The GDN cost is dominated by the chunkwise WY recurrence
+> (sequential scan), not by matmul throughput. See FINDINGS.md §"Chunkwise WY bottleneck".
+
+## 5. Memory decomposition: GDN O(1) state vs attention O(n) KV cache
+
+_Analytical model from `src/orionsbelt/engines/memory.py`. Shapes verified against primary sources.
+Full table including 0.8B: [`memory_comparison.md`](memory_comparison.md)._
+
+### Qwen3.5-4B (24 GDN + 8 full-attention layers, 3:1 hybrid)
+
+| Context | Weights (fp16) | KV cache (8 attn) | GDN state | Total (hybrid) | If all-attn | Savings |
 |---:|---:|---:|---:|---:|---:|---:|
-| 4K | 7.83 | 0.12 | 51 | 8.01 | 8.33 | 0.33 GiB |
-| 32K | 7.83 | 1.00 | 51 | 8.88 | 11.83 | 2.95 GiB |
-| 128K | 7.83 | 4.00 | 51 | 11.88 | 23.83 | 11.95 GiB |
-| 262K | 7.83 | 8.00 | 51 | 15.88 | 39.83 | 23.95 GiB |
+| 4K | 7.83 GiB | 0.12 GiB | 51 MiB | 8.01 GiB | 8.33 GiB | 0.33 GiB |
+| 32K | 7.83 GiB | 1.00 GiB | 51 MiB | 8.88 GiB | 11.83 GiB | 2.95 GiB |
+| 128K | 7.83 GiB | 4.00 GiB | 51 MiB | 11.88 GiB | 23.83 GiB | 11.95 GiB |
+| 262K | 7.83 GiB | 8.00 GiB | 51 MiB | 15.88 GiB | 39.83 GiB | **23.95 GiB** |
 
-## Decode bandwidth model — Qwen3.5-4B at 100 GB/s (O6 stretch target)
+> At **262K context** the GDN hybrid saves **23.95 GiB** versus a hypothetical all-attention model.
+> The recurrent state is **51 MiB** regardless of context length, while the KV cache alone reaches
+> **8.0 GiB** — exceeding the fp16 weight footprint (7.83 GiB).
 
-| Quant | Weight traffic/token | State traffic/token | Total | Ceiling tok/s |
+## 6. Decode bandwidth ceilings (analytical)
+
+Qwen3.5-4B at 100 GB/s (O6 LPDDR5 spec; RK3588 shared pool is 34 GiB/s per cluster).
+
+| Quantization | Weight traffic/token | State traffic/token | Total | Ceiling tok/s |
 |---|---:|---:|---:|---:|
 | fp16 | 7.83 GiB | 51 MiB | 7.88 GiB | ≈12 |
 | INT8 | 3.92 GiB | 51 MiB | 3.96 GiB | ≈23 |
 | INT4 (W4A16) | 1.96 GiB | 51 MiB | 2.01 GiB | ≈46 |
+
+> These are **upper bounds** assuming the decode loop is purely memory-bandwidth-bound (no compute
+> overhead, no cache effects). Real throughput will be lower. The point is the scaling: INT4
+> quantization roughly doubles decode throughput versus fp16 because it halves the dominant
+> weight-traffic cost. The GDN recurrent state (51 MiB) is negligible at every precision.
