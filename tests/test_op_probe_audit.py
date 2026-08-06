@@ -140,7 +140,7 @@ class TestOkWithWarnings:
         assert verdict == "OK_WITH_WARNINGS"
 
     def test_warning_in_multiline(self):
-        log = "[INFO] Model parsed\n[WARN] Shape inference issue\n[INFO] Build OK"
+        log = "[INFO] Model parsed\n[WARNING] Shape inference issue\n[INFO] Build OK"
         verdict, evidence = classify(0, log)
         assert verdict == "OK_WITH_WARNINGS"
         assert "warn" in evidence.lower()

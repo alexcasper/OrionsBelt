@@ -835,12 +835,23 @@ class TestMetricVocabularyRules:
 class TestResultRowDataclass:
     def test_default_layer_class_is_all(self):
         row = ResultRow(
-            run_id="x", timestamp="2026-01-01", git_sha="abcdef0",
-            manifest_ref="ref", device="o6", engine_gdn="cpu",
-            engine_full_attention="cpu", model_checkpoint="m",
-            quantization="fp32", context_length=4096, phase="prefill",
-            metric_name="prefill_tokens_per_sec", metric_component=None,
-            value=1.0, unit="tokens_per_sec", repeat_index=0, repeat_count=1,
+            run_id="x",
+            timestamp="2026-01-01",
+            git_sha="abcdef0",
+            manifest_ref="ref",
+            device="o6",
+            engine_gdn="cpu",
+            engine_full_attention="cpu",
+            model_checkpoint="m",
+            quantization="fp32",
+            context_length=4096,
+            phase="prefill",
+            metric_name="prefill_tokens_per_sec",
+            metric_component=None,
+            value=1.0,
+            unit="tokens_per_sec",
+            repeat_index=0,
+            repeat_count=1,
         )
         assert row.layer_class == "all"
 
