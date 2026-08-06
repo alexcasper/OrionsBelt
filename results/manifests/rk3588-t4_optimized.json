@@ -1,0 +1,135 @@
+{
+  "caller": {},
+  "git": {
+    "dirty": true,
+    "sha": "8f8be11a058cd0b80b29e7aec563dac7a0d1312d"
+  },
+  "host": {
+    "core_count": 8,
+    "cpu_model": "aarch64",
+    "cpu_topology": [
+      {
+        "cpu": 0,
+        "cpu_capacity": 397,
+        "governor": "performance",
+        "max_freq_khz": 1800000,
+        "min_freq_khz": 1008000
+      },
+      {
+        "cpu": 1,
+        "cpu_capacity": 397,
+        "governor": "performance",
+        "max_freq_khz": 1800000,
+        "min_freq_khz": 1008000
+      },
+      {
+        "cpu": 2,
+        "cpu_capacity": 397,
+        "governor": "performance",
+        "max_freq_khz": 1800000,
+        "min_freq_khz": 1008000
+      },
+      {
+        "cpu": 3,
+        "cpu_capacity": 397,
+        "governor": "performance",
+        "max_freq_khz": 1800000,
+        "min_freq_khz": 1008000
+      },
+      {
+        "cpu": 4,
+        "cpu_capacity": 1024,
+        "governor": "performance",
+        "max_freq_khz": 2400000,
+        "min_freq_khz": 1200000
+      },
+      {
+        "cpu": 5,
+        "cpu_capacity": 1024,
+        "governor": "performance",
+        "max_freq_khz": 2400000,
+        "min_freq_khz": 1200000
+      },
+      {
+        "cpu": 6,
+        "cpu_capacity": 1024,
+        "governor": "performance",
+        "max_freq_khz": 2400000,
+        "min_freq_khz": 1200000
+      },
+      {
+        "cpu": 7,
+        "cpu_capacity": 1024,
+        "governor": "performance",
+        "max_freq_khz": 2400000,
+        "min_freq_khz": 1200000
+      }
+    ],
+    "hostname": "t4",
+    "kernel": "6.11.0-1006-rockchip",
+    "machine": "aarch64",
+    "os": "Linux-6.11.0-1006-rockchip-aarch64-with-glibc2.40"
+  },
+  "isa_features": {
+    "asimddp": true,
+    "bf16": false,
+    "i8mm": false,
+    "sme": false,
+    "sve": false,
+    "sve2": false
+  },
+  "manifest_version": 1,
+  "memory": {
+    "mem_available_kb": 5177316,
+    "mem_total_kb": 8120248
+  },
+  "run_id": "t4_20260806T101637Z_8f8be11",
+  "software": {
+    "packages": {
+      "numpy": "2.5.1",
+      "onnxruntime": null,
+      "torch": null,
+      "transformers": null
+    },
+    "python_implementation": "CPython",
+    "python_version": "3.12.7 (main, Jun 18 2025, 13:16:51) [GCC 14.2.0]"
+  },
+  "thermal_zones": [
+    {
+      "temp_millicelsius": 39769,
+      "type": "package-thermal",
+      "zone": "thermal_zone0"
+    },
+    {
+      "temp_millicelsius": 39769,
+      "type": "bigcore0-thermal",
+      "zone": "thermal_zone1"
+    },
+    {
+      "temp_millicelsius": 39769,
+      "type": "bigcore2-thermal",
+      "zone": "thermal_zone2"
+    },
+    {
+      "temp_millicelsius": 39769,
+      "type": "littlecore-thermal",
+      "zone": "thermal_zone3"
+    },
+    {
+      "temp_millicelsius": 38846,
+      "type": "center-thermal",
+      "zone": "thermal_zone4"
+    },
+    {
+      "temp_millicelsius": 38846,
+      "type": "gpu-thermal",
+      "zone": "thermal_zone5"
+    },
+    {
+      "temp_millicelsius": 38846,
+      "type": "npu-thermal",
+      "zone": "thermal_zone6"
+    }
+  ],
+  "timestamp_utc": "2026-08-06T10:16:37Z"
+}
