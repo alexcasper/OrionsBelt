@@ -189,6 +189,7 @@ static void run_sustained(int seconds, int csv_mode,
     float *o   = malloc(n * sizeof(float));
     float *g   = malloc(n * sizeof(float));
     float *x   = malloc(n * sizeof(float));
+    float *wg  = malloc(n * sizeof(float));  /* GDN-2 write gate (separate from x) */
     float *st  = malloc(ch * sizeof(float));
     float *w   = malloc(4 * ch * sizeof(float));
     float *hist = malloc(3 * ch * sizeof(float));
@@ -196,7 +197,7 @@ static void run_sustained(int seconds, int csv_mode,
     __fp16 *state_f16  = malloc(ch * sizeof(__fp16));
     uint16_t *decay_bf16 = malloc(n * sizeof(uint16_t));
     uint16_t *state_bf16 = malloc(ch * sizeof(uint16_t));
-    if (!a || !o || !g || !x || !st || !w || !hist ||
+    if (!a || !o || !g || !x || !wg || !st || !w || !hist ||
         !decay_f16 || !state_f16 || !decay_bf16 || !state_bf16) {
         fprintf(stderr, "sustained: allocation failed\n");
         return;
@@ -206,6 +207,7 @@ static void run_sustained(int seconds, int csv_mode,
         a[i] = 0.90f + 0.09f * (float)((i * 2654435761u) % 1000) / 1000.0f;
         g[i] = 0.50f + 0.40f * (float)((i * 40503u) % 1000) / 1000.0f;
         x[i] = (float)((i * 69069u) % 2000) / 1000.0f - 1.0f;
+        wg[i] = 0.50f + 0.49f * (float)((i * 2246822519u) % 1000) / 1000.0f;
     }
     for (size_t i = 0; i < ch; ++i) { st[i] = 0.0f; state_f16[i] = 0; state_bf16[i] = 0; }
     for (size_t i = 0; i < 4 * ch; ++i) w[i] = 0.1f;
@@ -242,7 +244,7 @@ static void run_sustained(int seconds, int csv_mode,
             case K_SCAN_F16:   gdn_gated_scan_f16(g, x, o, state_f16, seq, ch); break;
             case K_DECAY_BF16: gdn_cumdecay_bf16(a, decay_bf16, seq, ch); break;
             case K_SCAN_BF16:  gdn_gated_scan_bf16(g, x, o, state_bf16, seq, ch); break;
-            case K_SCAN2:      gdn2_gated_scan_f32(g, a, x, x, o, st, seq, ch); break;
+            case K_SCAN2:      gdn2_gated_scan_f32(g, a, wg, x, o, st, seq, ch); break;
             case K_LAST:       break;
         }
         calls_in_window++;
@@ -280,7 +282,7 @@ static void run_sustained(int seconds, int csv_mode,
         printf("  Steady-state visible in throughput column — look for decay.\n");
     }
 
-    free(a); free(o); free(g); free(x); free(st);
+    free(a); free(o); free(g); free(x); free(wg); free(st);
     free(w); free(hist);
     free(decay_f16); free(state_f16);
     free(decay_bf16); free(state_bf16);
@@ -366,6 +368,7 @@ int main(int argc, char **argv) {
         float *out = malloc(n * sizeof(float));
         float *g = malloc(n * sizeof(float));
         float *x = malloc(n * sizeof(float));
+        float *wg = malloc(n * sizeof(float));  /* GDN-2 write gate (separate from x) */
         float *state = malloc(ch * sizeof(float));
         float *w = malloc(4 * ch * sizeof(float));
         float *hist = malloc(3 * ch * sizeof(float));
@@ -373,10 +376,10 @@ int main(int argc, char **argv) {
         uint16_t *state_bf16 = malloc(ch * sizeof(uint16_t));
         __fp16 *decay_f16 = malloc(n * sizeof(__fp16));
         uint16_t *decay_bf16 = malloc(n * sizeof(uint16_t));
-        if (!a || !out || !g || !x || !state || !w || !hist ||
+        if (!a || !out || !g || !x || !wg || !state || !w || !hist ||
             !state_f16 || !state_bf16 || !decay_f16 || !decay_bf16) {
             fprintf(stderr, "allocation failed for %s (needs ~%.0f MiB)\n", cfgs[c].model,
-                    (double)(4 * n + 8 * ch) * sizeof(float) / 1048576.0);
+                    (double)(5 * n + 8 * ch) * sizeof(float) / 1048576.0);
             return 1;
         }
         /* Decay values in (0.90, 0.99): representative, and keeps the cumulative product
@@ -385,6 +388,7 @@ int main(int argc, char **argv) {
             a[i] = 0.90f + 0.09f * (float)((i * 2654435761u) % 1000) / 1000.0f;
             g[i] = 0.50f + 0.40f * (float)((i * 40503u) % 1000) / 1000.0f;
             x[i] = (float)((i * 69069u) % 2000) / 1000.0f - 1.0f;
+            wg[i] = 0.50f + 0.49f * (float)((i * 2246822519u) % 1000) / 1000.0f;
         }
         for (size_t i = 0; i < ch; ++i) state[i] = 0.0f;
         for (size_t i = 0; i < 4 * ch; ++i) w[i] = 0.1f;
@@ -408,7 +412,7 @@ int main(int argc, char **argv) {
                     case K_SCAN_F16:   gdn_gated_scan_f16(g, x, out, state_f16, seq, ch); break;
                     case K_DECAY_BF16: gdn_cumdecay_bf16(a, decay_bf16, seq, ch); break;
                     case K_SCAN_BF16:  gdn_gated_scan_bf16(g, x, out, state_bf16, seq, ch); break;
-                    case K_SCAN2:      gdn2_gated_scan_f32(g, a, x, x, out, state, seq, ch); break;
+                    case K_SCAN2:      gdn2_gated_scan_f32(g, a, wg, x, out, state, seq, ch); break;
                     case K_LAST: break;
                 }
                 double dt = now_s() - t0;
@@ -436,7 +440,7 @@ int main(int argc, char **argv) {
         if (!csv) {
             printf("\n");
         }
-        free(a); free(out); free(g); free(x); free(state); free(w); free(hist);
+        free(a); free(out); free(g); free(x); free(wg); free(state); free(w); free(hist);
         free(state_f16); free(state_bf16); free(decay_f16); free(decay_bf16);
     }
 
