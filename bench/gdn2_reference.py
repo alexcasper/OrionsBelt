@@ -356,7 +356,14 @@ def test_gdn2_multi_step_consistency():
     q, k, v, g, b_gate, w_gate, _, _ = make_synthetic_input(T, H, K, V, seed=99)
 
     o, S_final = gdn2_recurrent(
-        q, k, v, g, b_gate, w_gate, scale=1.0 / math.sqrt(K), use_qk_l2norm=True,
+        q,
+        k,
+        v,
+        g,
+        b_gate,
+        w_gate,
+        scale=1.0 / math.sqrt(K),
+        use_qk_l2norm=True,
     )
 
     # Verify output shape
