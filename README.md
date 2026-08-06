@@ -1,8 +1,8 @@
 # OrionsBelt
 
-**Optimizing a Qwen3.5 Gated DeltaNet hybrid model for Arm edge silicon (Radxa Orion O6 / CIX P1).**
+**Optimizing a Qwen3.5 Gated DeltaNet hybrid model for Arm edge silicon.**
 
-Submission for the [Arm Create: AI Optimization Challenge](https://arm-ai-optimization-challenge.devpost.com/) (deadline 2026-08-14, 16:00 PDT). This repository is the technical home of that submission: an in-progress, hardware-independent measurement harness and optimization effort aimed at the Physical AI and Edge AI tracks.
+Submission for the [Arm Create: AI Optimization Challenge](https://arm-ai-optimization-challenge.devpost.com/) (deadline 2026-08-14, 16:00 PDT), **Edge AI track**. This repository is the technical home of that submission: a hardware-independent measurement harness and optimization effort running on RK3588 (Cortex-A76/A55), Raspberry Pi 5, and Jetson Nano. Track decision: [ADR 0007](./docs/adr/0007-track-selection-edge-ai.md).
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
 
@@ -99,37 +99,47 @@ A portable aarch64 target (the **Edge AI** hedge track) is being brought up in p
 
 ## Status
 
-**This is an in-progress research repository as of 2026-08-03.** Neither the Orion O6 board nor CIX Early Bird SDK access is in hand yet — both are externally gated (procurement, vendor approval) and cannot be compressed by effort alone. A hard go/no-go between the Physical AI (O6) and Edge AI (portable aarch64) framing is scheduled for 2026-08-09; the portable hedge track runs from day one regardless of that decision, so hardware-independent work is not blocked on it.
+**Track decision: Edge AI** ([ADR 0007](./docs/adr/0007-track-selection-edge-ai.md), 2026-08-06).
+The Radxa Orion O6 board has not arrived (externally gated since project start). We committed
+to the **Edge AI** track on the RK3588 three days ahead of the Aug 9 hard date, because the
+hedge work already produces real results and Edge AI is a legitimate prize category. If the O6
+arrives before the deadline, it adds data; the framing does not change.
 
-**Device microbenchmarks are running on the Jetson Nano (Cortex-A57, NEON).** Three GDN CPU kernels (gated cumulative decay, gated delta-rule scan, causal depthwise Conv1D) plus mixed-precision bf16/fp16 variants have been measured at verified Qwen3.5-4B and 0.8B shapes, in both prefill and decode phases. Results are committed with provenance manifests; see [`docs/FINDINGS.md`](./docs/FINDINGS.md) for analysis and [`results/raw/`](./results/raw/) for CSVs. The full inference harness (end-to-end tokens/sec, TTFT, memory decomposition) is still pending hardware access.
+**Device-fleet microbenchmarks are running across three platforms:**
+
+| Device | Cores | ISA | Results |
+|---|---|---|---|
+| RK3588 (t3 + t4) | A76 big / A55 little | Armv8.2-A + dotprod | Bandwidth scaling, mixed-precision, cross-vendor NPU probe |
+| Raspberry Pi 5 | A76 | Armv8.2-A + dotprod | Bandwidth scaling |
+| Jetson Nano | A57 | Armv8-A NEON | Bandwidth scaling, sustained-load, power/energy |
+
+Three hand-written GDN CPU kernels (gated cumulative decay, gated delta-rule scan, causal
+depthwise Conv1D) plus mixed-precision bf16/fp16 variants have been measured at verified
+Qwen3.5-4B shapes. Results are committed with provenance manifests; see
+[`docs/FINDINGS.md`](./docs/FINDINGS.md) for analysis and [`results/raw/`](./results/raw/)
+for CSVs.
 
 | Item | Status |
 |---|---|
 | Implementation plan (`PLAN.md`) | Done |
-| Claim verification against primary sources (`docs/CLAIM_VERIFICATION.md`) | Done |
-| Repository skeleton, Apache-2.0 license | Done |
-| Results schema (`docs/RESULTS_SCHEMA.md`) | Done |
-| Benchmark harness (`bench/`) + device microbenchmark (`bench_gdn.c`) | Producing data |
-| Model survey / selection (`docs/MODEL_SURVEY.md`) | In progress |
-| Architecture decision records (`docs/adr/`) | 5 ADRs recorded |
-| CPU GDN kernels (NEON/SVE/scalar) | Verified, benchmarked on A57 |
-| Mixed-precision state kernels (bf16/fp16) | Implemented, benchmarked on A57 |
-| Orion O6 board bring-up | **Pending** — board not yet in hand |
-| CIX Early Bird SDK / NPU toolchain access | **Pending** — not yet approved |
-| Portable aarch64 hedge target (Pi 5 / RK3588) | Pending |
-| Per-layer engine mapping (NPU/GPU/CPU) | Hypothesis only — pending measurements |
-| Full inference results (tokens/sec, TTFT, memory) | **Not started — needs hardware** |
+| Claim verification (`docs/CLAIM_VERIFICATION.md`) | Done |
+| Repository skeleton, Apache-2.0 license, CI scripts | Done |
+| Model selection (Qwen3.5-4B primary, ADR 0003) | Done |
+| GDN layer structure audit from modeling code (`docs/GDN_LAYER_AUDIT.md`) | Done |
+| Architecture decision records (`docs/adr/`) | 7 ADRs (incl. track selection) |
+| CPU GDN kernels (NEON/SVE/scalar) | Verified, benchmarked on A57, A76, A55 |
+| Mixed-precision state kernels (bf16/fp16) | Measured on A76, A55; cross-device comparison |
+| NPU operator-coverage audit (CIX NOE) | Done — Scan rejected, Loop runtime rejected |
+| Cross-vendor NPU probe (Rockchip RKNN) | Done — RKNN accepts Scan, rejects Loop |
+| Weight fetch + license compliance | Done (`scripts/fetch_weights.py`, `docs/WEIGHT_LICENSE.md`) |
+| Device-fleet bandwidth-scaling study | Done (Pi 5, RK3588 ×2, Jetson Nano) |
+| Edge AI track decision | **Decided** — ADR 0007 |
+| Full inference results (tokens/sec, TTFT, memory) | Not started — needs model weights loaded |
+| Orion O6 board bring-up | **Not arrived** — externally gated |
 
-> **Results so far:** device-fleet microbenchmark data from the Jetson Nano.
->
-> ```
-> results/
->   raw/         <- per-run CSVs — jetson-j1.csv (28 rows), jetson-j1_sustained.csv
->   manifests/   <- provenance manifests — jetson-j1.json, jetson-j1_sustained.json
->   figures/     <- generated plots — pending plots.py run on a Python 3.10+ host
-> ```
->
-> See [`results/README.md`](./results/README.md) for the layout and [`docs/FINDINGS.md`](./docs/FINDINGS.md) for findings.
+> **Results so far:** device-fleet microbenchmark data from four physical devices, plus
+> cross-vendor NPU toolchain analysis. See [`results/raw/`](./results/raw/) for CSVs and
+> [`docs/FINDINGS.md`](./docs/FINDINGS.md) for findings.
 
 ## Repository layout
 
@@ -146,12 +156,20 @@ Full target layout and rationale are in [`PLAN.md`](./PLAN.md) §10. Highlights:
 
 ## Reproducing
 
-Setup documentation is being written and is **not complete yet**:
+Full step-by-step setup for any aarch64 edge device (RK3588, Pi 5, Jetson Nano) is in
+[`docs/SETUP_PORTABLE.md`](./docs/SETUP_PORTABLE.md). The quick path:
 
-- `docs/SETUP_O6.md` (Orion O6 bring-up, NPU SDK, Python 3.8 toolchain) — **pending**
-- `docs/SETUP_PORTABLE.md` (generic aarch64 hedge-target setup) — **pending**
+```bash
+git clone https://github.com/alexcasper/OrionsBelt.git && cd OrionsBelt
+CC=gcc ./scripts/build_device_bench.sh          # static binaries in dist/
+taskset -c 4-7 ./dist/bench_gdn_rk3588_a76 --repeats 30   # eyeball
+taskset -c 4-7 ./dist/bench_gdn_rk3588_a76 --repeats 30 --csv > results/raw/my_run.csv
+python3 bench/manifest.py > results/manifests/my_run.json   # provenance
+bash scripts/verify_kernels_native.sh           # correctness suite
+```
 
-Once those land, this section will give a step-by-step, clean-clone reproduction path, verified by rehearsal (tracked in beads as the reproduction-rehearsal task) before submission. We are not fabricating setup commands ahead of that work; check back closer to submission, or see [`scripts/README.md`](./scripts/README.md) for the entry points as they are added.
+This path was verified by rehearsal on an RK3588 (Cortex-A76/A55, Ubuntu 24.04) — see
+[`scripts/README.md`](./scripts/README.md) for the full script reference.
 
 ## License
 
