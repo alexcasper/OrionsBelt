@@ -2218,3 +2218,113 @@ The data is already in the Phase 1 CSVs — no separate run needed:
 grep -E "gdn_gated_scan|gdn2_gated_scan" results/raw/rk3588-t3_big.csv
 grep -E "gdn_gated_scan|gdn2_gated_scan" results/raw/rk3588-t3_little.csv
 ```
+
+---
+
+## 11. Delta-rule matmul: implementing the dual-path decision from §8 (2026-08-06, ob-8qt.1)
+
+### What this adds
+
+Section 8 (`ob-8qt.2`) *measured* that KleidiAI's packed-GEMM wins at prefill (M≥~8) and
+hand-NEON without packing wins at decode (M=1), on real RK3588 A76 silicon, and recommended a
+phase-dependent dual-path strategy. That was an evaluation — nothing in the tree actually called
+either path for the delta-rule update (β = α·S). `gdn_delta_rule_matmul` (new:
+`src/orionsbelt/engines/cpu/kernels/gdn_delta_matmul.{h,c}`) implements that dispatch:
+
+- **M < 5** (decode; matches the measured M=1 case exactly): hand-written NEON/SVE matmul, no
+  packing. SVE path is predicated and vector-length-agnostic — same idiom as the other three
+  kernels in `gdn_sve.c` (`svwhilelt_b32` tail, no scalar epilogue).
+- **M ≥ 5** (prefill; matches the measured M=64 case exactly): KleidiAI's
+  `kai_matmul_clamp_f32_f32_f32p8x1biasf32_6x8x4_neon_mla` + RHS packing, gated behind
+  `ORIONSBELT_WITH_KLEIDIAI`.
+- 5 is the midpoint of the measured break-even range [3,6] from §8. Only M=1 and M=64 were ever
+  measured — nothing calibrated the threshold itself between them. Both real GDN workloads
+  (single-token decode, 64-token chunk prefill) sit far enough from that range that the exact
+  placement inside [3,6] doesn't change dispatch for either; it only matters for a hypothetical
+  future partial-chunk or speculative-decode caller with 2 ≤ M ≤ 8.
+- The f32-only, non-i8mm kernel was chosen deliberately: the RK3588 A76 test device that produced
+  §8's numbers predates i8mm, and the delta-rule operands are fp32 (the quantization policy's
+  fp16 carve-outs apply to the *recurrent state* in `gdn_sve.c`, not to this matmul). An i8mm/int8
+  path would require quantizing the delta-rule's K and S first — a separate, larger decision this
+  bead does not make.
+
+### KleidiAI is still not vendored
+
+Per §8's own Reproducing note ("not yet a submodule — evaluation phase"), KleidiAI's source is
+not checked into this repo. `ORIONSBELT_WITH_KLEIDIAI` is therefore a compile-time opt-in: without
+it (and without supplying the KleidiAI sources at build time, exactly as
+`bench/kleidiai_matmul_bench.c`'s header comment already documents), `gdn_delta_rule_matmul`
+degrades to the hand-NEON/SVE path **unconditionally, at every M**. That fallback is correctness-
+preserving, not a stub — no build of this project can silently produce wrong delta-rule output for
+lack of KleidiAI; the only thing lost without it is the prefill speedup.
+
+### What is verified, and how
+
+This session's sandbox has an old cross toolchain (GCC 7.5, QEMU 2.11) that cannot compile or
+emulate SVE at all (`-march=armv8.2-a+sve` is rejected outright by `cc1`, and the
+`armv9.2-a+sve2+i8mm+bf16` target `scripts/verify_cpu_kernels.sh` normally builds against fails
+the same way — this is a pre-existing limitation of this sandbox, not something introduced here;
+the script's original SVE build fails identically before any of this section's kernel existed).
+So the SVE branch of `gdn_delta_matmul_neon` is new code, written in the same intrinsics idiom
+already verified correct elsewhere in `gdn_sve.c`, but **not compiled or executed in this
+session**. `scripts/verify_cpu_kernels.sh` now cross-compiles and QEMU-runs
+`test_gdn_delta_matmul.c` alongside the existing kernel test at the same `armv9.2-a+sve2+i8mm+bf16`
+/ `sve128=on` target, so CI (which provisions a current GCC/QEMU) becomes the actual verifier for
+that path — the same CI-as-oracle pattern this project already relies on for anything a
+lower-Armv8.0 device in the fleet can't run natively.
+
+What *was* verified in this sandbox, cross-compiled for aarch64 and run under `qemu-aarch64`,
+against a naive triple-loop fp32 reference at the exact shapes §8 measured (decode 1×128×128,
+prefill 64×128×128, both single-head and all-16-heads-batched at N=2048, plus two N=130 shapes to
+exercise the non-multiple-of-vector-width tail):
+
+1. **The NEON fallback path** (`-march=armv8.2-a+simd`, no `ORIONSBELT_WITH_KLEIDIAI`): bit-
+   identical to the reference at every shape (`max_abs=0.000e+00`, all 6 shapes PASS).
+2. **The real KleidiAI dispatch path**, built with `ORIONSBELT_WITH_KLEIDIAI` and linked directly
+   against `kai_matmul_clamp_f32_f32_f32p8x1biasf32_6x8x4_neon_mla.{c,S}` and
+   `kai_rhs_pack_kxn_f32p8x1biasf32_f32_f32_neon.c` cloned from
+   `https://github.com/ARM-software/kleidiai` (the GitHub mirror — `gitlab.arm.com` is unreachable
+   from this sandbox's network policy): also bit-identical at every shape, including both M=64
+   prefill shapes (which actually dispatch into KleidiAI) and the N=130 tail (exercising
+   KleidiAI's own non-multiple-of-`nr` handling). This confirms the same zero-error result §8
+   already reported on real RK3588 silicon (`max_abs_diff = 0.0`) still holds through this
+   dispatcher's exact call pattern, not just KleidiAI in isolation.
+
+Neither run produced real performance numbers — there is no Cortex-A720 silicon in the fleet
+(§5a/README target-hardware table: Jetson A57, Pi 5 A76, RK3588 A76/A55, no A720) and this
+project's own convention (§5, "QEMU timings are not measurements") correctly disclaims QEMU
+wall-clock as evidence. What §8 already measured on RK3588 A76 (1.7–3.6× KleidiAI matmul-only,
+net win at M≥~8, NEON net win at M=1) is the only real performance evidence this dispatch
+decision rests on; this section adds a working implementation of that decision plus a correctness
+oracle, not new performance data.
+
+### What is not done
+
+- The SVE branch's QEMU verification (blocked on this sandbox's toolchain age; deferred to CI).
+- Wiring KleidiAI into CI itself (`ci.yaml`'s `kernels` job does not clone or link it — doing so is
+  a deliberate decision about adding an external clone dependency to CI, not made here).
+- big.LITTLE placement / on-device tuning for this kernel specifically — `ob-dqu` covered this for
+  the existing three kernels on RK3588; extending it to the delta-rule matmul, and to a real
+  three-tier A720 big/medium/little split, needs real hardware.
+
+### Reproducing
+
+```bash
+# Fallback path only (portable, no external deps):
+K=src/orionsbelt/engines/cpu/kernels
+aarch64-linux-gnu-gcc -O3 -march=armv9.2-a+sve2+i8mm+bf16 -static \
+    "$K/gdn_delta_matmul.c" "$K/test_gdn_delta_matmul.c" -I"$K" -o /tmp/verify_matmul -lm
+QEMU_CPU=max,sve128=on qemu-aarch64 /tmp/verify_matmul
+
+# Real KleidiAI dispatch path (needs a local checkout):
+git clone --depth 1 https://github.com/ARM-software/kleidiai.git /tmp/kleidiai
+KAI=/tmp/kleidiai/kai/ukernels/matmul
+aarch64-linux-gnu-gcc -O3 -march=armv8.2-a+simd -DORIONSBELT_WITH_KLEIDIAI -static \
+    -I/tmp/kleidiai -I"$K" \
+    "$K/gdn_delta_matmul.c" "$K/test_gdn_delta_matmul.c" \
+    "$KAI/matmul_clamp_f32_f32_f32p/kai_matmul_clamp_f32_f32_f32p8x1biasf32_6x8x4_neon_mla.c" \
+    "$KAI/matmul_clamp_f32_f32_f32p/kai_matmul_clamp_f32_f32_f32p8x1biasf32_6x8x4_neon_mla_asm.S" \
+    "$KAI/pack/kai_rhs_pack_kxn_f32p8x1biasf32_f32_f32_neon.c" \
+    -o /tmp/verify_matmul_kleidiai -lm
+qemu-aarch64 /tmp/verify_matmul_kleidiai
+```
