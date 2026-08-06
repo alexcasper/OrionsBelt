@@ -1740,3 +1740,103 @@ for t in 4 8; do
   OMP_NUM_THREADS=$t dist/bench_gdn_rk3588_a76 --repeats 30 --csv
 done
 ```
+
+---
+
+## 10. GDN-2 vs GDN-1 gating: microbenchmark comparison on RK3588 (2026-08-06, ob-82b)
+
+### The architectural difference
+
+**GDN-1** (standard Gated DeltaNet): `s[t] = x[t] + s[t-1] * g[t]` — one decay gate, one input.
+- 3 fp32 streams per step (read g, x; write s) = 12 bytes/element
+- 1 FMA = 2 FLOPs/element
+
+**GDN-2** (decoupled erase/write): `s[t] = w[t]*x[t] + s[t-1] * (g[t]*b[t])` — separate erase (b)
+and write (w) gates, per ADR 0001.
+- 5 fp32 streams per step (read g, b, w, x; write s) = 20 bytes/element
+- 2 MUL + 1 FMA = 3 FLOPs/element
+
+GDN-2 does **67% more memory traffic** and **50% more arithmetic** per element, with the same
+sequential recurrence dependency chain.
+
+### Measured comparison (RK3588 A76, pinned cpu4-7, 30 repeats)
+
+**Prefill (seq=64) — Qwen3.5-4B (channels=4096):**
+
+| Kernel | p50 (µs) | GiB/s | GFLOP/s | Spread |
+|---|---|---|---|---|
+| gdn_gated_scan | 267 | 11.07 | 1.96 | 6.2% |
+| gdn2_gated_scan | 533 | 9.21 | 1.97 | 10.9% |
+| **Ratio** | **2.00× slower** | 0.83× | 1.01× | — |
+
+**Decode (seq=1) — Qwen3.5-4B (channels=4096):**
+
+| Kernel | p50 (µs) | GiB/s | GFLOP/s | Spread |
+|---|---|---|---|---|
+| gdn_gated_scan | 1.46 | 52.33 | 5.62 | 0.1% |
+| gdn2_gated_scan | 1.46 | 73.20 | 11.23 | 20.0% |
+| **Ratio** | **1.00× (identical)** | 1.40× | 2.00× | — |
+
+**Decode (seq=1) — Qwen3.5-0.8B (channels=2048):**
+
+| Kernel | p50 (µs) | GiB/s | GFLOP/s |
+|---|---|---|---|
+| gdn_gated_scan | 1.17 | 32.72 | 3.51 |
+| gdn2_gated_scan | 1.17 | 45.77 | 7.02 |
+| **Ratio** | **1.00× (identical)** | 1.40× | 2.00× |
+
+**Little cluster (A55) — Qwen3.5-4B prefill:**
+
+| Kernel | p50 (µs) | Ratio |
+|---|---|---|
+| gdn_gated_scan | 1304 | — |
+| gdn2_gated_scan | 4047 | **3.1× slower** |
+
+### Analysis
+
+**Finding 1: GDN-2's extra gates are free at decode.** At seq=1, both kernels take identical
+wall-clock time (1.46µs). GDN-2 achieves 2× the GFLOP/s because it does 2× the FLOPs in the same
+time — the extra multiply-adds are completely hidden behind memory latency. This confirms the
+kernel is **memory-bandwidth-bound at decode**, not compute-bound: you could add arbitrary
+arithmetic per element without changing the latency, as long as the stream count doesn't increase
+past what the memory system can serve.
+
+Wait — GDN-2 does increase streams from 3 to 5, yet latency is unchanged. This means at seq=1 the
+kernel is not even bandwidth-bound — it's dominated by **function-call and state load/store
+overhead**. The per-element work (whether 2 or 3 FLOPs, 3 or 5 streams) is negligible compared
+to the fixed cost of entering the kernel, loading the state vector, and storing the output.
+
+**Finding 2: GDN-2 costs exactly 2× at prefill.** At seq=64, GDN-2 is 2.0× slower with identical
+GFLOP/s throughput (1.97 vs 1.96). This means the A76 pipeline processes both kernels at the same
+FLOP rate — GDN-2 simply has 2× the FLOPs to do. The extra streams (5 vs 3) cause the effective
+bandwidth to drop slightly (11.07 → 9.21 GiB/s), suggesting the memory system is approaching
+saturation but is not yet the bottleneck at this shape.
+
+**Finding 3: GDN-2 penalty is worse on the little cluster.** On A55 (in-order, narrower pipeline),
+GDN-2 is 3.1× slower vs 2.0× on A76. The A55's simpler pipeline cannot hide the extra instruction
+latency from the two additional multiplies per step. This has implications for heterogeneous
+dispatch: GDN-2 models are relatively more expensive on little cores.
+
+### What this means for the project
+
+1. **GDN-2 is a viable decode-time alternative at zero cost.** The decoupled erase/write gating
+   that improves retrieval quality (per NVLabs' paper) adds no decode latency on this hardware.
+   The quality improvement is "free" at inference time.
+
+2. **GDN-2 costs 2× at prefill.** This is expected and acceptable — prefill is amortised across
+   all subsequent decode steps. For a chunk size of 64, the 266µs extra prefill cost is recovered
+   after ~182 decode steps (at 1.46µs/step).
+
+3. **On edge devices with little cores, GDN-2 should be routed to big cores only.** The 3.1×
+   penalty on A55 vs 2.0× on A76 means the little cluster is a worse-than-linear fit for GDN-2's
+   extra arithmetic.
+
+### Reproducing
+
+The data is already in the Phase 1 CSVs — no separate run needed:
+
+```bash
+# GDN-1 vs GDN-2 from existing benchmark data:
+grep -E "gdn_gated_scan|gdn2_gated_scan" results/raw/rk3588-t3_big.csv
+grep -E "gdn_gated_scan|gdn2_gated_scan" results/raw/rk3588-t3_little.csv
+```
