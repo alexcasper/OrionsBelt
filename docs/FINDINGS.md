@@ -880,3 +880,52 @@ This re-run addresses ob-bf7's "cross-code-version" concern: the prior t4 CSVs
 were at the unoptimized baseline. Manifest:
 `results/manifests/rk3588-t4_optimized.json` (SHA 8f8be11, governor=performance,
 thermals 37–41 °C pre/post).
+
+### Per-Layer Latency Profile: GDN vs Full-Attention (ob-c9k)
+
+Instrumented all 24 decoder layers of Qwen3.5-0.8B with PyTorch forward
+pre/post hooks to measure wall-clock time per layer, broken down by type
+(18 `linear_attention` / GDN layers, 6 `full_attention` layers). Hooks add
+~15% overhead to absolute timings but relative breakdowns are valid.
+
+**Prefill phase (p50 µs per layer, aggregated):**
+
+| Ctx | Full-Attn Total | GDN Total | Full/layer | GDN/layer | GDN % time | GDN/Full ratio |
+|----:|----------------:|----------:|-----------:|----------:|-----------:|---------------:|
+|  32 |         468,484 | 2,324,884 |     78,081 |   129,160 |      83.2% |          1.65× |
+|  64 |         675,950 | 3,080,169 |    112,658 |   171,120 |      82.0% |          1.52× |
+| 128 |         948,075 | 4,298,430 |    158,013 |   238,802 |      81.9% |          1.51× |
+
+**Decode phase (p50 µs per layer, aggregated):**
+
+| Ctx | Full-Attn Total | GDN Total | Full/layer | GDN/layer | GDN % time | GDN/Full ratio |
+|----:|----------------:|----------:|-----------:|----------:|-----------:|---------------:|
+|  32 |         253,715 |   854,858 |     42,286 |    47,492 |      77.1% |          1.12× |
+|  64 |         292,420 |   876,000 |     48,737 |    48,667 |      75.0% |          1.00× |
+| 128 |         341,825 |   932,504 |     56,971 |    51,806 |      73.2% |          0.91× |
+
+**Key findings:**
+
+1. **GDN layers dominate prefill** at 82% of total layer time despite being
+   75% of layers. Each GDN layer is 1.5–1.65× more expensive than a
+   full-attention layer during prefill, making them the primary optimization
+   target for TTFT.
+
+2. **The crossover happens in decode**: at ctx=128, GDN per-layer cost
+   (51,806 µs) drops *below* full-attention (56,971 µs) — a 0.91× ratio.
+   This is because GDN recurrent state is O(1) (fixed-size, independent of
+   context length), while full-attention KV cache grows linearly with ctx.
+
+3. **GDN decode cost is nearly flat**: 47,492 → 51,806 µs (9% increase)
+   across ctx 32→128, confirming the O(1) recurrent state hypothesis.
+   Full-attention decode grows 35% across the same range.
+
+4. **Implication for heterogeneous mapping**: During prefill, GDN layers
+   are the bottleneck and should be prioritized for acceleration (NPU,
+   custom kernels). During decode at long contexts, full-attention layers
+   become the per-layer bottleneck due to KV cache traffic — but they are
+   only 6 of 24 layers, so total decode time remains GDN-dominated in
+   aggregate.
+
+Data: `results/raw/rk3588-t4_layer_profile.csv`. Script:
+`bench/profile_layers.py` (3 repeats, 3 decode tokens per context length).
