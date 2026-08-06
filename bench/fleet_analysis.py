@@ -223,6 +223,10 @@ def plot_cross_device(device_data, output_path):
         else:
             cores_labels.append("")
 
+    if not devices:
+        print("No devices with scan data — skipping cross-device plot")
+        return False
+
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
 
     # Left: achieved scan throughput bar chart
