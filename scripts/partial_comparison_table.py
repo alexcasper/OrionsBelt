@@ -1,0 +1,209 @@
+#!/usr/bin/env python3
+# ob-9t0.2: partial comparison table aggregation. stdlib only (csv, statistics, json).
+# Reads committed CSVs + manifests, prints structured numbers with provenance.
+# Does NOT import bench/ (this node is Py 3.6.9; bench/ needs 3.7+).
+import csv, statistics, json, os
+
+RAW = "/home/j1/OrionsBelt/results/raw"
+MAN = "/home/j1/OrionsBelt/results/manifests"
+
+def median(xs):
+    return statistics.median(xs) if xs else None
+
+def load_ablation():
+    """tidy long -> p50 per (phase, metric, component) over the 5 repeats."""
+    path = os.path.join(RAW, "ablation/ablation_cpu-only.csv")
+    groups = {}
+    run_ids = set(); shas = set(); manifest_refs = set()
+    ctxs = set(); quants = set(); engines = set(); model = set()
+    with open(path) as f:
+        for r in csv.DictReader(f):
+            key = (r["phase"], r["metric_name"], r.get("metric_component") or "")
+            groups.setdefault(key, []).append(float(r["value"]))
+            run_ids.add(r["run_id"]); shas.add(r["git_sha"])
+            manifest_refs.add(r["manifest_ref"]); ctxs.add(r["context_length"])
+            quants.add(r["quantization"]); engines.add((r["engine_gdn"], r["engine_full_attention"]))
+            model.add(r["model_checkpoint"])
+    return {
+        "groups": {k: median(v) for k, v in groups.items()},
+        "n": {k: len(v) for k, v in groups.items()},
+        "run_id": sorted(run_ids), "git_sha": sorted(shas),
+        "manifest_ref": sorted(manifest_refs), "context": sorted(ctxs),
+        "quant": sorted(quants), "engines": sorted(engines), "model": sorted(model),
+    }
+
+def load_kernel(fname):
+    """kernel micro-bench CSVs already store p50 over 30 repeats; read directly."""
+    rows = []
+    with open(os.path.join(RAW, fname)) as f:
+        for r in csv.DictReader(f):
+            rows.append(r)
+    return rows
+
+def kv(rows, model, kernel, seq):
+    for r in rows:
+        if r["model"] == model and r["kernel"] == kernel and int(r["seq"]) == seq:
+            return float(r["gib_per_s_p50"]), float(r["p50_us"]), float(r["spread_pct"])
+    return None
+
+def show_kernel_table(title, fname):
+    print("\n###", title, "::", fname)
+    rows = load_kernel(fname)
+    for m in ["Qwen3.5-4B", "Qwen3.5-0.8B", "Qwen3.5-4B_decode", "Qwen3.5-0.8B_decode"]:
+        seq = 1 if "decode" in m else 64
+        for k in ["gdn_cumdecay", "gdn_gated_scan", "gdn_causal_dwconv1d"]:
+            v = kv(rows, m, k, seq)
+            if v:
+                print("  %-20s %-22s seq=%-3d  GiB/s=%-6.2f  p50us=%-9.3f  spread=%.1f%%" % (m, k, seq, v[0], v[1], v[2]))
+
+def load_sustained(fname):
+    gibs = []
+    with open(os.path.join(RAW, fname)) as f:
+        for r in csv.DictReader(f):
+            gibs.append(float(r["throughput_gibs"]))
+    if not gibs: return None
+    return gibs[0], gibs[-1], median(gibs), len(gibs)
+
+# ---- provenance map (run_id, git_sha, dirty) from manifests ----
+PROV = {
+    "jetson-j1_clean.csv": ("j1_20260804T102230Z_ba7506d", "ba7506d", False),
+    "jetson-j1.csv":       ("j1_20260802T235238Z_2c9ac9f", "2c9ac9f", True),
+    "jetson-j1_single.csv":("(no manifest)",                 "dffac4b*", True),
+    "jetson-j1_omp.csv":   ("(no manifest)",                 "dffac4b*", True),
+    "jetson-j2.csv":       ("j2_20260803T144316Z_6ea1771", "6ea1771", True),
+    "jetson-j2_single.csv":("(no manifest)",                 "a085417*", True),
+    "jetson-j2-omp.csv":   ("(no manifest)",                 "a085417*", True),
+    "jetson-j2-omp-full.csv":("(no manifest)",               "a085417*", True),
+    "jetson-j2-full-optimized.csv":("jetson-j2-full-optimized","8c9b3a9", True),
+    "jetson-j2-conv-unroll.csv":("(no manifest)",             "a085417*", True),
+    "jetson-j2-omp-unroll.csv":("(no manifest)",              "a085417*", True),
+    "pi5-r5.csv":          ("r5_20260802T201237Z_28729f3",  "28729f3", True),
+    "pi5-j1.csv":          ("r5_20260803T083154Z_f127a11",  "f127a11", True),
+    "rk3588-t3_big.csv":   ("t3_20260802T211312Z_28729f3",  "28729f3", True),
+    "rk3588-t3_little.csv":("t3_20260802T211312Z_28729f3",  "28729f3", True),
+    "rk3588-t4_big.csv":   ("t4_20260802T211249Z_28729f3",  "28729f3", True),
+    "rk3588-t4_little.csv":("t4_20260802T211249Z_28729f3",  "28729f3", True),
+}
+
+print("="*90)
+print("ABLATION (model-level, tidy long, cpu/cpu hybrid, 4K)")
+ab = load_ablation()
+print("  run_id    :", ab["run_id"])
+print("  git_sha   :", ab["git_sha"], " (manifest file MISSING from results/manifests/)")
+print("  manifest  :", ab["manifest_ref"])
+print("  context   :", ab["context"], " quant:", ab["quant"], " engines:", ab["engines"])
+print("  model     :", ab["model"])
+print("  --- p50 over repeats (n) ---")
+g = ab["groups"]
+def fmt_mem(b):
+    x = b/1024.0
+    for u in ("KiB","MiB","GiB"):
+        if abs(x) < 1024: return "%.1f %s" % (x, u)
+        x /= 1024
+    return "%.1f TiB" % x
+print("  prefill_tokens_per_sec : %-14.1f (n=%d)" % (g[("prefill","prefill_tokens_per_sec","")], ab["n"][("prefill","prefill_tokens_per_sec","")]))
+print("  decode_tokens_per_sec  : %-14.1f (n=%d)" % (g[("decode","decode_tokens_per_sec","")],  ab["n"][("decode","decode_tokens_per_sec","")]))
+print("  ttft_seconds           : %-14.6f s = %.4f ms (n=%d)" % (g[("prefill","ttft_seconds","")], g[("prefill","ttft_seconds","")]*1000, ab["n"][("prefill","ttft_seconds","")]))
+for comp in ("weights","kv_cache","recurrent_state"):
+    for ph in ("prefill","decode"):
+        k = (ph,"peak_memory_bytes",comp)
+        if k in g:
+            print("  mem[%s][%s] : %-12s (%.0f bytes, n=%d)" % (comp, ph, fmt_mem(g[k]), g[k], ab["n"][k]))
+
+print("\n" + "="*90)
+print("KERNEL FLEET BASELINE (4B/0.8B, seq=64, single-core canonical, fp32) — GiB/s @ p50")
+print("Device            run_id_sha            dirty   CumDecay  Scan    DWConv1D")
+fleet = [
+    ("Jetson j1 (canon)", "jetson-j1.csv"),
+    ("Jetson j2 (canon)", "jetson-j2.csv"),
+    ("Pi5 r5",            "pi5-r5.csv"),
+    ("Pi5 j1",            "pi5-j1.csv"),
+    ("RK3588 t4 big",     "rk3588-t4_big.csv"),
+    ("RK3588 t3 big",     "rk3588-t3_big.csv"),
+    ("RK3588 t4 little",  "rk3588-t4_little.csv"),
+    ("RK3588 t3 little",  "rk3588-t3_little.csv"),
+]
+for label, fname in fleet:
+    rows = load_kernel(fname)
+    rid, sha, dirty = PROV[fname]
+    cd = kv(rows,"Qwen3.5-4B","gdn_cumdecay",64)
+    sc = kv(rows,"Qwen3.5-4B","gdn_gated_scan",64)
+    cv = kv(rows,"Qwen3.5-4B","gdn_causal_dwconv1d",64)
+    ds = "dirty" if dirty else "CLEAN"
+    print("  %-16s %-20s %-6s  %s  %s  %s" % (label, sha, ds,
+        "%-5.2f"%cd[0] if cd else "  —  ",
+        "%-5.2f"%sc[0] if sc else "  —  ",
+        "%-5.2f"%cv[0] if cv else "  —  "))
+print("  (t4 preferred over t3 per ob-bf7: t3 scan spread=153% contaminated; t4 spread=17%)")
+
+print("\n" + "="*90)
+print("OPTIMIZATION LADDER on Jetson (Qwen3.5-4B, seq=64) — GiB/s @ p50 / p50 µs")
+ladder = [
+    ("baseline single (j1, manifest, dirty)",  "jetson-j1.csv"),
+    ("baseline single (j2, manifest, dirty)",  "jetson-j2.csv"),
+    ("CLEAN tree 4-core OMP (j1, dirty=false)","jetson-j1_clean.csv"),
+    ("single-core (j2_single, NO manifest)",   "jetson-j2_single.csv"),
+    ("4-core OMP (j2_omp, NO manifest)",       "jetson-j2-omp.csv"),
+    ("4-core OMP full (j2_omp-full, NO manif)","jetson-j2-omp-full.csv"),
+    ("conv-unroll (j2, NO manifest)",          "jetson-j2-conv-unroll.csv"),
+    ("omp+unroll (j2, NO manifest)",           "jetson-j2-omp-unroll.csv"),
+    ("FULL-OPTIMIZED (j2, manifest, dirty)",   "jetson-j2-full-optimized.csv"),
+]
+print("Config                                        CumDecay       Scan          DWConv1D")
+for label, fname in ladder:
+    rows = load_kernel(fname)
+    cd = kv(rows,"Qwen3.5-4B","gdn_cumdecay",64)
+    sc = kv(rows,"Qwen3.5-4B","gdn_gated_scan",64)
+    cv = kv(rows,"Qwen3.5-4B","gdn_causal_dwconv1d",64)
+    def cell(v): return "%.2f GiB/s (%.0fus)" % (v[0], v[1]) if v else "—"
+    print("  %-42s %-14s %-13s %-14s" % (label, cell(cd), cell(sc), cell(cv)))
+
+# speedup ratios (within j2 series, same device)
+print("\n  Within-j2-series speedups (4B seq=64, GiB/s):")
+def gib(fname, kernel):
+    r = load_kernel(fname); v = kv(r,"Qwen3.5-4B",kernel,64); return v[0] if v else None
+for k in ("gdn_cumdecay","gdn_gated_scan","gdn_causal_dwconv1d"):
+    base = gib("jetson-j2_single.csv", k)
+    omp = gib("jetson-j2-omp.csv", k); full = gib("jetson-j2-full-optimized.csv", k)
+    print("    %-20s single=%.2f  omp=%.2f (%.2fx)  full-opt=%.2f (%.2fx)" % (
+        k, base if base else 0, omp, omp/base if base and omp else 0,
+        full, full/base if base and full else 0))
+# manifest-backed clean-tree 4-core vs manifest-backed canonical single (j1 same device)
+print("  Manifest-backed (j1 device): single j1.csv scan=%.2f -> 4-core CLEAN j1_clean scan=%.2f (%.2fx, SUPERLINEAR=confounded)" % (
+    gib("jetson-j1.csv","gdn_gated_scan"), gib("jetson-j1_clean.csv","gdn_gated_scan"),
+    gib("jetson-j1_clean.csv","gdn_gated_scan")/gib("jetson-j1.csv","gdn_gated_scan")))
+
+print("\n" + "="*90)
+print("DECODE (seq=1) KERNEL — Qwen3.5-4B — p50 µs/token + GiB/s (recurrence cost)")
+for label, fname in [("j1 CLEAN 4-core (manifest)", "jetson-j1_clean.csv"),
+                     ("j2 full-optimized (manifest)","jetson-j2-full-optimized.csv")]:
+    rows = load_kernel(fname)
+    print("  ", label)
+    for k in ("gdn_cumdecay","gdn_gated_scan","gdn_causal_dwconv1d"):
+        v = kv(rows,"Qwen3.5-4B_decode",k,1)
+        if v: print("     %-22s %.3f us/token   %.2f GiB/s   spread=%.1f%%" % (k, v[1], v[0], v[2]))
+
+print("\n" + "="*90)
+print("SUSTAINED LOAD / THERMAL (gdn_gated_scan, Qwen3.5-4B, seq=64)")
+for label, fname in [("j1 sustained 120s (manifest, dirty)", "jetson-j1_sustained.csv"),
+                     ("j2 1-core 30s (manifest, dirty)",     "jetson-j2_sustained_1core.csv"),
+                     ("j2 4-core 30s (manifest, dirty)",     "jetson-j2_sustained_4core.csv"),
+                     ("j2 optimized 120s (manifest, dirty)", "jetson-j2-sustained-optimized.csv")]:
+    s = load_sustained(fname)
+    if s:
+        print("  %-38s first=%.2f last=%.2f median=%.2f GiB/s  drift=%+.1f%%  (n=%d samples)" % (
+            label, s[0], s[1], s[2], (s[1]-s[0])/s[0]*100, s[3]))
+
+print("\n" + "="*90)
+print("POWER / ENERGY (jetson-j1_power.json, INA3221, 10s sustained, Qwen3.5-4B seq=64)")
+with open(os.path.join(MAN,"jetson-j1_power.json")) as f:
+    pj = json.load(f)
+for run in pj["sustained_runs"]:
+    print("  %-22s %.2f GiB/s  delta_board=%4dmW  delta_cpu=%4dmW  energy=%4d mJ/GiB(board) %4d mJ/GiB(cpu)  therm %s->%sC" % (
+        run["kernel"], run["throughput_gib_per_s"],
+        run["delta_power_mw"]["board"], run["delta_power_mw"]["cpu"],
+        run["energy_per_gib_board_mj"], run["energy_per_gib_cpu_mj"],
+        run["thermal_c"]["idle"]/1000.0, run["thermal_c"]["peak"]/1000.0))
+print("  provenance: bead ob-agf.1/ob-mrd.7, run_id jetson-j1 (no git sha in this manifest)")
+
+print("\nDONE.")
