@@ -82,26 +82,28 @@ def _write_std_csv(path, rows):
 def _schema_row(**overrides):
     """A valid schema-compliant row dict (bench/schema.py format)."""
     base = {col: "" for col in SCHEMA_COLS}
-    base.update({
-        "run_id": "rk3588-t4_test",
-        "timestamp": "2026-08-06T10:00:00Z",
-        "git_sha": "abc1234",
-        "manifest_ref": "results/manifests/rk3588-t4_test.json",
-        "device": "rk3588-t4",
-        "engine_gdn": "cpu",
-        "engine_full_attention": "cpu",
-        "model_checkpoint": "Qwen3.5-0.8B",
-        "quantization": "fp32",
-        "context_length": "64",
-        "phase": "prefill",
-        "metric_name": "prefill_tokens_per_sec",
-        "metric_component": "",
-        "value": "14.93",
-        "unit": "tokens_per_sec",
-        "repeat_index": "0",
-        "repeat_count": "5",
-        "layer_class": "all",
-    })
+    base.update(
+        {
+            "run_id": "rk3588-t4_test",
+            "timestamp": "2026-08-06T10:00:00Z",
+            "git_sha": "abc1234",
+            "manifest_ref": "results/manifests/rk3588-t4_test.json",
+            "device": "rk3588-t4",
+            "engine_gdn": "cpu",
+            "engine_full_attention": "cpu",
+            "model_checkpoint": "Qwen3.5-0.8B",
+            "quantization": "fp32",
+            "context_length": "64",
+            "phase": "prefill",
+            "metric_name": "prefill_tokens_per_sec",
+            "metric_component": "",
+            "value": "14.93",
+            "unit": "tokens_per_sec",
+            "repeat_index": "0",
+            "repeat_count": "5",
+            "layer_class": "all",
+        }
+    )
     base.update(overrides)
     return base
 
@@ -109,16 +111,18 @@ def _schema_row(**overrides):
 def _profile_row(**overrides):
     """A valid per-layer profiling row dict."""
     base = {col: "" for col in PROFILE_COLS}
-    base.update({
-        "phase": "decode",
-        "ctx_len": "64",
-        "layer_idx": "0",
-        "layer_type": "linear_attention",
-        "p50_us": "5000.0",
-        "p95_us": "6000.0",
-        "mean_us": "5200.0",
-        "n_samples": "9",
-    })
+    base.update(
+        {
+            "phase": "decode",
+            "ctx_len": "64",
+            "layer_idx": "0",
+            "layer_type": "linear_attention",
+            "p50_us": "5000.0",
+            "p95_us": "6000.0",
+            "mean_us": "5200.0",
+            "n_samples": "9",
+        }
+    )
     base.update(overrides)
     return base
 
@@ -171,9 +175,10 @@ class TestDetectCsvType:
 
     def test_schema_detected_with_subset(self):
         """Detection uses key columns, not the full 19."""
-        assert detect_csv_type(
-            ["run_id", "metric_name", "value", "phase", "context_length"]
-        ) == "schema"
+        assert (
+            detect_csv_type(["run_id", "metric_name", "value", "phase", "context_length"])
+            == "schema"
+        )
 
     def test_profile_detected(self):
         assert detect_csv_type(PROFILE_COLS) == "profile"

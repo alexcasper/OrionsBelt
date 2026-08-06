@@ -22,6 +22,7 @@ from bench.profile_layers import write_csv  # noqa: E402
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_times():
     """Build a small all_times dict with 3 layers, 2 phases, 1 ctx."""
     times = defaultdict(list)
@@ -55,8 +56,14 @@ class TestWriteCsvFormat:
         write_csv(times, {1}, {0}, str(out))
         fieldnames, rows = _read_csv(out)
         assert fieldnames == [
-            "phase", "ctx_len", "layer_idx", "layer_type",
-            "p50_us", "p95_us", "mean_us", "n_samples",
+            "phase",
+            "ctx_len",
+            "layer_idx",
+            "layer_type",
+            "p50_us",
+            "p95_us",
+            "mean_us",
+            "n_samples",
         ]
 
     def test_row_count(self, tmp_path):

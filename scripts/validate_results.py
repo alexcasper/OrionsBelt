@@ -289,13 +289,23 @@ def validate_schema_row(row, csv_name, issues, row_num):
 
     # Context length must be positive
     if ctx_len <= 0:
-        issues.append(Issue("ERROR", csv_name, f"row {row_num}: non-positive context_length {ctx_len}"))
+        issues.append(
+            Issue("ERROR", csv_name, f"row {row_num}: non-positive context_length {ctx_len}")
+        )
 
     # Sanity check on repeat indices
     if repeat_count < 1:
-        issues.append(Issue("ERROR", csv_name, f"row {row_num}: repeat_count={repeat_count} (must be >= 1)"))
+        issues.append(
+            Issue("ERROR", csv_name, f"row {row_num}: repeat_count={repeat_count} (must be >= 1)")
+        )
     if repeat_index >= repeat_count:
-        issues.append(Issue("WARNING", csv_name, f"row {row_num}: repeat_index={repeat_index} >= repeat_count={repeat_count}"))
+        issues.append(
+            Issue(
+                "WARNING",
+                csv_name,
+                f"row {row_num}: repeat_index={repeat_index} >= repeat_count={repeat_count}",
+            )
+        )
 
     # Phase must be a known value
     phase = row.get("phase", "")
@@ -305,7 +315,9 @@ def validate_schema_row(row, csv_name, issues, row_num):
     # Absurd throughput check for tokens_per_sec metrics
     metric = row.get("metric_name", "")
     if "tokens_per_sec" in metric and value > 100000:
-        issues.append(Issue("WARNING", csv_name, f"row {row_num}: very high throughput {value} tokens/sec"))
+        issues.append(
+            Issue("WARNING", csv_name, f"row {row_num}: very high throughput {value} tokens/sec")
+        )
 
 
 def validate_profile_row(row, csv_name, issues, row_num):
