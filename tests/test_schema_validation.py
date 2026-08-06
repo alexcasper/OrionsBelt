@@ -175,9 +175,7 @@ class TestValidateTimestamp:
 
     def test_invalid_timestamp(self):
         row = make_row(timestamp="garbage")
-        with pytest.raises(
-            SchemaValidationError, match="timestamp.*not valid ISO 8601"
-        ):
+        with pytest.raises(SchemaValidationError, match="timestamp.*not valid ISO 8601"):
             validate_row(row)
 
 
@@ -391,9 +389,7 @@ class TestMetricComponentRules:
         ))
 
     def test_invalid_memory_component(self):
-        with pytest.raises(
-            SchemaValidationError, match="metric_component.*not in allowed"
-        ):
+        with pytest.raises(SchemaValidationError, match="metric_component.*not in allowed"):
             validate_row(make_row(
                 metric_name="peak_memory_bytes",
                 metric_component="activations",
@@ -403,9 +399,7 @@ class TestMetricComponentRules:
 
     def test_non_memory_metric_with_component_rejected(self):
         """Non-memory metrics must NOT have a component."""
-        with pytest.raises(
-            SchemaValidationError, match="metric_component.*must be empty"
-        ):
+        with pytest.raises(SchemaValidationError, match="metric_component.*must be empty"):
             validate_row(make_row(
                 metric_name="prefill_tokens_per_sec",
                 metric_component="weights",
@@ -473,15 +467,11 @@ class TestValidateContextLength:
             validate_row(make_row(context_length=-1))
 
     def test_float_rejected(self):
-        with pytest.raises(
-            SchemaValidationError, match="context_length.*must be an int"
-        ):
+        with pytest.raises(SchemaValidationError, match="context_length.*must be an int"):
             validate_row(make_row(context_length=4096.0))
 
     def test_bool_rejected(self):
-        with pytest.raises(
-            SchemaValidationError, match="context_length.*must be an int"
-        ):
+        with pytest.raises(SchemaValidationError, match="context_length.*must be an int"):
             validate_row(make_row(context_length=True))
 
 
@@ -498,45 +488,31 @@ class TestValidateRepeat:
         validate_row(make_row(repeat_index=4, repeat_count=5))
 
     def test_index_equal_to_count_rejected(self):
-        with pytest.raises(
-            SchemaValidationError, match="repeat_index.*must be < repeat_count"
-        ):
+        with pytest.raises(SchemaValidationError, match="repeat_index.*must be < repeat_count"):
             validate_row(make_row(repeat_index=5, repeat_count=5))
 
     def test_index_greater_than_count_rejected(self):
-        with pytest.raises(
-            SchemaValidationError, match="repeat_index.*must be < repeat_count"
-        ):
+        with pytest.raises(SchemaValidationError, match="repeat_index.*must be < repeat_count"):
             validate_row(make_row(repeat_index=10, repeat_count=5))
 
     def test_negative_index_rejected(self):
-        with pytest.raises(
-            SchemaValidationError, match="repeat_index.*must be an int >= 0"
-        ):
+        with pytest.raises(SchemaValidationError, match="repeat_index.*must be an int >= 0"):
             validate_row(make_row(repeat_index=-1, repeat_count=5))
 
     def test_zero_count_rejected(self):
-        with pytest.raises(
-            SchemaValidationError, match="repeat_count.*must be an int >= 1"
-        ):
+        with pytest.raises(SchemaValidationError, match="repeat_count.*must be an int >= 1"):
             validate_row(make_row(repeat_index=0, repeat_count=0))
 
     def test_negative_count_rejected(self):
-        with pytest.raises(
-            SchemaValidationError, match="repeat_count.*must be an int >= 1"
-        ):
+        with pytest.raises(SchemaValidationError, match="repeat_count.*must be an int >= 1"):
             validate_row(make_row(repeat_index=0, repeat_count=-1))
 
     def test_bool_index_rejected(self):
-        with pytest.raises(
-            SchemaValidationError, match="repeat_index.*must be an int >= 0"
-        ):
+        with pytest.raises(SchemaValidationError, match="repeat_index.*must be an int >= 0"):
             validate_row(make_row(repeat_index=True, repeat_count=5))
 
     def test_bool_count_rejected(self):
-        with pytest.raises(
-            SchemaValidationError, match="repeat_count.*must be an int >= 1"
-        ):
+        with pytest.raises(SchemaValidationError, match="repeat_count.*must be an int >= 1"):
             validate_row(make_row(repeat_index=0, repeat_count=True))
 
 
@@ -766,9 +742,7 @@ class TestCSVSerialization:
         content = content.replace("4096", "not_a_number")
         with open(path, "w") as f:
             f.write(content)
-        with pytest.raises(
-            SchemaValidationError, match="context_length.*could not parse"
-        ):
+        with pytest.raises(SchemaValidationError, match="context_length.*could not parse"):
             read_csv(path, validate=False)
 
     def test_read_csv_bad_float_rejected(self, tmp_path):
