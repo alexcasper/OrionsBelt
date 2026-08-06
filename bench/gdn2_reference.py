@@ -368,9 +368,7 @@ def test_gdn2_multi_step_consistency():
 
     # Verify output shape
     assert o.shape == (T, H, V), f"Output shape {o.shape} != ({T}, {H}, {V})"
-    assert S_final.shape == (H, K, V), (
-        f"State shape {S_final.shape} != ({H}, {K}, {V})"
-    )
+    assert S_final.shape == (H, K, V), f"State shape {S_final.shape} != ({H}, {K}, {V})"
 
     # Verify no NaN / Inf
     assert np.all(np.isfinite(o)), "Output contains NaN or Inf!"
