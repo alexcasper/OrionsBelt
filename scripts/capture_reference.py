@@ -233,7 +233,7 @@ def capture_reference(
     output_files = []
 
     for pi, prompt in enumerate(prompts):
-        for ci, ctx_len in enumerate(context_lengths):
+        for _ci, ctx_len in enumerate(context_lengths):
             tag = f"ref_{pi + 1:04d}_ctx{ctx_len:06d}"
             out_path = os.path.join(output_dir, f"{tag}.json")
 
@@ -252,7 +252,7 @@ def capture_reference(
             except RuntimeError as e:
                 if "out of memory" in str(e).lower():
                     torch.cuda.empty_cache()
-                    print(f"OOM (skipping)")
+                    print("OOM (skipping)")
                     continue
                 raise
 
