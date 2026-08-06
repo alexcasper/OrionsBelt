@@ -24,6 +24,8 @@ from scripts.validate_results import (  # noqa: E402
     detect_csv_type,
     expected_columns,
     find_device_spec,
+    load_manifest,
+    validate_csv,
     validate_manifest,
     validate_profile_row,
     validate_schema_row,
@@ -598,3 +600,102 @@ class TestMainEndToEnd:
         """A non-existent CSV directory exits 2."""
         result = self._run_main(tmp_path / "nonexistent", tmp_path / "manifests")
         assert result == 2
+
+
+# ---------------------------------------------------------------------------
+# validate_csv() — edge cases
+# ---------------------------------------------------------------------------
+
+
+class TestValidateCsv:
+    def test_file_not_found(self):
+        issues = []
+        result = validate_csv("/nonexistent/file.csv", "file.csv", issues)
+        assert result == (None, 0)
+        assert any("not found" in i.message for i in issues)
+
+    def test_empty_csv(self, tmp_path):
+        path = tmp_path / "empty.csv"
+        path.write_text("")
+        issues = []
+        result = validate_csv(str(path), "empty.csv", issues)
+        assert result == (None, 0)
+        assert any(
+            "empty" in i.message.lower() or "unreadable" in i.message.lower() for i in issues
+        )
+
+    def test_unrecognized_format(self, tmp_path):
+        path = tmp_path / "unknown.csv"
+        path.write_text("foo,bar,baz\n1,2,3\n")
+        issues = []
+        result = validate_csv(str(path), "unknown.csv", issues)
+        assert result == (None, 0)
+        assert any("unrecognized" in i.message for i in issues)
+
+    def test_standard_csv_validated(self, tmp_path):
+        header = ",".join(STANDARD_COLS)
+        row = "Qwen3.5-4B,gdn_cumdecay,neon,64,4096,30,100,120,20,1.5,0.3"
+        path = tmp_path / "standard.csv"
+        path.write_text(f"{header}\n{row}\n")
+        issues = []
+        csv_type, row_count, _ = validate_csv(str(path), "standard.csv", issues)
+        assert csv_type == "standard"
+        assert row_count == 1
+
+    def test_sustained_csv_validated(self, tmp_path):
+        from scripts.validate_results import SUSTAINED_COLS
+
+        header = ",".join(SUSTAINED_COLS)
+        row = "Qwen3.5-4B,gdn_gated_scan,neon,10.0,2.5,55.0,-5.0"
+        path = tmp_path / "sustained.csv"
+        path.write_text(f"{header}\n{row}\n")
+        issues = []
+        csv_type, row_count, _ = validate_csv(str(path), "sustained.csv", issues)
+        assert csv_type == "sustained"
+        assert row_count == 1
+
+    def test_schema_csv_extracts_manifest_ref(self, tmp_path):
+        header = ",".join(SCHEMA_COLS)
+        row = (
+            "run1,2026-01-01,a1b2c3d,manifests/run1.json,rk3588,cpu,cpu,"
+            "Qwen3.5-4B,fp16,4096,prefill,prefill_tokens_per_sec,,800.0,"
+            "tokens_per_sec,0,5,all,"
+        )
+        path = tmp_path / "schema.csv"
+        path.write_text(f"{header}\n{row}\n")
+        issues = []
+        csv_type, row_count, schema_ref = validate_csv(str(path), "schema.csv", issues)
+        assert csv_type == "schema"
+        assert schema_ref == "manifests/run1.json"
+
+    def test_profile_csv_validated(self, tmp_path):
+        header = "phase,ctx_len,layer_idx,layer_type,p50_us,p95_us,mean_us,n_samples"
+        row = "prefill,64,0,linear_attention,100.0,120.0,110.0,3"
+        path = tmp_path / "profile.csv"
+        path.write_text(f"{header}\n{row}\n")
+        issues = []
+        csv_type, row_count, _ = validate_csv(str(path), "profile.csv", issues)
+        assert csv_type == "profile"
+        assert row_count == 1
+
+
+class TestLoadManifest:
+    def test_valid_json(self, tmp_path):
+        path = tmp_path / "manifest.json"
+        path.write_text('{"git": {"sha": "abc123"}}')
+        result = load_manifest(str(path))
+        assert result["git"]["sha"] == "abc123"
+
+    def test_invalid_json(self, tmp_path):
+        path = tmp_path / "bad.json"
+        path.write_text("{not valid json}")
+        assert load_manifest(str(path)) is None
+
+
+class TestValidateManifestExtra:
+    def test_manifest_invalid_json(self, tmp_path):
+        path = tmp_path / "bad.json"
+        path.write_text("{broken}")
+        issues = []
+        validate_manifest("test.csv", "standard", 6, str(path), issues, "abc123")
+        assert any("invalid JSON" in i.message for i in issues)
