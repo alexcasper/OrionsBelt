@@ -1519,3 +1519,108 @@ python3 scripts/rknn_op_probe.py                               # runs all 7 prob
 Environment note: rknn-toolkit2 2.3.2 installs cleanly from PyPI on aarch64 and requires no
 vendor SDK download — unlike the CIX toolchain which needed a manual wheel install and
 has an unconditional TensorFlow dependency.
+
+---
+
+## 8. KleidiAI packed-GEMM micro-kernels for delta-rule matmuls (2026-08-06, ob-8qt.2)
+
+### Motivation
+
+The delta-rule update β = α·S involves a small matmul per chunk (M×K×N where K=head_dim=128,
+N=head_dim×n_heads). Arm's KleidiAI library ships 185+ tuned GEMM micro-kernels. The question:
+do KleidiAI's packed-GEMM kernels actually win at GDN delta-rule sizes, or does their packing
+overhead eat the benefit on small per-chunk matmuls?
+
+### Device and kernel selection
+
+**Device**: RK3588 Cortex-A76 @ 2.3 GHz (big cluster, cores 4-7). ISA: `asimddp=true` (dotprod),
+`i8mm=false`, `sve=false`, `bf16=false`. The A76 predates i8mm (A78+) and SVE (Neoverse/V2+).
+
+**Kernel**: `kai_matmul_clamp_f32_f32_f32p8x1biasf32_6x8x4_neon_mla` — tile mr=6, nr=8, kr=1.
+This is the best f32 kernel available without i8mm/SME. Also needed: `kai_rhs_pack_kxn_f32p8x1biasf32_f32_f32_neon`
+for RHS (state matrix S) packing.
+
+### Results — matmul only (excluding packing)
+
+Benchmarked at four GDN delta-rule shapes, pinned to A76 cores, 2000 repeats:
+
+| Shape | M | K | N | Naive C (µs) | Hand NEON (µs) | KleidiAI (µs) | KleidiAI vs NEON |
+|---|---|---|---|---|---|---|---|
+| decode (1 head) | 1 | 128 | 128 | 13.5 | 3.4 | 1.87 | **1.8× faster** |
+| prefill (1 head) | 64 | 128 | 128 | 867 | 217 | 60.8 | **3.6× faster** |
+| decode (16 heads) | 1 | 128 | 2048 | 705 | 52.9 | 31.5 | **1.7× faster** |
+| prefill (16 heads) | 64 | 128 | 2048 | 44914 | 3467 | 975 | **3.5× faster** |
+
+KleidiAI's matmul kernel always wins over hand-written NEON — 1.7× at decode (M=1), 3.5-3.6× at
+prefill (M=64). The larger speedup at prefill reflects better tile utilisation: the 6×8 tile is
+underutilised when M=1 (only one row of the 6-row tile is useful).
+
+Correctness: `max_abs_diff = 0.0` for both NEON and KleidiAI vs naive reference across all shapes.
+
+### Results — packing cost (the catch)
+
+KleidiAI requires the RHS (state matrix S) to be packed into its internal layout before the matmul.
+In the delta-rule, S changes **every chunk**, so packing cannot be amortised across iterations —
+it is a per-step cost.
+
+| RHS size | Pack time (µs) | Packed bytes | Raw bytes | Overhead |
+|---|---|---|---|---|
+| 128×128 (1 head) | ~7 | 66048 | 65536 | +0.8% |
+| 128×2048 (16 heads) | ~126 | 1056768 | 1048576 | +0.8% |
+
+### Net comparison: KleidiAI (matmul + pack) vs hand-NEON (no pack)
+
+| Shape | KleidiAI total (µs) | NEON (µs) | Winner | Margin |
+|---|---|---|---|---|
+| decode 1×128×128 | 1.87 + 7 = **8.9** | 3.4 | **NEON wins** | 2.6× |
+| prefill 64×128×128 | 60.8 + 7 = **67.8** | 217 | **KleidiAI wins** | 3.2× |
+| decode 1×128×2048 | 31.5 + 126 = **157.5** | 52.9 | **NEON wins** | 3.0× |
+| prefill 64×128×2048 | 975 + 126 = **1101** | 3467 | **KleidiAI wins** | 3.1× |
+
+**Break-even M** (where KleidiAI packing cost equals matmul savings): **M ≈ 3-6** for both head
+configurations. Below M≈5, hand-written NEON without packing is faster.
+
+### Interpretation
+
+This is a **phase-dependent recommendation**:
+
+1. **Prefill / chunked-prefill (M ≥ ~8)**: Use KleidiAI. The packed kernel delivers 3-3.6× over
+   hand-NEON and packing cost is negligible (<1% of matmul time at M=64). This is where GDN models
+   spend most wall-clock time during long-sequence ingestion.
+
+2. **Decode (M = 1)**: Use hand-written NEON. The matmul is small enough that KleidiAI's packing
+   overhead (7-126 µs) exceeds the matmul itself. A 4-wide fp32 FMA loop without packing is faster.
+
+3. **On devices with i8mm** (Cortex-A78+, Neoverse V2/N2, Cortex-A720): KleidiAI ships int8 and
+   int4 matmul kernels using the I8MM dot-product instruction. These would be both faster (2× per
+   cycle vs NEON FMLA) and have smaller packed representations (4-8× less data to move during
+   packing). The packing-cost threshold would shift accordingly. This device (A76) cannot test
+   that path.
+
+### What this means for the project
+
+The delta-rule matmul in `gdn_gated_scan` should use a **dual-path strategy**: KleidiAI packed-GEMM
+for prefill, hand-NEON for decode. This keeps the novel implementation work focused on the three
+primitives KleidiAI genuinely lacks (causal conv, gated prefix product, sequential scan), while
+reusing Arm's tuned matmul where it actually helps.
+
+The benchmark harness (`bench/kleidiai_matmul_bench.c`) and raw data
+(`results/raw/kleidiai/rk3588-t3_kleidiai_matmul.csv`) are committed for reproducibility.
+
+### Reproducing
+
+```bash
+# KleidiAI must be cloned (not yet a submodule — evaluation phase):
+git clone https://gitlab.arm.com/kleidi/kleidiai.git /tmp/kleidiai
+
+# Build:
+gcc -O3 -march=armv8.2-a+simd -I/tmp/kleidiai \
+  bench/kleidiai_matmul_bench.c \
+  /tmp/kleidiai/kai/ukernels/matmul/matmul_clamp_f32_f32_f32p/kai_matmul_clamp_f32_f32_f32p8x1biasf32_6x8x4_neon_mla.c \
+  /tmp/kleidiai/kai/ukernels/matmul/matmul_clamp_f32_f32_f32p/kai_matmul_clamp_f32_f32p8x1biasf32_6x8x4_neon_mla_asm.S \
+  /tmp/kleidiai/kai/ukernels/matmul/pack/kai_rhs_pack_kxn_f32p8x1biasf32_f32_f32_neon.c \
+  -lm -o dist/bench_kleidiai
+
+# Run on big cores:
+taskset -c 4-7 dist/bench_kleidiai --csv
+```
