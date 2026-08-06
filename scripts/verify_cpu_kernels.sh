@@ -19,6 +19,17 @@ aarch64-linux-gnu-gcc -O3 $MARCH -static \
 echo "== running under QEMU with 128-bit vectors (as Cortex-A720)"
 QEMU_CPU=max,sve128=on qemu-aarch64 "$OUT/verify"
 
+echo "== cross-compiling the delta-rule matmul (ob-8qt.1) for aarch64 ($MARCH)"
+# KleidiAI is deliberately NOT linked in here (evaluation phase, not a submodule --
+# see docs/FINDINGS.md §8's Reproducing steps). This build exercises the hand-NEON/SVE
+# fallback path only; the ORIONSBELT_WITH_KLEIDIAI dispatch branch is verified
+# separately by hand against a real KleidiAI checkout (see docs/FINDINGS.md §11).
+aarch64-linux-gnu-gcc -O3 $MARCH -static \
+    "$K/gdn_delta_matmul.c" "$K/test_gdn_delta_matmul.c" -I"$K" -o "$OUT/verify_matmul" -lm
+
+echo "== running delta-rule matmul under QEMU with 128-bit vectors (as Cortex-A720)"
+QEMU_CPU=max,sve128=on qemu-aarch64 "$OUT/verify_matmul"
+
 echo "== portability matrix: SVE1 floor, SVE2, and no-SVE fallback"
 # The kernels are SVE1-clean; SVE2 is NOT required. Verified across vector lengths and cores.
 for spec in \

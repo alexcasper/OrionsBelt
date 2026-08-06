@@ -59,11 +59,20 @@ POWER_COLS = [
     "temp_milliC",
 ]
 
-# Canonical schema-compliant CSV format (bench/schema.py, frozen by ob-q9i).
-# This is the tidy/long format that end-to-end model-level benchmarks emit.
-# Defined here as a static list (not imported from bench.schema) to keep the
-# validator stdlib-only and compatible with Python 3.6.9 (Jetson Nano).
-SCHEMA_COLS = [
+# Per-layer latency profiling CSV (from profile_layers.py)
+LAYER_PROFILE_COLS = [
+    "phase",
+    "ctx_len",
+    "layer_idx",
+    "layer_type",
+    "p50_us",
+    "p95_us",
+    "mean_us",
+    "n_samples",
+]
+
+# End-to-end context-sweep CSV (from run_ablation.py / harness.py e2e mode)
+E2E_SWEEP_COLS = [
     "run_id",
     "timestamp",
     "git_sha",
@@ -85,21 +94,6 @@ SCHEMA_COLS = [
     "notes",
 ]
 
-# Subset of SCHEMA_COLS that uniquely identifies the schema-compliant format.
-SCHEMA_KEY_COLS = {"run_id", "metric_name", "value", "phase", "context_length"}
-
-# Per-layer profiling CSV (layer-level latency breakdowns).
-PROFILE_COLS = [
-    "phase",
-    "ctx_len",
-    "layer_idx",
-    "layer_type",
-    "p50_us",
-    "p95_us",
-    "mean_us",
-    "n_samples",
-]
-
 # Device spec bandwidth (GiB/s) for sanity-check upper bounds.
 # From DEVICE_RUNBOOK.md "What we are actually testing".
 DEVICE_SPEC_BW = {
@@ -113,32 +107,32 @@ ABSURD_THROUGHPUT = 200.0  # GiB/s
 
 
 def detect_csv_type(header):
-    """Return 'standard', 'sustained', 'power', 'schema', 'profile', or None."""
+    """Return 'standard', 'sustained', 'power', 'layer_profile', 'e2e_sweep', or None."""
     cols = set(header)
-    if cols >= SCHEMA_KEY_COLS:
-        return "schema"
     if cols >= set(STANDARD_COLS):
         return "standard"
     if cols >= set(SUSTAINED_COLS):
         return "sustained"
     if cols >= set(POWER_COLS):
         return "power"
-    if cols >= {"layer_idx", "layer_type", "p50_us"}:
-        return "profile"
+    if cols >= {"layer_idx", "layer_type", "p50_us", "mean_us"}:
+        return "layer_profile"
+    if cols >= {"run_id", "metric_name", "metric_component", "repeat_index"}:
+        return "e2e_sweep"
     return None
 
 
 def expected_columns(csv_type):
-    if csv_type == "schema":
-        return SCHEMA_COLS
     if csv_type == "standard":
         return STANDARD_COLS
     if csv_type == "sustained":
         return SUSTAINED_COLS
     if csv_type == "power":
         return POWER_COLS
-    if csv_type == "profile":
-        return PROFILE_COLS
+    if csv_type == "layer_profile":
+        return LAYER_PROFILE_COLS
+    if csv_type == "e2e_sweep":
+        return E2E_SWEEP_COLS
     return []
 
 
@@ -202,6 +196,46 @@ def check_manifest_exists(csv_name, manifest_dir):
         if os.path.isfile(path):
             return path
     return None
+
+
+def check_ablation_manifests(ablation_dir, issues):
+    """Validate that ablation CSVs' embedded manifest_ref paths exist (ob-20t).
+
+    Ablation CSVs use the bench.schema.ResultRow format and embed the manifest
+    path in each row's ``manifest_ref`` column.  This checks every distinct
+    manifest_ref referenced across all ablation CSVs and verifies the file
+    exists on disk.
+    """
+    if not os.path.isdir(ablation_dir):
+        return
+
+    for fname in sorted(os.listdir(ablation_dir)):
+        if not fname.endswith(".csv"):
+            continue
+        csv_path = os.path.join(ablation_dir, fname)
+        refs = set()
+        try:
+            with open(csv_path, newline="") as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    ref = row.get("manifest_ref", "")
+                    if ref:
+                        refs.add(ref)
+        except Exception:
+            issues.append(Issue("ERROR", fname, "cannot read ablation CSV"))
+            continue
+
+        for ref in sorted(refs):
+            if os.path.isfile(ref):
+                issues.append(Issue("NOTE", fname, f"ablation manifest_ref OK: {ref}"))
+            else:
+                issues.append(
+                    Issue(
+                        "WARNING",
+                        fname,
+                        f"ablation manifest_ref points to MISSING file: {ref}",
+                    )
+                )
 
 
 def load_manifest(path):
@@ -272,12 +306,39 @@ def validate_sustained_row(row, csv_name, issues, row_num):
         issues.append(Issue("ERROR", csv_name, f"row {row_num}: non-positive elapsed_s"))
 
 
-def validate_schema_row(row, csv_name, issues, row_num):
-    """Validate a single row of a schema-compliant CSV (bench/schema.py format)."""
+def validate_layer_profile_row(row, csv_name, issues, row_num):
+    """Validate a single row of a layer-profile CSV."""
+    try:
+        p50 = float(row["p50_us"])
+        p95 = float(row["p95_us"])
+        mean = float(row["mean_us"])
+        n = int(row["n_samples"])
+        ctx = int(row["ctx_len"])
+        layer_idx = int(row["layer_idx"])
+    except (ValueError, KeyError) as e:
+        issues.append(Issue("ERROR", csv_name, f"row {row_num}: cannot parse: {e}"))
+        return
+
+    if p50 <= 0:
+        issues.append(Issue("ERROR", csv_name, f"row {row_num}: non-positive p50_us"))
+    if p95 < p50:
+        issues.append(Issue("WARNING", csv_name, f"row {row_num}: p95 ({p95}) < p50 ({p50})"))
+    if mean <= 0:
+        issues.append(Issue("ERROR", csv_name, f"row {row_num}: non-positive mean_us"))
+    if n < 1:
+        issues.append(Issue("ERROR", csv_name, f"row {row_num}: n_samples={n}"))
+    if ctx <= 0:
+        issues.append(Issue("ERROR", csv_name, f"row {row_num}: non-positive ctx_len"))
+    if layer_idx < 0:
+        issues.append(Issue("ERROR", csv_name, f"row {row_num}: negative layer_idx"))
+
+
+def validate_e2e_sweep_row(row, csv_name, issues, row_num):
+    """Validate a single row of an e2e context-sweep CSV (bench/schema.py format)."""
     try:
         value = float(row["value"])
-        ctx_len = int(row["context_length"])
-        repeat_index = int(row["repeat_index"])
+        ctx = int(row["context_length"])
+        repeat_idx = int(row["repeat_index"])
         repeat_count = int(row["repeat_count"])
     except (ValueError, KeyError) as e:
         issues.append(Issue("ERROR", csv_name, f"row {row_num}: cannot parse numeric fields: {e}"))
@@ -287,64 +348,42 @@ def validate_schema_row(row, csv_name, issues, row_num):
     if value < 0:
         issues.append(Issue("ERROR", csv_name, f"row {row_num}: negative value {value}"))
 
-    # Context length must be positive
-    if ctx_len <= 0:
-        issues.append(
-            Issue("ERROR", csv_name, f"row {row_num}: non-positive context_length {ctx_len}")
-        )
+    if ctx <= 0:
+        issues.append(Issue("ERROR", csv_name, f"row {row_num}: non-positive context_length"))
 
-    # Sanity check on repeat indices
     if repeat_count < 1:
         issues.append(
             Issue("ERROR", csv_name, f"row {row_num}: repeat_count={repeat_count} (must be >= 1)")
         )
-    if repeat_index >= repeat_count:
+    if repeat_idx < 0 or repeat_idx >= repeat_count:
         issues.append(
             Issue(
                 "WARNING",
                 csv_name,
-                f"row {row_num}: repeat_index={repeat_index} >= repeat_count={repeat_count}",
+                f"row {row_num}: repeat_index {repeat_idx} out of range [0,{repeat_count})",
             )
         )
 
-    # Phase must be a known value
     phase = row.get("phase", "")
     if phase not in ("prefill", "decode"):
         issues.append(Issue("WARNING", csv_name, f"row {row_num}: unexpected phase '{phase}'"))
 
-    # Absurd throughput check for tokens_per_sec metrics
+    # Sanity-check throughput-like metrics
+    unit = row.get("unit", "")
     metric = row.get("metric_name", "")
+    if ("per_sec" in unit or "per_sec" in metric) and value <= 0:
+        issues.append(Issue("WARNING", csv_name, f"row {row_num}: non-positive {metric} = {value}"))
     if "tokens_per_sec" in metric and value > 100000:
         issues.append(
             Issue("WARNING", csv_name, f"row {row_num}: very high throughput {value} tokens/sec")
         )
 
 
-def validate_profile_row(row, csv_name, issues, row_num):
-    """Validate a single row of a per-layer profiling CSV."""
-    try:
-        p50 = float(row["p50_us"])
-        p95 = float(row["p95_us"])
-        n_samples = int(row["n_samples"])
-        # Parsed to validate; not otherwise inspected.
-        int(row["layer_idx"])
-    except (ValueError, KeyError) as e:
-        issues.append(Issue("ERROR", csv_name, f"row {row_num}: cannot parse numeric fields: {e}"))
-        return
-
-    if p50 <= 0:
-        issues.append(Issue("ERROR", csv_name, f"row {row_num}: non-positive latency p50={p50}"))
-    if p95 < p50:
-        issues.append(Issue("ERROR", csv_name, f"row {row_num}: p95 ({p95}) < p50 ({p50})"))
-    if n_samples < 1:
-        issues.append(Issue("WARNING", csv_name, f"row {row_num}: n_samples={n_samples} (too few)"))
-
-
 def validate_csv(path, csv_name, issues):
-    """Validate CSV schema and row-level data. Return (csv_type, row_count)."""
+    """Validate CSV schema and row-level data. Return (csv_type, row_count, manifest_ref)."""
     if not os.path.isfile(path):
         issues.append(Issue("ERROR", csv_name, "file not found"))
-        return None, 0
+        return None, 0, None
 
     try:
         with open(path, newline="") as f:
@@ -352,14 +391,14 @@ def validate_csv(path, csv_name, issues):
             header = reader.fieldnames
             if not header:
                 issues.append(Issue("ERROR", csv_name, "empty or unreadable CSV"))
-                return None, 0
+                return None, 0, None
 
             csv_type = detect_csv_type(header)
             if csv_type is None:
                 issues.append(
                     Issue("WARNING", csv_name, f"unrecognized CSV format ({len(header)} columns)")
                 )
-                return None, 0
+                return None, 0, None
 
             expected = expected_columns(csv_type)
             missing = [c for c in expected if c not in header]
@@ -371,31 +410,27 @@ def validate_csv(path, csv_name, issues):
                 )
 
             row_count = 0
+            manifest_ref = None
             for i, row in enumerate(reader, start=2):  # row 1 is header
                 row_count += 1
                 if csv_type == "standard":
                     validate_standard_row(row, csv_name, issues, i)
                 elif csv_type == "sustained":
                     validate_sustained_row(row, csv_name, issues, i)
-                elif csv_type == "schema":
-                    validate_schema_row(row, csv_name, issues, i)
-                elif csv_type == "profile":
-                    validate_profile_row(row, csv_name, issues, i)
+                elif csv_type == "layer_profile":
+                    validate_layer_profile_row(row, csv_name, issues, i)
+                elif csv_type == "e2e_sweep":
+                    validate_e2e_sweep_row(row, csv_name, issues, i)
+                    # e2e-sweep rows embed their own manifest path (bench.schema.ResultRow) —
+                    # every row in one sweep CSV shares the same manifest, so the first is enough.
+                    if manifest_ref is None:
+                        manifest_ref = row.get("manifest_ref") or None
 
-            # For schema CSVs, read the manifest_ref from the first data row
-            schema_manifest_ref = None
-            if csv_type == "schema":
-                with open(path, newline="") as f2:
-                    r2 = csv.DictReader(f2)
-                    first = next(r2, None)
-                    if first:
-                        schema_manifest_ref = first.get("manifest_ref", "")
-
-            return csv_type, row_count, schema_manifest_ref
+            return csv_type, row_count, manifest_ref
 
     except Exception as e:
         issues.append(Issue("ERROR", csv_name, f"cannot read CSV: {e}"))
-        return None, 0
+        return None, 0, None
 
 
 def validate_manifest(csv_name, csv_type, row_count, manifest_path, issues, head_sha):
@@ -465,7 +500,7 @@ def validate_manifest(csv_name, csv_type, row_count, manifest_path, issues, head
 
     # Check device spec bandwidth vs achieved
     spec_bw = find_device_spec(csv_name)
-    if spec_bw and csv_type in ("standard", "schema") and row_count > 0:
+    if spec_bw and csv_type in ("standard", "e2e_sweep") and row_count > 0:
         issues.append(Issue("NOTE", csv_name, f"device spec bandwidth: ~{spec_bw:.0f} GiB/s"))
 
 
@@ -504,18 +539,24 @@ def main():
 
     for csv_name in csv_files:
         csv_path = os.path.join(args.csv_dir, csv_name)
-        csv_type, row_count, schema_manifest_ref = validate_csv(csv_path, csv_name, all_issues)
+        csv_type, row_count, manifest_ref = validate_csv(csv_path, csv_name, all_issues)
 
-        # For schema CSVs, prefer manifest_ref column; fall back to filename matching
-        if csv_type == "schema" and schema_manifest_ref:
-            manifest_path = schema_manifest_ref
-            if not os.path.isabs(manifest_path):
-                manifest_path = os.path.join(".", manifest_path)
-            if not os.path.isfile(manifest_path):
-                manifest_path = check_manifest_exists(csv_name, args.manifest_dir)
-        else:
+        # e2e-sweep CSVs embed their manifest path in-row; prefer that, fall back
+        # to filename-based matching (e.g. if the embedded path was moved/renamed).
+        manifest_path = None
+        if csv_type == "e2e_sweep" and manifest_ref:
+            candidate = (
+                manifest_ref if os.path.isabs(manifest_ref) else os.path.join(".", manifest_ref)
+            )
+            if os.path.isfile(candidate):
+                manifest_path = candidate
+        if manifest_path is None:
             manifest_path = check_manifest_exists(csv_name, args.manifest_dir)
         validate_manifest(csv_name, csv_type, row_count, manifest_path, all_issues, head_sha)
+
+    # Check ablation CSVs (subdirectory) — different schema, manifest_ref in rows
+    ablation_dir = os.path.join(args.csv_dir, "ablation")
+    check_ablation_manifests(ablation_dir, all_issues)
 
     # Report
     errors = [i for i in all_issues if i.severity == "ERROR"]

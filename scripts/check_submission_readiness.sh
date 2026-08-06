@@ -20,19 +20,29 @@ set -euo pipefail
 PASS=0
 FAIL=0
 WARN=0
+SKIP=0
 
 ok()   { echo "  ✓ $1"; PASS=$((PASS + 1)); }
 fail() { echo "  ✗ $1"; FAIL=$((FAIL + 1)); }
 warn() { echo "  ! $1"; WARN=$((WARN + 1)); }
+skip() { echo "  ⊘ $1"; SKIP=$((SKIP + 1)); }
 
 echo "=== OrionsBelt Submission Readiness Check ==="
 echo ""
+
+# Detect Python version — some checks require Python 3.7+ and will be skipped
+# gracefully on older interpreters (e.g. Jetson Nano's Python 3.6.9).
+PY_MAJOR=$(python3 -c 'import sys; print(sys.version_info[0])' 2>/dev/null || echo 0)
+PY_MINOR=$(python3 -c 'import sys; print(sys.version_info[1])' 2>/dev/null || echo 0)
+PY_OK=$(( PY_MAJOR * 100 + PY_MINOR >= 307 ))
 
 # -------------------------------------------------------------------
 # 1. Tests
 # -------------------------------------------------------------------
 echo "[1/8] Python test suite"
-if python3 -m pytest tests/ --tb=no 2>&1 | grep -q "passed"; then
+if [ "$PY_OK" -ne 1 ]; then
+    skip "Python 3.7+ required (have ${PY_MAJOR}.${PY_MINOR}); run on CI or an x86 host"
+elif python3 -m pytest tests/ --tb=no 2>&1 | grep -q "passed"; then
     RESULT=$(python3 -m pytest tests/ --tb=no 2>&1 | grep "passed" | tail -1)
     ok "Tests: $RESULT"
 else
@@ -63,17 +73,21 @@ fi
 # 4. Memory plots regenerable
 # -------------------------------------------------------------------
 echo "[4/8] Memory scaling plots"
-TMPDIR=$(mktemp -d)
-if python3 scripts/generate_memory_plots.py --text-only --output-dir "$TMPDIR" > /dev/null 2>&1; then
-    if [ -f "$TMPDIR/memory_comparison.md" ]; then
-        ok "Memory plots generate successfully"
-    else
-        fail "Memory plots script ran but no output file"
-    fi
+if [ "$PY_OK" -ne 1 ]; then
+    skip "Python 3.7+ required (have ${PY_MAJOR}.${PY_MINOR}); run on CI or an x86 host"
 else
-    fail "Memory plots script failed"
+    TMPDIR=$(mktemp -d)
+    if python3 scripts/generate_memory_plots.py --text-only --output-dir "$TMPDIR" > /dev/null 2>&1; then
+        if [ -f "$TMPDIR/memory_comparison.md" ]; then
+            ok "Memory plots generate successfully"
+        else
+            fail "Memory plots script ran but no output file"
+        fi
+    else
+        fail "Memory plots script failed"
+    fi
+    rm -rf "$TMPDIR"
 fi
-rm -rf "$TMPDIR"
 
 # -------------------------------------------------------------------
 # 5. Fleet analysis
@@ -146,6 +160,9 @@ echo "=== Summary ==="
 echo "  Passed: $PASS"
 echo "  Failed: $FAIL"
 echo "  Warnings: $WARN"
+if [ "$SKIP" -gt 0 ]; then
+    echo "  Skipped: $SKIP (Python version or tool not available on this device)"
+fi
 echo ""
 
 if [ "$FAIL" -gt 0 ]; then

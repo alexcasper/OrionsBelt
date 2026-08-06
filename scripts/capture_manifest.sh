@@ -52,7 +52,11 @@ if git rev-parse --git-dir >/dev/null 2>&1; then
     if [ -n "$SHA" ]; then
         GIT_SHA="\"$(json_escape "$SHA")\""
         SHORT_SHA="${SHA:0:7}"
-        STATUS=$(git status --porcelain 2>/dev/null || true)
+        # Exclude results/ and .beads/ from dirty check — these are output
+        # data (bench CSVs, manifests, thermal snapshots, beads export), not
+        # source code.  A dirty flag from writing benchmark output is misleading
+        # and causes exactly the provenance confusion ob-bf7 documents.
+        STATUS=$(git status --porcelain 2>/dev/null | grep -vE '^[ ?][M?] (results/|\.beads/)' || true)
         if [ -n "$STATUS" ]; then
             GIT_DIRTY="true"
         else

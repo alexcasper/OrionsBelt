@@ -1,0 +1,12 @@
+# Post-run thermal snapshot
+# Device: jetson-j1
+# Git SHA: 683e10e
+# Timestamp: Y-08-06T15:03:41Z
+# OMP_NUM_THREADS: 4
+
+thermal_zone0 AO-therm 51500
+thermal_zone1 CPU-therm 46000
+thermal_zone2 GPU-therm 44500
+thermal_zone3 PLL-therm 42500
+thermal_zone4 PMIC-Die 50000
+thermal_zone5 thermal-fan-est 44750

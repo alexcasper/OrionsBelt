@@ -18,6 +18,7 @@ import pytest
 # Ensure scripts/ is importable
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
+import fetch_weights  # noqa: E402
 from fetch_weights import (  # noqa: E402
     MODELS,
     DownloadRecord,
@@ -485,7 +486,6 @@ class TestListRepoFiles:
 
     def test_urllib_fallback_success(self):
         """When huggingface_hub is not available, use urllib to list files."""
-        import fetch_weights
 
         # Simulate ImportError for huggingface_hub
         with (
@@ -510,7 +510,6 @@ class TestListRepoFiles:
 
     def test_urllib_fallback_network_error_raises(self):
         """urllib fallback should re-raise network errors."""
-        import fetch_weights
 
         with (
             patch.dict(sys.modules, {"huggingface_hub": None}),
@@ -534,7 +533,6 @@ class TestDownloadFile:
 
     def test_urllib_fallback_writes_file(self, tmp_path):
         """When huggingface_hub is unavailable, download via urllib."""
-        import fetch_weights
 
         dest = tmp_path / "weights.safetensors"
 
@@ -567,7 +565,6 @@ class TestDownloadFile:
 
     def test_urllib_fallback_download_failure(self, tmp_path):
         """urllib download failure should raise."""
-        import fetch_weights
 
         dest = tmp_path / "bad.safetensors"
 
@@ -597,7 +594,6 @@ class TestFetchModelDownload:
 
     def test_download_success(self, tmp_path):
         """fetch_model downloads all planned files and writes manifest."""
-        import fetch_weights
 
         model = MODELS["4B"]
         files_to_serve = sorted(REPO_FILES_4B)
@@ -630,7 +626,6 @@ class TestFetchModelDownload:
 
     def test_existing_files_skipped(self, tmp_path):
         """Files already present are skipped, not re-downloaded."""
-        import fetch_weights
 
         model = MODELS["4B"]
         files_to_serve = sorted(REPO_FILES_4B)
@@ -668,7 +663,6 @@ class TestFetchModelDownload:
 
     def test_download_failure_recorded(self, tmp_path):
         """Download failures are recorded in manifest, other files still proceed."""
-        import fetch_weights
 
         model = MODELS["4B"]
         files_to_serve = sorted(REPO_FILES_4B)
@@ -696,7 +690,6 @@ class TestFetchModelDownload:
 
     def test_repo_list_error(self, tmp_path):
         """If _list_repo_files raises, manifest records the error."""
-        import fetch_weights
 
         model = MODELS["4B"]
 

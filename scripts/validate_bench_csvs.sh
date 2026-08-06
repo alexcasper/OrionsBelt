@@ -41,11 +41,19 @@ for csv in "$RAW"/jetson-j*.csv "$RAW"/pi5-*.csv "$RAW"/rk3588-t*_big.csv "$RAW"
 
     echo "  $base: $rows data rows"
 
-    # Check for manifest — try exact name, then stripped _big/_little suffix
-    # (rk3588-t3_big.csv and rk3588-t3_little.csv share rk3588-t3.json)
+    # Check for manifest.
+    # Some devices produce multiple CSVs from one run (e.g. rk3588-t3_big.csv and
+    # rk3588-t3_little.csv share rk3588-t3.json), so try the exact name first,
+    # then strip _big/_little/_singlethread suffixes to find the shared manifest.
     manifest_found=""
-    base_nosuffix="${base%_big}"; base_nosuffix="${base_nosuffix%_little}"
-    for m in "$MANIFESTS/$base.json" "$MANIFESTS/$base_nosuffix.json"; do
+    # Build candidate manifest names: exact, then progressively stripped
+    stripped="$base"
+    for suffix in _big _little _singlethread; do
+        case "$stripped" in
+            *"$suffix") stripped="${stripped%$suffix}" ;;
+        esac
+    done
+    for m in "$MANIFESTS/$base.json" "$MANIFESTS/$stripped.json"; do
         if [ -f "$m" ]; then
             manifest_found="$m"
             # Check for stale commit

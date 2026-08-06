@@ -16,19 +16,16 @@ if _ROOT not in sys.path:
 
 from scripts.validate_results import (  # noqa: E402
     ABSURD_THROUGHPUT,
-    PROFILE_COLS,
-    SCHEMA_COLS,
+    E2E_SWEEP_COLS,
+    LAYER_PROFILE_COLS,
     STANDARD_COLS,
     Issue,
     check_manifest_exists,
     detect_csv_type,
     expected_columns,
     find_device_spec,
-    load_manifest,
-    validate_csv,
-    validate_manifest,
-    validate_profile_row,
-    validate_schema_row,
+    validate_e2e_sweep_row,
+    validate_layer_profile_row,
     validate_standard_row,
     validate_sustained_row,
 )
@@ -74,60 +71,55 @@ def _sustained_row(**overrides):
     return base
 
 
+def _layer_profile_row(**overrides):
+    """A valid layer-profile row dict."""
+    base = {
+        "phase": "decode",
+        "ctx_len": "64",
+        "layer_idx": "0",
+        "layer_type": "linear_attention",
+        "p50_us": "100.0",
+        "p95_us": "120.0",
+        "mean_us": "105.0",
+        "n_samples": "10",
+    }
+    base.update(overrides)
+    return base
+
+
+def _e2e_sweep_row(**overrides):
+    """A valid e2e context-sweep row dict."""
+    base = {
+        "run_id": "rk3588-t4_20260806",
+        "timestamp": "2026-08-06T09:47:32Z",
+        "git_sha": "a37e116",
+        "manifest_ref": "results/manifests/rk3588-t4.json",
+        "device": "rk3588-t4",
+        "engine_gdn": "cpu",
+        "engine_full_attention": "cpu",
+        "model_checkpoint": "Qwen3.5-0.8B",
+        "quantization": "fp32",
+        "context_length": "128",
+        "phase": "prefill",
+        "metric_name": "prefill_tokens_per_sec",
+        "metric_component": "",
+        "value": "21.1",
+        "unit": "tokens_per_sec",
+        "repeat_index": "0",
+        "repeat_count": "5",
+        "layer_class": "all",
+        "notes": "",
+    }
+    base.update(overrides)
+    return base
+
+
 def _write_std_csv(path, rows):
     with open(path, "w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=STD_HEADER)
         w.writeheader()
         for r in rows:
             w.writerow(r)
-
-
-def _schema_row(**overrides):
-    """A valid schema-compliant row dict (bench/schema.py format)."""
-    base = {col: "" for col in SCHEMA_COLS}
-    base.update(
-        {
-            "run_id": "rk3588-t4_test",
-            "timestamp": "2026-08-06T10:00:00Z",
-            "git_sha": "abc1234",
-            "manifest_ref": "results/manifests/rk3588-t4_test.json",
-            "device": "rk3588-t4",
-            "engine_gdn": "cpu",
-            "engine_full_attention": "cpu",
-            "model_checkpoint": "Qwen3.5-0.8B",
-            "quantization": "fp32",
-            "context_length": "64",
-            "phase": "prefill",
-            "metric_name": "prefill_tokens_per_sec",
-            "metric_component": "",
-            "value": "14.93",
-            "unit": "tokens_per_sec",
-            "repeat_index": "0",
-            "repeat_count": "5",
-            "layer_class": "all",
-        }
-    )
-    base.update(overrides)
-    return base
-
-
-def _profile_row(**overrides):
-    """A valid per-layer profiling row dict."""
-    base = {col: "" for col in PROFILE_COLS}
-    base.update(
-        {
-            "phase": "decode",
-            "ctx_len": "64",
-            "layer_idx": "0",
-            "layer_type": "linear_attention",
-            "p50_us": "5000.0",
-            "p95_us": "6000.0",
-            "mean_us": "5200.0",
-            "n_samples": "9",
-        }
-    )
-    base.update(overrides)
-    return base
 
 
 # ---------------------------------------------------------------------------
@@ -172,23 +164,23 @@ class TestDetectCsvType:
         cols = STD_HEADER + ["layer_class", "extra_col"]
         assert detect_csv_type(cols) == "standard"
 
-    def test_schema_detected(self):
-        """Canonical 19-column schema CSV (bench/schema.py) is detected."""
-        assert detect_csv_type(SCHEMA_COLS) == "schema"
+    def test_layer_profile_detected(self):
+        """Per-layer latency profiling CSV should be detected."""
+        assert detect_csv_type(LAYER_PROFILE_COLS) == "layer_profile"
 
-    def test_schema_detected_with_subset(self):
-        """Detection uses key columns, not the full 19."""
-        assert (
-            detect_csv_type(["run_id", "metric_name", "value", "phase", "context_length"])
-            == "schema"
-        )
+    def test_layer_profile_minimal_cols(self):
+        """Detection only needs the key columns, not the full set."""
+        cols = ["layer_idx", "layer_type", "p50_us", "mean_us"]
+        assert detect_csv_type(cols) == "layer_profile"
 
-    def test_profile_detected(self):
-        assert detect_csv_type(PROFILE_COLS) == "profile"
+    def test_e2e_sweep_detected(self):
+        """E2E context-sweep CSV should be detected."""
+        assert detect_csv_type(E2E_SWEEP_COLS) == "e2e_sweep"
 
-    def test_schema_takes_precedence_over_standard(self):
-        """Schema CSVs contain many columns — must not misidentify as standard."""
-        assert detect_csv_type(SCHEMA_COLS) == "schema"
+    def test_e2e_sweep_minimal_cols(self):
+        """Detection only needs the key columns."""
+        cols = ["run_id", "metric_name", "metric_component", "repeat_index"]
+        assert detect_csv_type(cols) == "e2e_sweep"
 
 
 # ---------------------------------------------------------------------------
@@ -209,12 +201,13 @@ class TestExpectedColumns:
     def test_unknown_type_returns_empty(self):
         assert expected_columns("unknown") == []
 
-    def test_schema_columns(self):
-        assert "run_id" in expected_columns("schema")
-        assert "metric_name" in expected_columns("schema")
+    def test_layer_profile_columns(self):
+        assert "layer_idx" in expected_columns("layer_profile")
+        assert "layer_type" in expected_columns("layer_profile")
 
-    def test_profile_columns(self):
-        assert "layer_idx" in expected_columns("profile")
+    def test_e2e_sweep_columns(self):
+        assert "metric_name" in expected_columns("e2e_sweep")
+        assert "context_length" in expected_columns("e2e_sweep")
 
 
 # ---------------------------------------------------------------------------
@@ -317,87 +310,101 @@ class TestValidateSustainedRow:
 
 
 # ---------------------------------------------------------------------------
-# validate_schema_row
+# validate_layer_profile_row
 # ---------------------------------------------------------------------------
 
 
-class TestValidateSchemaRow:
+class TestValidateLayerProfileRow:
     def test_valid_row_no_issues(self):
         issues = []
-        validate_schema_row(_schema_row(), "test.csv", issues, 2)
+        validate_layer_profile_row(_layer_profile_row(), "test.csv", issues, 2)
         assert issues == []
 
-    def test_negative_value(self):
+    def test_p95_less_than_p50(self):
         issues = []
-        validate_schema_row(_schema_row(value="-1.5"), "test.csv", issues, 2)
-        assert any("negative" in i.message for i in issues)
+        validate_layer_profile_row(
+            _layer_profile_row(p50_us="200.0", p95_us="100.0"), "test.csv", issues, 2
+        )
+        assert any("p95" in i.message and i.severity == "WARNING" for i in issues)
 
-    def test_zero_context_length(self):
+    def test_non_positive_p50(self):
         issues = []
-        validate_schema_row(_schema_row(context_length="0"), "test.csv", issues, 2)
-        assert any("context_length" in i.message and i.severity == "ERROR" for i in issues)
+        validate_layer_profile_row(_layer_profile_row(p50_us="0.0"), "test.csv", issues, 2)
+        assert any("p50_us" in i.message for i in issues)
 
-    def test_repeat_count_zero(self):
+    def test_zero_samples(self):
         issues = []
-        validate_schema_row(_schema_row(repeat_count="0"), "test.csv", issues, 2)
-        assert any("repeat_count" in i.message and i.severity == "ERROR" for i in issues)
+        validate_layer_profile_row(_layer_profile_row(n_samples="0"), "test.csv", issues, 2)
+        assert any("n_samples" in i.message for i in issues)
+
+    def test_malformed_value(self):
+        issues = []
+        validate_layer_profile_row(_layer_profile_row(p50_us="abc"), "test.csv", issues, 2)
+        assert any("cannot parse" in i.message for i in issues)
+
+
+# ---------------------------------------------------------------------------
+# validate_e2e_sweep_row
+# ---------------------------------------------------------------------------
+
+
+class TestValidateE2eSweepRow:
+    def test_valid_row_no_issues(self):
+        issues = []
+        validate_e2e_sweep_row(_e2e_sweep_row(), "test.csv", issues, 2)
+        assert issues == []
 
     def test_repeat_index_out_of_range(self):
         issues = []
-        validate_schema_row(_schema_row(repeat_index="5", repeat_count="5"), "test.csv", issues, 2)
-        assert any("repeat_index" in i.message and i.severity == "WARNING" for i in issues)
+        validate_e2e_sweep_row(
+            _e2e_sweep_row(repeat_index="5", repeat_count="5"), "test.csv", issues, 2
+        )
+        assert any("repeat_index" in i.message for i in issues)
+
+    def test_non_positive_throughput(self):
+        issues = []
+        validate_e2e_sweep_row(
+            _e2e_sweep_row(value="0.0", metric_name="prefill_tokens_per_sec"),
+            "test.csv",
+            issues,
+            2,
+        )
+        assert any("non-positive" in i.message for i in issues)
+
+    def test_zero_context_length(self):
+        issues = []
+        validate_e2e_sweep_row(_e2e_sweep_row(context_length="0"), "test.csv", issues, 2)
+        assert any("context_length" in i.message for i in issues)
+
+    def test_malformed_value(self):
+        issues = []
+        validate_e2e_sweep_row(_e2e_sweep_row(value="not_a_number"), "test.csv", issues, 2)
+        assert any("cannot parse" in i.message for i in issues)
+
+    def test_negative_value(self):
+        issues = []
+        validate_e2e_sweep_row(_e2e_sweep_row(value="-1.5"), "test.csv", issues, 2)
+        assert any("negative" in i.message for i in issues)
+
+    def test_repeat_count_zero(self):
+        issues = []
+        validate_e2e_sweep_row(_e2e_sweep_row(repeat_count="0"), "test.csv", issues, 2)
+        assert any("repeat_count" in i.message and i.severity == "ERROR" for i in issues)
 
     def test_unexpected_phase(self):
         issues = []
-        validate_schema_row(_schema_row(phase="weird"), "test.csv", issues, 2)
+        validate_e2e_sweep_row(_e2e_sweep_row(phase="weird"), "test.csv", issues, 2)
         assert any("phase" in i.message and i.severity == "WARNING" for i in issues)
 
     def test_high_throughput_warning(self):
         issues = []
-        validate_schema_row(
-            _schema_row(value="999999", metric_name="prefill_tokens_per_sec"),
+        validate_e2e_sweep_row(
+            _e2e_sweep_row(value="999999", metric_name="prefill_tokens_per_sec"),
             "test.csv",
             issues,
             2,
         )
         assert any("high throughput" in i.message for i in issues)
-
-    def test_malformed_value(self):
-        issues = []
-        validate_schema_row(_schema_row(value="not_a_number"), "test.csv", issues, 2)
-        assert any("cannot parse" in i.message for i in issues)
-
-
-# ---------------------------------------------------------------------------
-# validate_profile_row
-# ---------------------------------------------------------------------------
-
-
-class TestValidateProfileRow:
-    def test_valid_row_no_issues(self):
-        issues = []
-        validate_profile_row(_profile_row(), "test.csv", issues, 2)
-        assert issues == []
-
-    def test_p95_less_than_p50(self):
-        issues = []
-        validate_profile_row(_profile_row(p50_us="5000", p95_us="3000"), "test.csv", issues, 2)
-        assert any("p95" in i.message for i in issues)
-
-    def test_non_positive_latency(self):
-        issues = []
-        validate_profile_row(_profile_row(p50_us="0"), "test.csv", issues, 2)
-        assert any("latency" in i.message for i in issues)
-
-    def test_too_few_samples(self):
-        issues = []
-        validate_profile_row(_profile_row(n_samples="0"), "test.csv", issues, 2)
-        assert any("n_samples" in i.message for i in issues)
-
-    def test_malformed_value(self):
-        issues = []
-        validate_profile_row(_profile_row(layer_idx="not_a_number"), "test.csv", issues, 2)
-        assert any("cannot parse" in i.message for i in issues)
 
 
 # ---------------------------------------------------------------------------
@@ -423,96 +430,6 @@ class TestCheckManifestExists:
         manifest.write_text("{}")
         result = check_manifest_exists("jetson_j1.csv", str(tmp_path))
         assert result is not None
-
-
-# ---------------------------------------------------------------------------
-# validate_manifest
-# ---------------------------------------------------------------------------
-
-
-class TestValidateManifest:
-    """Tests for manifest-level provenance and dirty-tree checks."""
-
-    def _run(
-        self,
-        manifest_dict,
-        tmp_path,
-        csv_name="test.csv",
-        csv_type="standard",
-        row_count=24,
-        head_sha="abc1234",
-    ):
-        """Helper: write manifest JSON and call validate_manifest."""
-        import json
-
-        man_path = tmp_path / "test.json"
-        man_path.write_text(json.dumps(manifest_dict))
-        issues: list = []
-        validate_manifest(csv_name, csv_type, row_count, str(man_path), issues, head_sha)
-        return issues
-
-    def test_no_manifest_path_warns(self, tmp_path):
-        issues: list = []
-        validate_manifest("test.csv", "standard", 24, None, issues, "abc1234")
-        assert any(i.severity == "WARNING" and "no manifest" in i.message for i in issues)
-
-    def test_clean_manifest_no_warnings(self, tmp_path):
-        """A manifest with git.sha and dirty=False produces no WARNINGs."""
-        issues = self._run({"git": {"sha": "abc1234", "dirty": False}}, tmp_path)
-        warnings = [i for i in issues if i.severity == "WARNING"]
-        assert len(warnings) == 0
-
-    def test_missing_git_section_warns(self, tmp_path):
-        """A manifest with no git section at all should WARN about missing provenance."""
-        issues = self._run({"device": "test"}, tmp_path)
-        warnings = [i for i in issues if i.severity == "WARNING"]
-        assert len(warnings) == 1
-        assert "no provenance" in warnings[0].message
-
-    def test_empty_git_dict_warns(self, tmp_path):
-        """A manifest with an empty git dict should WARN."""
-        issues = self._run({"device": "test", "git": {}}, tmp_path)
-        warnings = [i for i in issues if i.severity == "WARNING"]
-        assert any("no provenance" in w.message for w in warnings)
-
-    def test_sha_present_no_provenance_warning(self, tmp_path):
-        """If sha is present, the no-provenance warning should NOT fire."""
-        issues = self._run({"git": {"sha": "abc1234", "dirty": True}}, tmp_path)
-        no_prov = [i for i in issues if "no provenance" in i.message]
-        assert len(no_prov) == 0
-
-    def test_dirty_tree_warns(self, tmp_path):
-        """dirty=True should produce a DIRTY tree WARNING."""
-        issues = self._run({"git": {"sha": "abc1234", "dirty": True}}, tmp_path)
-        dirty_warnings = [i for i in issues if "DIRTY" in i.message]
-        assert len(dirty_warnings) == 1
-
-    def test_stale_sha_note(self, tmp_path):
-        """SHA different from HEAD produces a NOTE (not WARNING)."""
-        issues = self._run(
-            {"git": {"sha": "different", "dirty": False}}, tmp_path, head_sha="abc1234"
-        )
-        notes = [i for i in issues if "run-time snapshot" in i.message]
-        assert len(notes) == 1
-        assert notes[0].severity == "NOTE"
-
-    def test_sha_matching_head_no_note(self, tmp_path):
-        """SHA matching HEAD should not produce a staleness NOTE."""
-        issues = self._run(
-            {"git": {"sha": "abc1234", "dirty": False}}, tmp_path, head_sha="abc1234"
-        )
-        notes = [i for i in issues if "run-time snapshot" in i.message]
-        assert len(notes) == 0
-
-    def test_note_includes_manifest_filename(self, tmp_path):
-        """The first NOTE should identify which manifest was found."""
-        issues = self._run({"git": {"sha": "abc1234", "dirty": False}}, tmp_path)
-        assert any("test.json" in i.message and i.severity == "NOTE" for i in issues)
-
-    def test_low_row_count_note(self, tmp_path):
-        """Standard CSVs with < 12 rows get a NOTE about possible missing variants."""
-        issues = self._run({"git": {"sha": "abc1234", "dirty": False}}, tmp_path, row_count=8)
-        assert any("only 8 rows" in i.message for i in issues)
 
 
 # ---------------------------------------------------------------------------
@@ -600,102 +517,3 @@ class TestMainEndToEnd:
         """A non-existent CSV directory exits 2."""
         result = self._run_main(tmp_path / "nonexistent", tmp_path / "manifests")
         assert result == 2
-
-
-# ---------------------------------------------------------------------------
-# validate_csv() — edge cases
-# ---------------------------------------------------------------------------
-
-
-class TestValidateCsv:
-    def test_file_not_found(self):
-        issues = []
-        result = validate_csv("/nonexistent/file.csv", "file.csv", issues)
-        assert result == (None, 0)
-        assert any("not found" in i.message for i in issues)
-
-    def test_empty_csv(self, tmp_path):
-        path = tmp_path / "empty.csv"
-        path.write_text("")
-        issues = []
-        result = validate_csv(str(path), "empty.csv", issues)
-        assert result == (None, 0)
-        assert any(
-            "empty" in i.message.lower() or "unreadable" in i.message.lower() for i in issues
-        )
-
-    def test_unrecognized_format(self, tmp_path):
-        path = tmp_path / "unknown.csv"
-        path.write_text("foo,bar,baz\n1,2,3\n")
-        issues = []
-        result = validate_csv(str(path), "unknown.csv", issues)
-        assert result == (None, 0)
-        assert any("unrecognized" in i.message for i in issues)
-
-    def test_standard_csv_validated(self, tmp_path):
-        header = ",".join(STANDARD_COLS)
-        row = "Qwen3.5-4B,gdn_cumdecay,neon,64,4096,30,100,120,20,1.5,0.3"
-        path = tmp_path / "standard.csv"
-        path.write_text(f"{header}\n{row}\n")
-        issues = []
-        csv_type, row_count, _ = validate_csv(str(path), "standard.csv", issues)
-        assert csv_type == "standard"
-        assert row_count == 1
-
-    def test_sustained_csv_validated(self, tmp_path):
-        from scripts.validate_results import SUSTAINED_COLS
-
-        header = ",".join(SUSTAINED_COLS)
-        row = "Qwen3.5-4B,gdn_gated_scan,neon,10.0,2.5,55.0,-5.0"
-        path = tmp_path / "sustained.csv"
-        path.write_text(f"{header}\n{row}\n")
-        issues = []
-        csv_type, row_count, _ = validate_csv(str(path), "sustained.csv", issues)
-        assert csv_type == "sustained"
-        assert row_count == 1
-
-    def test_schema_csv_extracts_manifest_ref(self, tmp_path):
-        header = ",".join(SCHEMA_COLS)
-        row = (
-            "run1,2026-01-01,a1b2c3d,manifests/run1.json,rk3588,cpu,cpu,"
-            "Qwen3.5-4B,fp16,4096,prefill,prefill_tokens_per_sec,,800.0,"
-            "tokens_per_sec,0,5,all,"
-        )
-        path = tmp_path / "schema.csv"
-        path.write_text(f"{header}\n{row}\n")
-        issues = []
-        csv_type, row_count, schema_ref = validate_csv(str(path), "schema.csv", issues)
-        assert csv_type == "schema"
-        assert schema_ref == "manifests/run1.json"
-
-    def test_profile_csv_validated(self, tmp_path):
-        header = "phase,ctx_len,layer_idx,layer_type,p50_us,p95_us,mean_us,n_samples"
-        row = "prefill,64,0,linear_attention,100.0,120.0,110.0,3"
-        path = tmp_path / "profile.csv"
-        path.write_text(f"{header}\n{row}\n")
-        issues = []
-        csv_type, row_count, _ = validate_csv(str(path), "profile.csv", issues)
-        assert csv_type == "profile"
-        assert row_count == 1
-
-
-class TestLoadManifest:
-    def test_valid_json(self, tmp_path):
-        path = tmp_path / "manifest.json"
-        path.write_text('{"git": {"sha": "abc123"}}')
-        result = load_manifest(str(path))
-        assert result["git"]["sha"] == "abc123"
-
-    def test_invalid_json(self, tmp_path):
-        path = tmp_path / "bad.json"
-        path.write_text("{not valid json}")
-        assert load_manifest(str(path)) is None
-
-
-class TestValidateManifestExtra:
-    def test_manifest_invalid_json(self, tmp_path):
-        path = tmp_path / "bad.json"
-        path.write_text("{broken}")
-        issues = []
-        validate_manifest("test.csv", "standard", 6, str(path), issues, "abc123")
-        assert any("invalid JSON" in i.message for i in issues)

@@ -43,8 +43,9 @@ before doing anything else.
 - **State the commit for every number.** Devices measured at different commits are
   not comparable. A cross-device table must use one matched commit.
 - **Check replicates before concluding.** On this fleet two runs of the same core
-  class at the *same commit* differed 1.68x. If your effect is smaller than that,
-  you do not have a result. See bead ob-bf7.
+  class at the *same commit* differed up to 4.13× (RK3588 little cluster, same
+  source commit, different physical boards; 3.36× on the big cluster). If your
+  effect is smaller than that, you do not have a result. See bead ob-bf7.
 - Do not claim a mechanism the data does not support. "Bandwidth-bound" and
   "explained by clock and pipeline width" are contradictory claims; one branch
   published both in the same paragraph.

@@ -229,6 +229,12 @@ class TestReset:
 class TestLoadWithMock:
     """Test load() with mocked torch and transformers."""
 
+    @pytest.fixture(autouse=True)
+    def mock_memory_check(self):
+        """Bypass the OOM pre-check so tests don't fail on low-RAM CI runners."""
+        with patch.object(HFTorchBackend, "_check_memory", return_value=None):
+            yield
+
     def test_load_calls_from_pretrained(self):
         """load() calls AutoModelForCausalLM.from_pretrained."""
         backend = make_backend_with_mock()
