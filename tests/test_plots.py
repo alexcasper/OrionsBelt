@@ -265,6 +265,10 @@ class TestMicrobenchTables:
         md = microbench_to_markdown([])
         assert "no data" in md.lower()
 
+    def test_bandwidth_table_empty_rows(self):
+        md = microbench_bandwidth_table([])
+        assert "no data" in md.lower()
+
 
 class TestSchemaTables:
     def test_throughput_table(self):
@@ -300,6 +304,14 @@ class TestSchemaTables:
         # KV cache: 128 MiB at 4K, 1024 MiB at 32K
         assert "128.0" in md
         assert "1,024.0" in md
+
+    def test_throughput_table_empty_rows(self):
+        md = schema_throughput_table([])
+        assert "no throughput data" in md.lower()
+
+    def test_memory_table_empty_rows(self):
+        md = schema_memory_table([])
+        assert "no memory data" in md.lower()
 
 
 # ---------------------------------------------------------------------------

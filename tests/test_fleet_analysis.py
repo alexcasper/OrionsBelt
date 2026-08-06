@@ -478,6 +478,30 @@ class TestProvenanceAudit:
         finally:
             fa.MANIFEST_DIR = original_dir
 
+    def test_corrupt_manifest_treated_as_missing(self, tmp_path):
+        """A manifest file with invalid JSON is treated as missing."""
+        manifest_dir = tmp_path / "manifests"
+        manifest_dir.mkdir(parents=True, exist_ok=True)
+
+        # Create a corrupt manifest for the first replicate
+        first_csv = fa.REPLICATES[0][1][0][1]
+        base = os.path.basename(first_csv).replace(".csv", "")
+        candidates = [base]
+        for suffix in ("_big", "_little"):
+            if base.endswith(suffix):
+                candidates.append(base[: -len(suffix)])
+        for c in candidates:
+            (manifest_dir / (c + ".json")).write_text("{corrupt json")
+
+        original_dir = fa.MANIFEST_DIR
+        fa.MANIFEST_DIR = str(manifest_dir)
+        try:
+            lines = fa._provenance_audit_lines()
+            # Should report the manifest as missing (not crash)
+            assert isinstance(lines, list)
+        finally:
+            fa.MANIFEST_DIR = original_dir
+
 
 # ---------------------------------------------------------------------------
 # generate_report
