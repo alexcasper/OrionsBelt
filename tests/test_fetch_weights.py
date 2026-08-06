@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -61,6 +62,26 @@ REPO_FILES_0_8B = [
     "video_preprocessor_config.json",
     "vocab.json",
 ]
+
+
+@pytest.fixture
+def mock_repo_files():
+    """Patch _list_repo_files so dry-run tests don't hit the live HF API.
+
+    Without this, tests that exercise ``main(["--dry-run", ...])`` call the real
+    HuggingFace Hub REST endpoint, which intermittently fails with HTTP 429
+    under CI's shared IP (bead ob-fty).
+    """
+
+    def _mock(repo_id, *args, **kwargs):
+        if "4B" in repo_id:
+            return sorted(REPO_FILES_4B)
+        elif "0.8B" in repo_id:
+            return sorted(REPO_FILES_0_8B)
+        return []
+
+    with patch("fetch_weights._list_repo_files", side_effect=_mock):
+        yield
 
 
 # ---------------------------------------------------------------------------
@@ -271,19 +292,19 @@ class TestFetchManifest:
 
 
 class TestDryRun:
-    def test_dry_run_4b(self, capsys, tmp_path):
+    def test_dry_run_4b(self, capsys, tmp_path, mock_repo_files):
         """Dry run should not create any files."""
         rc = main(["--model", "4B", "--dry-run", "--output-dir", str(tmp_path)])
         assert rc == 0
         # No model directory should exist
         assert not (tmp_path / "Qwen3.5-4B").exists()
 
-    def test_dry_run_metadata_only(self, capsys, tmp_path):
+    def test_dry_run_metadata_only(self, capsys, tmp_path, mock_repo_files):
         rc = main(["--model", "0.8B", "--dry-run", "--output-dir", str(tmp_path)])
         assert rc == 0
         assert not (tmp_path / "Qwen3.5-0.8B").exists()
 
-    def test_dry_run_all(self, capsys, tmp_path):
+    def test_dry_run_all(self, capsys, tmp_path, mock_repo_files):
         rc = main(["--model", "all", "--dry-run", "--output-dir", str(tmp_path)])
         assert rc == 0
         assert not (tmp_path / "Qwen3.5-4B").exists()
@@ -307,7 +328,7 @@ class TestCLI:
         with pytest.raises(SystemExit):
             main(["--model", "999B"])
 
-    def test_default_model_is_4b(self, tmp_path):
+    def test_default_model_is_4b(self, tmp_path, mock_repo_files):
         """--model defaults to 4B. Verify via dry-run stderr."""
         import io
 
@@ -321,7 +342,7 @@ class TestCLI:
         finally:
             sys.stderr = old_stderr
 
-    def test_output_dir_created_on_dry_run_not_needed(self, tmp_path):
+    def test_output_dir_created_on_dry_run_not_needed(self, tmp_path, mock_repo_files):
         """Dry run doesn't need the output dir to exist."""
         nonexistent = tmp_path / "does_not_exist"
         rc = main(["--model", "4B", "--dry-run", "--output-dir", str(nonexistent)])
