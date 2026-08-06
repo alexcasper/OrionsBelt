@@ -2,7 +2,10 @@
 # ob-9t0.2: partial comparison table aggregation. stdlib only (csv, statistics, json).
 # Reads committed CSVs + manifests, prints structured numbers with provenance.
 # Does NOT import bench/ (this node is Py 3.6.9; bench/ needs 3.7+).
-import csv, statistics, json, os
+import csv
+import json
+import os
+import statistics
 
 RAW = "/home/j1/OrionsBelt/results/raw"
 MAN = "/home/j1/OrionsBelt/results/manifests"
@@ -144,10 +147,7 @@ for comp in ("weights", "kv_cache", "recurrent_state"):
     for ph in ("prefill", "decode"):
         k = (ph, "peak_memory_bytes", comp)
         if k in g:
-            print(
-                f"  mem[{comp}][{ph}] : {fmt_mem(g[k]):<12} "
-                f"({g[k]:.0f} bytes, n={ab['n'][k]})"
-            )
+            print(f"  mem[{comp}][{ph}] : {fmt_mem(g[k]):<12} ({g[k]:.0f} bytes, n={ab['n'][k]})")
 
 print("\n" + "=" * 90)
 print("KERNEL FLEET BASELINE (4B/0.8B, seq=64, single-core canonical, fp32) — GiB/s @ p50")

@@ -121,12 +121,8 @@ class TestLayerTypesDerivation:
     def test_explicit_layer_types_list_reproduced(self):
         """When the config carries an explicit layer_types list, the derived
         layer_types must reproduce it (explicit → interval translation)."""
-        explicit = (
-            ["linear_attention"] * 3 + ["full_attention"]
-        ) * 8  # 32 entries, every 4th FA
-        cfg = ModelConfig.from_hf_config(
-            {"text_config": {"layer_types": explicit}}
-        )
+        explicit = (["linear_attention"] * 3 + ["full_attention"]) * 8  # 32 entries, every 4th FA
+        cfg = ModelConfig.from_hf_config({"text_config": {"layer_types": explicit}})
         assert cfg.layer_types == explicit
         assert cfg.num_full_attention_layers == 8
         assert cfg.num_gdn_layers == 24
@@ -189,17 +185,9 @@ class TestWeights:
 
     def test_tied_vs_untied_embedding(self):
         """Untied lm_head adds vocab×hidden weight bytes (separate lm_head)."""
-        base = {
-            k: v
-            for k, v in HF_CONFIG_4B["text_config"].items()
-            if k != "tie_word_embeddings"
-        }
-        tied = ModelConfig.from_hf_config(
-            {"text_config": {**base, "tie_word_embeddings": True}}
-        )
-        untied = ModelConfig.from_hf_config(
-            {"text_config": {**base, "tie_word_embeddings": False}}
-        )
+        base = {k: v for k, v in HF_CONFIG_4B["text_config"].items() if k != "tie_word_embeddings"}
+        tied = ModelConfig.from_hf_config({"text_config": {**base, "tie_word_embeddings": True}})
+        untied = ModelConfig.from_hf_config({"text_config": {**base, "tie_word_embeddings": False}})
         delta = weights_bytes(untied) - weights_bytes(tied)
         assert delta == 248320 * 2560 * 2  # vocab × hidden × fp16 bytes
 

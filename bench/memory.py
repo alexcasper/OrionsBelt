@@ -37,7 +37,6 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-
 # ---------------------------------------------------------------------------
 # Dtype mapping (config string → bytes per element)
 # ---------------------------------------------------------------------------
@@ -125,9 +124,7 @@ class ModelConfig:
             # recovers the interval; the property then reproduces the list.
             num_hidden_layers = len(explicit_layers)
             fa_indices = [i for i, t in enumerate(explicit_layers) if t == "full_attention"]
-            full_attention_interval = (
-                fa_indices[0] + 1 if fa_indices else num_hidden_layers + 1
-            )
+            full_attention_interval = fa_indices[0] + 1 if fa_indices else num_hidden_layers + 1
         else:
             num_hidden_layers = tc.get("num_hidden_layers", 0)
             full_attention_interval = tc.get("full_attention_interval", 4)
@@ -436,9 +433,7 @@ def decomposition(
     rs = recurrent_state_bytes(cfg)
     total_layers = cfg.num_gdn_layers + cfg.num_full_attention_layers
     fa_ratio = (
-        total_layers / cfg.num_full_attention_layers
-        if cfg.num_full_attention_layers > 0
-        else 1.0
+        total_layers / cfg.num_full_attention_layers if cfg.num_full_attention_layers > 0 else 1.0
     )
 
     rows = []
@@ -484,8 +479,7 @@ def cross_check(
         expected_w = weights_bytes(cfg)
         if introspected_weights != expected_w:
             discrepancies.append(
-                f"weights mismatch: analytic={expected_w}, "
-                f"introspected={introspected_weights}"
+                f"weights mismatch: analytic={expected_w}, introspected={introspected_weights}"
             )
 
     if introspected_state_shape is not None:
@@ -501,8 +495,7 @@ def cross_check(
             shape = (1,) + shape
         if shape != expected_shape:
             discrepancies.append(
-                f"recurrent state shape mismatch: analytic={expected_shape}, "
-                f"introspected={shape}"
+                f"recurrent state shape mismatch: analytic={expected_shape}, introspected={shape}"
             )
 
     if (
