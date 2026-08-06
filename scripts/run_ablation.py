@@ -169,6 +169,11 @@ def main(argv: list[str] | None = None) -> int:
         default="results/figures/ablation_comparison.md",
         help="Where to write the comparison table",
     )
+    parser.add_argument(
+        "--output-dir",
+        default="results/raw/ablation",
+        help="Directory for ablation CSVs (default: results/raw/ablation)",
+    )
     args = parser.parse_args(argv)
 
     context_lengths = [int(x) for x in args.context.split(",")]
@@ -178,6 +183,7 @@ def main(argv: list[str] | None = None) -> int:
         warmup=args.warmup,
         repeats=args.repeats,
         decode_length=args.decode_length,
+        output_dir=args.output_dir,
     )
 
     # Generate the comparison table

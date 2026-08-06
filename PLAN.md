@@ -219,7 +219,7 @@ Go/no-go decisions, risk register, descope ladder. Deliberately a first-class ep
 Apache-2.0 license visible in About (day one — hard requirement), directory skeleton, Python tooling (uv/ruff/pytest), CI, results schema contract, run-manifest provenance capture. The results schema is an early dependency because the harness, the plots, and the final table all bind to it; changing it late is expensive.
 
 ### E2 — Hardware and toolchain acquisition (externally gated)
-Board procurement, CIX Early Bird enrollment, Debian 12 flash and bring-up, Python 3.8 + NOE Compiler, NPU runtime smoke test, Vulkan/OpenCL validation, perf tooling. **Both procurement beads are P0 with no dependencies — they start immediately and block a large fraction of the graph.**
+Board procurement, CIX Early Bird enrollment, Debian 12 flash and bring-up, Python 3.10 + NOE Compiler, NPU runtime smoke test, Vulkan/OpenCL validation, perf tooling. **Both procurement beads are P0 with no dependencies — they start immediately and block a large fraction of the graph.**
 
 ### E3 — Portable Arm hedge track
 Select and bring up a generic aarch64 target; build llama.cpp with i8mm/SVE; run baselines. Keeps a viable **Edge AI** submission alive independent of the O6.
@@ -376,7 +376,7 @@ OrionsBelt/
 ├── AGENTS.md / CLAUDE.md    # agent instructions (beads pointer)
 ├── docs/
 │   ├── BEADS.md             # how to use beads on this repo
-│   ├── SETUP_O6.md          # Orion O6 bring-up, NPU SDK, Python 3.8
+│   ├── SETUP_O6.md          # Orion O6 bring-up, NPU SDK, Python 3.10
 │   ├── SETUP_PORTABLE.md    # generic aarch64 hedge target
 │   ├── METHODOLOGY.md       # metric definitions, statistical approach
 │   ├── FINDINGS.md          # NOE op-coverage gaps, profiling results

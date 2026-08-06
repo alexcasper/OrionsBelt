@@ -12,10 +12,14 @@ from pathlib import Path
 
 import pytest
 from bench.correctness import (
+    ComparisonMetric,
     CorrectnessReport,
+    DriftPoint,
     ToleranceConfig,
     _kl_divergence,
     _max_abs_diff,
+    _np_kl_divergence,
+    _np_softmax,
     _softmax,
     _topk_indices,
     compare_logits,
@@ -24,6 +28,7 @@ from bench.correctness import (
     drift_summary,
     long_context_drift,
 )
+from bench.correctness import main as correctness_main
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _REF_PATH = _REPO_ROOT / "results" / "reference" / "qwen35-0.8b_reference_compact.json"
@@ -530,3 +535,306 @@ class TestIntegrationSimulated:
         points = long_context_drift(reports, cfg)
         assert all(p.passed for p in points)
         assert points[-1].tolerance_scale > 1.0
+
+
+# ---------------------------------------------------------------------------
+# Runner
+# ---------------------------------------------------------------------------
+
+
+def _run_all():
+    tests = [
+        TestSoftmax(),
+        TestKLDivergence(),
+        TestMaxAbsDiff(),
+        TestTopKIndices(),
+        TestToleranceConfig(),
+        TestCompareLogits(),
+        TestComparePerplexity(),
+        TestCorrectnessReport(),
+        TestLongContextDrift(),
+        TestIntegrationSimulated(),
+    ]
+    for suite in tests:
+        for name in sorted(dir(suite)):
+            if name.startswith("test_"):
+                getattr(suite, name)()
+
+
+# ---------------------------------------------------------------------------
+# Pytest-style tests for previously untested paths
+# ---------------------------------------------------------------------------
+
+
+class TestNumpySoftmax:
+    """numpy-accelerated softmax helper."""
+
+    def test_sums_to_one(self):
+        import numpy as np
+
+        result = _np_softmax(np.array([1.0, 2.0, 3.0]))
+        assert abs(float(np.sum(result)) - 1.0) < 1e-9
+
+    def test_matches_pure_python(self):
+        import numpy as np
+
+        logits = [0.5, -1.2, 3.4, 0.0]
+        np_result = _np_softmax(np.array(logits))
+        py_result = _softmax(logits)
+        for a, b in zip(np_result, py_result, strict=True):
+            assert abs(float(a) - b) < 1e-9
+
+    def test_large_values_stable(self):
+        """Numerically stable — no overflow."""
+        import numpy as np
+
+        result = _np_softmax(np.array([1000.0, 1001.0, 1002.0]))
+        assert all(0 <= r <= 1 for r in result)
+        assert abs(sum(result) - 1.0) < 1e-9
+
+    def test_numpy_2d(self):
+        """Works on 2D arrays (batch dimension)."""
+        import numpy as np
+
+        arr = np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
+        result = _np_softmax(arr)
+        assert result.shape == (2, 3)
+        for row in result:
+            assert abs(sum(row) - 1.0) < 1e-9
+
+
+class TestNumpyKLDivergence:
+    def test_identical_distributions(self):
+        import numpy as np
+
+        p = np.array([0.2, 0.3, 0.5])
+        assert abs(_np_kl_divergence(p, p)) < 1e-9
+
+    def test_matches_pure_python(self):
+        import numpy as np
+
+        p = [0.1, 0.4, 0.5]
+        q = [0.3, 0.3, 0.4]
+        np_result = _np_kl_divergence(np.array(p), np.array(q))
+        py_result = _kl_divergence(p, q)
+        assert abs(np_result - py_result) < 1e-9
+
+    def test_zero_handling(self):
+        """p[i]=0 entries are skipped."""
+        import numpy as np
+
+        p = np.array([0.0, 0.5, 0.5])
+        q = np.array([0.9, 0.05, 0.05])
+        result = _np_kl_divergence(p, q)
+        assert result > 0
+
+
+class TestComparisonMetricStr:
+    """ComparisonMetric.__str__ formatting."""
+
+    def test_with_threshold_passed(self):
+        m = ComparisonMetric("KL", 0.001, threshold=0.01, passed=True)
+        s = str(m)
+        assert "✓" in s
+        assert "KL" in s
+        assert "threshold" in s
+
+    def test_with_threshold_failed(self):
+        m = ComparisonMetric("KL", 0.5, threshold=0.01, passed=False)
+        s = str(m)
+        assert "✗" in s
+        assert "threshold" in s
+
+    def test_without_threshold(self):
+        m = ComparisonMetric("Info", 42.0, threshold=None, passed=None)
+        s = str(m)
+        assert "ℹ" in s
+        assert "Info" in s
+        assert "threshold" not in s
+
+    def test_passed_none_shows_info(self):
+        m = ComparisonMetric("Note", 1.0, threshold=None, passed=None)
+        assert "ℹ" in str(m)
+
+    def test_passed_false_shows_x(self):
+        m = ComparisonMetric("Note", 1.0, threshold=2.0, passed=False)
+        assert "✗" in str(m)
+
+
+class TestCorrectnessReportSummary:
+    """CorrectnessReport.summary() with failures."""
+
+    def test_summary_with_failures(self):
+        report = CorrectnessReport(context_length=2048)
+        report.add_metric("KL", 0.5, threshold=0.01, passed=False)
+        summary = report.summary()
+        assert "FAILED" in summary
+        assert "Failures:" in summary
+        assert "KL" in summary
+
+    def test_summary_with_context_length(self):
+        report = CorrectnessReport(context_length=4096)
+        report.add_metric("Atol", 1e-6, threshold=1e-4, passed=True)
+        summary = report.summary()
+        assert "context_length=4096" in summary
+        assert "PASSED" in summary
+
+    def test_summary_without_context_length(self):
+        report = CorrectnessReport()
+        report.add_metric("Info", 1.0, threshold=None, passed=None)
+        summary = report.summary()
+        assert "context_length" not in summary
+
+    def test_summary_has_separator_line(self):
+        report = CorrectnessReport()
+        report.add_metric("KL", 0.01, threshold=0.1, passed=True)
+        summary = report.summary()
+        assert "-" * 60 in summary
+
+    def test_to_dict_serializable(self):
+        report = CorrectnessReport(context_length=1024)
+        report.add_metric("KL", 0.01, threshold=0.1, passed=True)
+        report.add_metric("Atol", 1e-5, threshold=1e-4, passed=True)
+        d = report.to_dict()
+        json.dumps(d)  # must be serializable
+        assert d["context_length"] == 1024
+        assert d["passed"] is True
+        assert len(d["metrics"]) == 2
+
+    def test_to_dict_with_failures(self):
+        report = CorrectnessReport()
+        report.add_metric("KL", 0.9, threshold=0.01, passed=False)
+        d = report.to_dict()
+        assert d["passed"] is False
+        assert d["metrics"][0]["passed"] is False
+
+
+class TestDriftSummaryEdgeCases:
+    """drift_summary with edge cases."""
+
+    def test_empty_points(self):
+        result = drift_summary([])
+        assert "No drift" in result
+
+    def test_single_point_pass(self):
+        points = [
+            DriftPoint(
+                context_length=4096,
+                kl_divergence=0.001,
+                argmax_accuracy=1.0,
+                tolerance_scale=1.0,
+                passed=True,
+            )
+        ]
+        result = drift_summary(points)
+        assert "PASS" in result
+        assert "4096" in result
+
+    def test_single_point_fail(self):
+        points = [
+            DriftPoint(
+                context_length=131072,
+                kl_divergence=0.9,
+                argmax_accuracy=0.3,
+                tolerance_scale=8.0,
+                passed=False,
+            )
+        ]
+        result = drift_summary(points)
+        assert "FAIL" in result
+        assert "131072" in result
+
+    def test_header_row_present(self):
+        points = [
+            DriftPoint(
+                context_length=4096,
+                kl_divergence=0.01,
+                argmax_accuracy=0.9,
+                tolerance_scale=1.0,
+                passed=True,
+            )
+        ]
+        result = drift_summary(points)
+        assert "context" in result
+        assert "kl_div" in result
+        assert "argmax_acc" in result
+
+
+class TestMainCLI:
+    """main() CLI with file I/O."""
+
+    def _write_ref_cand(self, tmp_path, ref_logits, cand_logits, ref_ppl=None, cand_ppl=None):
+        ref = {}
+        cand = {}
+        if ref_logits is not None:
+            ref["logits"] = [ref_logits]  # wrap in position list
+            cand["logits"] = [cand_logits]
+        if ref_ppl is not None:
+            ref["perplexity"] = ref_ppl
+            cand["perplexity"] = cand_ppl
+        ref_path = tmp_path / "ref.json"
+        cand_path = tmp_path / "cand.json"
+        ref_path.write_text(json.dumps(ref))
+        cand_path.write_text(json.dumps(cand))
+        return str(ref_path), str(cand_path)
+
+    def test_logit_comparison_pass(self, tmp_path):
+        ref, cand = self._write_ref_cand(tmp_path, [1.0, 2.0, 3.0], [1.0, 2.0, 3.0])
+        rc = correctness_main(["--reference", ref, "--candidate", cand])
+        assert rc == 0
+
+    def test_logit_comparison_fail(self, tmp_path):
+        ref, cand = self._write_ref_cand(tmp_path, [1.0, 2.0, 3.0], [10.0, 0.0, 0.0])
+        rc = correctness_main(["--reference", ref, "--candidate", cand])
+        assert rc == 1
+
+    def test_perplexity_comparison(self, tmp_path):
+        ref, cand = self._write_ref_cand(tmp_path, None, None, ref_ppl=10.0, cand_ppl=10.01)
+        rc = correctness_main(["--reference", ref, "--candidate", cand])
+        assert rc == 0
+
+    def test_perplexity_comparison_fail(self, tmp_path):
+        ref, cand = self._write_ref_cand(tmp_path, None, None, ref_ppl=10.0, cand_ppl=100.0)
+        rc = correctness_main(["--reference", ref, "--candidate", cand])
+        assert rc == 1
+
+    def test_both_logits_and_perplexity(self, tmp_path):
+        ref, cand = self._write_ref_cnd_combined(tmp_path)
+        rc = correctness_main(["--reference", ref, "--candidate", cand])
+        assert rc == 0
+
+    def test_no_comparable_data(self, tmp_path):
+        """Files without logits or perplexity → error, return 1."""
+        ref_path = tmp_path / "ref.json"
+        cand_path = tmp_path / "cand.json"
+        ref_path.write_text(json.dumps({"other": "data"}))
+        cand_path.write_text(json.dumps({"other": "data"}))
+        rc = correctness_main(["--reference", str(ref_path), "--candidate", str(cand_path)])
+        assert rc == 1
+
+    def test_output_to_file(self, tmp_path):
+        ref, cand = self._write_ref_cand(tmp_path, [1.0, 2.0], [1.0, 2.0])
+        out_path = str(tmp_path / "report.json")
+        rc = correctness_main(["--reference", ref, "--candidate", cand, "--output", out_path])
+        assert rc == 0
+        assert Path(out_path).exists()
+        data = json.loads(Path(out_path).read_text())
+        assert "reports" in data
+        assert "passed" in data
+
+    def test_custom_tolerances(self, tmp_path):
+        """Custom tolerance values are respected."""
+        ref, cand = self._write_ref_cand(tmp_path, [1.0, 2.0], [1.0, 2.001])
+        # Very tight tolerance → should fail
+        rc = correctness_main(["--reference", ref, "--candidate", cand, "--atol", "1e-10"])
+        assert rc == 1
+
+    @staticmethod
+    def _write_ref_cnd_combined(tmp_path):
+        ref = {"logits": [[1.0, 2.0, 3.0]], "perplexity": 5.0}
+        cand = {"logits": [[1.0, 2.0, 3.0]], "perplexity": 5.0}
+        ref_path = tmp_path / "ref.json"
+        cand_path = tmp_path / "cand.json"
+        ref_path.write_text(json.dumps(ref))
+        cand_path.write_text(json.dumps(cand))
+        return str(ref_path), str(cand_path)

@@ -563,9 +563,7 @@ def generate_report(output_path):
         lines.append("")
         worst = max(spread_ratios)
         # Find the RK3588 big spread from spread_rows for data-driven narrative
-        rk_big_row = next(
-            (r for r in spread_rows if r[0] == "RK3588 big"), None
-        )
+        rk_big_row = next((r for r in spread_rows if r[0] == "RK3588 big"), None)
         if rk_big_row and rk_big_row[3] < 1.5:
             # t3 and t4 have converged — both showing optimized-level numbers
             lines.append(

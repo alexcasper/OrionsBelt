@@ -6,9 +6,10 @@ import csv
 import json
 import os
 import statistics
+from pathlib import Path
 
-RAW = "/home/j1/OrionsBelt/results/raw"
-MAN = "/home/j1/OrionsBelt/results/manifests"
+RAW = str(Path(__file__).resolve().parent.parent / "results" / "raw")
+MAN = str(Path(__file__).resolve().parent.parent / "results" / "manifests")
 
 
 def median(xs):
@@ -66,28 +67,32 @@ def kv(rows, model, kernel, seq):
     return None
 
 
-def show_kernel_table(title, fname):
-    print(f"\n### {title} :: {fname}")
-    rows = load_kernel(fname)
-    for m in ["Qwen3.5-4B", "Qwen3.5-0.8B", "Qwen3.5-4B_decode", "Qwen3.5-0.8B_decode"]:
-        seq = 1 if "decode" in m else 64
-        for k in ["gdn_cumdecay", "gdn_gated_scan", "gdn_causal_dwconv1d"]:
-            v = kv(rows, m, k, seq)
-            if v:
-                print(
-                    f"  {m:<20} {k:<22} seq={seq:<3}  "
-                    f"GiB/s={v[0]:<6.2f}  p50us={v[1]:<9.3f}  spread={v[2]:.1f}%"
-                )
-
-
 def load_sustained(fname):
+    path = os.path.join(RAW, fname)
+    if not os.path.isfile(path):
+        return None
     gibs = []
-    with open(os.path.join(RAW, fname)) as f:
+    with open(path) as f:
         for r in csv.DictReader(f):
             gibs.append(float(r["throughput_gibs"]))
     if not gibs:
         return None
     return gibs[0], gibs[-1], median(gibs), len(gibs)
+
+
+def fmt_mem(b):
+    x = b / 1024.0
+    for u in ("KiB", "MiB", "GiB"):
+        if abs(x) < 1024:
+            return f"{x:.1f} {u}"
+        x /= 1024
+    return f"{x:.1f} TiB"
+
+
+def gib(fname, kernel):
+    r = load_kernel(fname)
+    v = kv(r, "Qwen3.5-4B", kernel, 64)
+    return v[0] if v else None
 
 
 # ---- provenance map (run_id, git_sha, dirty) from manifests ----
@@ -111,171 +116,164 @@ PROV = {
     "rk3588-t4_little.csv": ("t4_20260802T211249Z_28729f3", "28729f3", True),
 }
 
-print("=" * 90)
-print("ABLATION (model-level, tidy long, cpu/cpu hybrid, 4K)")
-ab = load_ablation()
-print("  run_id    :", ab["run_id"])
-_abl_man_exists = all(os.path.isfile(m) for m in ab["manifest_ref"])
-print(
-    "  git_sha   :",
-    ab["git_sha"],
-    " (manifest file exists)"
-    if _abl_man_exists
-    else " (manifest file MISSING from results/manifests/)",
-)
-print("  manifest  :", ab["manifest_ref"])
-print("  context   :", ab["context"], " quant:", ab["quant"], " engines:", ab["engines"])
-print("  model     :", ab["model"])
-print("  --- p50 over repeats (n) ---")
-g = ab["groups"]
 
-
-def fmt_mem(b):
-    x = b / 1024.0
-    for u in ("KiB", "MiB", "GiB"):
-        if abs(x) < 1024:
-            return f"{x:.1f} {u}"
-        x /= 1024
-    return f"{x:.1f} TiB"
-
-
-print(
-    f"  prefill_tokens_per_sec : {g[('prefill', 'prefill_tokens_per_sec', '')]:<14.1f} "
-    f"(n={ab['n'][('prefill', 'prefill_tokens_per_sec', '')]})"
-)
-print(
-    f"  decode_tokens_per_sec  : {g[('decode', 'decode_tokens_per_sec', '')]:<14.1f} "
-    f"(n={ab['n'][('decode', 'decode_tokens_per_sec', '')]})"
-)
-ttft = g[("prefill", "ttft_seconds", "")]
-ttft_n = ab["n"][("prefill", "ttft_seconds", "")]
-print(f"  ttft_seconds           : {ttft:<14.6f} s = {ttft * 1000:.4f} ms (n={ttft_n})")
-for comp in ("weights", "kv_cache", "recurrent_state"):
-    for ph in ("prefill", "decode"):
-        k = (ph, "peak_memory_bytes", comp)
-        if k in g:
-            print(f"  mem[{comp}][{ph}] : {fmt_mem(g[k]):<12} ({g[k]:.0f} bytes, n={ab['n'][k]})")
-
-print("\n" + "=" * 90)
-print("KERNEL FLEET BASELINE (4B/0.8B, seq=64, single-core canonical, fp32) — GiB/s @ p50")
-print("Device            run_id_sha            dirty   CumDecay  Scan    DWConv1D")
-fleet = [
-    ("Jetson j1 (canon)", "jetson-j1.csv"),
-    ("Jetson j2 (canon)", "jetson-j2.csv"),
-    ("Pi5 r5", "pi5-r5.csv"),
-    ("Pi5 j1", "pi5-j1.csv"),
-    ("RK3588 t4 big", "rk3588-t4_big.csv"),
-    ("RK3588 t3 big", "rk3588-t3_big.csv"),
-    ("RK3588 t4 little", "rk3588-t4_little.csv"),
-    ("RK3588 t3 little", "rk3588-t3_little.csv"),
-]
-for label, fname in fleet:
-    rows = load_kernel(fname)
-    rid, sha, dirty = PROV[fname]
-    cd = kv(rows, "Qwen3.5-4B", "gdn_cumdecay", 64)
-    sc = kv(rows, "Qwen3.5-4B", "gdn_gated_scan", 64)
-    cv = kv(rows, "Qwen3.5-4B", "gdn_causal_dwconv1d", 64)
-    ds = "dirty" if dirty else "CLEAN"
-    cd_s = f"{cd[0]:<5.2f}" if cd else "  —  "
-    sc_s = f"{sc[0]:<5.2f}" if sc else "  —  "
-    cv_s = f"{cv[0]:<5.2f}" if cv else "  —  "
-    print(f"  {label:<16} {sha:<20} {ds:<6}  {cd_s}  {sc_s}  {cv_s}")
-print("  (t4 used as conservative anchor; t3 re-run clean at 553a96e — 6% spread, 11.07 GiB/s)")
-
-print("\n" + "=" * 90)
-print("OPTIMIZATION LADDER on Jetson (Qwen3.5-4B, seq=64) — GiB/s @ p50 / p50 µs")
-ladder = [
-    ("baseline single (j1, manifest, dirty)", "jetson-j1.csv"),
-    ("baseline single (j2, manifest, dirty)", "jetson-j2.csv"),
-    ("CLEAN tree 4-core OMP (j1, dirty=false)", "jetson-j1_clean.csv"),
-    ("single-core (j2_single, NO manifest)", "jetson-j2_single.csv"),
-    ("4-core OMP (j2_omp, NO manifest)", "jetson-j2-omp.csv"),
-    ("4-core OMP full (j2_omp-full, NO manif)", "jetson-j2-omp-full.csv"),
-    ("conv-unroll (j2, NO manifest)", "jetson-j2-conv-unroll.csv"),
-    ("omp+unroll (j2, NO manifest)", "jetson-j2-omp-unroll.csv"),
-    ("FULL-OPTIMIZED (j2, manifest, dirty)", "jetson-j2-full-optimized.csv"),
-]
-print("Config                                        CumDecay       Scan          DWConv1D")
-for label, fname in ladder:
-    rows = load_kernel(fname)
-    cd = kv(rows, "Qwen3.5-4B", "gdn_cumdecay", 64)
-    sc = kv(rows, "Qwen3.5-4B", "gdn_gated_scan", 64)
-    cv = kv(rows, "Qwen3.5-4B", "gdn_causal_dwconv1d", 64)
-
-    def cell(v):
-        return f"{v[0]:.2f} GiB/s ({v[1]:.0f}us)" if v else "—"
-
-    print(f"  {label:<42} {cell(cd):<14} {cell(sc):<13} {cell(cv):<14}")
-
-# speedup ratios (within j2 series, same device)
-print("\n  Within-j2-series speedups (4B seq=64, GiB/s):")
-
-
-def gib(fname, kernel):
-    r = load_kernel(fname)
-    v = kv(r, "Qwen3.5-4B", kernel, 64)
-    return v[0] if v else None
-
-
-for k in ("gdn_cumdecay", "gdn_gated_scan", "gdn_causal_dwconv1d"):
-    base = gib("jetson-j2_single.csv", k)
-    omp = gib("jetson-j2-omp.csv", k)
-    full = gib("jetson-j2-full-optimized.csv", k)
+def main() -> int:
+    print("=" * 90)
+    print("ABLATION (model-level, tidy long, cpu/cpu hybrid, 4K)")
+    ab = load_ablation()
+    print("  run_id    :", ab["run_id"])
+    _abl_man_exists = all(os.path.isfile(m) for m in ab["manifest_ref"])
     print(
-        f"    {k:<20} single={base if base else 0:.2f}  "
-        f"omp={omp if omp else 0:.2f} ({omp / base if base and omp else 0:.2f}x)  "
-        f"full-opt={full if full else 0:.2f} ({full / base if base and full else 0:.2f}x)"
+        "  git_sha   :",
+        ab["git_sha"],
+        " (manifest file exists)"
+        if _abl_man_exists
+        else " (manifest file MISSING from results/manifests/)",
     )
-# manifest-backed clean-tree 4-core vs manifest-backed canonical single (j1 same device)
-j1_single = gib("jetson-j1.csv", "gdn_gated_scan")
-j1_clean = gib("jetson-j1_clean.csv", "gdn_gated_scan")
-print(
-    f"  Manifest-backed (j1 device): single j1.csv scan={j1_single:.2f} "
-    f"-> 4-core CLEAN j1_clean scan={j1_clean:.2f} "
-    f"({j1_clean / j1_single:.2f}x, SUPERLINEAR=confounded)"
-)
+    print("  manifest  :", ab["manifest_ref"])
+    print("  context   :", ab["context"], " quant:", ab["quant"], " engines:", ab["engines"])
+    print("  model     :", ab["model"])
+    print("  --- p50 over repeats (n) ---")
+    g = ab["groups"]
 
-print("\n" + "=" * 90)
-print("DECODE (seq=1) KERNEL — Qwen3.5-4B — p50 µs/token + GiB/s (recurrence cost)")
-for label, fname in [
-    ("j1 CLEAN 4-core (manifest)", "jetson-j1_clean.csv"),
-    ("j2 full-optimized (manifest)", "jetson-j2-full-optimized.csv"),
-]:
-    rows = load_kernel(fname)
-    print("  ", label)
+    print(
+        f"  prefill_tokens_per_sec : {g[('prefill', 'prefill_tokens_per_sec', '')]:<14.1f} "
+        f"(n={ab['n'][('prefill', 'prefill_tokens_per_sec', '')]})"
+    )
+    print(
+        f"  decode_tokens_per_sec  : {g[('decode', 'decode_tokens_per_sec', '')]:<14.1f} "
+        f"(n={ab['n'][('decode', 'decode_tokens_per_sec', '')]})"
+    )
+    ttft = g[("prefill", "ttft_seconds", "")]
+    ttft_n = ab["n"][("prefill", "ttft_seconds", "")]
+    print(f"  ttft_seconds           : {ttft:<14.6f} s = {ttft * 1000:.4f} ms (n={ttft_n})")
+    for comp in ("weights", "kv_cache", "recurrent_state"):
+        for ph in ("prefill", "decode"):
+            k = (ph, "peak_memory_bytes", comp)
+            if k in g:
+                print(
+                    f"  mem[{comp}][{ph}] : {fmt_mem(g[k]):<12} ({g[k]:.0f} bytes, n={ab['n'][k]})"
+                )
+
+    print("\n" + "=" * 90)
+    print("KERNEL FLEET BASELINE (4B/0.8B, seq=64, single-core canonical, fp32) — GiB/s @ p50")
+    print("Device            run_id_sha            dirty   CumDecay  Scan    DWConv1D")
+    fleet = [
+        ("Jetson j1 (canon)", "jetson-j1.csv"),
+        ("Jetson j2 (canon)", "jetson-j2.csv"),
+        ("Pi5 r5", "pi5-r5.csv"),
+        ("Pi5 j1", "pi5-j1.csv"),
+        ("RK3588 t4 big", "rk3588-t4_big.csv"),
+        ("RK3588 t3 big", "rk3588-t3_big.csv"),
+        ("RK3588 t4 little", "rk3588-t4_little.csv"),
+        ("RK3588 t3 little", "rk3588-t3_little.csv"),
+    ]
+    for label, fname in fleet:
+        rows = load_kernel(fname)
+        rid, sha, dirty = PROV[fname]
+        cd = kv(rows, "Qwen3.5-4B", "gdn_cumdecay", 64)
+        sc = kv(rows, "Qwen3.5-4B", "gdn_gated_scan", 64)
+        cv = kv(rows, "Qwen3.5-4B", "gdn_causal_dwconv1d", 64)
+        ds = "dirty" if dirty else "CLEAN"
+        cd_s = f"{cd[0]:<5.2f}" if cd else "  —  "
+        sc_s = f"{sc[0]:<5.2f}" if sc else "  —  "
+        cv_s = f"{cv[0]:<5.2f}" if cv else "  —  "
+        print(f"  {label:<16} {sha:<20} {ds:<6}  {cd_s}  {sc_s}  {cv_s}")
+    print("  (t4 preferred over t3 per ob-bf7: t3 scan spread=153% contaminated; t4 spread=17%)")
+
+    print("\n" + "=" * 90)
+    print("OPTIMIZATION LADDER on Jetson (Qwen3.5-4B, seq=64) — GiB/s @ p50 / p50 µs")
+    ladder = [
+        ("baseline single (j1, manifest, dirty)", "jetson-j1.csv"),
+        ("baseline single (j2, manifest, dirty)", "jetson-j2.csv"),
+        ("CLEAN tree 4-core OMP (j1, dirty=false)", "jetson-j1_clean.csv"),
+        ("single-core (j2_single, NO manifest)", "jetson-j2_single.csv"),
+        ("4-core OMP (j2_omp, NO manifest)", "jetson-j2-omp.csv"),
+        ("4-core OMP full (j2_omp-full, NO manif)", "jetson-j2-omp-full.csv"),
+        ("conv-unroll (j2, NO manifest)", "jetson-j2-conv-unroll.csv"),
+        ("omp+unroll (j2, NO manifest)", "jetson-j2-omp-unroll.csv"),
+        ("FULL-OPTIMIZED (j2, manifest, dirty)", "jetson-j2-full-optimized.csv"),
+    ]
+    print("Config                                        CumDecay       Scan          DWConv1D")
+    for label, fname in ladder:
+        rows = load_kernel(fname)
+        cd = kv(rows, "Qwen3.5-4B", "gdn_cumdecay", 64)
+        sc = kv(rows, "Qwen3.5-4B", "gdn_gated_scan", 64)
+        cv = kv(rows, "Qwen3.5-4B", "gdn_causal_dwconv1d", 64)
+
+        def cell(v):
+            return f"{v[0]:.2f} GiB/s ({v[1]:.0f}us)" if v else "—"
+
+        print(f"  {label:<42} {cell(cd):<14} {cell(sc):<13} {cell(cv):<14}")
+
+    # speedup ratios (within j2 series, same device)
+    print("\n  Within-j2-series speedups (4B seq=64, GiB/s):")
+
     for k in ("gdn_cumdecay", "gdn_gated_scan", "gdn_causal_dwconv1d"):
-        v = kv(rows, "Qwen3.5-4B_decode", k, 1)
-        if v:
-            print(f"     {k:<22} {v[1]:.3f} us/token   {v[0]:.2f} GiB/s   spread={v[2]:.1f}%")
-
-print("\n" + "=" * 90)
-print("SUSTAINED LOAD / THERMAL (gdn_gated_scan, Qwen3.5-4B, seq=64)")
-for label, fname in [
-    ("j1 sustained 120s (manifest, dirty)", "jetson-j1_sustained.csv"),
-    ("j2 1-core 30s (manifest, dirty)", "jetson-j2_sustained_1core.csv"),
-    ("j2 4-core 30s (manifest, dirty)", "jetson-j2_sustained_4core.csv"),
-    ("j2 optimized 120s (manifest, dirty)", "jetson-j2-sustained-optimized.csv"),
-]:
-    s = load_sustained(fname)
-    if s:
+        base = gib("jetson-j2_single.csv", k)
+        omp = gib("jetson-j2-omp.csv", k)
+        full = gib("jetson-j2-full-optimized.csv", k)
         print(
-            f"  {label:<38} first={s[0]:.2f} last={s[1]:.2f} median={s[2]:.2f} GiB/s  "
-            f"drift={(s[1] - s[0]) / s[0] * 100:+.1f}%  (n={s[3]} samples)"
+            f"    {k:<20} single={base if base else 0:.2f}  "
+            f"omp={omp if omp else 0:.2f} ({omp / base if base and omp else 0:.2f}x)  "
+            f"full-opt={full if full else 0:.2f} ({full / base if base and full else 0:.2f}x)"
         )
-
-print("\n" + "=" * 90)
-print("POWER / ENERGY (jetson-j1_power.json, INA3221, 10s sustained, Qwen3.5-4B seq=64)")
-with open(os.path.join(MAN, "jetson-j1_power.json")) as f:
-    pj = json.load(f)
-for run in pj["sustained_runs"]:
+    # manifest-backed clean-tree 4-core vs manifest-backed canonical single (j1 same device)
+    j1_single = gib("jetson-j1.csv", "gdn_gated_scan")
+    j1_clean = gib("jetson-j1_clean.csv", "gdn_gated_scan")
     print(
-        f"  {run['kernel']:<22} {run['throughput_gib_per_s']:.2f} GiB/s  "
-        f"delta_board={run['delta_power_mw']['board']:4d}mW  "
-        f"delta_cpu={run['delta_power_mw']['cpu']:4d}mW  "
-        f"energy={run['energy_per_gib_board_mj']:4d} mJ/GiB(board) "
-        f"{run['energy_per_gib_cpu_mj']:4d} mJ/GiB(cpu)  "
-        f"therm {run['thermal_c']['idle'] / 1000.0}->{run['thermal_c']['peak'] / 1000.0}C"
+        f"  Manifest-backed (j1 device): single j1.csv scan={j1_single:.2f} "
+        f"-> 4-core CLEAN j1_clean scan={j1_clean:.2f} "
+        f"({j1_clean / j1_single:.2f}x, SUPERLINEAR=confounded)"
     )
-print("  provenance: bead ob-agf.1/ob-mrd.7, run_id jetson-j1 (no git sha in this manifest)")
 
-print("\nDONE.")
+    print("\n" + "=" * 90)
+    print("DECODE (seq=1) KERNEL — Qwen3.5-4B — p50 µs/token + GiB/s (recurrence cost)")
+    for label, fname in [
+        ("j1 CLEAN 4-core (manifest)", "jetson-j1_clean.csv"),
+        ("j2 full-optimized (manifest)", "jetson-j2-full-optimized.csv"),
+    ]:
+        rows = load_kernel(fname)
+        print("  ", label)
+        for k in ("gdn_cumdecay", "gdn_gated_scan", "gdn_causal_dwconv1d"):
+            v = kv(rows, "Qwen3.5-4B_decode", k, 1)
+            if v:
+                print(f"     {k:<22} {v[1]:.3f} us/token   {v[0]:.2f} GiB/s   spread={v[2]:.1f}%")
+
+    print("\n" + "=" * 90)
+    print("SUSTAINED LOAD / THERMAL (gdn_gated_scan, Qwen3.5-4B, seq=64)")
+    for label, fname in [
+        ("j1 sustained 120s (manifest, dirty)", "jetson-j1_sustained.csv"),
+        ("j2 1-core 30s (manifest, dirty)", "jetson-j2_sustained_1core.csv"),
+        ("j2 4-core 30s (manifest, dirty)", "jetson-j2_sustained_4core.csv"),
+        ("j2 optimized 120s (manifest, dirty)", "jetson-j2-sustained-optimized.csv"),
+    ]:
+        s = load_sustained(fname)
+        if s:
+            print(
+                f"  {label:<38} first={s[0]:.2f} last={s[1]:.2f} median={s[2]:.2f} GiB/s  "
+                f"drift={(s[1] - s[0]) / s[0] * 100:+.1f}%  (n={s[3]} samples)"
+                if s[0]
+                else "drift=N/A"
+            )
+
+    print("\n" + "=" * 90)
+    print("POWER / ENERGY (jetson-j1_power.json, INA3221, 10s sustained, Qwen3.5-4B seq=64)")
+    with open(os.path.join(MAN, "jetson-j1_power.json")) as f:
+        pj = json.load(f)
+    for run in pj["sustained_runs"]:
+        print(
+            f"  {run['kernel']:<22} {run['throughput_gib_per_s']:.2f} GiB/s  "
+            f"delta_board={run['delta_power_mw']['board']:4d}mW  "
+            f"delta_cpu={run['delta_power_mw']['cpu']:4d}mW  "
+            f"energy={run['energy_per_gib_board_mj']:4d} mJ/GiB(board) "
+            f"{run['energy_per_gib_cpu_mj']:4d} mJ/GiB(cpu)  "
+            f"therm {run['thermal_c']['idle'] / 1000.0}->{run['thermal_c']['peak'] / 1000.0}C"
+        )
+    print("  provenance: bead ob-agf.1/ob-mrd.7, run_id jetson-j1 (no git sha in this manifest)")
+
+    print("\nDONE.")
+
+
+if __name__ == "__main__":
+    main()

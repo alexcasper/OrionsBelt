@@ -16,18 +16,18 @@ if _ROOT not in sys.path:
 
 from scripts.validate_results import (  # noqa: E402
     ABSURD_THROUGHPUT,
-    LAYER_PROFILE_COLS,
     E2E_SWEEP_COLS,
+    LAYER_PROFILE_COLS,
     STANDARD_COLS,
     Issue,
     check_manifest_exists,
     detect_csv_type,
     expected_columns,
     find_device_spec,
+    validate_e2e_sweep_row,
+    validate_layer_profile_row,
     validate_standard_row,
     validate_sustained_row,
-    validate_layer_profile_row,
-    validate_e2e_sweep_row,
 )
 
 # ---------------------------------------------------------------------------
@@ -380,6 +380,31 @@ class TestValidateE2eSweepRow:
         issues = []
         validate_e2e_sweep_row(_e2e_sweep_row(value="not_a_number"), "test.csv", issues, 2)
         assert any("cannot parse" in i.message for i in issues)
+
+    def test_negative_value(self):
+        issues = []
+        validate_e2e_sweep_row(_e2e_sweep_row(value="-1.5"), "test.csv", issues, 2)
+        assert any("negative" in i.message for i in issues)
+
+    def test_repeat_count_zero(self):
+        issues = []
+        validate_e2e_sweep_row(_e2e_sweep_row(repeat_count="0"), "test.csv", issues, 2)
+        assert any("repeat_count" in i.message and i.severity == "ERROR" for i in issues)
+
+    def test_unexpected_phase(self):
+        issues = []
+        validate_e2e_sweep_row(_e2e_sweep_row(phase="weird"), "test.csv", issues, 2)
+        assert any("phase" in i.message and i.severity == "WARNING" for i in issues)
+
+    def test_high_throughput_warning(self):
+        issues = []
+        validate_e2e_sweep_row(
+            _e2e_sweep_row(value="999999", metric_name="prefill_tokens_per_sec"),
+            "test.csv",
+            issues,
+            2,
+        )
+        assert any("high throughput" in i.message for i in issues)
 
 
 # ---------------------------------------------------------------------------

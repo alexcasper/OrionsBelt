@@ -17,7 +17,7 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
     "Operating System :: POSIX :: Linux",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
@@ -40,6 +40,7 @@ dev = [
     "pytest>=7.0",
     "ruff>=0.5",
     "pre-commit>=3.5",
+    "onnx>=1.15",  # unit tests for npu_op_probe.py probe graph generation
 ]
 # Benchmark harness and reference inference stack: modern Python, heavier
 # numerical/plotting stack. Also not required on the NPU side.

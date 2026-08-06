@@ -200,9 +200,7 @@ def test_oracle_topk_from_reference_is_ordered(ref_data):
         for window in entry["topk_window"]:
             vals = window["values"]
             # The top-1 index should correspond to the highest value
-            assert vals[0] == max(vals), (
-                f"{entry['entry_id']}: top-1 value is not the maximum"
-            )
+            assert vals[0] == max(vals), f"{entry['entry_id']}: top-1 value is not the maximum"
             # Top-5 should be a subset of the top-20
             top5 = set(window["indices"][:5])
             top20 = set(window["indices"])
