@@ -4,15 +4,8 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
-void gdn_cumdecay_f32(const float*,float*,size_t,size_t);
-void gdn_gated_scan_f32(const float*,const float*,float*,float*,size_t,size_t);
-void gdn_causal_dwconv1d_f32(const float*,const float*,float*,float*,size_t,size_t);
 
-/* fp16/bf16 state variants (ob-8qt.4) */
-void gdn_gated_scan_f16(const float*,const float*,float*,__fp16*,size_t,size_t);
-void gdn_cumdecay_f16(const float*,__fp16*,size_t,size_t);
-void gdn_gated_scan_bf16(const float*,const float*,float*,uint16_t*,size_t,size_t);
-void gdn_cumdecay_bf16(const float*,uint16_t*,size_t,size_t);
+#include "gdn_sve.h"
 
 /* precision-MATCHED scalar reference (float accumulators, like the kernel) */
 static void refF_scan(const float*g,const float*x,float*s,float*st,size_t T,size_t C){

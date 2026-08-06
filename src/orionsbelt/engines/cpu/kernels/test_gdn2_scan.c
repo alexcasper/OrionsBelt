@@ -39,16 +39,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* Kernel under test */
-void gdn2_gated_scan_f32(const float *restrict g, const float *restrict b_gate,
-                         const float *restrict w_gate, const float *restrict x,
-                         float *restrict s, float *restrict state,
-                         size_t seq, size_t channels);
+#include "gdn_sve.h"
 
-/* GDN-1 kernel for the reduction test */
-void gdn_gated_scan_f32(const float *restrict g, const float *restrict x,
-                        float *restrict s, float *restrict state,
-                        size_t seq, size_t channels);
+/* GDN-1 kernel for the reduction test — already declared in gdn_sve.h */
 
 /* ---- Precision-matched scalar references (float accumulators, like the kernel) ---- */
 

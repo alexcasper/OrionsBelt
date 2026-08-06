@@ -2095,9 +2095,9 @@ done
 **GDN-2** (decoupled erase/write): `s[t] = w[t]*x[t] + s[t-1] * (g[t]*b[t])` — separate erase (b)
 and write (w) gates, per ADR 0001.
 - 5 fp32 streams per step (read g, b, w, x; write s) = 20 bytes/element
-- 2 MUL + 1 FMA = 3 FLOPs/element
+- 2 MUL + 1 FMA = 4 FLOPs/element
 
-GDN-2 does **67% more memory traffic** and **50% more arithmetic** per element, with the same
+GDN-2 does **67% more memory traffic** and **2× the arithmetic** per element, with the same
 sequential recurrence dependency chain.
 
 ### Measured comparison (RK3588 A76, pinned cpu4-7, 30 repeats)
@@ -2144,7 +2144,7 @@ past what the memory system can serve.
 
 Wait — GDN-2 does increase streams from 3 to 5, yet latency is unchanged. This means at seq=1 the
 kernel is not even bandwidth-bound — it's dominated by **function-call and state load/store
-overhead**. The per-element work (whether 2 or 3 FLOPs, 3 or 5 streams) is negligible compared
+overhead**. The per-element work (whether 2 or 4 FLOPs, 3 or 5 streams) is negligible compared
 to the fixed cost of entering the kernel, loading the state vector, and storing the output.
 
 **Finding 2: GDN-2 costs exactly 2× at prefill.** At seq=64, GDN-2 is 2.0× slower with identical

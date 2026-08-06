@@ -26,18 +26,7 @@
 #include <string.h>
 #include <time.h>
 
-void gdn_cumdecay_f32(const float *, float *, size_t, size_t);
-void gdn_gated_scan_f32(const float *, const float *, float *, float *, size_t, size_t);
-void gdn_causal_dwconv1d_f32(const float *, const float *, float *, float *, size_t, size_t);
-
-/* fp16/bf16 state variants (ob-8qt.4): mixed precision, fp32 accumulation */
-void gdn_cumdecay_f16(const float *, __fp16 *, size_t, size_t);
-void gdn_gated_scan_f16(const float *, const float *, float *, __fp16 *, size_t, size_t);
-void gdn_cumdecay_bf16(const float *, uint16_t *, size_t, size_t);
-void gdn_gated_scan_bf16(const float *, const float *, float *, uint16_t *, size_t, size_t);
-
-/* GDN-2 decoupled-gating scan (ob-y3f): two extra channel-wise gates */
-void gdn2_gated_scan_f32(const float *, const float *, const float *, const float *, float *, float *, size_t, size_t);
+#include "gdn_sve.h"
 
 /* Which path did the compiler actually select in gdn_sve.c? Mirrors its guard order exactly. */
 #if defined(__ARM_FEATURE_SVE)
