@@ -348,9 +348,7 @@ def _provenance_audit_lines():
     )
     if missing:
         out.append("")
-        out.append(
-            f"**{len(missing)} have no manifest** ({', '.join(sorted(set(missing)))})."
-        )
+        out.append(f"**{len(missing)} have no manifest** ({', '.join(sorted(set(missing)))}).")
     out.append("")
     out.append(
         "Since all runs are now commit-matched and clean-tree, the RK3588 inter-board "
@@ -616,7 +614,9 @@ def generate_report(output_path):
         conservative_high = rk_scan * 5.0
         lines.append("**Core-performance-based prediction** (scaling from RK3588 A76):")
         lines.append("")
-        lines.append(f"- RK3588 scan: {rk_scan:.2f} GiB/s (4x A76 @ 2.3 GHz, Armv8.2, single-thread)")
+        lines.append(
+            f"- RK3588 scan: {rk_scan:.2f} GiB/s (4x A76 @ 2.3 GHz, Armv8.2, single-thread)"
+        )
         lines.append("- O6 big cluster: 4x A720 @ 2.8 GHz, Armv9.2 (SVE2, i8mm, wider OoO)")
         lines.append(
             f"- **Predicted O6 scan throughput: {conservative_low:.1f}-{conservative_high:.1f} GiB/s**"
