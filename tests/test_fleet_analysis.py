@@ -144,13 +144,13 @@ def setup_fleet_data(root):
     raw_dir.mkdir(parents=True, exist_ok=True)
     manifests_dir.mkdir(parents=True, exist_ok=True)
 
-    # Device data for DEVICES registry
+    # Device data for DEVICES registry (fleet sweep clean CSVs)
     device_data_map = {
         "results/raw/pi5-r5.csv": 2.0,
-        "results/raw/rk3588-t4_big.csv": 3.3,
-        "results/raw/rk3588-t4_little.csv": 1.0,
-        "results/raw/jetson-j1.csv": 0.72,
-        "results/raw/jetson-j2.csv": 0.73,
+        "results/raw/rk3588-t4-clean.csv": 5.75,
+        "results/raw/rk3588-t4-little-clean.csv": 0.72,
+        "results/raw/jetson-j1-clean.csv": 1.18,
+        "results/raw/jetson-j2-clean.csv": 1.09,
     }
     for rel_path, scan_gib in device_data_map.items():
         full_path = root / rel_path
@@ -160,12 +160,10 @@ def setup_fleet_data(root):
             spread=5.0,
         )
 
-    # Replicate CSVs
+    # Replicate CSVs (fleet sweep clean — only t3 replicates need separate files)
     replicate_map = {
-        "results/raw/rk3588-t3_big.csv": (3.29, NOISY_SPREAD),
-        "results/raw/rk3588-t3_little.csv": (0.8, 25.0),
-        "results/raw/pi5-j1.csv": (1.84, 6.0),
-        "results/raw/jetson-j2_single.csv": (1.13, 8.0),
+        "results/raw/rk3588-t3-clean.csv": (2.91, NOISY_SPREAD),
+        "results/raw/rk3588-t3-little-clean.csv": (0.55, 25.0),
     }
     for rel_path, (scan_gib, spread) in replicate_map.items():
         full_path = root / rel_path
@@ -191,17 +189,18 @@ def setup_fleet_data(root):
         for kern in FP32_KERNELS:
             writer.writerow(make_csv_row("Qwen3.5-0.8B", kern, 5.0, 5.0))
 
-    # Manifests for all devices
+    # Manifests for all devices (fleet sweep: all clean)
     manifest_basenames = [
         "pi5-r5",
-        "pi5-j1",
-        "rk3588-t3",
-        "rk3588-t4",
-        "jetson-j1",
-        "jetson-j2",
+        "rk3588-t3-clean",
+        "rk3588-t3-little-clean",
+        "rk3588-t4-clean",
+        "rk3588-t4-little-clean",
+        "jetson-j1-clean",
+        "jetson-j2-clean",
     ]
     for base in manifest_basenames:
-        write_manifest(str(manifests_dir / (base + ".json")), dirty=True)
+        write_manifest(str(manifests_dir / (base + ".json")), dirty=False)
 
     return root
 
@@ -215,8 +214,8 @@ class TestRegistryIntegrity:
     """Validate the DEVICES and REPLICATES constants are well-formed."""
 
     def test_devices_count(self):
-        """Exactly 3 devices in the fleet table (RK3588 excluded, ob-0h0)."""
-        assert len(fa.DEVICES) == 3
+        """5 devices: Pi 5, RK3588 big, RK3588 little, Jetson j1, Jetson j2."""
+        assert len(fa.DEVICES) == 5
 
     def test_devices_tuples(self):
         """Each device entry is a 5-tuple (name, path, spec_gibs, cores, isa)."""
