@@ -17,7 +17,7 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 
-from run_op_probe_audit import classify  # noqa: E402
+from run_op_probe_audit import cfg_for, classify  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # UNSUPPORTED_OP verdicts
@@ -225,3 +225,127 @@ class TestPriorityAndEdgeCases:
     def test_matrix(self, rc, log, expected):
         verdict, _ = classify(rc, log)
         assert verdict == expected
+
+
+# ---------------------------------------------------------------------------
+# cfg_for() — ONNX model → NOE Common-section cfg
+# ---------------------------------------------------------------------------
+@pytest.fixture
+def probe_onnx_models(tmp_path):
+    """Generate small ONNX probe models and return (path, name) pairs."""
+    import onnx
+
+    from npu_op_probe import (
+        probe_causal_conv1d,
+        probe_decay_cumprod,
+        probe_delta_rule_update,
+        probe_gate_chain,
+        probe_scan_recurrence,
+    )
+
+    probes = [
+        ("causal_conv1d", probe_causal_conv1d),
+        ("decay_cumprod", probe_decay_cumprod),
+        ("delta_rule_update", probe_delta_rule_update),
+        ("gate_chain", probe_gate_chain),
+        ("scan_recurrence", probe_scan_recurrence),
+    ]
+    models = []
+    for name, func in probes:
+        result = func()
+        model = result[0] if isinstance(result, tuple) else result
+        path = tmp_path / f"{name}.onnx"
+        onnx.save(model, str(path))
+        models.append((path, name))
+    return models
+
+
+class TestCfgFor:
+    def test_returns_string(self, probe_onnx_models):
+        path, name = probe_onnx_models[0]
+        cfg = cfg_for(path, name)
+        assert isinstance(cfg, str)
+
+    def test_has_common_section(self, probe_onnx_models):
+        path, name = probe_onnx_models[0]
+        cfg = cfg_for(path, name)
+        assert "[Common]" in cfg
+
+    def test_has_mode_build(self, probe_onnx_models):
+        path, name = probe_onnx_models[0]
+        cfg = cfg_for(path, name)
+        assert "mode=build" in cfg
+
+    def test_contains_model_name(self, probe_onnx_models):
+        path, name = probe_onnx_models[0]
+        cfg = cfg_for(path, name)
+        assert f"model_name={name}" in cfg
+
+    def test_contains_model_path(self, probe_onnx_models):
+        path, name = probe_onnx_models[0]
+        cfg = cfg_for(path, name)
+        assert f"input_model={path.resolve()}" in cfg
+
+    def test_has_input_and_output(self, probe_onnx_models):
+        path, name = probe_onnx_models[0]
+        cfg = cfg_for(path, name)
+        assert "input=" in cfg
+        assert "output=" in cfg
+
+    def test_has_input_shape(self, probe_onnx_models):
+        path, name = probe_onnx_models[0]
+        cfg = cfg_for(path, name)
+        assert "input_shape=" in cfg
+
+    def test_excludes_initializers_from_inputs(self, probe_onnx_models):
+        """Initializers (weights) must not appear in input declarations."""
+        path, name = probe_onnx_models[0]
+        cfg = cfg_for(path, name)
+        import onnx
+
+        model = onnx.load(str(path))
+        initializer_names = {i.name for i in model.graph.initializer}
+        # The input= line should not reference any initializer name
+        for init_name in initializer_names:
+            # input= should not start with or contain the initializer
+            for line in cfg.splitlines():
+                if line.startswith("input="):
+                    assert init_name not in line.split("=", 1)[1]
+
+    def test_all_probes_produce_valid_cfg(self, probe_onnx_models):
+        """Every probe model generates a well-formed cfg."""
+        for path, name in probe_onnx_models:
+            cfg = cfg_for(path, name)
+            assert "[Common]" in cfg
+            assert f"model_name={name}" in cfg
+            assert "mode=build" in cfg
+            assert "input=" in cfg
+            assert "output=" in cfg
+            assert "input_shape=" in cfg
+
+    def test_cfg_lines_are_newline_separated(self, probe_onnx_models):
+        path, name = probe_onnx_models[0]
+        cfg = cfg_for(path, name)
+        lines = cfg.strip().split("\n")
+        assert len(lines) >= 5  # [Common], mode, model_name, input_model, input, ...
+
+    def test_cfg_ends_with_empty_line(self, probe_onnx_models):
+        """cfg should end with a blank line (trailing newline)."""
+        path, name = probe_onnx_models[0]
+        cfg = cfg_for(path, name)
+        assert cfg.endswith("\n")
+
+    def test_input_shape_bracket_format(self, probe_onnx_models):
+        """input_shape values use [dim,dim] bracket notation."""
+        path, name = probe_onnx_models[0]
+        cfg = cfg_for(path, name)
+        assert "input_shape=[" in cfg
+        assert "]" in cfg
+
+    def test_different_names_produce_different_cfgs(self, probe_onnx_models):
+        """Same model with different names → different model_name in cfg."""
+        path, _ = probe_onnx_models[0]
+        cfg_a = cfg_for(path, "alpha")
+        cfg_b = cfg_for(path, "beta")
+        assert "model_name=alpha" in cfg_a
+        assert "model_name=beta" in cfg_b
