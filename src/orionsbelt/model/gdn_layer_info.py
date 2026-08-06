@@ -56,6 +56,7 @@ class CheckpointLayerInfo:
     # --- global model dims ---
     vocab_size: int
     intermediate_size: int  # MLP intermediate (gate/up/down)
+    tie_word_embeddings: bool = True  # embed_tokens and lm_head share weights
 
     # --- derived (computed in __post_init__) ---
     key_dim: int = field(init=False)
@@ -166,7 +167,8 @@ _4B = CheckpointLayerInfo(
     full_attn_head_dim=256,
     partial_rotary_factor=0.25,
     vocab_size=248320,
-    intermediate_size=12288,
+    intermediate_size=9216,  # verified from HF config.json 2026-08-06
+    tie_word_embeddings=True,
 )
 
 _0_8B = CheckpointLayerInfo(
@@ -186,11 +188,9 @@ _0_8B = CheckpointLayerInfo(
     num_key_value_heads=2,
     full_attn_head_dim=256,
     partial_rotary_factor=0.25,
-    # vocab_size: same tokenizer as 4B (Qwen3.5 family uses unified vocab)
     vocab_size=248320,
-    # intermediate_size: estimated from 4B ratio (12288/2560 = 4.8).
-    # Unverified against 0.8B config.json — update when confirmed.
-    intermediate_size=4915,
+    intermediate_size=3584,  # verified from HF config.json 2026-08-06
+    tie_word_embeddings=True,
 )
 
 #: Lookup by name.  Primary checkpoint is "4B"; fallback is "0.8B" (ADR 0003).
