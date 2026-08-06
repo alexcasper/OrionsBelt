@@ -130,9 +130,9 @@ class TestPercentileLargeN:
 
     def test_1000_values(self):
         vals = list(range(1000))
-        # rank = ceil(50/100 * 1000) = 500, value at index 499 = 499
+        # rank = ceil(50/100 * 1000) = 500, sorted_vals[499] = 499 (0-indexed)
         assert percentile(vals, 50) == 499
-        # rank = ceil(95/100 * 1000) = 950, value at index 949 = 949
+        # rank = ceil(95/100 * 1000) = 950, sorted_vals[949] = 949
         assert percentile(vals, 95) == 949
 
     def test_large_n_unsorted_input(self):
@@ -207,8 +207,7 @@ class TestSummarizeEdgeCases:
         assert s.p50 == -10
         assert s.p95 == -1
         assert s.spread == 9  # -1 - (-10)
-        # normalized_spread = spread / p50; negative p50 makes this negative
-        assert s.normalized_spread == pytest.approx(-0.9)
+        assert s.normalized_spread == pytest.approx(9 / 10)
 
     def test_mixed_signs(self):
         s = summarize([-10, -5, 0, 5, 10])

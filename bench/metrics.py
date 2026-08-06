@@ -61,7 +61,7 @@ def summarize(values: Sequence[float]) -> Summary:
     p50 = percentile(values, 50)
     p95 = percentile(values, 95)
     spread = p95 - p50
-    normalized_spread = spread / p50 if p50 != 0 else math.inf
+    normalized_spread = spread / abs(p50) if p50 != 0 else math.inf
     return Summary(
         n=len(values),
         p50=p50,

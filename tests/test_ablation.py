@@ -194,12 +194,22 @@ class TestRunAblationMinimal:
 
 
 class TestAblationMain:
-    def test_main_writes_csvs_and_table(self, tmp_path):
-        """main() should write per-config CSVs and a comparison table.
+    """Tests for the CLI main() entry point.
 
-        CSVs go to results/raw/ablation/ (default, ephemeral in CI runner).
-        Table is redirected to tmp_path for isolation.
-        """
+    main() calls run_sweep() internally, which resolves the git SHA via
+    ``git rev-parse --short HEAD``.  Since these tests chdir to tmp_path
+    (outside the repo), we monkeypatch _git_short_sha to avoid the
+    un-attributable-run guard.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _stub_git_sha(self, monkeypatch):
+        monkeypatch.setattr("bench.harness._git_short_sha", lambda: "deadbeef")
+
+    def test_main_writes_csvs_and_table(self, tmp_path, monkeypatch):
+        """main() should write per-config CSVs and a comparison table."""
+        # main() uses relative default paths, so chdir to tmp_path for isolation.
+        monkeypatch.chdir(tmp_path)
         table_path = tmp_path / "table.md"
         rc = main(
             [
@@ -217,13 +227,15 @@ class TestAblationMain:
         )
         assert rc == 0
         assert table_path.exists()
-        # CSVs go to results/raw/ablation/ relative to repo root
-        csv_dir = Path("results/raw/ablation")
+        # CSVs go to results/raw/ablation/ (relative to tmp_path)
+        csv_dir = tmp_path / "results" / "raw" / "ablation"
+        assert csv_dir.exists()
         csvs = list(csv_dir.glob("*.csv"))
         assert len(csvs) == 6
 
-    def test_main_multi_context(self, tmp_path):
+    def test_main_multi_context(self, tmp_path, monkeypatch):
         """Multiple comma-separated context lengths should be accepted."""
+        monkeypatch.chdir(tmp_path)
         table_path = tmp_path / "table.md"
         rc = main(
             [
@@ -241,8 +253,9 @@ class TestAblationMain:
         )
         assert rc == 0
 
-    def test_main_table_contains_engine_info(self, tmp_path):
+    def test_main_table_contains_engine_info(self, tmp_path, monkeypatch):
         """The comparison table should reference the engine configurations."""
+        monkeypatch.chdir(tmp_path)
         table_path = tmp_path / "table.md"
         main(
             [
