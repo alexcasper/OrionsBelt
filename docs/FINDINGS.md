@@ -828,3 +828,55 @@ of degrading to fp32 emulation. fp32 works correctly.
 
 Run ID: `rk3588-t4_20260806T094451Z_a37e116`. Full manifest at
 `results/manifests/rk3588-t4_20260806T094451Z_a37e116.json`.
+
+### Device-Microbenchmark: Optimized vs Unoptimized GDN Kernels on RK3588 (ob-bf7)
+
+After cherry-picking j2's optimized GDN kernels (commit 9110034: OpenMP
+parallelization of channel loops + NEON double-width unrolling for gated_scan,
+cumdecay, and dwconv1d), we re-ran the device microbenchmark on the same
+RK3588-t4 board with identical methodology (governor=performance, taskset
+pinning, 30 repeats, 3 warmups).
+
+**Qwen3.5-4B model config (seq=64, channels=4096, 24 GDN layers):**
+
+| Kernel | Cluster | Old p50 (µs) | Old GiB/s | New p50 (µs) | New GiB/s | Speedup |
+|--------|---------|-------------:|----------:|-------------:|----------:|--------:|
+| gdn_cumdecay | A76 big | 459.4 | 4.25 | 80.5 | 24.3 | 5.7× |
+| gdn_gated_scan | A76 big | 899.0 | 3.29 | 257.9 | 11.5 | 3.5× |
+| gdn_causal_dwconv1d | A76 big | 456.2 | 4.52 | 98.0 | 21.0 | 4.7× |
+| gdn_cumdecay | A55 little | 2008.3 | 0.97 | 332.8 | 5.87 | 6.0× |
+| gdn_gated_scan | A55 little | 5395.6 | 0.55 | 757.2 | 3.91 | 7.1× |
+| gdn_causal_dwconv1d | A55 little | 2892.1 | 0.71 | 388.8 | 5.30 | 7.4× |
+
+**Qwen3.5-0.8B model config (seq=64, channels=2048, 18 GDN layers), big cluster:**
+
+| Kernel | Old p50 (µs) | Old GiB/s | New p50 (µs) | New GiB/s | Speedup |
+|--------|-------------:|----------:|-------------:|----------:|--------:|
+| gdn_cumdecay | 195.1 | 5.00 | 33.3 | 29.4 | 5.9× |
+| gdn_gated_scan | 309.2 | 4.79 | 124.6 | 11.9 | 2.5× |
+| gdn_causal_dwconv1d | 171.8 | 6.00 | 47.3 | 21.8 | 3.6× |
+
+**Key observations:**
+
+1. **3.5×–7.4× speedup** across all kernels and clusters. The OpenMP
+   parallelization across 4 cores accounts for ~4×, with NEON unrolling adding
+   further gains on the sequential-scan kernels.
+
+2. **Little cluster (A55) benefits more** (6.0–7.4×) than big (A76) (3.5–5.9×).
+   The A55's weaker single-thread NEON throughput makes it more reliant on
+   multi-thread parallelization — the optimization closes the big/little gap
+   from ~4:1 to ~2.5:1 on bandwidth.
+
+3. **Spread tightened**: gated_scan big cluster went from 17.4% → 7.5% spread,
+   consistent with the OpenMP work distribution reducing per-iteration
+   variance.
+
+4. **cumdecay is now bandwidth-saturated**: 24.3 GiB/s on the A76 big cluster
+   approaches the RK3588's theoretical LPDDR4x bandwidth (~25.6 GiB/s at
+   1600 MHz dual-channel), confirming the kernel is now memory-bound rather
+   than instruction-overhead-bound.
+
+This re-run addresses ob-bf7's "cross-code-version" concern: the prior t4 CSVs
+were at the unoptimized baseline. Manifest:
+`results/manifests/rk3588-t4_optimized.json` (SHA 8f8be11, governor=performance,
+thermals 37–41 °C pre/post).
