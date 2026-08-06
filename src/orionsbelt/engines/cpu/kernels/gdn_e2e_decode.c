@@ -94,6 +94,7 @@ static void gemv_neon(const float *a, const float *B, float *c, size_t K, size_t
         }
         vst1q_f32(c + j, acc);
     }
+    /* Tail: remaining columns when N % 4 != 0 */
     for (; j < N; ++j) {
         float acc = 0.0f;
         for (size_t k = 0; k < K; ++k)
