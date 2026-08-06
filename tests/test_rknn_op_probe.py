@@ -646,3 +646,57 @@ class TestMainCLI:
         results = json.loads((tmp_path / "audit" / "rknn_audit_results.json").read_text())
         assert results[0]["onnx_ops"] == ["Conv", "Add"]
         assert results[0]["description"] == "conv + add"
+
+
+class TestMainPrintPaths:
+    """Cover op_table, evidence, and cpu_fallback print paths in main() (lines 219-235)."""
+
+    def test_op_table_and_evidence_printed(self, tmp_path, monkeypatch, capsys):
+        """main() prints op placement, CPU fallbacks, and evidence when present."""
+        probe_dir = tmp_path / "probes"
+        probe_dir.mkdir()
+        manifest = [{"probe": "scan", "file": "scan.onnx", "ops": ["Scan"], "description": "test"}]
+        (probe_dir / "manifest.json").write_text(json.dumps(manifest))
+        (probe_dir / "scan.onnx").write_text("fake")
+
+        monkeypatch.setattr(rknn_op_probe, "PROBE_DIR", probe_dir)
+        monkeypatch.setattr(rknn_op_probe, "MANIFEST", probe_dir / "manifest.json")
+        monkeypatch.setattr(rknn_op_probe, "OUT_DIR", tmp_path / "audit")
+
+        def fake_probe_one(onnx_path, probe_name):
+            return {
+                "probe": probe_name,
+                "config_ret": 0,
+                "load_ret": 0,
+                "build_ret": 0,
+                "export_ret": 0,
+                "rknn_file_size": 1000,
+                "op_table": [
+                    {"target": "NPU", "op_type": "Conv", "dtype": "float"},
+                    {"target": "CPU", "op_type": "CumSum", "dtype": "float"},
+                    {"target": "CPU", "op_type": "InputOperator", "dtype": "float"},
+                ],
+                "evidence": ["line1: evidence", "line2: more"],
+                "log": "scan.log",
+                "verdict": "COMPILED",
+                "cpu_fallback_ops": ["CumSum:1"],
+                "npu_ops": ["Conv:0"],
+            }
+
+        with patch("rknn_op_probe.probe_one", side_effect=fake_probe_one):
+            rknn_op_probe.main()
+
+        captured = capsys.readouterr()
+        # op_table printing
+        assert "Op placement" in captured.out
+        assert "[NPU]" in captured.out
+        assert "[CPU]" in captured.out
+        assert "CPU FALLBACK" in captured.out
+        # cpu_fallback_ops printing
+        assert "CPU FALLBACKS:" in captured.out
+        assert "CumSum:1" in captured.out
+        # evidence printing
+        assert "Key evidence" in captured.out
+        assert "evidence" in captured.out
+        # summary with "silent fallback" note
+        assert "silent fallback" in captured.out

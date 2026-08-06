@@ -21,6 +21,7 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "bench"))
 
+import correctness  # noqa: E402
 from correctness import (  # noqa: E402
     ComparisonMetric,
     CorrectnessReport,
@@ -732,6 +733,96 @@ class TestMainCLI:
         ref_path.write_text(_json.dumps(ref))
         cand_path.write_text(_json.dumps(cand))
         return str(ref_path), str(cand_path)
+
+
+class TestNoNumpyFallback:
+    """Test compare_logits pure-Python paths by forcing HAS_NUMPY=False."""
+
+    def test_max_abs_diff_pure_python(self):
+        """Max abs diff computed correctly without numpy."""
+        from unittest.mock import patch
+
+        ref = [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]
+        cand = [[1.5, 2.0, 2.5], [4.0, 5.5, 6.0]]
+        cfg = ToleranceConfig(atol=1.0)
+        with patch.object(correctness, "HAS_NUMPY", False):
+            report = compare_logits(ref, cand, cfg)
+        diff_metric = [m for m in report.metrics if m.name == "max_abs_diff"][0]
+        assert diff_metric.value == pytest.approx(0.5)
+
+    def test_kl_divergence_pure_python(self):
+        """KL divergence computed correctly without numpy."""
+        from unittest.mock import patch
+
+        ref = [[1.0, 2.0, 3.0]]
+        cand = [[1.0, 2.0, 3.0]]
+        cfg = ToleranceConfig()
+        with patch.object(correctness, "HAS_NUMPY", False):
+            report = compare_logits(ref, cand, cfg)
+        kl_metric = [m for m in report.metrics if m.name == "avg_kl_divergence"][0]
+        assert kl_metric.value == pytest.approx(0.0, abs=1e-10)
+
+    def test_topk_accuracy_pure_python(self):
+        """Top-k agreement computed correctly without numpy."""
+        from unittest.mock import patch
+
+        ref = [[3.0, 1.0, 2.0]]
+        cand = [[3.0, 2.0, 1.0]]
+        cfg = ToleranceConfig(topk=2, topk_min_accuracy=0.5)
+        with patch.object(correctness, "HAS_NUMPY", False):
+            report = compare_logits(ref, cand, cfg)
+        topk_metric = [m for m in report.metrics if "top" in m.name and "accuracy" in m.name][0]
+        # top-2 of [3,1,2] = {0,2}, top-2 of [3,2,1] = {0,1} -> overlap=1/2
+        assert topk_metric.value == pytest.approx(0.5)
+
+    def test_argmax_accuracy_pure_python(self):
+        """Argmax accuracy computed correctly without numpy."""
+        from unittest.mock import patch
+
+        ref = [[1.0, 3.0, 2.0], [5.0, 1.0, 2.0]]
+        cand = [[1.0, 3.0, 2.0], [1.0, 5.0, 2.0]]  # second row different argmax
+        cfg = ToleranceConfig()
+        with patch.object(correctness, "HAS_NUMPY", False):
+            report = compare_logits(ref, cand, cfg)
+        argmax_metric = [m for m in report.metrics if m.name == "argmax_accuracy"][0]
+        assert argmax_metric.value == pytest.approx(0.5)
+
+    def test_identical_passes_pure_python(self):
+        """Identical logits pass all checks without numpy."""
+        from unittest.mock import patch
+
+        ref = [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]
+        cfg = ToleranceConfig()
+        with patch.object(correctness, "HAS_NUMPY", False):
+            report = compare_logits(ref, ref, cfg)
+        assert report.passed
+
+    def test_context_scaling_pure_python(self):
+        """Context-length scaling works without numpy."""
+        from unittest.mock import patch
+
+        ref = [[1.0, 2.0, 3.0]]
+        cand = [[1.01, 2.0, 2.99]]
+        cfg = ToleranceConfig(atol=0.005, kl_div_threshold=0.001, drift_scale_factor=2.0)
+        with patch.object(correctness, "HAS_NUMPY", False):
+            report = compare_logits(ref, cand, cfg, context_length=131072)
+        # Should have drift_tolerance_scale metric
+        scale_metric = [m for m in report.metrics if m.name == "drift_tolerance_scale"]
+        assert len(scale_metric) == 1
+        assert scale_metric[0].value > 1.0
+
+    def test_empty_input_pure_python(self):
+        """Empty reference list handled gracefully without numpy."""
+        from unittest.mock import patch
+
+        ref: list[list[float]] = []
+        cand: list[list[float]] = []
+        cfg = ToleranceConfig()
+        with patch.object(correctness, "HAS_NUMPY", False):
+            report = compare_logits(ref, cand, cfg)
+        # Should not crash — argmax_accuracy handles empty ref
+        argmax_metric = [m for m in report.metrics if m.name == "argmax_accuracy"][0]
+        assert argmax_metric.value == 0.0
 
 
 if __name__ == "__main__" and not pytest.version_info:

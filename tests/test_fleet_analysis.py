@@ -719,3 +719,67 @@ class TestRealDataIntegration:
         assert "Pi 5" in report
         assert "Jetson" in report
         assert "RK3588" in report
+
+
+class TestGetManifestSha:
+    """Cover get_manifest_sha and _manifest_path_for_csv edge cases."""
+
+    def test_missing_manifest_returns_none(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(fa, "MANIFEST_DIR", str(tmp_path))
+        sha, dirty, full = fa.get_manifest_sha(str(tmp_path / "nonexistent.csv"))
+        assert sha is None
+        assert dirty is None
+        assert full is None
+
+    def test_corrupt_manifest_returns_none(self, tmp_path, monkeypatch):
+        """Malformed JSON triggers ValueError → (None, None, None)."""
+        monkeypatch.setattr(fa, "MANIFEST_DIR", str(tmp_path))
+        (tmp_path / "rk3588-t4.json").write_text("{not valid json")
+        sha, dirty, full = fa.get_manifest_sha("rk3588-t4.csv")
+        assert sha is None
+        assert dirty is None
+        assert full is None
+
+    def test_valid_manifest(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(fa, "MANIFEST_DIR", str(tmp_path))
+        (tmp_path / "rk3588-t4.json").write_text(
+            json.dumps({"git": {"sha": "abcdef1234567890", "dirty": False}})
+        )
+        sha, dirty, full = fa.get_manifest_sha("rk3588-t4.csv")
+        assert sha == "abcdef123456"
+        assert dirty is False
+        assert full == "abcdef1234567890"
+
+    def test_empty_sha_returns_none(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(fa, "MANIFEST_DIR", str(tmp_path))
+        (tmp_path / "rk3588-t4.json").write_text(json.dumps({"git": {"sha": "", "dirty": True}}))
+        sha, dirty, full = fa.get_manifest_sha("rk3588-t4.csv")
+        assert sha is None
+        assert dirty is True
+
+    def test_big_suffix_finds_shared_manifest(self, tmp_path, monkeypatch):
+        """_big CSV finds the shared manifest (without _big suffix)."""
+        monkeypatch.setattr(fa, "MANIFEST_DIR", str(tmp_path))
+        (tmp_path / "rk3588-t4.json").write_text(
+            json.dumps({"git": {"sha": "abc123def456", "dirty": False}})
+        )
+        sha, dirty, full = fa.get_manifest_sha("rk3588-t4_big.csv")
+        assert sha == "abc123def456"
+
+
+class TestMainCLI:
+    """Cover fleet_analysis.main()."""
+
+    def test_main_creates_report(self, tmp_path, monkeypatch):
+        """main() writes report and plot files."""
+        setup_fleet_data(tmp_path)
+        monkeypatch.chdir(tmp_path)
+        import sys
+
+        old_argv = sys.argv
+        sys.argv = ["fleet_analysis", "--output-dir", str(tmp_path / "out")]
+        try:
+            fa.main()
+        finally:
+            sys.argv = old_argv
+        assert os.path.exists(str(tmp_path / "out" / "fleet_bandwidth_scaling.md"))

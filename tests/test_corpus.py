@@ -23,6 +23,9 @@ from corpus import (
     save_corpus,
     save_manifest,
 )
+from corpus import (
+    main as corpus_main,
+)
 
 # ---------------------------------------------------------------------------
 # Haystack generation
@@ -347,3 +350,69 @@ class TestSerialisation:
         assert d["task_type"] == "niah_multikey"
         assert d["metadata"]["num_keys"] == 10
         assert d["metadata"]["query_key"] == item.metadata["query_key"]
+
+
+# ---------------------------------------------------------------------------
+# CLI — main()
+# ---------------------------------------------------------------------------
+
+
+class TestMainCLI:
+    """Cover the corpus.main() entry point (lines 623-683)."""
+
+    def test_stdout_mode_prints_first_prompt(self, tmp_path, capsys):
+        """--stdout writes the first prompt to stdout, returns 0."""
+        rc = corpus_main(["--stdout", "--context-lengths", "4096", "--task", "niah_single"])
+        assert rc == 0
+        captured = capsys.readouterr()
+        assert len(captured.out) > 100  # actual prompt text
+
+    def test_save_mode_creates_files(self, tmp_path, capsys):
+        """Normal mode saves files to --output-dir, prints summary."""
+        out = str(tmp_path / "prompts")
+        rc = corpus_main(
+            ["--output-dir", out, "--context-lengths", "4096", "--task", "niah_single"]
+        )
+        assert rc == 0
+        captured = capsys.readouterr()
+        assert "Generated" in captured.out
+        assert "4096" in captured.out
+        assert os.path.isdir(out)
+
+    def test_task_all_generates_both(self, tmp_path, capsys):
+        """--task all generates both niah_single and niah_multikey."""
+        out = str(tmp_path / "prompts")
+        rc = corpus_main(["--output-dir", out, "--context-lengths", "4096", "--task", "all"])
+        assert rc == 0
+        captured = capsys.readouterr()
+        assert "niah_single" in captured.out
+        assert "niah_multikey" in captured.out
+
+    def test_custom_seed(self, tmp_path, capsys):
+        """Custom --seed is reflected in output."""
+        out = str(tmp_path / "prompts")
+        rc = corpus_main(
+            [
+                "--output-dir",
+                out,
+                "--context-lengths",
+                "4096",
+                "--task",
+                "niah_single",
+                "--seed",
+                "99",
+            ]
+        )
+        assert rc == 0
+        captured = capsys.readouterr()
+        assert "99" in captured.out
+
+    def test_multikey_task(self, tmp_path, capsys):
+        """--task niah_multikey generates only multikey prompts."""
+        out = str(tmp_path / "prompts")
+        rc = corpus_main(
+            ["--output-dir", out, "--context-lengths", "4096", "--task", "niah_multikey"]
+        )
+        assert rc == 0
+        captured = capsys.readouterr()
+        assert "niah_multikey" in captured.out

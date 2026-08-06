@@ -19,8 +19,11 @@ import tempfile
 # Make bench/ importable when run from repo root or from tests/.
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+import bench.manifest as manifest_mod
 from bench.manifest import (
     _core_count,
+    _cpu_model,
+    _cpufreq_topology,
     _default_run_id,
     _isa_features,
     _meminfo,
@@ -28,6 +31,7 @@ from bench.manifest import (
     _parallelism,
     _read_int_file,
     _safe,
+    _thermal_zones,
     _utc_timestamp,
     capture,
     manifest_ref,
@@ -349,3 +353,87 @@ class TestParallelism:
         result = _parallelism()
         assert result["omp_num_threads"] is None
         assert result["threads_source"] == "core_count_default"
+
+
+# ---------------------------------------------------------------------------
+# Platform-dependent edge cases (lines 149, 187, 193, 232, 235, 238, 261, 283, 311-312)
+# ---------------------------------------------------------------------------
+
+
+class TestCpuModelFallback:
+    """Cover _cpu_model fallback to platform.processor (line 149)."""
+
+    def test_no_match_falls_back_to_processor(self, monkeypatch):
+        """When /proc/cpuinfo has no model name, falls back to platform.processor."""
+        monkeypatch.setattr(manifest_mod, "_read_text", lambda path: "unrelated: text\n")
+        monkeypatch.setattr(manifest_mod.platform, "processor", lambda: "Generic CPU")
+        assert _cpu_model() == "Generic CPU"
+
+    def test_no_text_no_processor(self, monkeypatch):
+        """When /proc/cpuinfo unreadable and processor empty, returns None."""
+        monkeypatch.setattr(manifest_mod, "_read_text", lambda path: None)
+        monkeypatch.setattr(manifest_mod.platform, "processor", lambda: "")
+        assert _cpu_model() is None
+
+
+class TestCpufreqTopologyMissing:
+    """Cover _cpufreq_topology when /sys tree absent (lines 187, 193)."""
+
+    def test_no_sys_tree_returns_none(self, monkeypatch):
+        monkeypatch.setattr(manifest_mod.os.path, "isdir", lambda p: False)
+        assert _cpufreq_topology() is None
+
+    def test_empty_cpu_dirs_returns_none(self, monkeypatch):
+        """sys tree exists but no cpu[0-9]* dirs → None."""
+        monkeypatch.setattr(manifest_mod.os.path, "isdir", lambda p: True)
+        monkeypatch.setattr(manifest_mod, "glob", type("G", (), {"glob": lambda *a: []}))
+        assert _cpufreq_topology() is None
+
+
+class TestIsaFeaturesEdge:
+    """Cover _isa_features non-aarch64 and empty paths (lines 232, 235, 238)."""
+
+    def test_non_aarch64_returns_none(self, monkeypatch):
+        monkeypatch.setattr(manifest_mod, "_machine_arch", lambda: "x86_64")
+        assert _isa_features() is None
+
+    def test_no_cpuinfo_returns_none(self, monkeypatch):
+        monkeypatch.setattr(manifest_mod, "_machine_arch", lambda: "aarch64")
+        monkeypatch.setattr(manifest_mod, "_read_text", lambda path: None)
+        assert _isa_features() is None
+
+    def test_no_features_line_returns_none(self, monkeypatch):
+        monkeypatch.setattr(manifest_mod, "_machine_arch", lambda: "aarch64")
+        monkeypatch.setattr(manifest_mod, "_read_text", lambda path: "processor : 0\n")
+        assert _isa_features() is None
+
+
+class TestThermalZonesMissing:
+    """Cover _thermal_zones when /sys/class/thermal absent (line 261)."""
+
+    def test_no_thermal_dir_returns_none(self, monkeypatch):
+        monkeypatch.setattr(manifest_mod.os.path, "isdir", lambda p: False)
+        assert _thermal_zones() is None
+
+
+class TestMeminfoMissing:
+    """Cover _meminfo when /proc/meminfo unreadable (line 283)."""
+
+    def test_no_meminfo_returns_none(self, monkeypatch):
+        monkeypatch.setattr(manifest_mod, "_read_text", lambda path: None)
+        assert _meminfo() is None
+
+
+class TestOptionalPackageVersionsException:
+    """Cover _optional_package_versions generic exception handler (lines 311-312)."""
+
+    def test_generic_exception_handled(self, monkeypatch):
+        """A non-PackageNotFoundError exception is caught → value is None."""
+
+        def boom(name):
+            raise RuntimeError("unexpected")
+
+        monkeypatch.setattr(manifest_mod, "_pkg_version", boom)
+        result = _optional_package_versions()
+        # All should be None since every call raises RuntimeError
+        assert all(v is None for v in result.values())
