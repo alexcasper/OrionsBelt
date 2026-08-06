@@ -29,15 +29,13 @@ import os
 DEVICES = [
     # (display_name, csv_path, spec_gibs, cores, isa_generation)
     # Fleet comparison uses single-threaded data for fair cross-device comparison.
-    # Pi5 and RK3588 (t4) were captured at commit 28729f3; the Jetsons at later commits.
-    # That mismatch, plus the fact that every manifest records a dirty tree (except
-    # rk3588-t3.json at 553a96e, which is clean), is why the provenance audit below
-    # limits this table to qualitative conclusions.
+    # Fleet devices are at various commits. RK3588 t4 (fe32f1c) and t3 (553a96e)
+    # are both clean-tree runs with optimized kernels (OpenMP + NEON unrolling) and
+    # agree within 4-5% on all three kernels. The Jetsons and Pi 5 are at earlier
+    # commits — see the provenance audit below for why this limits quantitative claims.
     #
-    # RK3588 rows use host t4, not t3. t3 was re-run at 553a96e with optimized kernels
-    # (OpenMP + NEON unrolling) — its data is clean but at a different code level,
-    # so it belongs in the optimization-impact section, not the cross-device comparison.
-    # t4 (28729f3, pre-optimization) matches the Pi 5's commit for a fair comparison.
+    # RK3588 rows use host t4 (fe32f1c, clean). t3 serves as a cross-check on the
+    # same hardware class and appears in the replicate spread section.
     ("Pi 5", "results/raw/pi5-r5.csv", 17.0, "4x Cortex-A76 @ 2.4 GHz", "Armv8.2-A + dotprod"),
     (
         "RK3588 big",
@@ -415,11 +413,11 @@ def generate_report(output_path):
     # ---- 4B comparison ----
     lines.append("## Achieved throughput vs spec bandwidth (4B model, seq=64)")
     lines.append("")
-    lines.append("All fleet devices were benchmarked single-threaded at commit `28729f3`")
-    lines.append("(pre-OpenMP, pre-NEON-unrolling). The j2 single-threaded numbers below")
-    lines.append("are a fresh run of the current binary with `OMP_NUM_THREADS=1` to match")
-    lines.append("that optimization level for fair comparison. See the optimization-impact")
-    lines.append("section below for what 4-core OpenMP + NEON unrolling achieves on j2.")
+    lines.append("Fleet devices are at various commits — see the provenance audit below.")
+    lines.append("RK3588 (t4) is at `fe32f1c` with optimized kernels (clean tree). The j2")
+    lines.append("single-threaded numbers are a fresh run of the current binary with")
+    lines.append("`OMP_NUM_THREADS=1`. See the optimization-impact section below for what")
+    lines.append("4-core OpenMP + NEON unrolling achieves on j2.")
     lines.append("")
 
     for model in ["Qwen3.5-4B", "Qwen3.5-0.8B"]:
@@ -574,21 +572,19 @@ def generate_report(output_path):
         worst = max(spread_ratios)
         lines.append(
             "The RK3588 pair was historically the most concerning — two hosts on the same "
-            "core class. Their CSVs originally shared commit `28729f3`, but **t3 was "
-            "re-run at `553a96e`** (clean tree, optimized kernels: OpenMP + NEON unrolling) "
-            "per the `ob-bf7` 2026-08-06 update, while t4 remains at `28729f3` (dirty tree, "
-            "pre-optimization). The spread between them is now a **code-version difference, "
-            "not an environmental one**. On the big cluster, t3 reads 11.07 GiB/s (optimized) "
-            "vs t4 at 3.29 (pre-opt) — a 3.4x gap that is the optimization stack's real-world "
-            "impact on the same hardware. Worst replicate spread on the fleet is "
-            f"**{worst:.2f}x**."
+            "core class. Both t3 (`553a96e`) and t4 (`fe32f1c`) are now clean-tree runs "
+            "with optimized kernels (OpenMP + NEON unrolling). On the big cluster, they "
+            "agree within ~5% (t3 11.07 vs t4 11.56 GiB/s on scan) — this is now an "
+            "environmental difference between physical boards, not a code-version artifact. "
+            "The historical 3.4x gap (when t4 was pre-optimization) was the optimization "
+            f"stack's real-world impact on the same hardware. Worst replicate spread on "
+            f"the fleet is **{worst:.2f}x**."
         )
         lines.append("")
         lines.extend(_provenance_audit_lines())
         lines.append(
-            "This report selects `t4` for RK3588 (pre-optimization, same commit as Pi 5 for a "
-            "fair cross-device comparison) and `r5` for the Pi 5. t3's optimized data is "
-            "shown separately in the optimization-impact analysis below."
+            "This report uses `t4` for RK3588 (clean, optimized at `fe32f1c`) and `r5` "
+            "for the Pi 5. t3 confirms the RK3588 result on independent silicon."
         )
         lines.append(
             "**Treat the predictions as order-of-magnitude, not as a fit.** The "
@@ -649,35 +645,29 @@ def generate_report(output_path):
             f"- This is ~{conservative_low / O6_SPEC_GIBS * 100:.0f}-{conservative_high / O6_SPEC_GIBS * 100:.0f}% of spec bandwidth, vs {rk_big_scan / 34.0 * 100:.0f}% achieved on A76"
         )
         lines.append("")
-        # The other RK3588 host (t3) — shown for transparency. t3 was re-run at 553a96e
-        # with optimized kernels (OpenMP + NEON unrolling), so it reads much higher than
-        # t4. This is NOT a same-commit comparison — it shows what the optimization
-        # stack achieves on identical silicon. The O6 extrapolation anchors on t4
-        # (pre-optimization, same commit as Pi 5) for the cross-device comparison.
+        # The other RK3588 host (t3) — shown for transparency. Both t3 and t4 are now
+        # clean-tree, optimized runs. They agree within ~5%, confirming cross-device
+        # reproducibility on independent silicon.
         rk_t3_rows = load_device_csv("results/raw/rk3588-t3_big.csv")
         rk_t3 = get_gibs(rk_t3_rows, "Qwen3.5-4B", "gdn_gated_scan")
         rk_t3_spread = get_spread(rk_t3_rows, "Qwen3.5-4B", "gdn_gated_scan")
         rk_t3_sha, rk_t3_dirty, _ = get_manifest_sha("results/raw/rk3588-t3_big.csv")
         if rk_t3 and rk_t3_spread:
-            t3_low, t3_high = rk_t3 * 1.5, rk_t3 * 2.5
             lines.append(
-                f"**On the anchor choice.** t3 was re-run at commit `{rk_t3_sha or '?'}`"
-                f"{' (clean tree)' if not rk_t3_dirty else ' (dirty tree)'} with optimized "
-                f"kernels (OpenMP + NEON unrolling), reading **{rk_t3:.2f} GiB/s** "
-                f"(spread {rk_t3_spread:.1f}%) — vs t4 at {rk_big_scan:.2f} at `28729f3` "
-                f"(pre-optimization). Extrapolating t3's optimized numbers would give "
-                f"{t3_low:.1f}-{t3_high:.1f} GiB/s on the O6, but that conflates the IPC "
-                "gain from A720 cores with the optimization-stack gain from the A76. "
-                "t4 is used for the cross-device comparison (same commit as Pi 5); t3's "
-                "data shows the optimization impact on identical A76 silicon."
+                f"**On the anchor choice.** Both t3 (`{rk_t3_sha or '?'}`"
+                f"{' (clean tree)' if not rk_t3_dirty else ' (dirty tree)'}) and t4 "
+                f"(`fe32f1c`, clean) are optimized runs. t3 reads **{rk_t3:.2f} GiB/s** "
+                f"(spread {rk_t3_spread:.1f}%) vs t4 at {rk_big_scan:.2f} — they agree "
+                f"within ~{abs(rk_t3 - rk_big_scan) / min(rk_t3, rk_big_scan) * 100:.0f}%. "
+                "The O6 extrapolation anchors on t4; t3 confirms the result on "
+                "independent silicon."
             )
             lines.append("")
             lines.append(
                 f"Published claim: **~{conservative_low:.0f}-{conservative_high:.0f} GiB/s** "
-                "(from pre-optimization A76). t3's optimized run suggests the O6 with both "
-                "A720 IPC gains AND the optimization stack could reach higher. Resolving "
-                "`ob-bf7` — one clean-tree, commit-matched sweep with pinning and thermals "
-                "recorded — narrows this more than any modelling refinement would."
+                "(from optimized A76, confirmed by two independent RK3588 units). Resolving "
+                "`ob-bf7` — one commit-matched sweep across all devices with pinning and "
+                "thermals recorded — narrows this more than any modelling refinement would."
             )
             lines.append("")
         lines.append("To check this prediction: if the O6 board arrives, run")
@@ -728,33 +718,33 @@ def generate_report(output_path):
     lines.append("5x more bandwidth mean the O6 will scale better than the fleet devices.")
     lines.append("")
 
-    # ---- Optimization impact on RK3588 A76 (t4 pre-opt vs t3 optimized) ----
-    lines.append("### RK3588 A76: optimization stack impact")
+    # ---- RK3588 A76 cross-device agreement (both optimized) ----
+    lines.append("### RK3588 A76: cross-device agreement")
     lines.append("")
     lines.append(
-        "t4 (commit `28729f3`, pre-optimization) vs t3 (commit `553a96e`, optimized: "
-        "OpenMP + NEON unrolling) on the same A76 big cluster. Different physical "
-        "boards, so this is indicative — but j1's same-device re-run on t3 itself "
-        "showed 2.26 → 11.07 GiB/s on Scan (4.9x), confirming the direction."
+        "Both t3 (`553a96e`) and t4 (`fe32f1c`) are clean-tree runs with optimized "
+        "kernels (OpenMP + NEON unrolling) on different physical boards. Their "
+        "agreement confirms the measurement is reproducible on independent silicon."
     )
     lines.append("")
-    lines.append("| Kernel (4B, seq=64) | t4 pre-opt (GiB/s) | t3 optimized (GiB/s) | Speedup |")
-    lines.append("|--------------------|--------------------|-----------------------|---------|")
+    lines.append("| Kernel (4B, seq=64) | t3 (GiB/s) | t4 (GiB/s) | Agreement |")
+    lines.append("|--------------------|-----------|-----------|-----------|")
     t4_rows = load_device_csv("results/raw/rk3588-t4_big.csv")
     t3_rows = load_device_csv("results/raw/rk3588-t3_big.csv")
     for kern in ["gdn_cumdecay", "gdn_gated_scan", "gdn_causal_dwconv1d"]:
-        pre = get_gibs(t4_rows, "Qwen3.5-4B", kern)
-        opt = get_gibs(t3_rows, "Qwen3.5-4B", kern)
-        if pre and opt:
-            speedup = opt / pre
+        t3_val = get_gibs(t3_rows, "Qwen3.5-4B", kern)
+        t4_val = get_gibs(t4_rows, "Qwen3.5-4B", kern)
+        if t3_val and t4_val:
+            diff_pct = abs(t3_val - t4_val) / min(t3_val, t4_val) * 100
             label = KERNEL_LABELS.get(kern, kern)
-            lines.append(f"| {label} | {pre:.2f} | {opt:.2f} | {speedup:.1f}x |")
+            lines.append(f"| {label} | {t3_val:.2f} | {t4_val:.2f} | {diff_pct:.0f}% |")
     lines.append("")
     lines.append(
-        "The optimization stack delivers 2.6-5.1x on A76 silicon — larger than the "
-        "2.6-3.1x seen on A57 (Jetson). This is consistent with wider OoO pipelines "
-        "benefiting more from NEON unrolling and thread parallelism. t3's clean-tree "
-        "manifest (`553a96e`, `dirty=false`) is the only clean provenance in the fleet."
+        "The optimization stack (OpenMP + NEON unrolling) was measured by j1's "
+        "same-device re-run on t3: gated scan went from 2.26 → 11.07 GiB/s (4.9x), "
+        "confirming the real-world impact of the optimization track on A76 silicon. "
+        "Both units now run optimized kernels, and their ~5% agreement is purely "
+        "environmental noise between physical boards."
     )
     lines.append("")
     j2_opt_all = []
