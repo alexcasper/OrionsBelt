@@ -15,3 +15,4 @@ dist/
 
 # Downloaded model weights — never committed (license compliance, repo size)
 weights/
+*.rknn

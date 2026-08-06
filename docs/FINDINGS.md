@@ -154,7 +154,87 @@ existing inference path — and a candidate baseline, though its GDN support is 
 
 ---
 
-## 3. Toolchain and KleidiAI coverage for Armv9.2 GDN kernels (2026-08-02)
+## 2a. Cross-vendor: Rockchip RKNN also rejects runtime-loop recurrence (2026-08-06)
+
+**Bead `ob-t3b.5`. Run on rk3588-t4 (RK3588, Cortex-A76/A55 + 6 TOPS Rockchip NPU) with rknn-toolkit2 2.3.2.**
+
+### Motivation
+
+§1 established that the CIX NOE Compiler cannot express a runtime-length sequential recurrence —
+Scan is rejected outright, Loop is accepted only with a compile-time trip count (and then only via
+static unrolling). The question: is this a CIX-specific limitation, or a general property of edge
+NPU toolchains? If Rockchip's RKNN — an entirely independent vendor toolchain on different silicon —
+fails the same way, the finding strengthens from "a CIX limitation" to "edge NPU toolchains
+generally cannot host a linear-attention recurrence."
+
+### Method
+
+The same seven hand-authored ONNX probe graphs from §1 (`artifacts/npu_op_probe/`) were fed to the
+RKNN toolkit via `rknn.config(target_platform='rk3588') → load_onnx → build(do_quantization=False)
+→ export_rknn`. Generator and runner: [`scripts/rknn_op_probe.py`](../scripts/rknn_op_probe.py).
+Logs committed under [`artifacts/npu_op_probe/audit_rknn/`](../artifacts/npu_op_probe/audit_rknn/).
+
+### Results
+
+| Probe | ONNX ops | CIX NOE | RKNN (RK3588) |
+|---|---|---|---|
+| causal depthwise Conv1D | `Conv` (groups=C, asym pads) | ✅ supported | ✅ compiles |
+| gated decay | `Log`, `CumSum`, `Exp` | ✅ supported | ✅ compiles |
+| delta-rule state update | `MatMul`, `Sub`, `Add`, `Transpose` | ✅ supported | ✅ compiles |
+| elementwise gate chain | `Sigmoid`, `Softplus`, `Neg`, `Exp`, `Mul` | ✅ supported | ✅ compiles |
+| chunk recurrence via `Scan` | `Scan` | ❌ **rejected** | ✅ **compiles** |
+| chunk recurrence via `Loop`, const trip | `Loop` | ⚠️ **unrolled** (static) | ❌ **rejected** |
+| chunk recurrence via `Loop`, runtime trip | `Loop` | ❌ **rejected** | ❌ **rejected** |
+
+### The Scan surprise — and why it does not change the conclusion
+
+RKNN's compiler **accepts** ONNX `Scan`, which CIX rejected outright. The compiled model (8 KB)
+was verified in RKNN's built-in simulator against a hand-written reference implementation: with
+random input, max absolute error is 0.001 (fp16 precision); with zero initial state, the output at
+chunk 3 reflects accumulation through all four chunks (not passthrough), confirming the recurrence
+is genuinely computed.
+
+```
+# RKNN simulator vs reference, zero initial state
+ys[3] reference: [-0.984  0.076 -1.103  0.857 -0.222 ...]
+ys[3] RKNN sim:  [-0.983  0.076 -1.101  0.857 -0.222 ...]
+Max abs diff: 0.0017
+```
+
+However, the simulator runs on onnxruntime — not on the NPU. The on-NPU runtime library
+(`librknnrt.so`) is not present on this board (Ubuntu 24.04 mainline kernel without the `rknpu`
+driver module), so **we cannot confirm whether the scan body executes on the NPU or silently falls
+back to CPU at runtime**. This is the same silent-fallback risk flagged in §1 for the CIX case.
+
+### What does generalise — and what does not
+
+**Generalises (both vendors agree):**
+
+- All four arithmetic operator families (Conv, Log/CumSum/Exp, MatMul/Sub/Add, elementwise gates)
+  compile on both toolchains. The per-chunk math is not the gap.
+- `Loop` with a **runtime** trip count is **rejected by both**. Neither toolchain can express a
+  variable-length sequential control flow via `Loop`. This is the finding that generalises.
+
+**Does not generalise (vendors diverge):**
+
+- `Scan`: RKNN accepts it; CIX does not. This is a genuine toolchain difference — the ONNX `Scan`
+  operator's subgraph-based iteration is within RKNN's IR but outside CIX's.
+- `Loop` with a **const** trip count: CIX accepts it via static unrolling (producing N copies of
+  the body, no loop construct in IR); RKNN rejects even this, with: *"The Loop will cause the graph
+  to be a dynamic graph! Remove it manually and try again."* RKNN's rejection is stricter.
+
+### Practical implication
+
+A developer porting GDN to the RK3588 NPU could potentially express the chunk-to-chunk recurrence
+as an ONNX `Scan` rather than a `Loop`, and RKNN would compile it. Whether it runs on the NPU at
+production scale (262K context = 4,096 chunks per layer × 24 layers) without falling back to CPU is
+unanswered by this probe — but the compilation acceptance is itself a meaningful difference from the
+CIX platform, where no control-flow op is available at all.
+
+For the project's design (PLAN.md §3.1: CPU hosts the GDN recurrence), this cross-vendor probe
+confirms the decision for both platforms: the safe assumption is that edge NPU toolchains cannot be
+relied upon to host a runtime-length recurrence, even if one vendor's compiler accepts the `Scan`
+construct.
 
 Investigating what compiler targets Cortex-A720, and whether Arm's own micro-kernel library
 already contains anything we need for the CPU-hosted GDN scan (`ob-8qt.1`).
