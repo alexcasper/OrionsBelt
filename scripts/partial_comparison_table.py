@@ -114,6 +114,13 @@ PROV = {
     "rk3588-t3_little.csv": ("t3_20260806T053612Z_553a96e", "553a96e", False),
     "rk3588-t4_big.csv": ("t4_20260802T211249Z_28729f3", "28729f3", True),
     "rk3588-t4_little.csv": ("t4_20260802T211249Z_28729f3", "28729f3", True),
+    # Fleet sweep (ob-bf7): commit-matched, clean-tree, single-threaded
+    "jetson-j1-clean.csv": ("jetson-j1-clean_sweep_234807d", "234807d", False),
+    "jetson-j2-clean.csv": ("jetson-j2-clean_sweep_234807d", "234807d", False),
+    "rk3588-t3-clean.csv": ("rk3588-t3-clean_sweep_234807d", "234807d", False),
+    "rk3588-t3-little-clean.csv": ("rk3588-t3-little-clean_sweep_234807d", "234807d", False),
+    "rk3588-t4-clean.csv": ("rk3588-t4-clean_sweep_234807d", "234807d", False),
+    "rk3588-t4-little-clean.csv": ("rk3588-t4-little-clean_sweep_234807d", "234807d", False),
 }
 
 
@@ -180,6 +187,26 @@ def main() -> int:
         cv_s = f"{cv[0]:<5.2f}" if cv else "  —  "
         print(f"  {label:<16} {sha:<20} {ds:<6}  {cd_s}  {sc_s}  {cv_s}")
     print("  (t4 preferred over t3 per ob-bf7: t3 scan spread=153% contaminated; t4 spread=17%)")
+
+    print("\n  --- Fleet sweep (ob-bf7): commit 234807d, clean tree, single-thread ---")
+    sweep = [
+        ("RK3588 t4 big (clean)", "rk3588-t4-clean.csv"),
+        ("RK3588 t3 big (clean)", "rk3588-t3-clean.csv"),
+        ("RK3588 t4 little (cln)", "rk3588-t4-little-clean.csv"),
+        ("RK3588 t3 little (cln)", "rk3588-t3-little-clean.csv"),
+        ("Jetson j1 (clean)", "jetson-j1-clean.csv"),
+        ("Jetson j2 (clean)", "jetson-j2-clean.csv"),
+    ]
+    for label, fname in sweep:
+        rows = load_kernel(fname)
+        cd = kv(rows, "Qwen3.5-4B", "gdn_cumdecay", 64)
+        sc = kv(rows, "Qwen3.5-4B", "gdn_gated_scan", 64)
+        cv = kv(rows, "Qwen3.5-4B", "gdn_causal_dwconv1d", 64)
+        cd_s = f"{cd[0]:<5.2f}" if cd else "  —  "
+        sc_s = f"{sc[0]:<5.2f}" if sc else "  —  "
+        cv_s = f"{cv[0]:<5.2f}" if cv else "  —  "
+        print(f"  {label:<20} 234807d             CLEAN  {cd_s}  {sc_s}  {cv_s}")
+    print("  (All at commit 234807d, dirty=false, OMP_NUM_THREADS=1, governor=performance)")
 
     print("\n" + "=" * 90)
     print("OPTIMIZATION LADDER on Jetson (Qwen3.5-4B, seq=64) — GiB/s @ p50 / p50 µs")
