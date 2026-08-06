@@ -47,7 +47,7 @@ echo
 # --- Test 1: fp32 kernel correctness (gated_scan, cumdecay, causal_dwconv1d) ---
 echo "--- Test 1: fp32 kernel correctness ---"
 if $CC -O3 $MARCH -static \
-    "$K/gdn_sve.c" "$K/test_gdn_sve.c" -o "$OUT/test_fp32" -lm 2>/dev/null; then
+    "$K/gdn_sve.c" "$K/test_gdn_sve.c" -I"$K" -o "$OUT/test_fp32" -lm 2>/dev/null; then
     OUTPUT=$("$OUT/test_fp32" 2>&1) || true
     echo "$OUTPUT" | sed 's/^/  /'
     if echo "$OUTPUT" | grep -q "bit-identical to matched reference: YES"; then
@@ -65,8 +65,44 @@ echo
 # --- Test 2: mixed-precision (bf16/fp16) kernel correctness ---
 echo "--- Test 2: mixed-precision (bf16/fp16) kernel correctness ---"
 if $CC -O3 $MARCH -static \
-    "$K/gdn_sve.c" "$K/test_gdn_mixed.c" -o "$OUT/test_mixed" -lm 2>/dev/null; then
+    "$K/gdn_sve.c" "$K/test_gdn_mixed.c" -I"$K" -o "$OUT/test_mixed" -lm 2>/dev/null; then
     OUTPUT=$("$OUT/test_mixed" 2>&1) || true
+    echo "$OUTPUT" | sed 's/^/  /'
+    if echo "$OUTPUT" | grep -q "ALL TESTS PASSED"; then
+        echo "  RESULT: PASS"
+    else
+        echo "  RESULT: FAIL"
+        FAILURES=$((FAILURES + 1))
+    fi
+else
+    echo "  RESULT: SKIP (build failed — toolchain may not support $MARCH)"
+fi
+echo
+
+# --- Test 3: delta-rule matmul correctness ---
+echo "--- Test 3: delta-rule matmul correctness ---"
+if $CC -O3 $MARCH -static \
+    "$K/gdn_delta_matmul.c" "$K/test_gdn_delta_matmul.c" -I"$K" \
+    -o "$OUT/test_matmul" -lm 2>/dev/null; then
+    OUTPUT=$("$OUT/test_matmul" 2>&1) || true
+    echo "$OUTPUT" | sed 's/^/  /'
+    if echo "$OUTPUT" | grep -q "ALL PASS"; then
+        echo "  RESULT: PASS"
+    else
+        echo "  RESULT: FAIL"
+        FAILURES=$((FAILURES + 1))
+    fi
+else
+    echo "  RESULT: SKIP (build failed — toolchain may not support $MARCH)"
+fi
+echo
+
+# --- Test 4: GDN-2 decoupled-gating scan correctness ---
+echo "--- Test 4: GDN-2 decoupled-gating scan correctness ---"
+if $CC -O3 $MARCH -static \
+    "$K/gdn_sve.c" "$K/test_gdn2_scan.c" -I"$K" \
+    -o "$OUT/test_gdn2" -lm 2>/dev/null; then
+    OUTPUT=$("$OUT/test_gdn2" 2>&1) || true
     echo "$OUTPUT" | sed 's/^/  /'
     if echo "$OUTPUT" | grep -q "ALL TESTS PASSED"; then
         echo "  RESULT: PASS"

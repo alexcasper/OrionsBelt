@@ -15,9 +15,11 @@ if _ROOT not in sys.path:
 
 from bench.harness import QWEN35_08B, QWEN35_4B  # noqa: E402
 from bench.memory import (  # noqa: E402
+    _fmt_bytes,
     cross_check,
     decomposition,
     kv_cache_bytes,
+    print_decomposition,
     recurrent_state_bytes,
     weights_bytes,
 )
@@ -156,3 +158,72 @@ class TestCrossCheck:
         )
         assert len(discrepancies) == 1
         assert "dtype mismatch" in discrepancies[0]
+
+
+# ---------------------------------------------------------------------------
+# _fmt_bytes
+# ---------------------------------------------------------------------------
+
+
+class TestFmtBytes:
+    def test_bytes(self):
+        assert _fmt_bytes(512) == "512.0 B"
+
+    def test_kib(self):
+        assert _fmt_bytes(2048) == "2.0 KiB"
+
+    def test_mib(self):
+        assert _fmt_bytes(5 * 1024 * 1024) == "5.0 MiB"
+
+    def test_gib(self):
+        assert _fmt_bytes(8 * 1024**3) == "8.0 GiB"
+
+    def test_tib(self):
+        assert _fmt_bytes(2 * 1024**4) == "2.0 TiB"
+
+    def test_pib_overflow(self):
+        assert _fmt_bytes(1024**5) == "1.0 PiB"
+
+    def test_zero(self):
+        assert _fmt_bytes(0) == "0.0 B"
+
+
+# ---------------------------------------------------------------------------
+# print_decomposition
+# ---------------------------------------------------------------------------
+
+
+class TestPrintDecomposition:
+    def test_prints_header_and_rows(self, capsys):
+        print_decomposition(QWEN35_4B, [4096, 32768])
+        captured = capsys.readouterr()
+        assert "Memory decomposition" in captured.out
+        assert "GDN" in captured.out
+        assert "FA layers" in captured.out
+        # Both context lengths should appear
+        assert "4,096" in captured.out
+        assert "32,768" in captured.out
+
+    def test_prints_weights_column(self, capsys):
+        print_decomposition(QWEN35_4B, [4096])
+        captured = capsys.readouterr()
+        assert "Weights" in captured.out
+        assert "KV cache" in captured.out
+        assert "GDN state" in captured.out
+
+    def test_prints_saved_column(self, capsys):
+        print_decomposition(QWEN35_4B, [32768])
+        captured = capsys.readouterr()
+        assert "Saved" in captured.out
+
+    def test_single_context_length(self, capsys):
+        print_decomposition(QWEN35_08B, [4096])
+        captured = capsys.readouterr()
+        assert "4,096" in captured.out
+        assert "Qwen3.5-0.8B" in captured.out
+
+    def test_large_context(self, capsys):
+        """131072 context should produce output with very large KV cache."""
+        print_decomposition(QWEN35_4B, [131072])
+        captured = capsys.readouterr()
+        assert "131,072" in captured.out

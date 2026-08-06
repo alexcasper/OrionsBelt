@@ -23,10 +23,15 @@ from bench.harness import (  # noqa: E402
     RepeatTimings,
     SweepConfig,
     SyntheticBackend,
+    _busy_sleep,
+    _fmt_bytes,
+    _fmt_value,
     _rows_from_timing,
     compute_summaries,
     generate_prompt,
     load_config_from_dict,
+    load_config_from_hub,
+    load_corpus_prompt,
     main,
     run_one_repeat,
     run_sweep,
@@ -622,6 +627,51 @@ class TestLoadConfigFromDict:
         assert cfg.num_full_attention_layers == 1
 
 
+class TestLoadConfigFromHub:
+    """Tests for load_config_from_hub (network function, mocked)."""
+
+    def test_fetches_and_parses_config(self, monkeypatch):
+        """load_config_from_hub fetches config.json from HF and builds a ModelConfig."""
+        import io
+        import json
+
+        fake_config = {
+            "text_config": {
+                "layer_types": ["linear_attention"] * 2 + ["full_attention"],
+                "linear_num_value_heads": 16,
+                "linear_key_head_dim": 128,
+                "linear_value_head_dim": 128,
+            }
+        }
+        fake_resp = io.BytesIO(json.dumps(fake_config).encode())
+
+        captured = {}
+
+        def fake_urlopen(url, timeout=10):
+            captured["url"] = url
+            captured["timeout"] = timeout
+            return fake_resp
+
+        monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+        cfg = load_config_from_hub("test-org/test-model", timeout=15)
+        assert cfg.num_gdn_layers == 2
+        assert cfg.num_full_attention_layers == 1
+        assert cfg.linear_num_value_heads == 16
+        assert "test-org/test-model" in captured["url"]
+        assert captured["timeout"] == 15
+
+    def test_network_error_propagates(self, monkeypatch):
+        """URLError from the network propagates as-is."""
+        import urllib.request
+
+        def fake_urlopen(url, timeout=10):
+            raise urllib.error.URLError("simulated network failure")
+
+        monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+        with pytest.raises(urllib.error.URLError):
+            load_config_from_hub("test-org/test-model")
+
+
 class TestSweepConfigValidation:
     """SweepConfig rejects schema-invalid values at construction.
 
@@ -666,3 +716,159 @@ class TestSweepConfigValidation:
             assert self._cfg(device=d.value).device == d.value
         for e in Engine:
             assert self._cfg(engine_gdn=e.value).engine_gdn == e.value
+
+
+# ---------------------------------------------------------------------------
+# _fmt_bytes + _fmt_value + _busy_sleep
+# ---------------------------------------------------------------------------
+
+
+class TestFmtBytes:
+    def test_bytes(self):
+        assert _fmt_bytes(512) == "512.0 B"
+
+    def test_kib(self):
+        assert _fmt_bytes(2048) == "2.0 KiB"
+
+    def test_gib(self):
+        assert _fmt_bytes(3 * 1024**3) == "3.0 GiB"
+
+    def test_pib_overflow(self):
+        assert _fmt_bytes(1024**5) == "1.0 PiB"
+
+
+class TestFmtValue:
+    def test_per_sec_format(self):
+        result = _fmt_value("tokens_per_sec", 800.5)
+        assert "800.50" in result
+
+    def test_ttft_format(self):
+        result = _fmt_value("ttft_seconds", 0.025)
+        assert "25.00ms" in result
+
+    def test_memory_format(self):
+        result = _fmt_value("peak_memory_bytes", 2048)
+        assert "KiB" in result
+
+    def test_generic_format(self):
+        result = _fmt_value("some_metric", 3.14159)
+        assert "3.142" in result
+
+
+class TestBusySleep:
+    def test_returns_after_elapsed(self):
+        import time
+
+        start = time.perf_counter_ns()
+        _busy_sleep(2_000_000)  # 2ms
+        elapsed = time.perf_counter_ns() - start
+        assert elapsed >= 1_500_000  # at least ~2ms (allow scheduling slack)
+
+    def test_zero_is_instant(self):
+        import time
+
+        start = time.perf_counter_ns()
+        _busy_sleep(0)
+        elapsed = time.perf_counter_ns() - start
+        assert elapsed < 1_000_000  # less than 1ms
+
+
+class TestSyntheticBackendTiming:
+    """Test prefill/decode with simulated timing."""
+
+    def test_prefill_with_timing(self):
+        b = SyntheticBackend(QWEN35_4B, prefill_ns_per_token=1000)
+        b.prefill(list(range(50)))
+        assert b._seq_len == 50
+
+    def test_decode_with_timing(self):
+        b = SyntheticBackend(QWEN35_4B, decode_ns_per_step=1000)
+        b.prefill(list(range(10)))
+        token = b.decode_step(5)
+        assert token == 6
+        assert b._seq_len == 11
+
+
+class TestLoadCorpusPrompt:
+    """Cover load_corpus_prompt fallback when file missing (line 377)."""
+
+    def test_missing_file_falls_back_to_generate(self, tmp_path):
+        """When prompt file doesn't exist, falls back to generate_prompt."""
+        result = load_corpus_prompt("needle", 4096, str(tmp_path))
+        assert len(result) > 0  # generate_prompt returns non-empty text
+
+    def test_existing_file_loaded(self, tmp_path):
+        """When prompt file exists, its content is returned."""
+        prompt_file = tmp_path / "needle_4096.txt"
+        prompt_file.write_text("This is a test prompt.\n")
+        result = load_corpus_prompt("needle", 4096, str(tmp_path))
+        assert result == "This is a test prompt."
+
+
+class TestSweepExceptionHandling:
+    """Cover the sweep exception handler (lines 655-656)."""
+
+    def test_failing_context_length_continues(self, capsys):
+        """A failing context_length is skipped, others still produce rows."""
+        from unittest.mock import patch
+
+        original_prefill = SyntheticBackend.prefill
+        call_count = [0]
+
+        def failing_prefill(self, input_ids):
+            call_count[0] += 1
+            if call_count[0] > 3:
+                raise RuntimeError("simulated failure")
+            return original_prefill(self, input_ids)
+
+        b = SyntheticBackend(QWEN35_4B)
+        config = SweepConfig(
+            context_lengths=[64, 128],
+            warmup_count=0,
+            repeat_count=5,
+            decode_length=2,
+        )
+        with patch.object(SyntheticBackend, "prefill", failing_prefill):
+            rows = run_sweep(b, config)
+        # First context_length succeeds, second fails
+        assert len(rows) > 0
+        captured = capsys.readouterr()
+        assert "WARNING" in captured.err
+        assert "failed" in captured.err
+
+
+class TestHFBackendImportError:
+    """Cover the --backend hf ImportError fallback (lines 893-898).
+
+    When the HuggingFace backend cannot instantiate (torch/transformers
+    missing), the harness must give a clear message via parser.error
+    rather than an unhandled traceback.
+    """
+
+    def test_hf_backend_import_error_gives_clear_message(self, monkeypatch):
+        """main() with --backend hf + missing torch → parser.error (exit 2)."""
+
+        def _raise_import_error(*_args, **_kwargs):
+            raise ImportError("simulated: torch not installed")
+
+        # HFTorchBackend is imported lazily inside main(), so patching the
+        # attribute on the module is sufficient.
+        monkeypatch.setattr("bench.hf_backend.HFTorchBackend", _raise_import_error)
+
+        with pytest.raises(SystemExit) as exc_info:
+            main(
+                [
+                    "--backend",
+                    "hf",
+                    "--context-lengths",
+                    "64",
+                    "--warmup",
+                    "1",
+                    "--repeats",
+                    "5",
+                    "--decode-length",
+                    "10",
+                    "--allow-missing-sha",
+                ]
+            )
+        assert exc_info.value.code == 2

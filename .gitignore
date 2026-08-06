@@ -11,6 +11,8 @@ __pycache__/
 *.pyc
 .pytest_cache/
 .ruff_cache/
+.coverage
+htmlcov/
 dist/
 
 # Downloaded model weights — never committed (license compliance, repo size)
@@ -33,3 +35,5 @@ artifacts/reference/
 gpu/gdn_gpu_bench
 gpu/gdn_gpu_validate
 references/
+
+results/manifests/generic_aarch64_*

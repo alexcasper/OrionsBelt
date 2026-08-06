@@ -295,6 +295,75 @@ class TestLoadWithMock:
             call_kwargs = mock_alm.from_pretrained.call_args[1]
             assert call_kwargs["torch_dtype"] == "float32"
 
+    def test_load_int4_quantization_success(self):
+        """load() with int4 and BitsAndBytesConfig available sets quantization_config."""
+        backend = make_backend_with_mock(quantization="int4")
+
+        mock_model = MagicMock()
+        fake_bnb = MagicMock()
+
+        # Inject fake transformers module so the inner `from transformers import BitsAndBytesConfig` works
+        import sys
+
+        fake_transformers = type(sys)("transformers")
+        fake_transformers.BitsAndBytesConfig = MagicMock(return_value=fake_bnb)
+        original_transformers = sys.modules.get("transformers")
+        sys.modules["transformers"] = fake_transformers
+
+        try:
+            with patch("bench.hf_backend.torch") as mock_torch:
+                mock_torch.float16 = "float16"
+                mock_torch.float32 = "float32"
+                mock_torch.bfloat16 = "bfloat16"
+                with patch("bench.hf_backend.AutoModelForCausalLM") as mock_alm:
+                    mock_alm.from_pretrained.return_value = mock_model
+                    with patch("bench.hf_backend.AutoTokenizer") as mock_tok:
+                        mock_tok.from_pretrained.return_value = MagicMock()
+                        backend.load()
+
+            # BitsAndBytesConfig was called with correct args
+            fake_transformers.BitsAndBytesConfig.assert_called_once()
+            call_kwargs = fake_transformers.BitsAndBytesConfig.call_args[1]
+            assert call_kwargs["load_in_4bit"] is True
+            assert call_kwargs["bnb_4bit_quant_type"] == "nf4"
+            assert call_kwargs["bnb_4bit_use_double_quant"] is True
+        finally:
+            if original_transformers is not None:
+                sys.modules["transformers"] = original_transformers
+            else:
+                sys.modules.pop("transformers", None)
+
+    def test_load_int4_quantization_fallback_warns(self):
+        """load() with int4 but no bitsandbytes warns and falls back to fp16."""
+        backend = make_backend_with_mock(quantization="int4")
+
+        mock_model = MagicMock()
+
+        # Ensure transformers is NOT in sys.modules so `from transformers import BitsAndBytesConfig` fails
+        import sys
+
+        original_transformers = sys.modules.pop("transformers", None)
+
+        try:
+            with patch("bench.hf_backend.torch") as mock_torch:
+                mock_torch.float16 = "float16"
+                mock_torch.float32 = "float32"
+                mock_torch.bfloat16 = "bfloat16"
+                with patch("bench.hf_backend.AutoModelForCausalLM") as mock_alm:
+                    mock_alm.from_pretrained.return_value = mock_model
+                    with patch("bench.hf_backend.AutoTokenizer") as mock_tok:
+                        mock_tok.from_pretrained.return_value = MagicMock()
+                        with pytest.warns(UserWarning, match="bitsandbytes"):
+                            backend.load()
+
+            # Model was still loaded (fallback to fp16)
+            mock_alm.from_pretrained.assert_called_once()
+            call_kwargs = mock_alm.from_pretrained.call_args[1]
+            assert "quantization_config" not in call_kwargs
+        finally:
+            if original_transformers is not None:
+                sys.modules["transformers"] = original_transformers
+
 
 class TestTokenizeWithMock:
     """Test tokenize() with mocked tokenizer."""
@@ -414,6 +483,59 @@ class TestVerifyMemory:
         backend._past_key_values.recurrent_states = []
         # Should not raise
         backend._verify_memory()
+
+    def test_warns_on_shape_mismatch(self):
+        """_verify_memory warns when recurrent state shape doesn't match config."""
+        backend = make_backend_with_mock()
+        # QWEN35_4B expects shape (1, 32, 128, 128) and dtype_bytes=4
+        mock_state = MagicMock()
+        mock_state.shape = [1, 1, 1, 1]  # Wrong shape → discrepancy
+        mock_state.element_size.return_value = 4
+        backend._past_key_values = MagicMock()
+        backend._past_key_values.recurrent_states = [mock_state]
+
+        import warnings
+
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            backend._verify_memory()
+        messages = [str(w.message) for w in caught]
+        assert any("shape mismatch" in m for m in messages)
+
+    def test_warns_on_dtype_mismatch(self):
+        """_verify_memory warns when dtype_bytes doesn't match config."""
+        backend = make_backend_with_mock()
+        # QWEN35_4B expects dtype_bytes=4; provide 2 to trigger mismatch
+        mock_state = MagicMock()
+        mock_state.shape = [32, 128, 128]  # 3-D will be padded to (1, 32, 128, 128) — correct
+        mock_state.element_size.return_value = 2  # Wrong → discrepancy
+        backend._past_key_values = MagicMock()
+        backend._past_key_values.recurrent_states = [mock_state]
+
+        import warnings
+
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            backend._verify_memory()
+        messages = [str(w.message) for w in caught]
+        assert any("dtype mismatch" in m for m in messages)
+
+    def test_no_warnings_when_everything_matches(self):
+        """_verify_memory emits no warnings when shape and dtype match config."""
+        backend = make_backend_with_mock()
+        # QWEN35_4B: shape (1, 32, 128, 128), dtype_bytes=4
+        mock_state = MagicMock()
+        mock_state.shape = [1, 32, 128, 128]
+        mock_state.element_size.return_value = 4
+        backend._past_key_values = MagicMock()
+        backend._past_key_values.recurrent_states = [mock_state]
+
+        import warnings
+
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            backend._verify_memory()
+        assert len(caught) == 0
 
 
 # ---------------------------------------------------------------------------

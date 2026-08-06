@@ -520,3 +520,20 @@ class TestMainCLI:
         assert out_path.exists()
         content = out_path.read_text()
         assert "prefill_tokens_per_sec" in content
+
+    def test_main_no_csvs_returns_1(self, tmp_path, capsys):
+        """main() with no CSV files found returns 1."""
+        # Change to empty dir so glob finds nothing
+        import os
+
+        from bench.comparison_table import main
+
+        old_cwd = os.getcwd()
+        os.chdir(tmp_path)
+        try:
+            rc = main([])
+        finally:
+            os.chdir(old_cwd)
+        assert rc == 1
+        captured = capsys.readouterr()
+        assert "No CSV files found" in captured.err

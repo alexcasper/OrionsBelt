@@ -26,17 +26,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* fp32 kernels (reference) */
-void gdn_cumdecay_f32(const float *, float *, size_t, size_t);
-void gdn_gated_scan_f32(const float *, const float *, float *, float *, size_t, size_t);
+#include "gdn_sve.h"
 
-/* Mixed-precision kernels */
-void gdn_cumdecay_bf16(const float *, uint16_t *, size_t, size_t);
-void gdn_cumdecay_f16(const float *, uint16_t *, size_t, size_t);
-void gdn_gated_scan_bf16(const float *, const float *, float *, uint16_t *, size_t, size_t);
-void gdn_gated_scan_f16(const float *, const float *, float *, uint16_t *, size_t, size_t);
-
-/* bf16/fp16 conversion (duplicated from gdn_sve.c for standalone use) */
+/* bf16 conversion helpers (standalone; fp16 uses __fp16 casts directly) */
 static uint16_t f32_to_bf16(float f) {
     uint32_t bits;
     memcpy(&bits, &f, sizeof(bits));
@@ -48,17 +40,6 @@ static float bf16_to_f32(uint16_t b) {
     float f;
     memcpy(&f, &bits, sizeof(f));
     return f;
-}
-static uint16_t f32_to_f16(float f) {
-    __fp16 h = (__fp16)f;
-    uint16_t bits;
-    memcpy(&bits, &h, sizeof(bits));
-    return bits;
-}
-static float f16_to_f32(uint16_t h) {
-    __fp16 hp;
-    memcpy(&hp, &h, sizeof(hp));
-    return (float)hp;
 }
 
 typedef struct {
@@ -115,11 +96,11 @@ int main(void) {
     float *s_narrow = malloc(N * sizeof(float));
     float *decay_ref = malloc(N * sizeof(float));
     uint16_t *decay_bf16 = malloc(N * sizeof(uint16_t));
-    uint16_t *decay_f16 = malloc(N * sizeof(uint16_t));
+    __fp16 *decay_f16 = malloc(N * sizeof(__fp16));
     float *state_ref = malloc(C * sizeof(float));
     float *state_narrow_f = malloc(C * sizeof(float));
     uint16_t *state_bf16 = malloc(C * sizeof(uint16_t));
-    uint16_t *state_f16 = malloc(C * sizeof(uint16_t));
+    __fp16 *state_f16 = malloc(C * sizeof(__fp16));
 
     if (!a || !g || !x || !s_ref || !s_narrow || !decay_ref ||
         !decay_bf16 || !decay_f16 || !state_ref || !state_narrow_f ||
@@ -151,7 +132,7 @@ int main(void) {
     float *decay_f16_f = malloc(N * sizeof(float));
     for (size_t i = 0; i < N; i++) {
         decay_bf16_f[i] = bf16_to_f32(decay_bf16[i]);
-        decay_f16_f[i] = f16_to_f32(decay_f16[i]);
+        decay_f16_f[i] = (float)decay_f16[i];
     }
 
     error_stats es;
@@ -193,9 +174,9 @@ int main(void) {
     failures += pass_fail_rel("scan bf16 state", es.max_rel, 0.5);
 
     /* fp16 */
-    for (size_t i = 0; i < C; i++) state_f16[i] = f32_to_f16(state_init[i]);
+    for (size_t i = 0; i < C; i++) state_f16[i] = (__fp16)state_init[i];
     gdn_gated_scan_f16(g, x, s_narrow, state_f16, T, C);
-    for (size_t i = 0; i < C; i++) state_narrow_f[i] = f16_to_f32(state_f16[i]);
+    for (size_t i = 0; i < C; i++) state_narrow_f[i] = (float)state_f16[i];
 
     compare("f16 output vs fp32 ref", s_narrow, s_ref, N, 0.5, &es);
     failures += pass_fail_rel("scan f16 output", es.max_rel, 0.1);
@@ -228,7 +209,7 @@ int main(void) {
 
     for (size_t i = 0; i < N; i++) {
         decay_bf16_f[i] = bf16_to_f32(decay_bf16[i]);
-        decay_f16_f[i] = f16_to_f32(decay_f16[i]);
+        decay_f16_f[i] = (float)decay_f16[i];
     }
 
     /* Count fp16 flushes: decay_ref at t=63 is 0.5^64 ≈ 5.4e-20 */
@@ -299,7 +280,7 @@ int main(void) {
     float *st2_ref = malloc(C * sizeof(float));
     float *st2_narrow_f = malloc(C * sizeof(float));
     uint16_t *st2_bf16 = malloc(C * sizeof(uint16_t));
-    uint16_t *st2_f16 = malloc(C * sizeof(uint16_t));
+    __fp16 *st2_f16 = malloc(C * sizeof(__fp16));
 
     for (size_t i = 0; i < N; i++) {
         g2[i] = 0.50f + 0.40f * (rand() / (float)RAND_MAX);
@@ -311,7 +292,7 @@ int main(void) {
         float v = (rand() / (float)RAND_MAX) - 0.5f;
         st2_ref[i] = v;
         st2_bf16[i] = f32_to_bf16(v);
-        st2_f16[i] = f32_to_f16(v);
+        st2_f16[i] = (__fp16)v;
     }
 
     /* Run chunk 1 in fp32 and both narrow formats */

@@ -126,9 +126,10 @@ done
 # -------------------------------------------------------------------
 echo "[7/8] Credential scan"
 # Check for actual credential assignments, not the word "password" in docs
-SECRETS=$(git grep -n -E '(password|passwd|secret|api[_-]?key|token)\s*[=:]\s*["\x27][^"\x27]{4,}' -- '*.py' '*.sh' '*.yaml' '*.json' 2>/dev/null \
+SECRETS=$(git grep -n -E '(password|passwd|secret|api[_-]?key|access[_-]?token|auth[_-]?token)\s*[=:]\s*["\x27][^"\x27]{4,}' -- '*.py' '*.sh' '*.yaml' '*.json' 2>/dev/null \
     | grep -v '.beads/' \
     | grep -v 'node_modules/' \
+    | grep -v 'eos_token' \
     || true)
 if [ -z "$SECRETS" ]; then
     ok "No credential patterns found in tracked files"

@@ -13,6 +13,9 @@ from plots import (
     MicrobenchRow,
     PlotResult,
     SchemaRow,
+    _lookup_spec_bandwidth,
+    _plot_cross_device,
+    _try_import_matplotlib,
     detect_format,
     generate_all,
     main,
@@ -265,6 +268,10 @@ class TestMicrobenchTables:
         md = microbench_to_markdown([])
         assert "no data" in md.lower()
 
+    def test_bandwidth_table_empty_rows(self):
+        md = microbench_bandwidth_table([])
+        assert "no data" in md.lower()
+
 
 class TestSchemaTables:
     def test_throughput_table(self):
@@ -301,6 +308,14 @@ class TestSchemaTables:
         assert "128.0" in md
         assert "1,024.0" in md
 
+    def test_throughput_table_empty_rows(self):
+        md = schema_throughput_table([])
+        assert "no throughput data" in md.lower()
+
+    def test_memory_table_empty_rows(self):
+        md = schema_memory_table([])
+        assert "no memory data" in md.lower()
+
 
 # ---------------------------------------------------------------------------
 # Device spec bandwidth lookup
@@ -309,28 +324,23 @@ class TestSchemaTables:
 
 class TestDeviceSpecBandwidth:
     def test_jetson_lookup(self):
-        from plots import _lookup_spec_bandwidth
 
         assert _lookup_spec_bandwidth("jetson-j1") == 25.6
         assert _lookup_spec_bandwidth("jetson") == 25.6
 
     def test_pi5_lookup(self):
-        from plots import _lookup_spec_bandwidth
 
         assert _lookup_spec_bandwidth("pi5") == 17.0
 
     def test_rk3588_lookup(self):
-        from plots import _lookup_spec_bandwidth
 
         assert _lookup_spec_bandwidth("rk3588") == 34.0
 
     def test_o6_lookup(self):
-        from plots import _lookup_spec_bandwidth
 
         assert _lookup_spec_bandwidth("o6") == 93.1
 
     def test_unknown_returns_none(self):
-        from plots import _lookup_spec_bandwidth
 
         assert _lookup_spec_bandwidth("mystery-board") is None
 
@@ -856,3 +866,100 @@ class TestMainCLI:
         os.unlink(sc_path)
 
         assert rc == 0
+
+
+# ---------------------------------------------------------------------------
+# _try_import_matplotlib fallback
+# ---------------------------------------------------------------------------
+
+
+class TestTryImportMatplotlib:
+    """Test the matplotlib import guard."""
+
+    def test_returns_module_when_available(self):
+        """When matplotlib is installed, returns the pyplot module."""
+        plt = _try_import_matplotlib()
+        assert plt is not None
+
+    def test_returns_none_on_import_error(self, monkeypatch):
+        """When matplotlib is not available, returns None."""
+        import sys
+
+        monkeypatch.setitem(sys.modules, "matplotlib", None)
+        monkeypatch.setitem(sys.modules, "matplotlib.pyplot", None)
+        monkeypatch.setitem(sys.modules, "matplotlib.backends.backend_agg", None)
+        result = _try_import_matplotlib()
+        assert result is None
+
+
+class TestGenerateAllMatplotlibUnavailable:
+    """Cover generate_all warning when matplotlib is missing (line 601)."""
+
+    def test_warns_when_matplotlib_missing(self, tmp_path, monkeypatch):
+        """generate_all(text_only=False) warns when matplotlib unavailable."""
+        import sys
+
+        monkeypatch.setitem(sys.modules, "matplotlib", None)
+        monkeypatch.setitem(sys.modules, "matplotlib.pyplot", None)
+        monkeypatch.setitem(sys.modules, "matplotlib.backends.backend_agg", None)
+
+        mb_path = write_temp_csv(MICROBENCH_CSV)
+        result = generate_all([mb_path], str(tmp_path / "out"), text_only=False)
+        os.unlink(mb_path)
+
+        assert any("matplotlib not available" in w for w in result.warnings)
+
+
+class TestPlotCrossDeviceEdgeCases:
+    """Cover _plot_cross_device edge-case branches (lines 725, 757)."""
+
+    @staticmethod
+    def _scan_row(gib=2.0):
+        return MicrobenchRow(
+            model="Qwen3.5-4B",
+            kernel="gdn_gated_scan",
+            dispatch_path="neon",
+            seq=64,
+            channels=4096,
+            repeats=30,
+            p50_us=1000.0,
+            p95_us=1100.0,
+            spread_pct=5.0,
+            gib_per_s=gib,
+            gflop_per_s=0.2,
+        )
+
+    @staticmethod
+    def _decay_row():
+        return MicrobenchRow(
+            model="Qwen3.5-4B",
+            kernel="gdn_cumdecay",
+            dispatch_path="neon",
+            seq=64,
+            channels=4096,
+            repeats=30,
+            p50_us=1000.0,
+            p95_us=1100.0,
+            spread_pct=5.0,
+            gib_per_s=2.0,
+            gflop_per_s=0.2,
+        )
+
+    def test_no_scan_data_returns_early(self, tmp_path):
+        """_plot_cross_device returns early when no gated_scan rows (line 725)."""
+        plt = _try_import_matplotlib()
+        # Two devices but neither has gated_scan data
+        by_device = {
+            "dev-a": [self._decay_row()],
+            "dev-b": [self._decay_row()],
+        }
+        _plot_cross_device(by_device, str(tmp_path / "cross.png"), plt)
+        assert not os.path.exists(str(tmp_path / "cross.png"))
+
+    def test_spec_bandwidth_line_drawn(self, tmp_path):
+        """_plot_cross_device draws spec line for recognised device (line 757)."""
+        plt = _try_import_matplotlib()
+        # "rk3588" prefix is in DEVICE_SPEC_BANDWIDTH → spec lookup hits
+        by_device = {"rk3588-t4": [self._scan_row(gib=3.3)]}
+        _plot_cross_device(by_device, str(tmp_path / "cross.png"), plt)
+        assert os.path.exists(str(tmp_path / "cross.png"))

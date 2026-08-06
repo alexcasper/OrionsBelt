@@ -19,9 +19,19 @@ import tempfile
 # Make bench/ importable when run from repo root or from tests/.
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+import bench.manifest as manifest_mod
 from bench.manifest import (
+    _core_count,
+    _cpu_model,
+    _cpufreq_topology,
     _default_run_id,
+    _isa_features,
+    _meminfo,
+    _optional_package_versions,
+    _parallelism,
+    _read_int_file,
     _safe,
+    _thermal_zones,
     _utc_timestamp,
     capture,
     manifest_ref,
@@ -237,3 +247,193 @@ class TestDefaultRunId:
         rid = _default_run_id()
         # Only alphanumerics, hyphens, dots, underscores
         assert re.match(r"^[A-Za-z0-9._-]+$", rid), f"Unexpected chars in run_id: {rid}"
+
+
+# ---------------------------------------------------------------------------
+# _read_int_file
+# ---------------------------------------------------------------------------
+
+
+class TestReadIntFile:
+    def test_valid_integer(self, tmp_path):
+        f = tmp_path / "freq"
+        f.write_text("1800000\n")
+        assert _read_int_file(str(f)) == 1800000
+
+    def test_non_integer_returns_none(self, tmp_path):
+        f = tmp_path / "bad"
+        f.write_text("not_a_number\n")
+        assert _read_int_file(str(f)) is None
+
+    def test_missing_file_returns_none(self):
+        assert _read_int_file("/nonexistent/path/file") is None
+
+
+# ---------------------------------------------------------------------------
+# _core_count
+# ---------------------------------------------------------------------------
+
+
+class TestCoreCount:
+    def test_returns_int_or_none(self):
+        result = _core_count()
+        assert result is None or isinstance(result, int)
+
+
+# ---------------------------------------------------------------------------
+# _isa_features — non-aarch64 early return
+# ---------------------------------------------------------------------------
+
+
+class TestIsaFeatures:
+    def test_returns_dict_on_aarch64_or_none(self):
+        """On non-aarch64, _isa_features returns None."""
+        result = _isa_features()
+        # On this device (aarch64), should return a dict; on x86 CI, None
+        assert result is None or isinstance(result, dict)
+
+
+# ---------------------------------------------------------------------------
+# _meminfo
+# ---------------------------------------------------------------------------
+
+
+class TestMeminfo:
+    def test_returns_dict_or_none(self):
+        result = _meminfo()
+        assert result is None or isinstance(result, dict)
+        if result is not None:
+            assert "mem_total_kb" in result
+            assert "mem_available_kb" in result
+
+
+# ---------------------------------------------------------------------------
+# _optional_package_versions — PackageNotFoundError path
+# ---------------------------------------------------------------------------
+
+
+class TestOptionalPackageVersions:
+    def test_returns_dict(self):
+        result = _optional_package_versions()
+        assert isinstance(result, dict)
+
+    def test_missing_packages_are_none(self):
+        """At least some optional packages may not be installed."""
+        result = _optional_package_versions()
+        # Values should be strings (version) or None (not installed)
+        for v in result.values():
+            assert v is None or isinstance(v, str)
+
+
+# ---------------------------------------------------------------------------
+# _parallelism — OMP_NUM_THREADS edge cases
+# ---------------------------------------------------------------------------
+
+
+class TestParallelism:
+    def test_non_numeric_omp_threads(self, monkeypatch):
+        """Non-numeric OMP_NUM_THREADS falls back to core_count."""
+        monkeypatch.setenv("OMP_NUM_THREADS", "not_a_number")
+        result = _parallelism()
+        assert result["omp_num_threads"] == "not_a_number"
+        # effective_threads should fall back to core count
+        assert result["threads_source"] == "core_count_default"
+
+    def test_valid_omp_threads(self, monkeypatch):
+        """Numeric OMP_NUM_THREADS is parsed correctly."""
+        monkeypatch.setenv("OMP_NUM_THREADS", "4")
+        result = _parallelism()
+        assert result["omp_num_threads"] == "4"
+        assert result["effective_threads"] == 4
+        assert result["threads_source"] == "OMP_NUM_THREADS"
+
+    def test_unset_omp_threads(self, monkeypatch):
+        """Unset OMP_NUM_THREADS falls back to core count."""
+        monkeypatch.delenv("OMP_NUM_THREADS", raising=False)
+        result = _parallelism()
+        assert result["omp_num_threads"] is None
+        assert result["threads_source"] == "core_count_default"
+
+
+# ---------------------------------------------------------------------------
+# Platform-dependent edge cases (lines 149, 187, 193, 232, 235, 238, 261, 283, 311-312)
+# ---------------------------------------------------------------------------
+
+
+class TestCpuModelFallback:
+    """Cover _cpu_model fallback to platform.processor (line 149)."""
+
+    def test_no_match_falls_back_to_processor(self, monkeypatch):
+        """When /proc/cpuinfo has no model name, falls back to platform.processor."""
+        monkeypatch.setattr(manifest_mod, "_read_text", lambda path: "unrelated: text\n")
+        monkeypatch.setattr(manifest_mod.platform, "processor", lambda: "Generic CPU")
+        assert _cpu_model() == "Generic CPU"
+
+    def test_no_text_no_processor(self, monkeypatch):
+        """When /proc/cpuinfo unreadable and processor empty, returns None."""
+        monkeypatch.setattr(manifest_mod, "_read_text", lambda path: None)
+        monkeypatch.setattr(manifest_mod.platform, "processor", lambda: "")
+        assert _cpu_model() is None
+
+
+class TestCpufreqTopologyMissing:
+    """Cover _cpufreq_topology when /sys tree absent (lines 187, 193)."""
+
+    def test_no_sys_tree_returns_none(self, monkeypatch):
+        monkeypatch.setattr(manifest_mod.os.path, "isdir", lambda p: False)
+        assert _cpufreq_topology() is None
+
+    def test_empty_cpu_dirs_returns_none(self, monkeypatch):
+        """sys tree exists but no cpu[0-9]* dirs → None."""
+        monkeypatch.setattr(manifest_mod.os.path, "isdir", lambda p: True)
+        monkeypatch.setattr(manifest_mod, "glob", type("G", (), {"glob": lambda *a: []}))
+        assert _cpufreq_topology() is None
+
+
+class TestIsaFeaturesEdge:
+    """Cover _isa_features non-aarch64 and empty paths (lines 232, 235, 238)."""
+
+    def test_non_aarch64_returns_none(self, monkeypatch):
+        monkeypatch.setattr(manifest_mod, "_machine_arch", lambda: "x86_64")
+        assert _isa_features() is None
+
+    def test_no_cpuinfo_returns_none(self, monkeypatch):
+        monkeypatch.setattr(manifest_mod, "_machine_arch", lambda: "aarch64")
+        monkeypatch.setattr(manifest_mod, "_read_text", lambda path: None)
+        assert _isa_features() is None
+
+    def test_no_features_line_returns_none(self, monkeypatch):
+        monkeypatch.setattr(manifest_mod, "_machine_arch", lambda: "aarch64")
+        monkeypatch.setattr(manifest_mod, "_read_text", lambda path: "processor : 0\n")
+        assert _isa_features() is None
+
+
+class TestThermalZonesMissing:
+    """Cover _thermal_zones when /sys/class/thermal absent (line 261)."""
+
+    def test_no_thermal_dir_returns_none(self, monkeypatch):
+        monkeypatch.setattr(manifest_mod.os.path, "isdir", lambda p: False)
+        assert _thermal_zones() is None
+
+
+class TestMeminfoMissing:
+    """Cover _meminfo when /proc/meminfo unreadable (line 283)."""
+
+    def test_no_meminfo_returns_none(self, monkeypatch):
+        monkeypatch.setattr(manifest_mod, "_read_text", lambda path: None)
+        assert _meminfo() is None
+
+
+class TestOptionalPackageVersionsException:
+    """Cover _optional_package_versions generic exception handler (lines 311-312)."""
+
+    def test_generic_exception_handled(self, monkeypatch):
+        """A non-PackageNotFoundError exception is caught → value is None."""
+
+        def boom(name):
+            raise RuntimeError("unexpected")
+
+        monkeypatch.setattr(manifest_mod, "_pkg_version", boom)
+        result = _optional_package_versions()
+        # All should be None since every call raises RuntimeError
+        assert all(v is None for v in result.values())

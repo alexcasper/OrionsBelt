@@ -1,16 +1,21 @@
 """Tests for runtime ISA feature detection (bead ob-ng6)."""
 
+import json as _json
 import os
 import sys
 import textwrap
+from unittest.mock import patch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from orionsbelt.engines.cpu.isa_detect import (
     FeatureSet,
+    _parse_cpuinfo,
+    _read_cpuinfo,
     _recommend_binary,
     cpu_part_name,
     detect_features,
+    main,
 )
 
 # Simulated /proc/cpuinfo for a Cortex-A76 (Pi 5)
@@ -112,3 +117,106 @@ def test_featureset_summary():
     assert "asimd" in s
     assert "asimddp" in s
     assert "i8mm" not in s
+
+
+class TestFeatureSetMethods:
+    """Cover summary/to_dict/to_json on FeatureSet."""
+
+    def test_summary_no_active_features(self):
+        """summary() returns '(none)' when no dispatch features are active."""
+        fs = FeatureSet(dispatch_features={"asimd": False, "asimddp": False})
+        assert "(none)" in fs.summary()
+
+    def test_to_dict(self):
+        """to_dict returns all dataclass fields."""
+        fs = FeatureSet(machine="aarch64", core_count=4)
+        d = fs.to_dict()
+        assert d["machine"] == "aarch64"
+        assert d["core_count"] == 4
+        assert "features_raw" in d
+        assert "dispatch_features" in d
+
+    def test_to_json(self):
+        """to_json returns valid JSON string."""
+        fs = FeatureSet(machine="aarch64", core_count=8)
+        s = fs.to_json()
+        parsed = _json.loads(s)
+        assert parsed["machine"] == "aarch64"
+        assert parsed["core_count"] == 8
+
+
+class TestReadCpuinfo:
+    """Cover _read_cpuinfo edge cases."""
+
+    def test_missing_file_returns_empty(self):
+        """Missing file returns empty string."""
+        assert _read_cpuinfo("/nonexistent/path/cpuinfo") == ""
+
+    def test_valid_file(self, tmp_path):
+        """Valid file returns its content."""
+        p = tmp_path / "cpuinfo"
+        p.write_text("processor : 0\n")
+        assert "processor" in _read_cpuinfo(str(p))
+
+
+class TestParseCpuinfo:
+    """Cover _parse_cpuinfo parsing."""
+
+    def test_empty_string(self):
+        """Empty string returns empty dict."""
+        assert _parse_cpuinfo("") == {}
+
+    def test_strips_whitespace(self):
+        """Values are stripped."""
+        text = "CPU part\t:  0xd0b \n"
+        result = _parse_cpuinfo(text)
+        assert result.get("cpu_part") == "0xd0b"
+
+    def test_first_key_wins(self):
+        """First occurrence of a key wins."""
+        text = "processor : 0\n\nprocessor : 1\n"
+        result = _parse_cpuinfo(text)
+        assert result.get("processor") == "0"
+
+
+class TestCpuPartNameLower:
+    """Cover cpu_part_name lowercase normalization."""
+
+    def test_uppercase_hex(self):
+        """Uppercase hex is normalized."""
+        assert cpu_part_name("0xD0B") == "Cortex-A76"
+
+    def test_mixed_case(self):
+        """Mixed case hex is normalized."""
+        assert cpu_part_name("0xD0b") == "Cortex-A76"
+
+
+class TestDetectFeaturesEmpty:
+    """Cover detect_features with empty/missing cpuinfo."""
+
+    def test_empty_cpuinfo(self, tmp_path):
+        """Empty cpuinfo gives scalar recommendation, core_count=1."""
+        p = tmp_path / "cpuinfo"
+        p.write_text("")
+        fs = detect_features(str(p))
+        assert fs.recommended_binary == "scalar"
+        assert fs.core_count == 1
+        assert fs.features == []
+
+
+class TestMainCLI:
+    """Cover main() CLI entry point."""
+
+    def test_main_prints_json(self, tmp_path, capsys):
+        """main() prints JSON with enriched fields."""
+        p = tmp_path / "cpuinfo"
+        p.write_text(_PI5_CPUINFO)
+        with patch("orionsbelt.engines.cpu.isa_detect._read_cpuinfo") as mock_read:
+            mock_read.return_value = _PI5_CPUINFO
+            rc = main()
+        assert rc == 0
+        captured = capsys.readouterr()
+        parsed = _json.loads(captured.out)
+        assert "cpu_part_name" in parsed
+        assert "active_dispatch_features" in parsed
+        assert parsed["cpu_part_name"] == "Cortex-A76"

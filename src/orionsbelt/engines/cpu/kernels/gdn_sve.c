@@ -42,6 +42,8 @@
 #include <string.h>   /* memcpy for bf16 software conversion */
 #include <stdint.h>
 
+#include "gdn_sve.h"
+
 #ifdef __ARM_FEATURE_SVE
 #include <arm_sve.h>
 #endif

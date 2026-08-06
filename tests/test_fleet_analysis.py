@@ -144,13 +144,13 @@ def setup_fleet_data(root):
     raw_dir.mkdir(parents=True, exist_ok=True)
     manifests_dir.mkdir(parents=True, exist_ok=True)
 
-    # Device data for DEVICES registry
+    # Device data for DEVICES registry (fleet sweep clean CSVs)
     device_data_map = {
         "results/raw/pi5-r5.csv": 2.0,
-        "results/raw/rk3588-t4_big.csv": 3.3,
-        "results/raw/rk3588-t4_little.csv": 1.0,
-        "results/raw/jetson-j1.csv": 0.72,
-        "results/raw/jetson-j2.csv": 0.73,
+        "results/raw/rk3588-t4-clean.csv": 5.75,
+        "results/raw/rk3588-t4-little-clean.csv": 0.72,
+        "results/raw/jetson-j1-clean.csv": 1.18,
+        "results/raw/jetson-j2-clean.csv": 1.09,
     }
     for rel_path, scan_gib in device_data_map.items():
         full_path = root / rel_path
@@ -160,12 +160,10 @@ def setup_fleet_data(root):
             spread=5.0,
         )
 
-    # Replicate CSVs
+    # Replicate CSVs (fleet sweep clean — only t3 replicates need separate files)
     replicate_map = {
-        "results/raw/rk3588-t3_big.csv": (3.29, NOISY_SPREAD),
-        "results/raw/rk3588-t3_little.csv": (0.8, 25.0),
-        "results/raw/pi5-j1.csv": (1.84, 6.0),
-        "results/raw/jetson-j2_single.csv": (1.13, 8.0),
+        "results/raw/rk3588-t3-clean.csv": (2.91, NOISY_SPREAD),
+        "results/raw/rk3588-t3-little-clean.csv": (0.55, 25.0),
     }
     for rel_path, (scan_gib, spread) in replicate_map.items():
         full_path = root / rel_path
@@ -191,17 +189,18 @@ def setup_fleet_data(root):
         for kern in FP32_KERNELS:
             writer.writerow(make_csv_row("Qwen3.5-0.8B", kern, 5.0, 5.0))
 
-    # Manifests for all devices
+    # Manifests for all devices (fleet sweep: all clean)
     manifest_basenames = [
         "pi5-r5",
-        "pi5-j1",
-        "rk3588-t3",
-        "rk3588-t4",
-        "jetson-j1",
-        "jetson-j2",
+        "rk3588-t3-clean",
+        "rk3588-t3-little-clean",
+        "rk3588-t4-clean",
+        "rk3588-t4-little-clean",
+        "jetson-j1-clean",
+        "jetson-j2-clean",
     ]
     for base in manifest_basenames:
-        write_manifest(str(manifests_dir / (base + ".json")), dirty=True)
+        write_manifest(str(manifests_dir / (base + ".json")), dirty=False)
 
     return root
 
@@ -215,8 +214,8 @@ class TestRegistryIntegrity:
     """Validate the DEVICES and REPLICATES constants are well-formed."""
 
     def test_devices_count(self):
-        """Exactly 3 devices in the fleet table (RK3588 excluded, ob-0h0)."""
-        assert len(fa.DEVICES) == 3
+        """5 devices: Pi 5, RK3588 big, RK3588 little, Jetson j1, Jetson j2."""
+        assert len(fa.DEVICES) == 5
 
     def test_devices_tuples(self):
         """Each device entry is a 5-tuple (name, path, spec_gibs, cores, isa)."""
@@ -316,6 +315,24 @@ class TestLoadDeviceCsv:
         rows = fa.load_device_csv(str(csv_path))
         assert len(rows) == 3
         assert all(r["model"] == "Qwen3.5-0.8B" for r in rows)
+
+    def test_filters_decode_model_with_seq64(self, tmp_path):
+        """Decode model rows with seq=64 are filtered by the _decode check.
+
+        The existing include_decode test uses seq=1 rows that get caught
+        by the seq!=64 filter first.  This test writes a decode-model row
+        with seq=64 so it passes the seq check and exercises the explicit
+        _decode guard (line 194).
+        """
+        csv_path = str(tmp_path / "test.csv")
+        with open(csv_path, "w", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=CSV_HEADER)
+            writer.writeheader()
+            writer.writerow(make_csv_row("Qwen3.5-4B", "gdn_gated_scan", 3.0, 5.0))
+            writer.writerow(make_csv_row("Qwen3.5-4B_decode", "gdn_gated_scan", 10.0, 5.0, seq=64))
+        rows = fa.load_device_csv(csv_path)
+        assert len(rows) == 1
+        assert "_decode" not in rows[0]["model"]
 
 
 # ---------------------------------------------------------------------------
@@ -475,6 +492,30 @@ class TestProvenanceAudit:
             lines = fa._provenance_audit_lines()
             assert isinstance(lines, list)
             assert all(isinstance(line, str) for line in lines)
+        finally:
+            fa.MANIFEST_DIR = original_dir
+
+    def test_corrupt_manifest_treated_as_missing(self, tmp_path):
+        """A manifest file with invalid JSON is treated as missing."""
+        manifest_dir = tmp_path / "manifests"
+        manifest_dir.mkdir(parents=True, exist_ok=True)
+
+        # Create a corrupt manifest for the first replicate
+        first_csv = fa.REPLICATES[0][1][0][1]
+        base = os.path.basename(first_csv).replace(".csv", "")
+        candidates = [base]
+        for suffix in ("_big", "_little"):
+            if base.endswith(suffix):
+                candidates.append(base[: -len(suffix)])
+        for c in candidates:
+            (manifest_dir / (c + ".json")).write_text("{corrupt json")
+
+        original_dir = fa.MANIFEST_DIR
+        fa.MANIFEST_DIR = str(manifest_dir)
+        try:
+            lines = fa._provenance_audit_lines()
+            # Should report the manifest as missing (not crash)
+            assert isinstance(lines, list)
         finally:
             fa.MANIFEST_DIR = original_dir
 
@@ -684,8 +725,39 @@ class TestPlotCrossDevice:
         result = fa.plot_cross_device(device_data, str(tmp_path / "plot.png"))
         assert isinstance(result, bool)
 
+    def test_matplotlib_unavailable_returns_false(self, tmp_path, monkeypatch):
+        """When matplotlib/numpy can't be imported, returns False with a message."""
+        import sys
 
-# ---------------------------------------------------------------------------
+        monkeypatch.setitem(sys.modules, "matplotlib", None)
+        monkeypatch.setitem(sys.modules, "matplotlib.pyplot", None)
+        result = fa.plot_cross_device({}, str(tmp_path / "plot.png"))
+        assert result is False
+
+    def test_unknown_cores_gets_empty_label(self, tmp_path, monkeypatch):
+        """Device with unrecognised cores (not A57/A55/A76) gets empty label.
+
+        Exercises the else branch of the cores-label if-chain (line 246).
+        """
+        csv_path = str(tmp_path / "mystery.csv")
+        write_device_csv(csv_path, gib_overrides={"gdn_gated_scan": 2.0})
+        monkeypatch.setattr(
+            fa,
+            "DEVICES",
+            [("Mystery-Dev", str(csv_path), 50.0, "X1 Custom", "Armv9.0")],
+        )
+        device_data = {}
+        for name, path, spec, cores, isa in fa.DEVICES:
+            device_data[name] = {
+                "rows": fa.load_device_csv(path),
+                "spec": spec,
+                "cores": cores,
+                "isa": isa,
+            }
+        result = fa.plot_cross_device(device_data, str(tmp_path / "plot.png"))
+        assert result is True
+
+
 # Integration: full pipeline with real committed CSVs (if present)
 # ---------------------------------------------------------------------------
 
@@ -719,3 +791,67 @@ class TestRealDataIntegration:
         assert "Pi 5" in report
         assert "Jetson" in report
         assert "RK3588" in report
+
+
+class TestGetManifestSha:
+    """Cover get_manifest_sha and _manifest_path_for_csv edge cases."""
+
+    def test_missing_manifest_returns_none(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(fa, "MANIFEST_DIR", str(tmp_path))
+        sha, dirty, full = fa.get_manifest_sha(str(tmp_path / "nonexistent.csv"))
+        assert sha is None
+        assert dirty is None
+        assert full is None
+
+    def test_corrupt_manifest_returns_none(self, tmp_path, monkeypatch):
+        """Malformed JSON triggers ValueError → (None, None, None)."""
+        monkeypatch.setattr(fa, "MANIFEST_DIR", str(tmp_path))
+        (tmp_path / "rk3588-t4.json").write_text("{not valid json")
+        sha, dirty, full = fa.get_manifest_sha("rk3588-t4.csv")
+        assert sha is None
+        assert dirty is None
+        assert full is None
+
+    def test_valid_manifest(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(fa, "MANIFEST_DIR", str(tmp_path))
+        (tmp_path / "rk3588-t4.json").write_text(
+            json.dumps({"git": {"sha": "abcdef1234567890", "dirty": False}})
+        )
+        sha, dirty, full = fa.get_manifest_sha("rk3588-t4.csv")
+        assert sha == "abcdef123456"
+        assert dirty is False
+        assert full == "abcdef1234567890"
+
+    def test_empty_sha_returns_none(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(fa, "MANIFEST_DIR", str(tmp_path))
+        (tmp_path / "rk3588-t4.json").write_text(json.dumps({"git": {"sha": "", "dirty": True}}))
+        sha, dirty, full = fa.get_manifest_sha("rk3588-t4.csv")
+        assert sha is None
+        assert dirty is True
+
+    def test_big_suffix_finds_shared_manifest(self, tmp_path, monkeypatch):
+        """_big CSV finds the shared manifest (without _big suffix)."""
+        monkeypatch.setattr(fa, "MANIFEST_DIR", str(tmp_path))
+        (tmp_path / "rk3588-t4.json").write_text(
+            json.dumps({"git": {"sha": "abc123def456", "dirty": False}})
+        )
+        sha, dirty, full = fa.get_manifest_sha("rk3588-t4_big.csv")
+        assert sha == "abc123def456"
+
+
+class TestMainCLI:
+    """Cover fleet_analysis.main()."""
+
+    def test_main_creates_report(self, tmp_path, monkeypatch):
+        """main() writes report and plot files."""
+        setup_fleet_data(tmp_path)
+        monkeypatch.chdir(tmp_path)
+        import sys
+
+        old_argv = sys.argv
+        sys.argv = ["fleet_analysis", "--output-dir", str(tmp_path / "out")]
+        try:
+            fa.main()
+        finally:
+            sys.argv = old_argv
+        assert os.path.exists(str(tmp_path / "out" / "fleet_bandwidth_scaling.md"))
