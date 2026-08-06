@@ -43,7 +43,7 @@ DEVICES = [
         "RK3588 big",
         "results/raw/rk3588-t4_big.csv",
         34.0,
-        "4x Cortex-A76 @ 2.4 GHz",
+        "4x Cortex-A76 @ 2.3 GHz",
         "Armv8.2-A + dotprod",
     ),
     (
@@ -631,7 +631,7 @@ def generate_report(output_path):
     lines.append("")
 
     # Better prediction: scale by core performance, not bandwidth
-    # A720 @ 2.8 GHz vs A76 @ 2.4 GHz: ~1.17x clock, wider pipeline
+    # A720 @ 2.8 GHz vs A76 @ 2.3 GHz: ~1.22x clock, wider pipeline
     # Conservative: A720 scan ~ 1.5-2x the RK3588-big (A76) result
     rk_big_scan = get_gibs(device_data["RK3588 big"]["rows"], "Qwen3.5-4B", "gdn_gated_scan")
     if rk_big_scan:
@@ -639,7 +639,7 @@ def generate_report(output_path):
         conservative_high = rk_big_scan * 2.5
         lines.append("**Core-performance-based prediction** (scaling from RK3588 A76 big cluster):")
         lines.append("")
-        lines.append(f"- RK3588 big scan: {rk_big_scan:.2f} GiB/s (4x A76 @ 2.4 GHz, Armv8.2)")
+        lines.append(f"- RK3588 big scan: {rk_big_scan:.2f} GiB/s (4x A76 @ 2.3 GHz, Armv8.2)")
         lines.append("- O6 big cluster: 4x A720 @ 2.8 GHz, Armv9.2 (SVE2, wider OoO)")
         lines.append("- Expected gain from IPC + clock: 1.5-2.5x over A76")
         lines.append(

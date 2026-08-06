@@ -9,7 +9,7 @@ from `METRICS.md` (~0.25 FLOP/byte).
 | Device | Cores | ISA | Spec BW (GiB/s) |
 |--------|-------|-----|-----------------|
 | Pi 5 | 4x Cortex-A76 @ 2.4 GHz | Armv8.2-A + dotprod | 17.0 |
-| RK3588 big | 4x Cortex-A76 @ 2.4 GHz | Armv8.2-A + dotprod | 34.0 |
+| RK3588 big | 4x Cortex-A76 @ 2.3 GHz | Armv8.2-A + dotprod | 34.0 |
 | RK3588 little | 4x Cortex-A55 @ 1.8 GHz | Armv8.2-A | 34.0 |
 | Jetson j1 | 4x Cortex-A57 @ 1.48 GHz | Armv8.0-A (NEON only) | 25.6 |
 | Jetson j2 | 4x Cortex-A57 @ 1.48 GHz | Armv8.0-A (NEON only) | 25.6 |
@@ -122,7 +122,7 @@ to its 4-5x bandwidth advantage**.
 
 **Core-performance-based prediction** (scaling from RK3588 A76 big cluster):
 
-- RK3588 big scan: 3.29 GiB/s (4x A76 @ 2.4 GHz, Armv8.2)
+- RK3588 big scan: 3.29 GiB/s (4x A76 @ 2.3 GHz, Armv8.2)
 - O6 big cluster: 4x A720 @ 2.8 GHz, Armv9.2 (SVE2, wider OoO)
 - Expected gain from IPC + clock: 1.5-2.5x over A76
 - **Predicted O6 scan throughput: 4.9-8.2 GiB/s**
