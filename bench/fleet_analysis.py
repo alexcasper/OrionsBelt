@@ -539,8 +539,8 @@ def generate_report(output_path):
             all_dirty = all(d for _, _, d in shas)
             no_manifest = [lbl for lbl, s, _ in shas if s is None]
             if no_manifest:
-                note = (
-                    "same board; " + ", ".join(f"{lbl} has **no manifest**" for lbl in no_manifest)
+                note = "same board; " + ", ".join(
+                    f"{lbl} has **no manifest**" for lbl in no_manifest
                 )
             elif len(sha_set) == 1:
                 if all_dirty:
@@ -738,9 +738,7 @@ def generate_report(output_path):
         "showed 2.26 → 11.07 GiB/s on Scan (4.9x), confirming the direction."
     )
     lines.append("")
-    lines.append(
-        "| Kernel (4B, seq=64) | t4 pre-opt (GiB/s) | t3 optimized (GiB/s) | Speedup |"
-    )
+    lines.append("| Kernel (4B, seq=64) | t4 pre-opt (GiB/s) | t3 optimized (GiB/s) | Speedup |")
     lines.append("|--------------------|--------------------|-----------------------|---------|")
     t4_rows = load_device_csv("results/raw/rk3588-t4_big.csv")
     t3_rows = load_device_csv("results/raw/rk3588-t3_big.csv")

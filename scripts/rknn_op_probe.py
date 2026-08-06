@@ -12,9 +12,8 @@ Bead: ob-t3b.5
 import json
 import os
 import re
-import sys
 import subprocess
-import traceback
+import sys
 from pathlib import Path
 
 PROBE_DIR = Path("artifacts/npu_op_probe")
@@ -28,9 +27,9 @@ def extract_op_table(output: str) -> list:
     in_table = False
     for line in output.split("\n"):
         # Strip RKNN log prefix: "D RKNN: [HH:MM:SS.mmm] actual content"
-        clean = re.sub(r'^[DIEW]\s+RKNN:\s*\[[\d:.]+\]\s*', '', line.strip())
+        clean = re.sub(r"^[DIEW]\s+RKNN:\s*\[[\d:.]+\]\s*", "", line.strip())
         # Also strip ANSI color codes
-        clean = re.sub(r'\x1b\[[0-9;]*m', '', clean)
+        clean = re.sub(r"\x1b\[[0-9;]*m", "", clean)
 
         if "Network Layer Information Table" in clean:
             in_table = True
@@ -49,28 +48,39 @@ def extract_op_table(output: str) -> list:
                 op_type = parts[1]
                 dtype = parts[2]
                 target = parts[3]
-                ops.append({
-                    "id": int(op_id),
-                    "op_type": op_type,
-                    "dtype": dtype,
-                    "target": target,
-                })
+                ops.append(
+                    {
+                        "id": int(op_id),
+                        "op_type": op_type,
+                        "dtype": dtype,
+                        "target": target,
+                    }
+                )
     return ops
 
 
 def extract_key_evidence(output: str) -> list:
     """Extract the most informative lines for the results table."""
     keywords = [
-        "unsupported", "UNSUPPORTED", "not support", "not found",
-        "fallback", "FALLBACK", "error", "ERROR",
-        "_RET=", "RKNN_FILE_SIZE=",
-        "Graph is not DAG", "cannot", "failed",
+        "unsupported",
+        "UNSUPPORTED",
+        "not support",
+        "not found",
+        "fallback",
+        "FALLBACK",
+        "error",
+        "ERROR",
+        "_RET=",
+        "RKNN_FILE_SIZE=",
+        "Graph is not DAG",
+        "cannot",
+        "failed",
     ]
     lines = []
     for line in output.split("\n"):
         stripped = line.strip()
         # Strip ANSI color codes
-        clean = re.sub(r'\x1b\[[0-9;]*m', '', stripped)
+        clean = re.sub(r"\x1b\[[0-9;]*m", "", stripped)
         for kw in keywords:
             if kw.lower() in clean.lower():
                 lines.append(clean[:200])
@@ -161,8 +171,11 @@ rknn.release()
 
     # Check for CPU fallbacks in op table
     if result["op_table"]:
-        cpu_ops = [op for op in result["op_table"] if op["target"] == "CPU"
-                   and op["op_type"] not in ("InputOperator", "OutputOperator")]
+        cpu_ops = [
+            op
+            for op in result["op_table"]
+            if op["target"] == "CPU" and op["op_type"] not in ("InputOperator", "OutputOperator")
+        ]
         npu_ops = [op for op in result["op_table"] if op["target"] == "NPU"]
         result["cpu_fallback_ops"] = [f"{op['op_type']}:{op['id']}" for op in cpu_ops]
         result["npu_ops"] = [f"{op['op_type']}:{op['id']}" for op in npu_ops]
@@ -184,13 +197,13 @@ def main():
         onnx_path = str(PROBE_DIR / onnx_file)
         ops = entry["ops"]
 
-        print(f"\n{'='*70}")
+        print(f"\n{'=' * 70}")
         print(f"Probe: {probe_name} ({onnx_file})")
         print(f"  ONNX ops: {', '.join(ops)}")
-        print(f"{'='*70}")
+        print(f"{'=' * 70}")
 
         if not os.path.exists(onnx_path):
-            print(f"  SKIP: file not found")
+            print("  SKIP: file not found")
             continue
 
         result = probe_one(onnx_path, probe_name)
@@ -198,19 +211,26 @@ def main():
         result["description"] = entry["description"]
 
         print(f"  Verdict: {result['verdict']}")
-        print(f"  load_ret={result['load_ret']} build_ret={result['build_ret']} export_ret={result['export_ret']}")
+        print(
+            f"  load_ret={result['load_ret']} build_ret={result['build_ret']} export_ret={result['export_ret']}"
+        )
 
         if result.get("op_table"):
-            print(f"  Op placement:")
+            print("  Op placement:")
             for op in result["op_table"]:
-                marker = " ← CPU FALLBACK" if op["target"] == "CPU" and op["op_type"] not in ("InputOperator", "OutputOperator") else ""
+                marker = (
+                    " ← CPU FALLBACK"
+                    if op["target"] == "CPU"
+                    and op["op_type"] not in ("InputOperator", "OutputOperator")
+                    else ""
+                )
                 print(f"    [{op['target']:3s}] {op['op_type']:<20s} {op['dtype']}{marker}")
 
         if result.get("cpu_fallback_ops"):
             print(f"  CPU FALLBACKS: {', '.join(result['cpu_fallback_ops'])}")
 
         if result["evidence"]:
-            print(f"  Key evidence:")
+            print("  Key evidence:")
             for e in result["evidence"][:8]:
                 print(f"    {e}")
 
@@ -222,10 +242,10 @@ def main():
         json.dump(results, f, indent=2)
 
     # Summary
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print(f"SUMMARY: {len(results)} probes completed")
     print(f"Results written to: {results_path}")
-    print(f"{'='*70}\n")
+    print(f"{'=' * 70}\n")
 
     print(f"{'Probe':<25} {'Verdict':<20} {'CPU Fallbacks':<30} {'Notes'}")
     print("-" * 100)

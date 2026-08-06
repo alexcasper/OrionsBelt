@@ -1428,6 +1428,7 @@ pipeline on-device:
 
 ```python
 from rknn.api import RKNN
+
 rknn = RKNN(verbose=True)
 rknn.config(target_platform="rk3588", float_dtype="float16", optimization_level=3)
 rknn.load_onnx(model=probe_onnx)
