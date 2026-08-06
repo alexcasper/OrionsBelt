@@ -21,17 +21,16 @@ This project deliberately runs **two separate Python environments**, and they mu
 merged:
 
 1. **The NPU toolchain environment.** The CIX NOE Compiler used to target the Orion O6's NPU
-   is reported to require Python 3.8. As recorded in `PLAN.md` §2.1 and
-   `docs/CLAIM_VERIFICATION.md` §4, **this pin is unverified** — the Radxa page that documented
-   it now 404s — so treat it as "design for 3.8 until proven otherwise," not as confirmed fact.
+   requires **Python 3.10** (VERIFIED — see `docs/CLAIM_VERIFICATION.md` §4: "The SDK is only
+   compatible with Python 3.10." The earlier "Python 3.8" figure in brief.md was wrong.)
    Anything that has to run inside this environment (NPU export/quantization code, and any
-   shared library code it imports) must stay Python-3.8-compatible; see "Code style" below.
+   shared library code it imports) must stay Python-3.10-compatible; see "Code style" below.
 2. **The harness and dev-tooling environment.** The benchmark harness, plotting, linting, and
    general development tooling target a modern Python and can use whatever language features
    and dependencies are convenient there.
 
 Keeping these separate is intentional, not an oversight: the moment shared code imports
-something the 3.8 toolchain can't parse, the NPU path silently breaks, possibly for weeks
+something the 3.10 toolchain can't parse, the NPU path silently breaks, possibly for weeks
 before anyone notices on real hardware. If you're setting up a fresh environment, install the
 NPU-facing extras and the dev/bench extras into two different virtualenvs (or conda envs), and
 don't let either one satisfy the other's dependency graph.
@@ -133,10 +132,10 @@ reads as the thing judges are specifically trained to catch.
 - Lint and format with `ruff`; configuration (line length, target Python version, rule set)
   lives in `pyproject.toml` — check there rather than assuming a default.
 - Anything that must run inside the NOE Compiler / NPU toolchain environment needs to stay
-  compatible with Python 3.8. Concretely: no `match` statements, no `X | Y` union syntax — use
-  `typing.Optional`, `typing.Union`, `typing.List`, `typing.Dict`, etc. When in doubt about
-  whether a piece of code is toolchain-facing, write it 3.8-compatible anyway; it's cheap
-  insurance against the pin turning out to be real.
+  compatible with Python 3.10. This is the same floor as the harness environment, so there is
+  no special syntax restriction — `match` statements, `X | Y` union syntax, and all 3.10
+  features are safe. The constraint is about the dependency graph, not the language: the NPU
+  toolchain has a pinned set of packages that must not be disturbed.
 - Tests live in `tests/`, split between fast unit tests (metrics, schema conformance, manifest
   capture, partitioning logic) and the correctness oracle (golden-output comparison against the
   x86 reference). See `tests/README.md` for the distinction — don't conflate the two.
