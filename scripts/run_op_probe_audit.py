@@ -28,11 +28,11 @@ import re
 import subprocess
 from pathlib import Path
 
-import onnx
-
 
 def cfg_for(model_path: Path, name: str) -> str:
     """Build a minimal Common-section cfg describing one probe graph."""
+    import onnx
+
     model = onnx.load(str(model_path))
     graph = model.graph
     initializers = {i.name for i in graph.initializer}
