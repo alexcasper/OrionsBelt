@@ -89,7 +89,7 @@ class TestL2Normalize:
 class TestGDN2Recurrent:
     def test_single_step_zero_state(self):
         """Single step with zero initial state matches hand computation."""
-        K, V = 2, 2
+        K = 2
         q = np.array([[[0.6, 0.8]]], dtype=np.float64)
         k_vec = np.array([[[0.8, 0.6]]], dtype=np.float64)
         v_vec = np.array([[[1.0, 2.0]]], dtype=np.float64)
@@ -235,7 +235,7 @@ class TestMakeSyntheticInput:
         """Same seed produces same inputs."""
         a = make_synthetic_input(seed=123)
         b = make_synthetic_input(seed=123)
-        for x, y in zip(a, b):
+        for x, y in zip(a, b, strict=True):
             np.testing.assert_array_equal(x, y)
 
     def test_different_seeds_differ(self):
