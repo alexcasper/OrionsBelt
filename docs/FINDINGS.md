@@ -574,6 +574,15 @@ waiting for the chain to resolve; with two chains, the scheduler can interleave 
 | + 8-wide unroll (conv) | 510 μs (**4.1×**) | 1010 μs (**3.9×**) | 590 μs (**3.3×**) |
 | Achieved bandwidth | 3.9 GiB/s | 2.9 GiB/s | 3.6 GiB/s |
 
+> **Cross-validation (ob-bf7, 2026-08-06):** jetson-j1 was re-run at commit
+> `0582d1b` (clean tree, dirty=false, OMP_NUM_THREADS=4, governor=performance)
+> using `scripts/fleet_sweep.sh`. j1 confirms j2's measurements to within 5%:
+> gated_scan 997 μs / 2.97 GiB/s (j2: 1010 μs / 2.9), cumdecay 538 μs / 3.63
+> GiB/s (j2: 510 μs / 3.9), conv 576 μs / 3.57 GiB/s (j2: 590 μs / 3.6).
+> Thermal delta +1 °C (pre 45.5 °C, post 46.5 °C). This is the clean provenance
+> data point for j1; the prior j1 CSV was at `2c9ac9f` with dirty=true and
+> pre-optimization code.
+
 **Qwen3.5-0.8B (C=2048, T=64):**
 
 | Stage | cumdecay | gated_scan | conv |
