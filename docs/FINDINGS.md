@@ -2172,6 +2172,45 @@ dispatch: GDN-2 models are relatively more expensive on little cores.
    penalty on A55 vs 2.0× on A76 means the little cluster is a worse-than-linear fit for GDN-2's
    extra arithmetic.
 
+### CORRECTION (Session 15): GDN-2 bandwidth was inflated by benchmark aliasing bug
+
+The GDN-2 numbers above were measured with a benchmark bug: `bench_gdn.c` passed
+the **same pointer** for both `w_gate` (3rd arg) and `x` (4th arg) of
+`gdn2_gated_scan_f32`. Since `bytes_per_call` counts 5 streams (g, b_gate, w_gate,
+x, out) but only 4 unique arrays were loaded, the cache served w_gate and x from
+the same lines, making the kernel run faster than it would with separate inputs.
+The reported GiB/s was inflated accordingly.
+
+**Fix** (commit 20b50c7): allocate a separate `wg[]` array for the write gate.
+Also fixes a `restrict`-qualifier violation (two `restrict` pointers to the same
+memory is UB).
+
+**Corrected t4 numbers (A76 big cluster, OpenMP, governor=performance):**
+
+| Config | Old GiB/s | New GiB/s | Inflation |
+|---|---|---|---|
+| 4B prefill | 10.71 | 6.84 | 1.57× |
+| 0.8B prefill | 12.28 | 8.15 | 1.51× |
+| 4B decode | 45.78 | 40.69 | 1.13× |
+| 0.8B decode | 30.52 | 30.52 | 1.00× |
+
+**Impact on §10 findings:**
+
+- **Finding 2 (prefill ratio) revises from "2.0×" to "~2.7×".** The corrected
+  gdn2_gated_scan is 718µs vs gdn_gated_scan's 267µs (2.69×). The old 2.0× ratio
+  was an artefact of the aliasing making GDN-2 look faster than it is.
+- **Finding 1 (decode is free) softens.** GDN-2 decode latency is 2.63µs vs
+  GDN-1's 2.04µs (1.29×), not identical. The extra stream adds ~29% at decode.
+  Still far below the 2.7× prefill penalty, confirming decode is overhead-dominated.
+- **The bandwidth ratio between GDN-1 and GDN-2 is now closer to the theoretical
+  5/3 = 1.67×** (6.84 vs 11.09 GiB/s = 1.62×), confirming the kernel is genuinely
+  bandwidth-bound at prefill.
+
+**Fleet-wide note:** All existing fleet CSVs (t3, t4, jetson, pi5) contain
+inflated GDN-2 numbers. The t4 CSVs have been re-run with the fix; other devices
+need re-running when accessible. The `partial_comparison_table.py` GDN-2 column
+will show corrected numbers for t4 only until other devices re-run.
+
 ### Correctness verification
 
 The `gdn2_gated_scan_f32` kernel is verified by `test_gdn2_scan.c` (added Session 14),
