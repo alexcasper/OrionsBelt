@@ -313,7 +313,12 @@ def test_gdn2_vs_gdn1_uniform_gates():
     alpha = np.ones((T, H), dtype=np.float64)
     beta_arr = np.full((T, H), beta, dtype=np.float64)
     o1, S1 = gdn1_recurrent(
-        q.copy(), k_in.copy(), v_in.copy(), alpha, beta_arr, scale=1.0 / math.sqrt(K),
+        q.copy(),
+        k_in.copy(),
+        v_in.copy(),
+        alpha,
+        beta_arr,
+        scale=1.0 / math.sqrt(K),
         use_qk_l2norm=True,
     )
 

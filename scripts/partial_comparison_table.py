@@ -116,7 +116,11 @@ print("ABLATION (model-level, tidy long, cpu/cpu hybrid, 4K)")
 ab = load_ablation()
 print("  run_id    :", ab["run_id"])
 _abl_man_exists = all(os.path.isfile(m) for m in ab["manifest_ref"])
-print("  git_sha   :", ab["git_sha"], " (manifest file exists)" if _abl_man_exists else " (manifest file MISSING from results/manifests/)")
+print(
+    "  git_sha   :",
+    ab["git_sha"],
+    " (manifest file exists)" if _abl_man_exists else " (manifest file MISSING from results/manifests/)",
+)
 print("  manifest  :", ab["manifest_ref"])
 print("  context   :", ab["context"], " quant:", ab["quant"], " engines:", ab["engines"])
 print("  model     :", ab["model"])

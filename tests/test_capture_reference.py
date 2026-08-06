@@ -303,7 +303,10 @@ class TestCLI:
         parser = argparse.ArgumentParser()
         parser.add_argument("--model", default="0.8b")
         parser.add_argument("--device", default="cuda")
-        parser.add_argument("--context-lengths", default=",".join(str(x) for x in DEFAULT_CONTEXT_LENGTHS))
+        parser.add_argument(
+            "--context-lengths",
+            default=",".join(str(x) for x in DEFAULT_CONTEXT_LENGTHS),
+        )
         parser.add_argument("--prompts", type=int, default=DEFAULT_PROMPTS)
         parser.add_argument("--decode-length", type=int, default=DEFAULT_DECODE_LENGTH)
         parser.add_argument("--topk", type=int, default=DEFAULT_TOPK)

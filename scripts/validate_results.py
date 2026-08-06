@@ -184,9 +184,7 @@ def check_ablation_manifests(ablation_dir, issues):
 
         for ref in sorted(refs):
             if os.path.isfile(ref):
-                issues.append(
-                    Issue("NOTE", fname, f"ablation manifest_ref OK: {ref}")
-                )
+                issues.append(Issue("NOTE", fname, f"ablation manifest_ref OK: {ref}"))
             else:
                 issues.append(
                     Issue(

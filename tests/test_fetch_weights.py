@@ -275,6 +275,7 @@ class TestDryRun:
     @pytest.fixture(autouse=True)
     def mock_hf_api(self, monkeypatch):
         """Mock HuggingFace API so dry-run tests never hit the network (ob-fty)."""
+
         def fake_list_repo_files(repo_id):
             if "0.8B" in repo_id:
                 return sorted(REPO_FILES_0_8B)
@@ -309,6 +310,7 @@ class TestCLI:
     @pytest.fixture(autouse=True)
     def mock_hf_api(self, monkeypatch):
         """Mock HuggingFace API so CLI dry-run tests never hit the network (ob-fty)."""
+
         def fake_list_repo_files(repo_id):
             if "0.8B" in repo_id:
                 return sorted(REPO_FILES_0_8B)
