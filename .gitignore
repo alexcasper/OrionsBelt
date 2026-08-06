@@ -35,3 +35,5 @@ artifacts/reference/
 gpu/gdn_gpu_bench
 gpu/gdn_gpu_validate
 references/
+
+results/manifests/generic_aarch64_*
