@@ -451,7 +451,8 @@ class TestCompareReferenceGoldenData:
     """End-to-end tests using the actual golden reference file."""
 
     @pytest.fixture(scope="class")
-    def ref_data(self):
+    @classmethod
+    def ref_data(cls):
         if not _REF_PATH.exists():
             pytest.skip("Compact reference not generated — run scripts/generate_reference.py")
         with open(_REF_PATH) as f:
