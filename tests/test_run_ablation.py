@@ -134,8 +134,8 @@ class TestRunAblation:
 class TestMain:
     """Test the CLI entry point.
 
-    NOTE: main() writes CSVs to results/raw/ablation/ (relative to CWD).
-    Tests must NOT chdir away from the repo or git rev-parse fails.
+    Tests pass --output-dir to a temp directory so they never overwrite
+    the committed ablation CSVs in results/raw/ablation/.
     """
 
     def test_main_returns_zero(self, tmp_path):
@@ -149,6 +149,8 @@ class TestMain:
                 "5",
                 "--decode-length",
                 "5",
+                "--output-dir",
+                str(tmp_path / "ablation"),
                 "--table-output",
                 str(tmp_path / "table.md"),
             ]
@@ -165,6 +167,8 @@ class TestMain:
                 "1",
                 "--repeats",
                 "5",
+                "--output-dir",
+                str(tmp_path / "ablation"),
                 "--table-output",
                 str(table_path),
             ]
@@ -182,6 +186,8 @@ class TestMain:
                 "1",
                 "--repeats",
                 "5",
+                "--output-dir",
+                str(tmp_path / "ablation"),
                 "--table-output",
                 str(tmp_path / "table.md"),
             ]
