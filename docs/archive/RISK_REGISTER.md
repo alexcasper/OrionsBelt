@@ -1,6 +1,6 @@
 # Risk Register and Go/No-Go Ritual
 
-Operable companion to [`PLAN.md`](../PLAN.md) §7 (risk register / descope ladder) and §5
+Operable companion to [`PLAN.md`](./PLAN.md) §7 (risk register / descope ladder) and §5
 (milestones). PLAN.md states the risks in prose and lists them once; this document tracks
 them as a living artifact with concrete triggers, owners, and a daily ritual someone can
 actually run between now (2026-08-02, T-12) and submission (2026-08-14, 16:00 PDT).

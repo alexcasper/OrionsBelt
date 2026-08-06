@@ -7,8 +7,11 @@ most importantly, the conventions that make our benchmark numbers trustworthy. I
 read one section, read "The reproducibility conventions" below: it's the difference between
 a number a judge can trust and a number they can't.
 
-For the full technical plan, rubric mapping, and verified claims, start with
-[`PLAN.md`](./PLAN.md) and [`docs/CLAIM_VERIFICATION.md`](./docs/CLAIM_VERIFICATION.md).
+For current status and rubric mapping, start with [`README.md`](./README.md)'s Status section
+and [`docs/FINDINGS.md`](./docs/FINDINGS.md); for verified claims see
+[`docs/CLAIM_VERIFICATION.md`](./docs/CLAIM_VERIFICATION.md). The original implementation plan is
+archived at [`docs/archive/PLAN.md`](./docs/archive/PLAN.md) — historical context, not current
+direction; see [`docs/archive/README.md`](./docs/archive/README.md) for why.
 
 ## Getting set up
 

@@ -1,8 +1,8 @@
 # OrionsBelt
 
-**Optimizing a Qwen3.5 Gated DeltaNet hybrid model for Arm edge silicon.**
+**Building and contributing optimized CPU kernels for Gated DeltaNet (linear attention) toward Arm's [KleidiAI](https://gitlab.arm.com/kleidi/kleidiai), demonstrated on a Qwen3.5 GDN hybrid model across the aarch64 edge device fleet.**
 
-Submission for the [Arm Create: AI Optimization Challenge](https://arm-ai-optimization-challenge.devpost.com/) (deadline 2026-08-14, 16:00 PDT). **Committed to the Edge AI track** (ADR [0007](./docs/adr/0007-commit-to-edge-ai-track.md)) — the Orion O6 board has not arrived and its last-useful-arrival date (Aug 8) is imminent. All hardware-independent work — benchmark harness, operator analysis, optimization kernels, GDN-2 research — runs on the portable aarch64 fleet regardless.
+Submission for the [Arm Create: AI Optimization Challenge](https://arm-ai-optimization-challenge.devpost.com/) (deadline 2026-08-14, 16:00 PDT). **Committed to the Edge AI track** (ADR [0007](./docs/adr/0007-commit-to-edge-ai-track.md)) — the Orion O6 board never arrived, so the project re-centered on what's provable without it: NEON/SVE2 CPU kernels for GDN's chunkwise recurrence (scan, decay, causal conv1d, and the delta-rule matmul), verified correct and benchmarked across five real Arm CPUs, with the headline deliverable being an actual upstream contribution to KleidiAI rather than a heterogeneous NPU/GPU/CPU demo. NPU and GPU exploration continues as secondary findings (see [`docs/FINDINGS.md`](./docs/FINDINGS.md) §1, §7, §8) — see [`docs/archive/`](./docs/archive/) for the original O6/NPU-primary plan and why it changed.
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
 
@@ -183,13 +183,14 @@ All figures above are verified against primary sources (Radxa product page and d
 
 ## Repository layout
 
-Full target layout and rationale are in [`PLAN.md`](./PLAN.md) §10. Highlights:
+Highlights:
 
-- [`PLAN.md`](./PLAN.md) — the implementation plan: workstreams, milestones, risk register, descope ladder.
+- [`docs/FINDINGS.md`](./docs/FINDINGS.md) — the living results and findings doc; current source of truth for what's built and measured.
 - [`docs/CLAIM_VERIFICATION.md`](./docs/CLAIM_VERIFICATION.md) — every quantitative claim in this README traced to a primary source, corrected, or dropped. Ground truth for numbers.
 - [`docs/DEVPOST_SUBMISSION.md`](./docs/DEVPOST_SUBMISSION.md) — the Devpost write-up, mapped section-by-section to the judging rubric.
-- [`docs/BEADS.md`](./docs/BEADS.md) — how issue tracking works on this project.
+- [`docs/BEADS.md`](./docs/BEADS.md) — how issue tracking works on this project; `bd ready` and `bd show <epic>` are the current plan, not a static document.
 - [`docs/adr/`](./docs/adr/) — architecture decision records for irreversible forks (track selection, hedge target, layer→engine mapping, GDN-2 scope).
+- [`docs/archive/`](./docs/archive/) — the original implementation plan, source brief, and O6-arrival risk register, superseded by ADR 0007's pivot to the CPU-fleet/KleidiAI-contribution focus. Kept for history, not current direction.
 - [`bench/`](./bench/README.md) — measurement harness: context sweep, metrics, provenance manifests, plotting.
 - [`results/`](./results/README.md) — committed CSVs and figures, once they exist.
 - [`src/orionsbelt/`](./src/orionsbelt/) — model loading/introspection, NPU/GPU/CPU engine backends, layer partitioning, quantization policy.
