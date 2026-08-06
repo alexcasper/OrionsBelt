@@ -79,6 +79,45 @@ int main(void){
   free(dK); free(dR);
 
   /* ====================================================================
+   * Conv streaming continuity: chunked execution must match continuous
+   *
+   * In decode, the conv kernel is called repeatedly with seq=1 (one token at
+   * a time).  The hist[] array carries the last 3 timesteps across calls.
+   * This test verifies that calling the kernel on two chunks [0..T) then
+   * [T..2T) produces bit-identical output to calling it once on [0..2T),
+   * starting from the same zero history.  The scan kernel has multi-chunk
+   * drift tests; the conv's history-carry property was previously untested.
+   * ==================================================================== */
+  {
+    size_t T2 = 2 * T, N2 = T2 * C;
+    float *x2 = malloc(N2 * sizeof(float));
+    float *oFull = malloc(N2 * sizeof(float));
+    float *oChunk = malloc(T * C * sizeof(float));
+    float *hC = malloc(3 * C * sizeof(float));
+    if (!x2 || !oFull || !oChunk || !hC) { fprintf(stderr, "alloc fail\n"); return 1; }
+    for (size_t i = 0; i < N2; i++)
+      x2[i] = (rand() / (float)RAND_MAX) - 0.5f;
+    /* Full run: 2T tokens from zero history */
+    memset(hC, 0, 3 * C * sizeof(float));
+    gdn_causal_dwconv1d_f32(x2, w, oFull, hC, T2, C);
+    /* Chunk 1: T tokens from zero history */
+    memset(hC, 0, 3 * C * sizeof(float));
+    gdn_causal_dwconv1d_f32(x2, w, oChunk, hC, T, C);
+    /* Chunk 2: next T tokens, history carried from chunk 1 */
+    gdn_causal_dwconv1d_f32(x2 + T * C, w, oChunk, hC, T, C);
+    /* Compare chunk 2 output vs full run's [T..2T) slice */
+    double m = 0;
+    for (size_t i = 0; i < T * C; i++) {
+      double d = fabs((double)oChunk[i] - oFull[T * C + i]);
+      if (d > m) m = d;
+    }
+    printf("\nConv streaming continuity (2 chunks of %zu, C=%zu):\n", T, C);
+    printf("  chunked vs continuous max_abs = %.3e\n", m);
+    printf("  conv streaming bit-identical: %s\n", m == 0.0 ? "YES" : "no");
+    free(x2); free(oFull); free(oChunk); free(hC);
+  }
+
+  /* ====================================================================
    * Mixed-precision state variants (ob-8qt.4)
    *
    * fp16/bf16 state should approximate fp32 closely — the state carries a

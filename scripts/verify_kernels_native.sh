@@ -79,6 +79,42 @@ else
 fi
 echo
 
+# --- Test 3: delta-rule matmul correctness ---
+echo "--- Test 3: delta-rule matmul correctness ---"
+if $CC -O3 $MARCH -static \
+    "$K/gdn_delta_matmul.c" "$K/test_gdn_delta_matmul.c" -I"$K" \
+    -o "$OUT/test_matmul" -lm 2>/dev/null; then
+    OUTPUT=$("$OUT/test_matmul" 2>&1) || true
+    echo "$OUTPUT" | sed 's/^/  /'
+    if echo "$OUTPUT" | grep -q "ALL PASS"; then
+        echo "  RESULT: PASS"
+    else
+        echo "  RESULT: FAIL"
+        FAILURES=$((FAILURES + 1))
+    fi
+else
+    echo "  RESULT: SKIP (build failed — toolchain may not support $MARCH)"
+fi
+echo
+
+# --- Test 4: GDN-2 decoupled-gating scan correctness ---
+echo "--- Test 4: GDN-2 decoupled-gating scan correctness ---"
+if $CC -O3 $MARCH -static \
+    "$K/gdn_sve.c" "$K/test_gdn2_scan.c" \
+    -o "$OUT/test_gdn2" -lm 2>/dev/null; then
+    OUTPUT=$("$OUT/test_gdn2" 2>&1) || true
+    echo "$OUTPUT" | sed 's/^/  /'
+    if echo "$OUTPUT" | grep -q "ALL TESTS PASSED"; then
+        echo "  RESULT: PASS"
+    else
+        echo "  RESULT: FAIL"
+        FAILURES=$((FAILURES + 1))
+    fi
+else
+    echo "  RESULT: SKIP (build failed — toolchain may not support $MARCH)"
+fi
+echo
+
 # --- Summary ---
 echo "=== Summary ==="
 if [ "$FAILURES" -eq 0 ]; then
