@@ -153,15 +153,15 @@ _Regenerable: `python3 scripts/generate_memory_plots.py`. See [`memory_compariso
 
 | Context | Weights (GiB) | KV cache (GiB) | Recurrent state (MiB) | Total (GiB) | If all-attn (GiB) | Savings |
 |---:|---:|---:|---:|---:|---:|---:|
-| 4K | 10.42 | 0.12 | 51 | 10.60 | 10.92 | 0.33 GiB |
-| 32K | 10.42 | 1.00 | 51 | 11.47 | 14.42 | 2.95 GiB |
-| 128K | 10.42 | 4.00 | 51 | 14.47 | 26.42 | 11.95 GiB |
-| 262K | 10.42 | 8.00 | 51 | 18.47 | 42.42 | 23.95 GiB |
+| 4K | 7.83 | 0.12 | 51 | 8.01 | 8.33 | 0.33 GiB |
+| 32K | 7.83 | 1.00 | 51 | 8.88 | 11.83 | 2.95 GiB |
+| 128K | 7.83 | 4.00 | 51 | 11.88 | 23.83 | 11.95 GiB |
+| 262K | 7.83 | 8.00 | 51 | 15.88 | 39.83 | 23.95 GiB |
 
 ## Decode bandwidth model — Qwen3.5-4B at 100 GB/s (O6 stretch target)
 
 | Quant | Weight traffic/token | State traffic/token | Total | Ceiling tok/s |
 |---|---:|---:|---:|---:|
-| fp16 | 10.42 GiB | 51 MiB | 10.47 GiB | ≈9 |
-| INT8 | 5.21 GiB | 51 MiB | 5.26 GiB | ≈18 |
-| INT4 (W4A16) | 2.61 GiB | 51 MiB | 2.66 GiB | ≈35 |
+| fp16 | 7.83 GiB | 51 MiB | 7.88 GiB | ≈12 |
+| INT8 | 3.92 GiB | 51 MiB | 3.96 GiB | ≈23 |
+| INT4 (W4A16) | 1.96 GiB | 51 MiB | 2.01 GiB | ≈46 |
