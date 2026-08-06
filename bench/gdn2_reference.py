@@ -378,8 +378,15 @@ def test_gdn2_multi_step_consistency():
     # continue seamlessly
     q2, k2, v2, g2, b2, w2, _, _ = make_synthetic_input(T, H, K, V, seed=77)
     o_cont, S_cont = gdn2_recurrent(
-        q2, k2, v2, g2, b2, w2, scale=1.0 / math.sqrt(K),
-        initial_state=S_final, use_qk_l2norm=True,
+        q2,
+        k2,
+        v2,
+        g2,
+        b2,
+        w2,
+        scale=1.0 / math.sqrt(K),
+        initial_state=S_final,
+        use_qk_l2norm=True,
     )
     assert np.all(np.isfinite(o_cont)), "Continued output contains NaN or Inf!"
 
