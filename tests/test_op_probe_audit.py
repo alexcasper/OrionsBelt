@@ -10,14 +10,17 @@ After a refactor that moved ``import onnx`` inside cfg_for(), this module can no
 be imported without onnx installed, making classify() directly testable.
 """
 
+import json
 import os
+import subprocess
 import sys
+from unittest.mock import patch
 
 import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 
-from run_op_probe_audit import cfg_for, classify  # noqa: E402
+from run_op_probe_audit import cfg_for, classify, main  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # UNSUPPORTED_OP verdicts
@@ -349,3 +352,281 @@ class TestCfgFor:
         cfg_b = cfg_for(path, "beta")
         assert "model_name=alpha" in cfg_a
         assert "model_name=beta" in cfg_b
+
+
+# ---------------------------------------------------------------------------
+# main() CLI — end-to-end with mocked cixparse
+# ---------------------------------------------------------------------------
+
+
+def _make_probe_dir(tmp_path):
+    """Create a probe directory with manifest.json and two ONNX models."""
+    import onnx
+
+    from npu_op_probe import probe_causal_conv1d, probe_scan_recurrence
+
+    probe_dir = tmp_path / "probes"
+    probe_dir.mkdir()
+
+    manifest = []
+    for name, func in [
+        ("causal_conv1d", probe_causal_conv1d),
+        ("scan_recurrence", probe_scan_recurrence),
+    ]:
+        result = func()
+        model = result[0] if isinstance(result, tuple) else result
+        path = probe_dir / f"{name}.onnx"
+        onnx.save(model, str(path))
+        manifest.append({"probe": name, "file": f"{name}.onnx", "ops": ["Conv", "Scan"]})
+
+    (probe_dir / "manifest.json").write_text(json.dumps(manifest))
+    return probe_dir
+
+
+class _FakeProc:
+    """Minimal stub for subprocess.run return value."""
+
+    def __init__(self, stdout="", stderr="", returncode=0):
+        self.stdout = stdout
+        self.stderr = stderr
+        self.returncode = returncode
+
+
+class TestMainCLI:
+    def test_all_ok(self, tmp_path):
+        """Both probes pass cixparse cleanly."""
+        probe_dir = _make_probe_dir(tmp_path)
+        out_dir = tmp_path / "audit"
+        argv = [
+            "--cixparse",
+            "/fake/cixparse",
+            "--probe-dir",
+            str(probe_dir),
+            "--out-dir",
+            str(out_dir),
+        ]
+
+        with (
+            patch("sys.argv", ["prog"] + argv),
+            patch("run_op_probe_audit.subprocess.run") as mock_run,
+        ):
+            mock_run.return_value = _FakeProc(stdout="Build complete\n", returncode=0)
+            rc = main()
+
+        assert rc == 0
+        # audit_results.json exists
+        results = json.loads((out_dir / "audit_results.json").read_text())
+        assert len(results) == 2
+        assert all(r["verdict"] == "OK" for r in results)
+        # cfg and log files written
+        for name in ("causal_conv1d", "scan_recurrence"):
+            assert (out_dir / f"{name}.cfg").exists()
+            assert (out_dir / f"{name}.log").exists()
+
+    def test_unsupported_op_detected(self, tmp_path):
+        """An unsupported op is classified correctly."""
+        probe_dir = _make_probe_dir(tmp_path)
+        out_dir = tmp_path / "audit"
+        argv = [
+            "--cixparse",
+            "/fake/cixparse",
+            "--probe-dir",
+            str(probe_dir),
+            "--out-dir",
+            str(out_dir),
+        ]
+
+        with (
+            patch("sys.argv", ["prog"] + argv),
+            patch("run_op_probe_audit.subprocess.run") as mock_run,
+        ):
+            mock_run.return_value = _FakeProc(stdout="Error: unsupported op Scan\n", returncode=1)
+            rc = main()
+
+        assert rc == 0
+        results = json.loads((out_dir / "audit_results.json").read_text())
+        assert all(r["verdict"] == "UNSUPPORTED_OP" for r in results)
+        assert all("Scan" in r["evidence"] for r in results)
+
+    def test_mixed_verdicts(self, tmp_path):
+        """One probe OK, one fails."""
+        probe_dir = _make_probe_dir(tmp_path)
+        out_dir = tmp_path / "audit"
+        argv = [
+            "--cixparse",
+            "/fake/cixparse",
+            "--probe-dir",
+            str(probe_dir),
+            "--out-dir",
+            str(out_dir),
+        ]
+
+        with (
+            patch("sys.argv", ["prog"] + argv),
+            patch("run_op_probe_audit.subprocess.run") as mock_run,
+        ):
+            mock_run.side_effect = [
+                _FakeProc(stdout="Build complete\n", returncode=0),
+                _FakeProc(stderr="fatal error: link failed\n", returncode=1),
+            ]
+            rc = main()
+
+        assert rc == 0
+        results = json.loads((out_dir / "audit_results.json").read_text())
+        assert results[0]["verdict"] == "OK"
+        assert results[1]["verdict"] == "FAILED"
+
+    def test_timeout(self, tmp_path):
+        """A timeout produces rc=124 and FAILED verdict."""
+        probe_dir = _make_probe_dir(tmp_path)
+        out_dir = tmp_path / "audit"
+        argv = [
+            "--cixparse",
+            "/fake/cixparse",
+            "--probe-dir",
+            str(probe_dir),
+            "--out-dir",
+            str(out_dir),
+            "--timeout",
+            "5",
+        ]
+
+        with (
+            patch("sys.argv", ["prog"] + argv),
+            patch("run_op_probe_audit.subprocess.run") as mock_run,
+        ):
+            mock_run.side_effect = subprocess.TimeoutExpired(cmd="cixparse", timeout=5)
+            rc = main()
+
+        assert rc == 0
+        results = json.loads((out_dir / "audit_results.json").read_text())
+        assert all(r["returncode"] == 124 for r in results)
+        assert all(r["verdict"] == "FAILED" for r in results)
+        # Log file contains timeout message
+        log_text = (out_dir / "causal_conv1d.log").read_text()
+        assert "TIMEOUT" in log_text
+
+    def test_ok_with_warnings(self, tmp_path):
+        """A successful build with warnings is classified as OK_WITH_WARNINGS."""
+        probe_dir = _make_probe_dir(tmp_path)
+        out_dir = tmp_path / "audit"
+        argv = [
+            "--cixparse",
+            "/fake/cixparse",
+            "--probe-dir",
+            str(probe_dir),
+            "--out-dir",
+            str(out_dir),
+        ]
+
+        with (
+            patch("sys.argv", ["prog"] + argv),
+            patch("run_op_probe_audit.subprocess.run") as mock_run,
+        ):
+            mock_run.return_value = _FakeProc(
+                stdout="Warning: deprecated attribute\nBuild complete\n", returncode=0
+            )
+            rc = main()
+
+        assert rc == 0
+        results = json.loads((out_dir / "audit_results.json").read_text())
+        assert all(r["verdict"] == "OK_WITH_WARNINGS" for r in results)
+
+    def test_results_json_structure(self, tmp_path):
+        """Each result entry has the required fields."""
+        probe_dir = _make_probe_dir(tmp_path)
+        out_dir = tmp_path / "audit"
+        argv = [
+            "--cixparse",
+            "/fake/cixparse",
+            "--probe-dir",
+            str(probe_dir),
+            "--out-dir",
+            str(out_dir),
+        ]
+
+        with (
+            patch("sys.argv", ["prog"] + argv),
+            patch("run_op_probe_audit.subprocess.run") as mock_run,
+        ):
+            mock_run.return_value = _FakeProc(stdout="Build complete\n", returncode=0)
+            main()
+
+        results = json.loads((out_dir / "audit_results.json").read_text())
+        r = results[0]
+        for key in ("probe", "ops", "returncode", "verdict", "evidence", "log"):
+            assert key in r
+        assert r["ops"] == ["Conv", "Scan"]
+        assert r["log"].endswith(".log")
+
+    def test_out_dir_created(self, tmp_path):
+        """Output directory is created if it doesn't exist."""
+        probe_dir = _make_probe_dir(tmp_path)
+        out_dir = tmp_path / "nested" / "deep" / "audit"
+        argv = [
+            "--cixparse",
+            "/fake/cixparse",
+            "--probe-dir",
+            str(probe_dir),
+            "--out-dir",
+            str(out_dir),
+        ]
+
+        with (
+            patch("sys.argv", ["prog"] + argv),
+            patch("run_op_probe_audit.subprocess.run") as mock_run,
+        ):
+            mock_run.return_value = _FakeProc(stdout="Build complete\n", returncode=0)
+            main()
+
+        assert out_dir.exists()
+
+    def test_cfg_file_written_for_each_probe(self, tmp_path):
+        """Each probe gets its own .cfg file."""
+        probe_dir = _make_probe_dir(tmp_path)
+        out_dir = tmp_path / "audit"
+        argv = [
+            "--cixparse",
+            "/fake/cixparse",
+            "--probe-dir",
+            str(probe_dir),
+            "--out-dir",
+            str(out_dir),
+        ]
+
+        with (
+            patch("sys.argv", ["prog"] + argv),
+            patch("run_op_probe_audit.subprocess.run") as mock_run,
+        ):
+            mock_run.return_value = _FakeProc(stdout="Build complete\n", returncode=0)
+            main()
+
+        for name in ("causal_conv1d", "scan_recurrence"):
+            cfg_text = (out_dir / f"{name}.cfg").read_text()
+            assert "[Common]" in cfg_text
+            assert f"model_name={name}" in cfg_text
+
+    def test_cixparse_invoked_with_correct_args(self, tmp_path):
+        """cixparse is called with -c <cfg> -v."""
+        probe_dir = _make_probe_dir(tmp_path)
+        out_dir = tmp_path / "audit"
+        argv = [
+            "--cixparse",
+            "/path/to/cixparse",
+            "--probe-dir",
+            str(probe_dir),
+            "--out-dir",
+            str(out_dir),
+        ]
+
+        with (
+            patch("sys.argv", ["prog"] + argv),
+            patch("run_op_probe_audit.subprocess.run") as mock_run,
+        ):
+            mock_run.return_value = _FakeProc(stdout="ok\n", returncode=0)
+            main()
+
+        call_args = mock_run.call_args_list[0][0][0]
+        assert call_args[0] == "/path/to/cixparse"
+        assert "-c" in call_args
+        assert "-v" in call_args
