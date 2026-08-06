@@ -17,6 +17,7 @@ import pytest
 # softplus
 # ---------------------------------------------------------------------------
 
+
 class TestSoftplus:
     def test_known_values(self):
         """gdn2.softplus(0) = ln(2), gdn2.softplus(large) ≈ x, gdn2.softplus(-large) ≈ 0."""
@@ -47,6 +48,7 @@ class TestSoftplus:
 # ---------------------------------------------------------------------------
 # l2_normalize
 # ---------------------------------------------------------------------------
+
 
 class TestL2Normalize:
     def test_unit_norm(self):
@@ -79,6 +81,7 @@ class TestL2Normalize:
 # ---------------------------------------------------------------------------
 # gdn2_recurrent
 # ---------------------------------------------------------------------------
+
 
 class TestGDN2Recurrent:
     def test_single_step_zero_state(self):
@@ -165,6 +168,7 @@ class TestGDN2Recurrent:
 # gdn1_recurrent
 # ---------------------------------------------------------------------------
 
+
 class TestGDN1Recurrent:
     def test_output_shape(self):
         T, H, K, V = 4, 2, 8, 8
@@ -202,6 +206,7 @@ class TestGDN1Recurrent:
 # ---------------------------------------------------------------------------
 # make_synthetic_input
 # ---------------------------------------------------------------------------
+
 
 class TestMakeSyntheticInput:
     def test_shapes(self):
