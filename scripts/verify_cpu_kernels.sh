@@ -30,6 +30,13 @@ aarch64-linux-gnu-gcc -O3 $MARCH -static \
 echo "== running delta-rule matmul under QEMU with 128-bit vectors (as Cortex-A720)"
 QEMU_CPU=max,sve128=on qemu-aarch64 "$OUT/verify_matmul"
 
+echo "== cross-compiling the GDN-2 scan correctness test for aarch64 ($MARCH)"
+aarch64-linux-gnu-gcc -O3 $MARCH -static \
+    "$K/gdn_sve.c" "$K/test_gdn2_scan.c" -o "$OUT/verify_gdn2" -lm
+
+echo "== running GDN-2 scan test under QEMU with 128-bit vectors (as Cortex-A720)"
+QEMU_CPU=max,sve128=on qemu-aarch64 "$OUT/verify_gdn2"
+
 echo "== portability matrix: SVE1 floor, SVE2, and no-SVE fallback"
 # The kernels are SVE1-clean; SVE2 is NOT required. Verified across vector lengths and cores.
 for spec in \
