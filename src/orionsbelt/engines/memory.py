@@ -99,7 +99,9 @@ def estimate_weights(
     # Embedding + LM head
     vocab = info.vocab_size
     embed = vocab * h
-    lm_head = vocab * h
+    # When embeddings are tied, lm_head reuses the embed_tokens weight tensor
+    # — do not double-count it.
+    lm_head = 0 if info.tie_word_embeddings else vocab * h
 
     total_params = (
         gdn_per_layer * info.num_gdn_layers

@@ -1,0 +1,450 @@
+[
+  {
+    "probe": "01_causal_conv1d",
+    "config_ret": 0,
+    "load_ret": 0,
+    "build_ret": 0,
+    "export_ret": 0,
+    "rknn_file_size": 65577,
+    "op_table": [
+      {
+        "id": 0,
+        "op_type": "InputOperator",
+        "dtype": "FLOAT16",
+        "target": "CPU"
+      },
+      {
+        "id": 1,
+        "op_type": "Reshape",
+        "dtype": "FLOAT16",
+        "target": "NPU"
+      },
+      {
+        "id": 2,
+        "op_type": "Conv",
+        "dtype": "FLOAT16",
+        "target": "NPU"
+      },
+      {
+        "id": 3,
+        "op_type": "Reshape",
+        "dtype": "FLOAT16",
+        "target": "NPU"
+      },
+      {
+        "id": 4,
+        "op_type": "OutputOperator",
+        "dtype": "FLOAT16",
+        "target": "CPU"
+      }
+    ],
+    "evidence": [
+      "CONFIG_RET=0",
+      "LOAD_RET=0",
+      "2026-08-06 09:36:03.838093254 [W:onnxruntime:Default, device_discovery.cc:164 DiscoverDevicesForPlatform] GPU device discovery failed: device_discovery.cc:89 ReadFileContents Failed to open file: \"/sy",
+      "BUILD_RET=0",
+      "EXPORT_RET=0",
+      "RKNN_FILE_SIZE=65577"
+    ],
+    "log": "01_causal_conv1d.log",
+    "verdict": "COMPILED",
+    "cpu_fallback_ops": [],
+    "npu_ops": [
+      "Reshape:1",
+      "Conv:2",
+      "Reshape:3"
+    ],
+    "onnx_ops": [
+      "Conv"
+    ],
+    "description": "GDN's causal short convolution as a depthwise Conv1D with left-only padding (kernel=4, groups=channels). Tests both depthwise grouping and asymmetric pads."
+  },
+  {
+    "probe": "02_decay_cumprod",
+    "config_ret": 0,
+    "load_ret": 0,
+    "build_ret": 0,
+    "export_ret": 0,
+    "rknn_file_size": 22121,
+    "op_table": [
+      {
+        "id": 0,
+        "op_type": "InputOperator",
+        "dtype": "FLOAT16",
+        "target": "CPU"
+      },
+      {
+        "id": 1,
+        "op_type": "Reshape",
+        "dtype": "FLOAT16",
+        "target": "NPU"
+      },
+      {
+        "id": 2,
+        "op_type": "Log",
+        "dtype": "FLOAT16",
+        "target": "CPU"
+      },
+      {
+        "id": 3,
+        "op_type": "Conv",
+        "dtype": "FLOAT16",
+        "target": "NPU"
+      },
+      {
+        "id": 4,
+        "op_type": "Exp",
+        "dtype": "FLOAT16",
+        "target": "CPU"
+      },
+      {
+        "id": 5,
+        "op_type": "Reshape",
+        "dtype": "FLOAT16",
+        "target": "NPU"
+      },
+      {
+        "id": 6,
+        "op_type": "OutputOperator",
+        "dtype": "FLOAT16",
+        "target": "CPU"
+      }
+    ],
+    "evidence": [
+      "CONFIG_RET=0",
+      "LOAD_RET=0",
+      "2026-08-06 09:36:06.944512406 [W:onnxruntime:Default, device_discovery.cc:164 DiscoverDevicesForPlatform] GPU device discovery failed: device_discovery.cc:89 ReadFileContents Failed to open file: \"/sy",
+      "BUILD_RET=0",
+      "EXPORT_RET=0",
+      "RKNN_FILE_SIZE=22121"
+    ],
+    "log": "02_decay_cumprod.log",
+    "verdict": "COMPILED",
+    "cpu_fallback_ops": [
+      "Log:2",
+      "Exp:4"
+    ],
+    "npu_ops": [
+      "Reshape:1",
+      "Conv:3",
+      "Reshape:5"
+    ],
+    "onnx_ops": [
+      "CumSum",
+      "Exp",
+      "Log"
+    ],
+    "description": "Gated decay as exp(cumsum(log(a))) along the sequence axis. ONNX has no CumProd, so this decomposition is the only standard route -- and CumSum support is the real question on a matmul-oriented NPU."
+  },
+  {
+    "probe": "03_delta_rule_update",
+    "config_ret": 0,
+    "load_ret": 0,
+    "build_ret": 0,
+    "export_ret": 0,
+    "rknn_file_size": 43000,
+    "op_table": [
+      {
+        "id": 0,
+        "op_type": "InputOperator",
+        "dtype": "FLOAT16",
+        "target": "CPU"
+      },
+      {
+        "id": 1,
+        "op_type": "InputOperator",
+        "dtype": "FLOAT16",
+        "target": "CPU"
+      },
+      {
+        "id": 2,
+        "op_type": "InputOperator",
+        "dtype": "FLOAT16",
+        "target": "CPU"
+      },
+      {
+        "id": 3,
+        "op_type": "Transpose",
+        "dtype": "FLOAT16",
+        "target": "NPU"
+      },
+      {
+        "id": 4,
+        "op_type": "Mul",
+        "dtype": "FLOAT16",
+        "target": "NPU"
+      },
+      {
+        "id": 5,
+        "op_type": "Transpose",
+        "dtype": "FLOAT16",
+        "target": "NPU"
+      },
+      {
+        "id": 6,
+        "op_type": "exMatMul",
+        "dtype": "FLOAT16",
+        "target": "NPU"
+      },
+      {
+        "id": 7,
+        "op_type": "Transpose",
+        "dtype": "FLOAT16",
+        "target": "NPU"
+      },
+      {
+        "id": 8,
+        "op_type": "Mul",
+        "dtype": "FLOAT16",
+        "target": "NPU"
+      },
+      {
+        "id": 9,
+        "op_type": "Sub",
+        "dtype": "FLOAT16",
+        "target": "NPU"
+      },
+      {
+        "id": 10,
+        "op_type": "Add",
+        "dtype": "FLOAT16",
+        "target": "NPU"
+      },
+      {
+        "id": 11,
+        "op_type": "OutputOperator",
+        "dtype": "FLOAT16",
+        "target": "CPU"
+      }
+    ],
+    "evidence": [
+      "CONFIG_RET=0",
+      "LOAD_RET=0",
+      "2026-08-06 09:36:09.749834500 [W:onnxruntime:Default, device_discovery.cc:164 DiscoverDevicesForPlatform] GPU device discovery failed: device_discovery.cc:89 ReadFileContents Failed to open file: \"/sy",
+      "BUILD_RET=0",
+      "EXPORT_RET=0",
+      "RKNN_FILE_SIZE=43000"
+    ],
+    "log": "03_delta_rule_update.log",
+    "verdict": "COMPILED",
+    "cpu_fallback_ops": [],
+    "npu_ops": [
+      "Transpose:3",
+      "Mul:4",
+      "Transpose:5",
+      "exMatMul:6",
+      "Transpose:7",
+      "Mul:8",
+      "Sub:9",
+      "Add:10"
+    ],
+    "onnx_ops": [
+      "Add",
+      "MatMul",
+      "Sub",
+      "Transpose"
+    ],
+    "description": "One delta-rule step S <- (I - k k^T) S + k v^T as batched MatMul/Sub/Add. Pure dense linear algebra, so this is the probe most likely to pass -- and if it does not, the NPU cannot host GDN layers at all."
+  },
+  {
+    "probe": "04_gate_chain",
+    "config_ret": 0,
+    "load_ret": 0,
+    "build_ret": 0,
+    "export_ret": 0,
+    "rknn_file_size": 47025,
+    "op_table": [
+      {
+        "id": 0,
+        "op_type": "InputOperator",
+        "dtype": "FLOAT16",
+        "target": "CPU"
+      },
+      {
+        "id": 1,
+        "op_type": "Sigmoid",
+        "dtype": "FLOAT16",
+        "target": "NPU"
+      },
+      {
+        "id": 2,
+        "op_type": "Softplus",
+        "dtype": "FLOAT16",
+        "target": "NPU"
+      },
+      {
+        "id": 3,
+        "op_type": "Mul",
+        "dtype": "FLOAT16",
+        "target": "NPU"
+      },
+      {
+        "id": 4,
+        "op_type": "Exp",
+        "dtype": "FLOAT16",
+        "target": "CPU"
+      },
+      {
+        "id": 5,
+        "op_type": "Mul",
+        "dtype": "FLOAT16",
+        "target": "NPU"
+      },
+      {
+        "id": 6,
+        "op_type": "OutputOperator",
+        "dtype": "FLOAT16",
+        "target": "CPU"
+      }
+    ],
+    "evidence": [
+      "CONFIG_RET=0",
+      "LOAD_RET=0",
+      "2026-08-06 09:36:12.587536761 [W:onnxruntime:Default, device_discovery.cc:164 DiscoverDevicesForPlatform] GPU device discovery failed: device_discovery.cc:89 ReadFileContents Failed to open file: \"/sy",
+      "BUILD_RET=0",
+      "EXPORT_RET=0",
+      "RKNN_FILE_SIZE=47025"
+    ],
+    "log": "04_gate_chain.log",
+    "verdict": "COMPILED",
+    "cpu_fallback_ops": [
+      "Exp:4"
+    ],
+    "npu_ops": [
+      "Sigmoid:1",
+      "Softplus:2",
+      "Mul:3",
+      "Mul:5"
+    ],
+    "onnx_ops": [
+      "Exp",
+      "Mul",
+      "Neg",
+      "Sigmoid",
+      "Softplus"
+    ],
+    "description": "Elementwise gate chain (Sigmoid, Softplus, Neg, Exp, Mul). Expected to be well supported; included so a failure here isolates cheaply."
+  },
+  {
+    "probe": "05_scan_recurrence",
+    "config_ret": 0,
+    "load_ret": 0,
+    "build_ret": 0,
+    "export_ret": 0,
+    "rknn_file_size": 8292,
+    "op_table": [
+      {
+        "id": 0,
+        "op_type": "InputOperator",
+        "dtype": "FLOAT16",
+        "target": "CPU"
+      },
+      {
+        "id": 1,
+        "op_type": "InputOperator",
+        "dtype": "FLOAT16",
+        "target": "CPU"
+      },
+      {
+        "id": 2,
+        "op_type": "Scan",
+        "dtype": "FLOAT16",
+        "target": "CPU"
+      },
+      {
+        "id": 3,
+        "op_type": "OutputOperator",
+        "dtype": "FLOAT16",
+        "target": "CPU"
+      },
+      {
+        "id": 4,
+        "op_type": "OutputOperator",
+        "dtype": "FLOAT16",
+        "target": "CPU"
+      }
+    ],
+    "evidence": [
+      "CONFIG_RET=0",
+      "LOAD_RET=0",
+      "2026-08-06 09:36:15.645522189 [W:onnxruntime:Default, device_discovery.cc:164 DiscoverDevicesForPlatform] GPU device discovery failed: device_discovery.cc:89 ReadFileContents Failed to open file: \"/sy",
+      "E RKNN: [09:36:15.671] Meet unsupported onnx attribute kind: 8, name: \ufffdh\ufffd\ufffd\ufffd",
+      "BUILD_RET=0",
+      "EXPORT_RET=0",
+      "RKNN_FILE_SIZE=8292"
+    ],
+    "log": "05_scan_recurrence.log",
+    "verdict": "COMPILED",
+    "cpu_fallback_ops": [
+      "Scan:2"
+    ],
+    "npu_ops": [],
+    "onnx_ops": [
+      "Add",
+      "Identity",
+      "Mul",
+      "Scan"
+    ],
+    "description": "Chunk-to-chunk recurrence as an ONNX Scan (gated accumulate over 4 chunks). THE CRUX PROBE: NPU compilers often lack control flow entirely. Failure here plus success on the delta-rule probe is the empirical justification for routing the sequential scan off the NPU."
+  },
+  {
+    "probe": "06_loop_recurrence",
+    "config_ret": 0,
+    "load_ret": 0,
+    "build_ret": null,
+    "export_ret": null,
+    "rknn_file_size": null,
+    "op_table": [],
+    "evidence": [
+      "CONFIG_RET=0",
+      "LOAD_RET=0",
+      "2026-08-06 09:36:18.636717548 [W:onnxruntime:Default, device_discovery.cc:164 DiscoverDevicesForPlatform] GPU device discovery failed: device_discovery.cc:89 ReadFileContents Failed to open file: \"/sy",
+      "File \"rknn/api/rknn_log.py\", line 344, in rknn.api.rknn_log.error_catch_decorator.error_catch_wrapper",
+      "ValueError: The Loop('chunkwise_loop') will cause the graph to be a dynamic graph! Remove it manually and try again!",
+      "File \"rknn/api/rknn_log.py\", line 344, in rknn.api.rknn_log.error_catch_decorator.error_catch_wrapper",
+      "ValueError: The Loop('chunkwise_loop') will cause the graph to be a dynamic graph! Remove it manually and try again!",
+      "File \"rknn/api/rknn_log.py\", line 349, in rknn.api.rknn_log.error_catch_decorator.error_catch_wrapper",
+      "ValueError: Traceback (most recent call last):",
+      "File \"rknn/api/rknn_log.py\", line 344, in rknn.api.rknn_log.error_catch_decorator.error_catch_wrapper",
+      "ValueError: The Loop('chunkwise_loop') will cause the graph to be a dynamic graph! Remove it manually and try again!"
+    ],
+    "log": "06_loop_recurrence.log",
+    "verdict": "REJECTED_AT_BUILD",
+    "onnx_ops": [
+      "Identity",
+      "Loop",
+      "Mul"
+    ],
+    "description": "The same recurrence via ONNX Loop rather than Scan. Compilers sometimes accept one control-flow form and not the other, so both are probed."
+  },
+  {
+    "probe": "07_loop_dynamic_trip",
+    "config_ret": 0,
+    "load_ret": 0,
+    "build_ret": null,
+    "export_ret": null,
+    "rknn_file_size": null,
+    "op_table": [],
+    "evidence": [
+      "CONFIG_RET=0",
+      "LOAD_RET=0",
+      "2026-08-06 09:36:21.260097927 [W:onnxruntime:Default, device_discovery.cc:164 DiscoverDevicesForPlatform] GPU device discovery failed: device_discovery.cc:89 ReadFileContents Failed to open file: \"/sy",
+      "File \"rknn/api/rknn_log.py\", line 344, in rknn.api.rknn_log.error_catch_decorator.error_catch_wrapper",
+      "ValueError: The Loop('dynamic_loop') will cause the graph to be a dynamic graph! Remove it manually and try again!",
+      "File \"rknn/api/rknn_log.py\", line 344, in rknn.api.rknn_log.error_catch_decorator.error_catch_wrapper",
+      "ValueError: The Loop('dynamic_loop') will cause the graph to be a dynamic graph! Remove it manually and try again!",
+      "File \"rknn/api/rknn_log.py\", line 349, in rknn.api.rknn_log.error_catch_decorator.error_catch_wrapper",
+      "ValueError: Traceback (most recent call last):",
+      "File \"rknn/api/rknn_log.py\", line 344, in rknn.api.rknn_log.error_catch_decorator.error_catch_wrapper",
+      "ValueError: The Loop('dynamic_loop') will cause the graph to be a dynamic graph! Remove it manually and try again!"
+    ],
+    "log": "07_loop_dynamic_trip.log",
+    "verdict": "REJECTED_AT_BUILD",
+    "onnx_ops": [
+      "Identity",
+      "Loop",
+      "Mul"
+    ],
+    "description": "Follow-up added after probe 06 turned out to be statically unrolled: identical recurrence but trip_count is a graph INPUT rather than an initializer. Decides whether Loop is genuinely supported as control flow or only ever unrolled. Result: rejected ('Graph is not DAG', shape inference unreliable for non-const max_count), proving unrolling is the only mechanism."
+  }
+]

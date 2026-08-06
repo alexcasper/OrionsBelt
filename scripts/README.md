@@ -17,6 +17,8 @@ following the documented path verbatim on a clean system.
 | `npu_op_probe.py` | Generate minimal per-operator ONNX probe graphs for the NOE op-coverage audit. | `ob-t3b.2` |
 | `power_bench.sh` | Power-instrumented benchmark wrapper for Jetson Nano. Samples the onboard INA3221 power monitor while `bench_gdn` runs, reports energy-per-GiB alongside throughput. Requires sudo. | `ob-agf.1` |
 | `run_op_probe_audit.py` | Drive the NOE Compiler (cixparse) over the probe graphs and record results. | `ob-t3b.1` |
+| `generate_memory_plots.py` | Generate memory scaling figures (stacked bar + area chart + comparison table) from the analytical model in `memory.py`. Shows GDN O(1) state vs attention O(n) KV cache. | `ob-9t0.4` |
+| `check_submission_readiness.sh` | Verify the repo is ready for Devpost submission: tests, lint, format, memory plots, fleet analysis, deliverable files, credential scan, CSV validation. | `ob-9t0.5` |
 
 ## Principles
 
