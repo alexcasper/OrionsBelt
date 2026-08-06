@@ -328,8 +328,14 @@ def test_gdn2_vs_gdn1_uniform_gates():
     w_uniform = np.full((T, H, V), beta, dtype=np.float64)
 
     o2, S2 = gdn2_recurrent(
-        q.copy(), k_in.copy(), v_in.copy(), g_zero, b_uniform, w_uniform,
-        scale=1.0 / math.sqrt(K), use_qk_l2norm=True,
+        q.copy(),
+        k_in.copy(),
+        v_in.copy(),
+        g_zero,
+        b_uniform,
+        w_uniform,
+        scale=1.0 / math.sqrt(K),
+        use_qk_l2norm=True,
     )
 
     assert np.allclose(o1, o2, atol=1e-10), (

@@ -280,6 +280,7 @@ class TestDryRun:
             if "0.8B" in repo_id:
                 return sorted(REPO_FILES_0_8B)
             return sorted(REPO_FILES_4B)
+
         monkeypatch.setattr(fetch_weights, "_list_repo_files", fake_list_repo_files)
 
     def test_dry_run_4b(self, capsys, tmp_path):
@@ -315,6 +316,7 @@ class TestCLI:
             if "0.8B" in repo_id:
                 return sorted(REPO_FILES_0_8B)
             return sorted(REPO_FILES_4B)
+
         monkeypatch.setattr(fetch_weights, "_list_repo_files", fake_list_repo_files)
 
     def test_list(self, capsys):
