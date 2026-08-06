@@ -8,10 +8,8 @@ corrupting downstream analysis.
 """
 
 import csv
-import math
 import os
 import sys
-import tempfile
 
 import pytest
 
@@ -22,8 +20,6 @@ from bench.schema import (  # noqa: E402
     METRIC_ALLOWED_PHASES,
     METRIC_UNITS,
     METRICS_REQUIRING_COMPONENT,
-    LayerClass,
-    MemoryComponent,
     MetricName,
     Phase,
     ResultRow,
@@ -260,7 +256,7 @@ class TestMetricUnitConsistency:
         ))
 
     def test_memory_correct_unit(self):
-        validate_row(make_memory_row(unit="bytes"))
+        validate_row(make_memory_row())
 
     def test_energy_correct_unit(self):
         validate_row(make_row(
@@ -757,7 +753,7 @@ class TestMetricVocabularyRules:
             assert metric in METRIC_ALLOWED_PHASES, f"{metric} missing from METRIC_ALLOWED_PHASES"
 
     def test_metrics_requiring_component_only_memory(self):
-        assert METRICS_REQUIRING_COMPONENT == {MetricName.PEAK_MEMORY_BYTES}
+        assert {MetricName.PEAK_MEMORY_BYTES} == METRICS_REQUIRING_COMPONENT
 
     def test_unit_values_match_metric_units(self):
         for metric, unit in METRIC_UNITS.items():
