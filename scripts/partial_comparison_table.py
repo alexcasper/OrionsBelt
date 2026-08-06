@@ -67,7 +67,6 @@ def kv(rows, model, kernel, seq):
     return None
 
 
-
 def load_sustained(fname):
     path = os.path.join(RAW, fname)
     if not os.path.isfile(path):
