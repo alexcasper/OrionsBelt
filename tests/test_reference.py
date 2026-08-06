@@ -138,7 +138,75 @@ def test_topk_window_is_consistent(ref_data):
                 )
 
 
-def test_generated_tokens_nonempty(ref_data):
+def test_correctness_oracle_rejects_divergence():
+    """The oracle must FAIL when logits diverge beyond tolerance."""
+    cfg = ToleranceConfig(atol=1e-4, rtol=1e-3)
+    ref = [[0.1, 0.5, 0.2, 0.8, 0.3]]
+    cand = [[0.1, 0.5, 0.2, 0.9, 0.3]]  # position 3 differs by 0.1
+    report = compare_logits(ref, cand, cfg)
+    assert not report.passed, "Divergent logits should fail"
+
+
+# ---------------------------------------------------------------------------
+# End-to-end oracle: golden reference → candidate comparison
+# ---------------------------------------------------------------------------
+
+
+def test_oracle_reference_perplexity_passes_self(ref_data):
+    """Every golden reference entry must pass the oracle against itself.
+
+    This is the baseline integrity check: if the reference can't pass against
+    itself, the tolerances are broken.
+    """
+    cfg = ToleranceConfig()
+    for entry in ref_data["entries"]:
+        report = compare_perplexity(
+            entry["perplexity"],
+            entry["perplexity"],
+            cfg,
+            context_length=entry["context_length"],
+        )
+        assert report.passed, f"{entry['entry_id']}: self-comparison failed"
+
+
+def test_oracle_rejects_perplexity_regression(ref_data):
+    """The oracle must flag a candidate whose perplexity regresses beyond tolerance.
+
+    A 50% perplexity increase (e.g., 20 → 30) is a clear regression that
+    must fail even with drift scaling at long context.
+    """
+    cfg = ToleranceConfig()
+    for entry in ref_data["entries"]:
+        candidate_ppl = entry["perplexity"] * 1.5
+        report = compare_perplexity(
+            entry["perplexity"],
+            candidate_ppl,
+            cfg,
+            context_length=entry["context_length"],
+        )
+        assert not report.passed, (
+            f"{entry['entry_id']}: 50% ppl regression should fail "
+            f"(ref={entry['perplexity']:.2f}, cand={candidate_ppl:.2f})"
+        )
+
+
+def test_oracle_topk_from_reference_is_ordered(ref_data):
+    """The top-k window from the reference must be properly ordered.
+
+    This validates that the oracle can extract meaningful comparison data
+    from the compact reference (where full logits are stripped).
+    """
+    for entry in ref_data["entries"]:
+        for window in entry["topk_window"]:
+            vals = window["values"]
+            # The top-1 index should correspond to the highest value
+            assert vals[0] == max(vals), (
+                f"{entry['entry_id']}: top-1 value is not the maximum"
+            )
+            # Top-5 should be a subset of the top-20
+            top5 = set(window["indices"][:5])
+            top20 = set(window["indices"])
+            assert top5.issubset(top20), "top-5 must be subset of top-20"
     """Each entry should have decoded at least 1 token."""
     for entry in ref_data["entries"]:
         assert len(entry["generated_token_ids"]) >= 1
@@ -180,10 +248,6 @@ def test_correctness_oracle_identity_logits():
     assert max_diff == 0.0
 
 
-def test_correctness_oracle_rejects_divergence():
-    """The oracle must FAIL when logits diverge beyond tolerance."""
-    cfg = ToleranceConfig(atol=1e-4, rtol=1e-3)
-    ref = [[0.1, 0.5, 0.2, 0.8, 0.3]]
-    cand = [[0.1, 0.5, 0.2, 0.9, 0.3]]  # position 3 differs by 0.1
-    report = compare_logits(ref, cand, cfg)
-    assert not report.passed, "Divergent logits should fail"
+# ---------------------------------------------------------------------------
+# End-to-end oracle: golden reference → candidate comparison
+# ---------------------------------------------------------------------------

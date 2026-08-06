@@ -1,0 +1,71 @@
+{
+  "device": "t3",
+  "gpu": "Mali-G610 MP4 (Valhall, r0p0)",
+  "opencl_version": "3.0 v1.g13p0-01eac0",
+  "driver": "libmali-valhall-g610-g13p0-x11 (libmali-g610-x11 1.0.5-2)",
+  "gpu_clock_mhz": 1000,
+  "gpu_governor": "performance",
+  "commit": "048aa7e",
+  "date": "2026-08-06T16:10:00Z",
+  "thermals_c_pre": 38.8,
+  "kernel_source": "gpu/gdn_gpu_kernels.cl",
+  "harness": "gpu/gdn_gpu_bench.c",
+  "repeats": 50,
+  "warmups": 3,
+  "validation": {
+    "gated_scan":    {"max_abs": 0.0,       "max_rel": 0.0,       "verdict": "bit-exact"},
+    "cumdecay":      {"max_abs": 0.0,       "max_rel": 0.0,       "verdict": "bit-exact"},
+    "causal_dwconv1d": {"max_abs": 5.96e-08, "max_rel": 2.67e-06, "verdict": "fp32 round-trip noise"},
+    "delta_rule":    {"max_abs": 1.86e-08,  "max_rel": 6.60e-07, "verdict": "within oracle atol=1e-4"}
+  },
+  "results": [
+    {
+      "kernel": "gdn_gated_scan",
+      "seq": 64, "channels": 2048,
+      "p50_ms": 0.1647, "p95_ms": 0.1665,
+      "bandwidth_mibs": 9202.8,
+      "bytes_per_call": 1589248,
+      "note": "0.8B model dimensions"
+    },
+    {
+      "kernel": "gdn_cumdecay",
+      "seq": 64, "channels": 2048,
+      "p50_ms": 0.0438,
+      "bandwidth_mibs": 22833.1,
+      "bytes_per_call": 524288,
+      "note": "0.8B model dimensions"
+    },
+    {
+      "kernel": "gdn_causal_dwconv1d",
+      "seq": 64, "channels": 2048,
+      "p50_ms": 0.0478,
+      "bandwidth_mibs": 22554.0,
+      "bytes_per_call": 1081344,
+      "note": "0.8B model dimensions"
+    },
+    {
+      "kernel": "gdn_delta_rule_decode",
+      "num_heads": 16, "head_k_dim": 128, "head_v_dim": 128,
+      "p50_ms": 0.2903, "p95_ms": 0.2944,
+      "bandwidth_mibs": 13887.9,
+      "state_size_floats": 262144,
+      "state_size_kib": 1024.0,
+      "note": "Full per-token delta-rule: decay+retrieve+correct+write+read, 0.8B dimensions"
+    }
+  ],
+  "cpu_comparison": {
+    "device": "Cortex-A76 (4 cores, NEON double-width unroll)",
+    "source": "dist/bench_gdn_rk3588_a76 --repeats 30, same commit",
+    "0.8B_dims": {
+      "gdn_cumdecay":      {"cpu_us": 35.59, "gpu_us": 43.8,  "gpu_cpu_ratio": 0.81},
+      "gdn_gated_scan":    {"cpu_us": 96.84, "gpu_us": 164.7, "gpu_cpu_ratio": 0.59},
+      "gdn_causal_dwconv1d": {"cpu_us": 34.42, "gpu_us": 47.8, "gpu_cpu_ratio": 0.72}
+    },
+    "interpretation": "On the Mali-G610 (Valhall), the GPU is slower than A76 NEON for all three channel-wise primitives. This is expected: mid-range mobile GPU with limited compute units, and the scan operations are bandwidth-bound with low arithmetic intensity. The value is code-path validation and O6 transferability, not G610 throughput."
+  },
+  "o6_transferability": {
+    "target_gpu": "Immortalis-G720 (Arm 5th gen, CIX P1 / Orion O6)",
+    "shader_code": "Identical OpenCL C source transfers — same kernel language, same algorithm. Only performance conclusion is O6-gated per ADR 0005.",
+    "expected": "The G720 has significantly more shader cores and higher clock than G610. The heterogeneous mapping (PLAN.md 3.1) may place GDN scan on GPU on the O6 even though CPU wins on t3."
+  }
+}

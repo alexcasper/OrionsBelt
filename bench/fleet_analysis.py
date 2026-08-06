@@ -29,10 +29,10 @@ import os
 DEVICES = [
     # (display_name, csv_path, spec_gibs, cores, isa_generation)
     # Fleet comparison uses single-threaded data for fair cross-device comparison.
-    # Pi5 and RK3588 (t4) were captured at commit 28729f3; the Jetsons at later commits.
-    # That mismatch, plus the fact that every manifest records a dirty tree (except
-    # rk3588-t3.json at 553a96e, which is clean), is why the provenance audit below
-    # limits this table to qualitative conclusions.
+    # Commit provenance varies across devices — see the provenance audit below for
+    # the full dirty/clean breakdown. t3's manifest is clean (dirty=false); others
+    # are dirty, so cross-device comparisons are qualitative until ob-bf7 is resolved
+    # with one commit-matched fleet sweep.
     #
     # RK3588 REMOVED from this table (ob-0h0): commit 8f8be11 overwrote t4's CSVs
     # with optimized kernel data (scan 4B: 3.29→11.48 GiB/s) but left the manifest
@@ -562,15 +562,25 @@ def generate_report(output_path):
             lines.append(f"| {cls} | {shown} | **{ratio:.2f}x** | {note} |")
         lines.append("")
         worst = max(spread_ratios)
-        lines.append(
-            "The RK3588 pair was historically the most concerning — two hosts on the same "
-            "core class. As of `ob-0h0`, **both t3 and t4 are at the optimized code level** "
-            "(t3 at `553a96e` clean, t4 overwritten by commit `8f8be11` but manifest stale at "
-            "`28729f3`). Their spread now reflects inter-board variance at the same optimization "
-            "level, not a code-version difference. The Pi 5 pair (r5 at `28729f3` vs j1 at "
-            "`f127a11`) remains a cross-commit comparison. Worst replicate spread on the fleet "
-            f"is **{worst:.2f}x**."
+        # Find the RK3588 big spread from spread_rows for data-driven narrative
+        rk_big_row = next(
+            (r for r in spread_rows if r[0] == "RK3588 big"), None
         )
+        if rk_big_row and rk_big_row[3] < 1.5:
+            # t3 and t4 have converged — both showing optimized-level numbers
+            lines.append(
+                "The RK3588 pair (t3, t4) — two hosts on the same A76 core class — "
+                f"now agree within **{rk_big_row[3]:.2f}x** on Scan. Their CSVs originally "
+                f"showed a 3.4x gap when t4 had pre-optimization data, but t4's CSV has "
+                f"since been updated. Worst replicate spread on the fleet is "
+                f"**{worst:.2f}x**."
+            )
+        else:
+            lines.append(
+                "The RK3588 pair was historically the most concerning — two hosts on the "
+                "same core class with a large spread driven by different code versions. "
+                f"Worst replicate spread on the fleet is **{worst:.2f}x**."
+            )
         lines.append("")
         lines.extend(_provenance_audit_lines())
         lines.append(

@@ -16,6 +16,8 @@ if _ROOT not in sys.path:
 
 from scripts.validate_results import (  # noqa: E402
     ABSURD_THROUGHPUT,
+    LAYER_PROFILE_COLS,
+    E2E_SWEEP_COLS,
     STANDARD_COLS,
     Issue,
     check_manifest_exists,
@@ -24,6 +26,8 @@ from scripts.validate_results import (  # noqa: E402
     find_device_spec,
     validate_standard_row,
     validate_sustained_row,
+    validate_layer_profile_row,
+    validate_e2e_sweep_row,
 )
 
 # ---------------------------------------------------------------------------
@@ -62,6 +66,49 @@ def _sustained_row(**overrides):
         "throughput_gibs": "2.3",
         "thermal_c": "55.0",
         "vs_first_pct": "-5.0",
+    }
+    base.update(overrides)
+    return base
+
+
+def _layer_profile_row(**overrides):
+    """A valid layer-profile row dict."""
+    base = {
+        "phase": "decode",
+        "ctx_len": "64",
+        "layer_idx": "0",
+        "layer_type": "linear_attention",
+        "p50_us": "100.0",
+        "p95_us": "120.0",
+        "mean_us": "105.0",
+        "n_samples": "10",
+    }
+    base.update(overrides)
+    return base
+
+
+def _e2e_sweep_row(**overrides):
+    """A valid e2e context-sweep row dict."""
+    base = {
+        "run_id": "rk3588-t4_20260806",
+        "timestamp": "2026-08-06T09:47:32Z",
+        "git_sha": "a37e116",
+        "manifest_ref": "results/manifests/rk3588-t4.json",
+        "device": "rk3588-t4",
+        "engine_gdn": "cpu",
+        "engine_full_attention": "cpu",
+        "model_checkpoint": "Qwen3.5-0.8B",
+        "quantization": "fp32",
+        "context_length": "128",
+        "phase": "prefill",
+        "metric_name": "prefill_tokens_per_sec",
+        "metric_component": "",
+        "value": "21.1",
+        "unit": "tokens_per_sec",
+        "repeat_index": "0",
+        "repeat_count": "5",
+        "layer_class": "all",
+        "notes": "",
     }
     base.update(overrides)
     return base
@@ -117,6 +164,24 @@ class TestDetectCsvType:
         cols = STD_HEADER + ["layer_class", "extra_col"]
         assert detect_csv_type(cols) == "standard"
 
+    def test_layer_profile_detected(self):
+        """Per-layer latency profiling CSV should be detected."""
+        assert detect_csv_type(LAYER_PROFILE_COLS) == "layer_profile"
+
+    def test_layer_profile_minimal_cols(self):
+        """Detection only needs the key columns, not the full set."""
+        cols = ["layer_idx", "layer_type", "p50_us", "mean_us"]
+        assert detect_csv_type(cols) == "layer_profile"
+
+    def test_e2e_sweep_detected(self):
+        """E2E context-sweep CSV should be detected."""
+        assert detect_csv_type(E2E_SWEEP_COLS) == "e2e_sweep"
+
+    def test_e2e_sweep_minimal_cols(self):
+        """Detection only needs the key columns."""
+        cols = ["run_id", "metric_name", "metric_component", "repeat_index"]
+        assert detect_csv_type(cols) == "e2e_sweep"
+
 
 # ---------------------------------------------------------------------------
 # expected_columns
@@ -135,6 +200,14 @@ class TestExpectedColumns:
 
     def test_unknown_type_returns_empty(self):
         assert expected_columns("unknown") == []
+
+    def test_layer_profile_columns(self):
+        assert "layer_idx" in expected_columns("layer_profile")
+        assert "layer_type" in expected_columns("layer_profile")
+
+    def test_e2e_sweep_columns(self):
+        assert "metric_name" in expected_columns("e2e_sweep")
+        assert "context_length" in expected_columns("e2e_sweep")
 
 
 # ---------------------------------------------------------------------------
@@ -234,6 +307,79 @@ class TestValidateSustainedRow:
         issues = []
         validate_sustained_row(_sustained_row(elapsed_s="0.0"), "test.csv", issues, 2)
         assert any("elapsed" in i.message for i in issues)
+
+
+# ---------------------------------------------------------------------------
+# validate_layer_profile_row
+# ---------------------------------------------------------------------------
+
+
+class TestValidateLayerProfileRow:
+    def test_valid_row_no_issues(self):
+        issues = []
+        validate_layer_profile_row(_layer_profile_row(), "test.csv", issues, 2)
+        assert issues == []
+
+    def test_p95_less_than_p50(self):
+        issues = []
+        validate_layer_profile_row(
+            _layer_profile_row(p50_us="200.0", p95_us="100.0"), "test.csv", issues, 2
+        )
+        assert any("p95" in i.message and i.severity == "WARNING" for i in issues)
+
+    def test_non_positive_p50(self):
+        issues = []
+        validate_layer_profile_row(_layer_profile_row(p50_us="0.0"), "test.csv", issues, 2)
+        assert any("p50_us" in i.message for i in issues)
+
+    def test_zero_samples(self):
+        issues = []
+        validate_layer_profile_row(_layer_profile_row(n_samples="0"), "test.csv", issues, 2)
+        assert any("n_samples" in i.message for i in issues)
+
+    def test_malformed_value(self):
+        issues = []
+        validate_layer_profile_row(_layer_profile_row(p50_us="abc"), "test.csv", issues, 2)
+        assert any("cannot parse" in i.message for i in issues)
+
+
+# ---------------------------------------------------------------------------
+# validate_e2e_sweep_row
+# ---------------------------------------------------------------------------
+
+
+class TestValidateE2eSweepRow:
+    def test_valid_row_no_issues(self):
+        issues = []
+        validate_e2e_sweep_row(_e2e_sweep_row(), "test.csv", issues, 2)
+        assert issues == []
+
+    def test_repeat_index_out_of_range(self):
+        issues = []
+        validate_e2e_sweep_row(
+            _e2e_sweep_row(repeat_index="5", repeat_count="5"), "test.csv", issues, 2
+        )
+        assert any("repeat_index" in i.message for i in issues)
+
+    def test_non_positive_throughput(self):
+        issues = []
+        validate_e2e_sweep_row(
+            _e2e_sweep_row(value="0.0", metric_name="prefill_tokens_per_sec"),
+            "test.csv",
+            issues,
+            2,
+        )
+        assert any("non-positive" in i.message for i in issues)
+
+    def test_zero_context_length(self):
+        issues = []
+        validate_e2e_sweep_row(_e2e_sweep_row(context_length="0"), "test.csv", issues, 2)
+        assert any("context_length" in i.message for i in issues)
+
+    def test_malformed_value(self):
+        issues = []
+        validate_e2e_sweep_row(_e2e_sweep_row(value="not_a_number"), "test.csv", issues, 2)
+        assert any("cannot parse" in i.message for i in issues)
 
 
 # ---------------------------------------------------------------------------

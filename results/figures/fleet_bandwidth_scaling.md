@@ -25,17 +25,17 @@ See the optimization-impact section below for RK3588 and j2 OpenMP data.
 | Device | Spec (GiB/s) | CumDecay | Scan | DWConv1D | Scan/Spec | Scan spread |
 |--------|-------------|----------|------|----------|-----------|-------------|
 | Pi 5 | 17.0 | 3.74 | 1.20 | 3.23 | 7.1% | 7.4% |
-| Jetson j1 | 25.6 | 1.16 | 0.72 | 1.04 | 2.8% | **17.2%** ⚠ |
+| Jetson j1 | 25.6 | 3.63 | 2.97 | 3.57 | 11.6% | **32.5%** ⚠ |
 | Jetson j2 | 25.6 | 1.15 | 0.73 | 1.04 | 2.9% | 9.4% |
 
-⚠ 1 of 3 scan rows exceed the DEVICE_RUNBOOK's ~10% cleanliness threshold, worst Jetson j1 at 17.2%. The runbook says to suspect thermal throttling first. Treat flagged rows as indicative only.
+⚠ 1 of 3 scan rows exceed the DEVICE_RUNBOOK's ~10% cleanliness threshold, worst Jetson j1 at 32.5%. The runbook says to suspect thermal throttling first. Treat flagged rows as indicative only.
 
 ### 0.8B model
 
 | Device | Spec (GiB/s) | CumDecay | Scan | DWConv1D | Scan/Spec | Scan spread |
 |--------|-------------|----------|------|----------|-----------|-------------|
 | Pi 5 | 17.0 | 4.47 | 4.43 | 4.55 | 26.1% | 6.5% |
-| Jetson j1 | 25.6 | 1.93 | 1.61 | 1.99 | 6.3% | **18.9%** ⚠ |
+| Jetson j1 | 25.6 | 4.64 | 5.16 | 5.05 | 20.2% | **25.9%** ⚠ |
 | Jetson j2 | 25.6 | 1.98 | 1.66 | 1.99 | 6.5% | **51.8%** ⚠ |
 
 ⚠ 2 of 3 scan rows exceed the DEVICE_RUNBOOK's ~10% cleanliness threshold, worst Jetson j2 at 51.8%. The runbook says to suspect thermal throttling first. Treat flagged rows as indicative only.
@@ -49,20 +49,10 @@ wins comfortably, the bandwidth-bound thesis is wrong or incomplete.**
 
 | Kernel (4B) | Pi 5 (17.0) | Jetson j1 (25.6) | Jetson j2 (25.6) | Winner | Pi5/J1 ratio |
 |-------------|-------------|------------------|------------------|--------|-------------|
-| Cumulative Decay | 3.74 | 1.16 | 1.15 | **Pi 5** | 3.22x |
-| Gated Delta-Rule Scan | 1.20 | 0.72 | 0.73 | **Pi 5** | 1.67x |
-| Causal DWConv1D | 3.23 | 1.04 | 1.04 | **Pi 5** | 3.11x |
+| Cumulative Decay | 3.74 | 3.63 | 1.15 | **Pi 5** | 1.03x |
+| Gated Delta-Rule Scan | 1.20 | 2.97 | 0.73 | **Jetson** | 0.40x |
+| Causal DWConv1D | 3.23 | 3.57 | 1.04 | **Jetson** | 0.90x |
 
-**Result: the Pi 5 wins on ALL three kernels despite having 33% LESS
-spec bandwidth.** The bandwidth-bound hypothesis does NOT hold at
-seq=64 working set sizes — these kernels are **instruction-overhead-bound,
-not DRAM-bandwidth-bound** at this scale.
-
-This is consistent with the working set analysis: at seq=64 with 4096
-channels, the state is ~1 MiB — small enough to be L2/L3-resident, so
-core microarchitecture (IPC, OoO depth, clock) dominates over raw DRAM
-bandwidth. The Pi 5's Cortex-A76 has ~1.6x higher clock and substantially
-better IPC than the A57, explaining its win despite less bandwidth.
 
 ## ⚠ Replicate spread limits everything below this line
 
@@ -72,12 +62,12 @@ cross-device effects being interpreted (bead `ob-bf7`):
 
 | Device class | Runs (scan, 4B, GiB/s) | Spread | Why it matters |
 |---|---|---:|---|
-| RK3588 big | t3 11.07 vs t4 11.48 | **1.04x** | **different commits** — t3 `553a96efa8aa`, t4 `28729f3e0a3c` (dirty); not an environmental comparison |
-| RK3588 little | t3 2.27 vs t4 3.91 | **1.72x** | **different commits** — t3 `553a96efa8aa`, t4 `28729f3e0a3c` (dirty); not an environmental comparison |
+| RK3588 big | t3 10.33 vs t4 11.48 | **1.11x** | **different commits** — t3 `47efdf8a885c`, t4 `28729f3e0a3c` (dirty); not an environmental comparison |
+| RK3588 little | t3 2.71 vs t4 3.91 | **1.44x** | **different commits** — t3 `47efdf8a885c`, t4 `28729f3e0a3c` (dirty); not an environmental comparison |
 | Pi 5 | r5 1.20 vs j1 1.84 | **1.53x** | **different commits** — r5 `28729f3e0a3c` (dirty), j1 `f127a11cfdee` (dirty); not an environmental comparison |
 | Jetson j2 | canonical 0.73 vs _single 1.13 | **1.55x** | same board; _single has **no manifest** |
 
-The RK3588 pair was historically the most concerning — two hosts on the same core class. As of `ob-0h0`, **both t3 and t4 are at the optimized code level** (t3 at `553a96e` clean, t4 overwritten by commit `8f8be11` but manifest stale at `28729f3`). Their spread now reflects inter-board variance at the same optimization level, not a code-version difference. The Pi 5 pair (r5 at `28729f3` vs j1 at `f127a11`) remains a cross-commit comparison. Worst replicate spread on the fleet is **1.72x**.
+The RK3588 pair (t3, t4) — two hosts on the same A76 core class — now agree within **1.11x** on Scan. Their CSVs originally showed a 3.4x gap when t4 had pre-optimization data, but t4's CSV has since been updated. Worst replicate spread on the fleet is **1.55x**.
 
 ### Provenance audit: were these runs captured from a clean tree?
 
@@ -100,7 +90,7 @@ linearly with spec bandwidth. Extrapolating the scan kernel from each device:
 | Extrapolated from | Scan (GiB/s) | O6 BW ratio | Predicted O6 scan (GiB/s) |
 |-------------------|-------------|-------------|--------------------------|
 | Pi 5 | 1.20 | 5.5x | 6.57 |
-| Jetson j1 | 0.72 | 3.6x | 2.62 |
+| Jetson j1 | 2.97 | 3.6x | 10.80 |
 | Jetson j2 | 0.73 | 3.6x | 2.65 |
 
 **⚠ However, this linear extrapolation is almost certainly WRONG.**
@@ -118,7 +108,7 @@ to its 4-5x bandwidth advantage**.
 - **Predicted O6 scan throughput: 3.6-6.0 GiB/s**
 - This is ~4-6% of spec bandwidth (93.1 GiB/s)
 
-**Optimized A76 reference.** t3 (commit `553a96efa8aa`, clean) with optimized kernels reads **11.07 GiB/s** on the same A76 big cluster — 9.2x the Pi 5's pre-optimization number. The O6's A720 cores will benefit from both the IPC gain AND the optimization stack, so the prediction above (scaled from pre-optimization Pi 5) is conservative.
+**Optimized A76 reference.** t3 (commit `47efdf8a885c`, clean) with optimized kernels reads **10.33 GiB/s** on the same A76 big cluster — 8.6x the Pi 5's pre-optimization number. The O6's A720 cores will benefit from both the IPC gain AND the optimization stack, so the prediction above (scaled from pre-optimization Pi 5) is conservative.
 
 Resolving `ob-bf7` — one clean-tree, commit-matched sweep with pinning and thermals recorded — narrows this more than any modelling refinement would.
 
