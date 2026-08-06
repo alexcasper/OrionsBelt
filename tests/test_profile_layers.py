@@ -7,7 +7,6 @@ assignment, CSV format) since load_model/run_profiling require PyTorch + weights
 from __future__ import annotations
 
 import csv
-import io
 import statistics
 import sys
 from collections import defaultdict
@@ -18,7 +17,6 @@ if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
 from bench.profile_layers import write_csv  # noqa: E402
-
 
 # ---------------------------------------------------------------------------
 # Helpers
