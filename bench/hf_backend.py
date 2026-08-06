@@ -153,9 +153,14 @@ class HFTorchBackend(BenchmarkBackend):
 
     def tokenize(self, text: str, max_tokens: int) -> list[int]:
         ids = self._tokenizer.encode(text, add_special_tokens=True)
-        if len(ids) > max_tokens:
-            ids = ids[:max_tokens]
-        return ids
+        # BPE tokenizers compress repeated chars (e.g. "xxx" -> 1 token),
+        # so pad with diverse text to reach the target context length.
+        if len(ids) < max_tokens:
+            pad_text = "The quick brown fox jumps over the lazy dog. "
+            pad_ids = self._tokenizer.encode(pad_text, add_special_tokens=False)
+            while len(ids) < max_tokens:
+                ids.extend(pad_ids)
+        return ids[:max_tokens]
 
     def prefill(self, input_ids: list[int]) -> None:
         ids = self._torch.tensor([input_ids], dtype=self._torch.long)

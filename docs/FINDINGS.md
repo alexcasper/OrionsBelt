@@ -771,3 +771,60 @@ that saving is irrelevant if it increases per-token energy under load.
 **Practical implication for submission:** all reported numbers use the
 `performance` governor. The `ondemand` comparison is documented to show the
 trade-off, not to suggest it as a recommended setting.
+
+## Model-Level Benchmark: Qwen3.5-0.8B on RK3588 (ob-mrd.2)
+
+### Three-Component Memory Decomposition — Confirmed on Real Model
+
+The headline architectural claim of GDN/hybrid models is that KV cache grows
+**only for full-attention layers**, while linear-attention (GDN) layers maintain
+a fixed-size recurrent state. We tested this directly by running the HF backend
+(`bench/hf_backend.py`) on Qwen3.5-0.8B — a 24-layer hybrid model with **18
+linear-attention (GDN) layers** and **6 full-attention layers** (every 4th).
+
+Measured memory breakdown (fp32, RK3588 Cortex-A76, governor=performance):
+
+| Context | Weights (GiB) | KV Cache (MiB) | Recurrent State (KiB) | Total (GiB) |
+|--------:|:-------------:|:---------------:|----------------------:|:-----------:|
+|      32 | 2.802         | 0.75            | 576                   | 2.803       |
+|      64 | 2.802         | 1.50            | 576                   | 2.804       |
+|     128 | 2.802         | 3.00            | 576                   | 2.805       |
+|     256 | 2.802         | 6.00            | 576                   | 2.808       |
+
+**Analytical predictions match measurements exactly:**
+
+- **KV cache:** 24,576 bytes/token = 2 (K+V) × 6 (full-attn layers) × 2 (KV
+  heads) × 256 (head_dim) × 4 (fp32 bytes). Scales linearly with seq_len.
+- **Recurrent state:** 589,824 bytes = 18 (linear layers) × 32,768 bytes/layer.
+  Each GDN layer holds: key_state (16×128×4 = 8 KiB) + value_state (8 KiB) +
+  conv_state (4×1024×4 = 16 KiB). **O(1) — does not grow with seq_len.**
+- **Weights:** 3,009,572,096 bytes (752M params × 4 bytes fp32). Flat.
+
+**Implication:** at 32K context, the KV cache would reach ~768 MiB, while the
+recurrent state remains at 576 KiB. If all 24 layers were full-attention, the KV
+cache would be 4× larger (~3 GiB at 32K). The hybrid GDN architecture saves 75%
+of KV cache memory — exactly the ratio of linear-to-total layers (18/24).
+
+### Throughput on RK3588 Cortex-A76 (fp32, 4 cores via taskset)
+
+| Context | Prefill (tok/s) | TTFT (s) | Decode (tok/s) |
+|--------:|----------------:|---------:|----------------:|
+|      32 |           9.61  | 3.33     | 0.65            |
+|      64 |          14.99  | 4.27     | 0.68            |
+|     128 |          21.11  | 6.07     | 0.67            |
+|     256 |          27.92  | 9.17     | 0.68            |
+
+Decode throughput is constant at ~0.68 tok/s regardless of context length — the
+KV cache at these sizes (≤6 MiB) is negligible compared to the 2.8 GiB weight
+matrix traffic, so attention lookup adds no measurable overhead.
+
+### Dtype Constraint: fp32 Required on RK3588
+
+bf16 and fp16 both hang on RK3588 Cortex-A76 due to missing OneDNN bf16 support
+in the torch CPU backend. The workaround is `ORIONS_FORCE_FP32=1`. This is an
+ARM-software limitation, not a hardware one — the A76 does not have native bf16
+ALUs (no SVE bf16), but the OneDNN fallback path enters an infinite loop instead
+of degrading to fp32 emulation. fp32 works correctly.
+
+Run ID: `rk3588-t4_20260806T094451Z_a37e116`. Full manifest at
+`results/manifests/rk3588-t4_20260806T094451Z_a37e116.json`.
