@@ -1634,7 +1634,26 @@ training and inference framework (lit_gpt-based, requires Python 3.10+, torch 2.
 CUDA, triton, flash-linear-attention). It cannot run on the Jetson A57 (Python 3.6.9,
 no CUDA). A smoke-test script (`scripts/smoke_test_gdn2.py`) is committed for x86/CUDA hosts.
 
-### GDN-2 recurrence (from `fused_recurrent_gdn2.py`)
+### Device-runnable NumPy reference (jetson-j1, 2026-08-06)
+
+A pure-NumPy reimplementation of the GDN-2 recurrence (`bench/gdn2_reference.py`)
+runs on every fleet device (Python 3.6.9 + NumPy 1.13 only — no PyTorch/Triton/CUDA).
+It provides three correctness tests:
+
+1. **Known-answer test** — hand-computed single-step output verified to 1e-10.
+2. **GDN-2 → GDN-1 reduction** — with uniform gates (b=β, w=β, g=0), GDN-2 output
+   matches GDN-1 with α=1, β to machine epsilon (max diff 2.8e-17), confirming the
+   strict-generalization property from ADR 0001.
+3. **Multi-step consistency** — 16-step recurrence at 4 heads × 16×16 state produces
+   finite, stable output with correct incremental continuation.
+
+The bandwidth analysis confirms the ADR 0001 cost prediction quantitatively: at the
+paper's dimensions (16 heads, d_k=d_v=128), GDN-2's extra gate vectors add only
+24,576 bytes per token per layer — **1.17% of the 2,097,152-byte state read-modify-write**.
+This is negligible, reinforcing the finding that GDN-2's decode overhead is bandwidth-
+dominated by the state matrix, not by the gates themselves.
+
+### GDN-2 recurrence
 
 Per token, the matrix state S ∈ R^{d_k × d_v} updates as:
 
