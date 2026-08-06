@@ -304,7 +304,6 @@ def validate_schema_row(row, csv_name, issues, row_num):
 
     # Absurd throughput check for tokens_per_sec metrics
     metric = row.get("metric_name", "")
-    unit = row.get("unit", "")
     if "tokens_per_sec" in metric and value > 100000:
         issues.append(Issue("WARNING", csv_name, f"row {row_num}: very high throughput {value} tokens/sec"))
 
@@ -314,9 +313,9 @@ def validate_profile_row(row, csv_name, issues, row_num):
     try:
         p50 = float(row["p50_us"])
         p95 = float(row["p95_us"])
-        mean = float(row["mean_us"])
         n_samples = int(row["n_samples"])
-        layer_idx = int(row["layer_idx"])
+        # Parsed to validate; not otherwise inspected.
+        int(row["layer_idx"])
     except (ValueError, KeyError) as e:
         issues.append(Issue("ERROR", csv_name, f"row {row_num}: cannot parse numeric fields: {e}"))
         return
