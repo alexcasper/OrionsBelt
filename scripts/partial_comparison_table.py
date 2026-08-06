@@ -105,8 +105,8 @@ PROV = {
     "jetson-j2-omp-unroll.csv": ("(no manifest)", "a085417*", True),
     "pi5-r5.csv": ("r5_20260802T201237Z_28729f3", "28729f3", True),
     "pi5-j1.csv": ("r5_20260803T083154Z_f127a11", "f127a11", True),
-    "rk3588-t3_big.csv": ("t3_20260802T211312Z_28729f3", "28729f3", True),
-    "rk3588-t3_little.csv": ("t3_20260802T211312Z_28729f3", "28729f3", True),
+    "rk3588-t3_big.csv": ("t3_20260806T053612Z_553a96e", "553a96e", False),
+    "rk3588-t3_little.csv": ("t3_20260806T053612Z_553a96e", "553a96e", False),
     "rk3588-t4_big.csv": ("t4_20260802T211249Z_28729f3", "28729f3", True),
     "rk3588-t4_little.csv": ("t4_20260802T211249Z_28729f3", "28729f3", True),
 }
