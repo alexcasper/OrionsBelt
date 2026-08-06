@@ -198,6 +198,46 @@ def check_manifest_exists(csv_name, manifest_dir):
     return None
 
 
+def check_ablation_manifests(ablation_dir, issues):
+    """Validate that ablation CSVs' embedded manifest_ref paths exist (ob-20t).
+
+    Ablation CSVs use the bench.schema.ResultRow format and embed the manifest
+    path in each row's ``manifest_ref`` column.  This checks every distinct
+    manifest_ref referenced across all ablation CSVs and verifies the file
+    exists on disk.
+    """
+    if not os.path.isdir(ablation_dir):
+        return
+
+    for fname in sorted(os.listdir(ablation_dir)):
+        if not fname.endswith(".csv"):
+            continue
+        csv_path = os.path.join(ablation_dir, fname)
+        refs = set()
+        try:
+            with open(csv_path, newline="") as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    ref = row.get("manifest_ref", "")
+                    if ref:
+                        refs.add(ref)
+        except Exception:
+            issues.append(Issue("ERROR", fname, "cannot read ablation CSV"))
+            continue
+
+        for ref in sorted(refs):
+            if os.path.isfile(ref):
+                issues.append(Issue("NOTE", fname, f"ablation manifest_ref OK: {ref}"))
+            else:
+                issues.append(
+                    Issue(
+                        "WARNING",
+                        fname,
+                        f"ablation manifest_ref points to MISSING file: {ref}",
+                    )
+                )
+
+
 def load_manifest(path):
     """Load and parse a manifest JSON file."""
     try:
@@ -465,6 +505,10 @@ def main():
 
         manifest_path = check_manifest_exists(csv_name, args.manifest_dir)
         validate_manifest(csv_name, csv_type, row_count, manifest_path, all_issues, head_sha)
+
+    # Check ablation CSVs (subdirectory) — different schema, manifest_ref in rows
+    ablation_dir = os.path.join(args.csv_dir, "ablation")
+    check_ablation_manifests(ablation_dir, all_issues)
 
     # Report
     errors = [i for i in all_issues if i.severity == "ERROR"]

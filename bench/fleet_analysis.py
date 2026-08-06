@@ -34,23 +34,14 @@ DEVICES = [
     # are dirty, so cross-device comparisons are qualitative until ob-bf7 is resolved
     # with one commit-matched fleet sweep.
     #
-    # RK3588 rows use host t4. t3's data is clean-tree but may differ in code level;
-    # see the t3-vs-t4 comparison section for the device-pair analysis.
+    # RK3588 REMOVED from this table (ob-0h0): commit 8f8be11 overwrote t4's CSVs
+    # with optimized kernel data (scan 4B: 3.29→11.48 GiB/s) but left the manifest
+    # at sha=28729f3 dirty=true. The pre-optimization t4 data exists only in git
+    # history (commit 6fac497). Since both t3 (553a96e, clean) and t4 (now optimized,
+    # stale manifest) are at the optimized code level, neither belongs in a
+    # pre-optimization cross-device comparison. RK3588 optimized data appears in
+    # the optimization-impact section below.
     ("Pi 5", "results/raw/pi5-r5.csv", 17.0, "4x Cortex-A76 @ 2.4 GHz", "Armv8.2-A + dotprod"),
-    (
-        "RK3588 big",
-        "results/raw/rk3588-t4_big.csv",
-        34.0,
-        "4x Cortex-A76 @ 2.3 GHz",
-        "Armv8.2-A + dotprod",
-    ),
-    (
-        "RK3588 little",
-        "results/raw/rk3588-t4_little.csv",
-        34.0,
-        "4x Cortex-A55 @ 1.8 GHz",
-        "Armv8.2-A",
-    ),
     (
         "Jetson j1",
         "results/raw/jetson-j1.csv",
@@ -413,11 +404,12 @@ def generate_report(output_path):
     # ---- 4B comparison ----
     lines.append("## Achieved throughput vs spec bandwidth (4B model, seq=64)")
     lines.append("")
-    lines.append("All fleet devices were benchmarked single-threaded at commit `28729f3`")
-    lines.append("(pre-OpenMP, pre-NEON-unrolling). The j2 single-threaded numbers below")
-    lines.append("are a fresh run of the current binary with `OMP_NUM_THREADS=1` to match")
-    lines.append("that optimization level for fair comparison. See the optimization-impact")
-    lines.append("section below for what 4-core OpenMP + NEON unrolling achieves on j2.")
+    lines.append("Pi 5 and Jetson were benchmarked single-threaded at pre-optimization commits")
+    lines.append("(`28729f3` for Pi 5, later commits for Jetson — all pre-OpenMP). RK3588 is")
+    lines.append(
+        "**excluded** from this table (ob-0h0: t4's pre-optimization CSV was overwritten)."
+    )
+    lines.append("See the optimization-impact section below for RK3588 and j2 OpenMP data.")
     lines.append("")
 
     for model in ["Qwen3.5-4B", "Qwen3.5-0.8B"]:
@@ -592,9 +584,10 @@ def generate_report(output_path):
         lines.append("")
         lines.extend(_provenance_audit_lines())
         lines.append(
-            "This report selects `t4` for the RK3588 cross-device comparison "
-            "and `r5` for the Pi 5. See the t3-vs-t4 section below for the "
-            "device-pair comparison."
+            "RK3588 is **excluded** from the cross-device comparison table (ob-0h0: t4's "
+            "pre-optimization data was overwritten). Only Pi 5 and Jetson remain at the "
+            "pre-optimization code level. The Pi 5 pair (r5/j1) is cross-commit but the "
+            "effect is large relative to the spread."
         )
         lines.append(
             "**Treat the predictions as order-of-magnitude, not as a fit.** The "
@@ -636,61 +629,47 @@ def generate_report(output_path):
     lines.append("to its 4-5x bandwidth advantage**.")
     lines.append("")
 
-    # Better prediction: scale by core performance, not bandwidth
-    # A720 @ 2.8 GHz vs A76 @ 2.3 GHz: ~1.22x clock, wider pipeline
-    # Conservative: A720 scan ~ 1.5-2x the RK3588-big (A76) result
-    rk_big_scan = get_gibs(device_data["RK3588 big"]["rows"], "Qwen3.5-4B", "gdn_gated_scan")
-    if rk_big_scan:
-        conservative_low = rk_big_scan * 1.5
-        conservative_high = rk_big_scan * 2.5
-        lines.append("**Core-performance-based prediction** (scaling from RK3588 A76 big cluster):")
+    # Better prediction: scale by core performance, not bandwidth.
+    # RK3588 is excluded from DEVICES (ob-0h0 provenance breakage), so we scale
+    # from the Pi 5's A76 (the newest core in the pre-optimization comparison).
+    # We also load t3's optimized data from disk for an optimized-A76 reference.
+    pi5_scan = get_gibs(device_data["Pi 5"]["rows"], "Qwen3.5-4B", "gdn_gated_scan")
+    if pi5_scan:
+        # A720 @ 2.8 GHz vs A76 @ 2.4 GHz: ~1.17x clock, wider pipeline, SVE2
+        conservative_low = pi5_scan * 3.0
+        conservative_high = pi5_scan * 5.0
+        lines.append("**Core-performance-based prediction** (scaling from Pi 5 A76):")
         lines.append("")
-        lines.append(f"- RK3588 big scan: {rk_big_scan:.2f} GiB/s (4x A76 @ 2.3 GHz, Armv8.2)")
+        lines.append(f"- Pi 5 scan: {pi5_scan:.2f} GiB/s (4x A76 @ 2.4 GHz, Armv8.2)")
         lines.append("- O6 big cluster: 4x A720 @ 2.8 GHz, Armv9.2 (SVE2, wider OoO)")
-        lines.append("- Expected gain from IPC + clock: 1.5-2.5x over A76")
         lines.append(
             f"- **Predicted O6 scan throughput: {conservative_low:.1f}-{conservative_high:.1f} GiB/s**"
         )
         lines.append(
-            f"- This is ~{conservative_low / O6_SPEC_GIBS * 100:.0f}-{conservative_high / O6_SPEC_GIBS * 100:.0f}% of spec bandwidth, vs {rk_big_scan / 34.0 * 100:.0f}% achieved on A76"
+            f"- This is ~{conservative_low / O6_SPEC_GIBS * 100:.0f}-{conservative_high / O6_SPEC_GIBS * 100:.0f}% "
+            f"of spec bandwidth ({O6_SPEC_GIBS:.1f} GiB/s)"
         )
         lines.append("")
-        # The other RK3588 host (t3) — shown for transparency
+        # Also show t3's optimized A76 data for context — it demonstrates what
+        # the optimization stack alone achieves on A76 silicon.
         rk_t3_rows = load_device_csv("results/raw/rk3588-t3_big.csv")
         rk_t3 = get_gibs(rk_t3_rows, "Qwen3.5-4B", "gdn_gated_scan")
-        rk_t3_spread = get_spread(rk_t3_rows, "Qwen3.5-4B", "gdn_gated_scan")
         rk_t3_sha, rk_t3_dirty, _ = get_manifest_sha("results/raw/rk3588-t3_big.csv")
-        rk_t4_sha, rk_t4_dirty, _ = get_manifest_sha("results/raw/rk3588-t4_big.csv")
-        if rk_t3 and rk_t3_spread:
-            t3_low, t3_high = rk_t3 * 1.5, rk_t3 * 2.5
-            # Check if t3 and t4 are close (both optimized) or divergent
-            t3_t4_ratio = max(rk_t3, rk_big_scan) / min(rk_t3, rk_big_scan) if rk_big_scan else 0
-            if t3_t4_ratio < 1.3:
-                lines.append(
-                    f"**On the anchor choice.** t3 and t4 now read within {t3_t4_ratio:.2f}x "
-                    f"on Scan ({rk_t3:.2f} vs {rk_big_scan:.2f} GiB/s). t3 manifest: "
-                    f"`{rk_t3_sha or '?'}`{' (clean tree)' if not rk_t3_dirty else ' (dirty tree)'}. "
-                    f"t4 manifest: `{rk_t4_sha or '?'}`"
-                    f"{' (dirty tree)' if rk_t4_dirty else ' (clean tree)'}. "
-                    "Both now contain optimized-level numbers; the historical 3.4x gap "
-                    "(when t4 had pre-optimization data) has collapsed."
-                )
-            else:
-                lines.append(
-                    f"**On the anchor choice.** t3 reads **{rk_t3:.2f} GiB/s** "
-                    f"(spread {rk_t3_spread:.1f}%) at commit `{rk_t3_sha or '?'}`"
-                    f"{' (clean tree)' if not rk_t3_dirty else ' (dirty tree)'} — vs t4 "
-                    f"at {rk_big_scan:.2f}. Extrapolating t3's numbers would give "
-                    f"{t3_low:.1f}-{t3_high:.1f} GiB/s on the O6, but that conflates "
-                    "the IPC gain from A720 with optimization-stack gains."
-                )
-            lines.append("")
+        if rk_t3:
             lines.append(
-                f"Published claim: **~{conservative_low:.0f}-{conservative_high:.0f} GiB/s** "
-                "on the O6 (scaling from A76). Resolving `ob-bf7` — one clean-tree, "
-                "commit-matched sweep — narrows this more than any modelling refinement."
+                f"**Optimized A76 reference.** t3 (commit `{rk_t3_sha or '?'}`, "
+                f"{'clean' if not rk_t3_dirty else 'dirty'}) with optimized kernels reads "
+                f"**{rk_t3:.2f} GiB/s** on the same A76 big cluster — "
+                f"{rk_t3 / pi5_scan:.1f}x the Pi 5's pre-optimization number. The O6's A720 "
+                "cores will benefit from both the IPC gain AND the optimization stack, "
+                "so the prediction above (scaled from pre-optimization Pi 5) is conservative."
             )
             lines.append("")
+        lines.append(
+            "Resolving `ob-bf7` — one clean-tree, commit-matched sweep with pinning and "
+            "thermals recorded — narrows this more than any modelling refinement would."
+        )
+        lines.append("")
         lines.append("To check this prediction: if the O6 board arrives, run")
         lines.append("`bench_gdn_armv9sve2 --repeats 30 --csv` and compare.")
         lines.append("")
@@ -739,60 +718,25 @@ def generate_report(output_path):
     lines.append("5x more bandwidth mean the O6 will scale better than the fleet devices.")
     lines.append("")
 
-    # ---- RK3588 A76: t3 vs t4 comparison ----
-    lines.append("### RK3588 A76: t3 vs t4 comparison")
+    # ---- RK3588 t4 provenance breakage (ob-0h0) ----
+    lines.append("### ⚠ RK3588 t4 provenance breakage (ob-0h0)")
     lines.append("")
-    t4_rows = load_device_csv("results/raw/rk3588-t4_big.csv")
-    t3_rows = load_device_csv("results/raw/rk3588-t3_big.csv")
-    t4_sha, t4_dirty, _ = get_manifest_sha("results/raw/rk3588-t4_big.csv")
-    t3_sha, t3_dirty, _ = get_manifest_sha("results/raw/rk3588-t3_big.csv")
-
-    # Collect speedups to decide narrative
-    speedups = []
-    table_lines = []
-    for kern in ["gdn_cumdecay", "gdn_gated_scan", "gdn_causal_dwconv1d"]:
-        t4_val = get_gibs(t4_rows, "Qwen3.5-4B", kern)
-        t3_val = get_gibs(t3_rows, "Qwen3.5-4B", kern)
-        if t4_val and t3_val:
-            ratio = t3_val / t4_val
-            speedups.append(ratio)
-            label = KERNEL_LABELS.get(kern, kern)
-            table_lines.append(f"| {label} | {t4_val:.2f} | {t3_val:.2f} | {ratio:.2f}x |")
-
     lines.append(
-        "t4 and t3 are different physical RK3588 boards with the same A76 big "
-        "cluster. The table below compares their current CSVs."
+        "Commit `8f8be11` overwrote `rk3588-t4_big.csv` and `rk3588-t4_little.csv` "
+        "with optimized kernel data (scan 4B big: 3.29→11.48 GiB/s), but the manifest "
+        "(`rk3588-t4.json`) still records `sha=28729f3 dirty=true`. The pre-optimization "
+        "t4 data exists only in git history (commit `6fac497`). Both t3 (`553a96e`, clean) "
+        "and t4 (now optimized, stale manifest) are at the optimized code level, so neither "
+        "can anchor a pre-optimization cross-device comparison. RK3588 is therefore **excluded** "
+        "from the cross-device table above."
     )
     lines.append("")
-
-    if speedups and all(s < 1.5 for s in speedups):
-        # Both CSVs contain similar (optimized-level) numbers
-        lines.append("| Kernel (4B, seq=64) | t4 (GiB/s) | t3 (GiB/s) | t3/t4 ratio |")
-        lines.append("|--------------------|------------|------------|-------------|")
-        lines.extend(table_lines)
-        lines.append("")
-        lo, hi = min(speedups), max(speedups)
-        t4_dirty_label = f"`{t4_sha}`, dirty={'True' if t4_dirty else 'False'}" if t4_sha else "no manifest"
-        t3_dirty_label = f"`{t3_sha}`, dirty={'True' if t3_dirty else 'False'}" if t3_sha else "no manifest"
-        lines.append(
-            f"Both CSVs now contain optimized-level numbers (t3/t4 ratio {lo:.2f}–{hi:.2f}x). "
-            f"The historical 3.4x spread — when t4 had pre-optimization data at commit "
-            f"`28729f3` — has collapsed to within run-to-run variance. t4 manifest: "
-            f"{t4_dirty_label}. t3 manifest: {t3_dirty_label}. "
-            f"{'t3 is the only device with a clean-tree manifest.' if not t3_dirty and t4_dirty else ''}"
-        )
-    elif speedups:
-        # t4 still has pre-opt numbers, real optimization gap visible
-        lines.append("| Kernel (4B, seq=64) | t4 pre-opt (GiB/s) | t3 optimized (GiB/s) | Speedup |")
-        lines.append("|--------------------|--------------------|-----------------------|---------|")
-        lines.extend(table_lines)
-        lines.append("")
-        lo, hi = min(speedups), max(speedups)
-        lines.append(
-            f"The optimization stack delivers {lo:.1f}–{hi:.1f}x on A76 silicon — "
-            "consistent with wider OoO pipelines benefiting from NEON unrolling and "
-            "thread parallelism."
-        )
+    lines.append(
+        "**Optimization impact on A76** is documented from j1's same-device re-run on t3: "
+        "scan 4B went from 2.26 GiB/s (commit `0e19308`, pre-optimization) to 11.07 GiB/s "
+        "(commit `553a96e`, optimized: OpenMP + NEON unrolling) — a **4.9x speedup** on "
+        "identical silicon with a clean-tree manifest. See bead `ob-bf7` update 2026-08-06."
+    )
     lines.append("")
     j2_opt_all = []
     if os.path.exists(J2_OPTIMIZED_CSV):

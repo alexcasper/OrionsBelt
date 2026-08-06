@@ -15,6 +15,7 @@ import pytest
 # Ensure scripts/ is importable
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
+import fetch_weights  # noqa: E402
 from fetch_weights import (  # noqa: E402
     MODELS,
     DownloadRecord,
@@ -271,6 +272,17 @@ class TestFetchManifest:
 
 
 class TestDryRun:
+    @pytest.fixture(autouse=True)
+    def mock_hf_api(self, monkeypatch):
+        """Mock HuggingFace API so dry-run tests never hit the network (ob-fty)."""
+
+        def fake_list_repo_files(repo_id):
+            if "0.8B" in repo_id:
+                return sorted(REPO_FILES_0_8B)
+            return sorted(REPO_FILES_4B)
+
+        monkeypatch.setattr(fetch_weights, "_list_repo_files", fake_list_repo_files)
+
     def test_dry_run_4b(self, capsys, tmp_path):
         """Dry run should not create any files."""
         rc = main(["--model", "4B", "--dry-run", "--output-dir", str(tmp_path)])
@@ -296,6 +308,17 @@ class TestDryRun:
 
 
 class TestCLI:
+    @pytest.fixture(autouse=True)
+    def mock_hf_api(self, monkeypatch):
+        """Mock HuggingFace API so CLI dry-run tests never hit the network (ob-fty)."""
+
+        def fake_list_repo_files(repo_id):
+            if "0.8B" in repo_id:
+                return sorted(REPO_FILES_0_8B)
+            return sorted(REPO_FILES_4B)
+
+        monkeypatch.setattr(fetch_weights, "_list_repo_files", fake_list_repo_files)
+
     def test_list(self, capsys):
         rc = main(["--list"])
         assert rc == 0

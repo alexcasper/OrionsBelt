@@ -32,3 +32,4 @@ artifacts/reference/
 .gitignore.repo
 gpu/gdn_gpu_bench
 gpu/gdn_gpu_validate
+references/

@@ -32,6 +32,8 @@ from bench.harness import (  # noqa: E402
     SyntheticBackend,
     run_sweep,
 )
+from bench.manifest import capture  # noqa: E402
+from bench.manifest import write as write_manifest  # noqa: E402
 from bench.schema import write_csv  # noqa: E402
 
 # The ablation grid: each entry is one configuration to benchmark.
@@ -76,6 +78,37 @@ ABLATION_GRID = [
 ]
 
 
+def _write_manifest_for_rows(
+    rows: list,
+    config: SweepConfig,
+    manifest_dir: str = "results/manifests",
+) -> str | None:
+    """Capture and write a provenance manifest for an ablation sweep (ob-20t).
+
+    ``run_sweep`` embeds a ``manifest_ref`` in every row but does not write
+    the manifest file itself — that was the harness CLI's job. This function
+    fills that gap so ablation CSVs are always accompanied by their manifest.
+    Returns the manifest path or None if there are no rows.
+    """
+    if not rows:
+        return None
+    run_id = rows[0].run_id
+    manifest = capture(
+        run_id=run_id,
+        backend="SyntheticBackend",
+        model_checkpoint=config.model_checkpoint,
+        quantization=config.quantization,
+        decode_length=config.decode_length,
+        warmup_count=config.warmup_count,
+        repeat_count=config.repeat_count,
+        context_lengths=list(config.context_lengths),
+    )
+    manifest_path = f"{manifest_dir}/{run_id}.json"
+    Path(manifest_path).parent.mkdir(parents=True, exist_ok=True)
+    write_manifest(manifest, manifest_path)
+    return manifest_path
+
+
 def run_ablation(
     context_lengths: list[int],
     warmup: int = 2,
@@ -112,6 +145,11 @@ def run_ablation(
         write_csv(rows, csv_file)
         csv_paths.append(csv_file)
         print(f"    {len(rows)} rows → {csv_file}")
+
+        # Capture provenance manifest (ob-20t: previously missing)
+        mpath = _write_manifest_for_rows(rows, config)
+        if mpath:
+            print(f"    manifest → {mpath}")
 
     return csv_paths
 

@@ -320,9 +320,7 @@ def load_model(model_path: str):
     return model, tokenizer
 
 
-def _build_sequence(
-    seed_ids: list[int], filler_ids: list[int], target_length: int
-) -> list[int]:
+def _build_sequence(seed_ids: list[int], filler_ids: list[int], target_length: int) -> list[int]:
     """Build a sequence of exactly target_length tokens from seed + filler.
 
     The seed prompt comes first, followed by filler tokens, truncated to
@@ -396,11 +394,13 @@ def run_reference_inference(
                 pos_logits = logits[0, pos, :].float().cpu().numpy()
                 topk_idx = np.argsort(pos_logits)[-top_k:][::-1]
                 topk_val = pos_logits[topk_idx]
-                topk_data.append({
-                    "position_from_end": pos,
-                    "indices": topk_idx.tolist(),
-                    "values": topk_val.tolist(),
-                })
+                topk_data.append(
+                    {
+                        "position_from_end": pos,
+                        "indices": topk_idx.tolist(),
+                        "values": topk_val.tolist(),
+                    }
+                )
 
             # --- Decode steps (greedy, with KV cache) ---
             generated = []
@@ -505,7 +505,9 @@ def main(argv: list[str] | None = None) -> int:
     # --- Provenance ---
     provenance = collect_provenance(str(model_path))
     print(f"Provenance: git={provenance['git_sha']} host={provenance['hostname']}")
-    print(f"  torch={provenance['torch_version']} transformers={provenance['transformers_version']}")
+    print(
+        f"  torch={provenance['torch_version']} transformers={provenance['transformers_version']}"
+    )
 
     # --- Load model ---
     model, tokenizer = load_model(str(model_path))
