@@ -16,3 +16,7 @@ dist/
 # Downloaded model weights — never committed (license compliance, repo size)
 weights/
 *.rknn
+
+# Agent task files — contain device credentials, must not be committed
+.goose-task.md
+.goose-loop.log
