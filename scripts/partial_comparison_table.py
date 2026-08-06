@@ -94,8 +94,8 @@ def load_sustained(fname):
 PROV = {
     "jetson-j1_clean.csv": ("j1_20260804T102230Z_ba7506d", "ba7506d", False),
     "jetson-j1.csv": ("j1_20260802T235238Z_2c9ac9f", "2c9ac9f", True),
-    "jetson-j1_single.csv": ("(no manifest)", "dffac4b*", True),
-    "jetson-j1_omp.csv": ("(no manifest)", "dffac4b*", True),
+    "jetson-j1_single.csv": ("j1_20260806T110812Z_829a9c3", "829a9c3", True),
+    "jetson-j1_omp.csv": ("j1_20260806T110807Z_829a9c3", "829a9c3", True),
     "jetson-j2.csv": ("j2_20260803T144316Z_6ea1771", "6ea1771", True),
     "jetson-j2_single.csv": ("(no manifest)", "a085417*", True),
     "jetson-j2-omp.csv": ("(no manifest)", "a085417*", True),
