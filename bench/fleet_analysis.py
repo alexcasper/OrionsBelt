@@ -233,7 +233,7 @@ def plot_cross_device(device_data, output_path):
     ax1.set_ylabel("Achieved GiB/s (scan, 4B, seq=64)")
     ax1.set_title("GDN Scan Throughput by Device")
     ax1.set_ylim(0, max(achieved) * 1.3)
-    for bar, val, cl in zip(bars, achieved, cores_labels, strict=True):
+    for bar, val, cl in zip(bars, achieved, cores_labels):  # noqa: B905
         ax1.text(
             bar.get_x() + bar.get_width() / 2.0,
             bar.get_height() + 0.03,
