@@ -24,6 +24,7 @@ from scripts.validate_results import (  # noqa: E402
     detect_csv_type,
     expected_columns,
     find_device_spec,
+    validate_manifest,
     validate_profile_row,
     validate_schema_row,
     validate_standard_row,
@@ -420,6 +421,96 @@ class TestCheckManifestExists:
         manifest.write_text("{}")
         result = check_manifest_exists("jetson_j1.csv", str(tmp_path))
         assert result is not None
+
+
+# ---------------------------------------------------------------------------
+# validate_manifest
+# ---------------------------------------------------------------------------
+
+
+class TestValidateManifest:
+    """Tests for manifest-level provenance and dirty-tree checks."""
+
+    def _run(
+        self,
+        manifest_dict,
+        tmp_path,
+        csv_name="test.csv",
+        csv_type="standard",
+        row_count=24,
+        head_sha="abc1234",
+    ):
+        """Helper: write manifest JSON and call validate_manifest."""
+        import json
+
+        man_path = tmp_path / "test.json"
+        man_path.write_text(json.dumps(manifest_dict))
+        issues: list = []
+        validate_manifest(csv_name, csv_type, row_count, str(man_path), issues, head_sha)
+        return issues
+
+    def test_no_manifest_path_warns(self, tmp_path):
+        issues: list = []
+        validate_manifest("test.csv", "standard", 24, None, issues, "abc1234")
+        assert any(i.severity == "WARNING" and "no manifest" in i.message for i in issues)
+
+    def test_clean_manifest_no_warnings(self, tmp_path):
+        """A manifest with git.sha and dirty=False produces no WARNINGs."""
+        issues = self._run({"git": {"sha": "abc1234", "dirty": False}}, tmp_path)
+        warnings = [i for i in issues if i.severity == "WARNING"]
+        assert len(warnings) == 0
+
+    def test_missing_git_section_warns(self, tmp_path):
+        """A manifest with no git section at all should WARN about missing provenance."""
+        issues = self._run({"device": "test"}, tmp_path)
+        warnings = [i for i in issues if i.severity == "WARNING"]
+        assert len(warnings) == 1
+        assert "no provenance" in warnings[0].message
+
+    def test_empty_git_dict_warns(self, tmp_path):
+        """A manifest with an empty git dict should WARN."""
+        issues = self._run({"device": "test", "git": {}}, tmp_path)
+        warnings = [i for i in issues if i.severity == "WARNING"]
+        assert any("no provenance" in w.message for w in warnings)
+
+    def test_sha_present_no_provenance_warning(self, tmp_path):
+        """If sha is present, the no-provenance warning should NOT fire."""
+        issues = self._run({"git": {"sha": "abc1234", "dirty": True}}, tmp_path)
+        no_prov = [i for i in issues if "no provenance" in i.message]
+        assert len(no_prov) == 0
+
+    def test_dirty_tree_warns(self, tmp_path):
+        """dirty=True should produce a DIRTY tree WARNING."""
+        issues = self._run({"git": {"sha": "abc1234", "dirty": True}}, tmp_path)
+        dirty_warnings = [i for i in issues if "DIRTY" in i.message]
+        assert len(dirty_warnings) == 1
+
+    def test_stale_sha_note(self, tmp_path):
+        """SHA different from HEAD produces a NOTE (not WARNING)."""
+        issues = self._run(
+            {"git": {"sha": "different", "dirty": False}}, tmp_path, head_sha="abc1234"
+        )
+        notes = [i for i in issues if "run-time snapshot" in i.message]
+        assert len(notes) == 1
+        assert notes[0].severity == "NOTE"
+
+    def test_sha_matching_head_no_note(self, tmp_path):
+        """SHA matching HEAD should not produce a staleness NOTE."""
+        issues = self._run(
+            {"git": {"sha": "abc1234", "dirty": False}}, tmp_path, head_sha="abc1234"
+        )
+        notes = [i for i in issues if "run-time snapshot" in i.message]
+        assert len(notes) == 0
+
+    def test_note_includes_manifest_filename(self, tmp_path):
+        """The first NOTE should identify which manifest was found."""
+        issues = self._run({"git": {"sha": "abc1234", "dirty": False}}, tmp_path)
+        assert any("test.json" in i.message and i.severity == "NOTE" for i in issues)
+
+    def test_low_row_count_note(self, tmp_path):
+        """Standard CSVs with < 12 rows get a NOTE about possible missing variants."""
+        issues = self._run({"git": {"sha": "abc1234", "dirty": False}}, tmp_path, row_count=8)
+        assert any("only 8 rows" in i.message for i in issues)
 
 
 # ---------------------------------------------------------------------------

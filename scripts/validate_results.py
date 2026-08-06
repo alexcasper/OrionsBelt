@@ -416,6 +416,18 @@ def validate_manifest(csv_name, csv_type, row_count, manifest_path, issues, head
     # Check git SHA staleness (NOTE, not WARNING — manifests are captured at run time)
     git_info = manifest.get("git", {})
     sha = git_info.get("sha", "")
+
+    # A manifest with no git section at all has zero provenance — worse than
+    # a dirty tree, because there is no SHA to trace back to.
+    if not sha and not git_info.get("dirty"):
+        issues.append(
+            Issue(
+                "WARNING",
+                csv_name,
+                "manifest has no git section -- no provenance (no SHA, no dirty flag)",
+            )
+        )
+
     if sha and head_sha and sha != head_sha:
         short_sha = sha[:7]
         issues.append(
