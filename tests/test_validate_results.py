@@ -79,21 +79,30 @@ def _write_std_csv(path, rows):
 # detect_csv_type
 # ---------------------------------------------------------------------------
 
+
 class TestDetectCsvType:
     def test_standard_detected(self):
         assert detect_csv_type(STD_HEADER) == "standard"
 
     def test_sustained_detected(self):
         cols = [
-            "sustained_model", "sustained_kernel", "dispatch_path",
-            "elapsed_s", "throughput_gibs", "thermal_c", "vs_first_pct",
+            "sustained_model",
+            "sustained_kernel",
+            "dispatch_path",
+            "elapsed_s",
+            "throughput_gibs",
+            "thermal_c",
+            "vs_first_pct",
         ]
         assert detect_csv_type(cols) == "sustained"
 
     def test_power_detected(self):
         cols = [
-            "timestamp_ms", "power_in_mw", "power_gpu_mw",
-            "power_cpu_mw", "temp_milliC",
+            "timestamp_ms",
+            "power_in_mw",
+            "power_gpu_mw",
+            "power_cpu_mw",
+            "temp_milliC",
         ]
         assert detect_csv_type(cols) == "power"
 
@@ -113,6 +122,7 @@ class TestDetectCsvType:
 # expected_columns
 # ---------------------------------------------------------------------------
 
+
 class TestExpectedColumns:
     def test_standard_columns(self):
         assert "p50_us" in expected_columns("standard")
@@ -131,6 +141,7 @@ class TestExpectedColumns:
 # find_device_spec
 # ---------------------------------------------------------------------------
 
+
 class TestFindDeviceSpec:
     def test_jetson(self):
         assert find_device_spec("jetson-j1.csv") == 25.6
@@ -148,6 +159,7 @@ class TestFindDeviceSpec:
 # ---------------------------------------------------------------------------
 # validate_standard_row
 # ---------------------------------------------------------------------------
+
 
 class TestValidateStandardRow:
     def test_valid_row_no_issues(self):
@@ -199,6 +211,7 @@ class TestValidateStandardRow:
 # validate_sustained_row
 # ---------------------------------------------------------------------------
 
+
 class TestValidateSustainedRow:
     def test_valid_row_no_issues(self):
         issues = []
@@ -227,6 +240,7 @@ class TestValidateSustainedRow:
 # check_manifest_exists
 # ---------------------------------------------------------------------------
 
+
 class TestCheckManifestExists:
     def test_exact_match(self, tmp_path):
         manifest = tmp_path / "jetson-j1.json"
@@ -251,6 +265,7 @@ class TestCheckManifestExists:
 # Issue
 # ---------------------------------------------------------------------------
 
+
 class TestIssue:
     def test_str_format(self):
         issue = Issue("ERROR", "test.csv", "something broke")
@@ -264,6 +279,7 @@ class TestIssue:
 # End-to-end via main()
 # ---------------------------------------------------------------------------
 
+
 class TestMainEndToEnd:
     def _run_main(self, csv_dir, manifest_dir):
         """Run validate_results.main() with patched sys.argv, return exit code."""
@@ -272,8 +288,10 @@ class TestMainEndToEnd:
         orig_argv = sys.argv
         sys.argv = [
             "validate_results.py",
-            "--csv-dir", str(csv_dir),
-            "--manifest-dir", str(manifest_dir),
+            "--csv-dir",
+            str(csv_dir),
+            "--manifest-dir",
+            str(manifest_dir),
             "--quiet",
         ]
         try:

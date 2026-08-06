@@ -26,11 +26,23 @@ from bench.comparison_table import (  # noqa: E402
 # ---------------------------------------------------------------------------
 
 COLUMNS = [
-    "run_id", "timestamp", "git_sha", "manifest_ref",
-    "device", "engine_gdn", "engine_full_attention",
-    "model_checkpoint", "quantization",
-    "context_length", "phase", "metric_name", "metric_component",
-    "value", "unit", "repeat_index", "repeat_count",
+    "run_id",
+    "timestamp",
+    "git_sha",
+    "manifest_ref",
+    "device",
+    "engine_gdn",
+    "engine_full_attention",
+    "model_checkpoint",
+    "quantization",
+    "context_length",
+    "phase",
+    "metric_name",
+    "metric_component",
+    "value",
+    "unit",
+    "repeat_index",
+    "repeat_count",
 ]
 
 
@@ -82,6 +94,7 @@ def _write_csv(path, rows):
 # ---------------------------------------------------------------------------
 # load_and_summarize
 # ---------------------------------------------------------------------------
+
 
 class TestLoadAndSummarize:
     def test_single_group_p50(self, tmp_path):
@@ -201,6 +214,7 @@ class TestLoadAndSummarize:
 # _fmt_value
 # ---------------------------------------------------------------------------
 
+
 class TestFmtValue:
     def test_tokens_per_sec(self):
         assert _fmt_value("prefill_tokens_per_sec", 123.456) == "123.5"
@@ -230,6 +244,7 @@ class TestFmtValue:
 # generate_markdown_table
 # ---------------------------------------------------------------------------
 
+
 class TestGenerateMarkdownTable:
     def test_basic_table_structure(self):
         """A markdown table has a header row, separator, and at least one data row."""
@@ -258,16 +273,28 @@ class TestGenerateMarkdownTable:
         """Two metrics become two columns in the table."""
         summaries = [
             {
-                "engine_gdn": "cpu", "engine_full_attention": "cpu",
-                "quantization": "fp16", "context_length": 4096,
-                "phase": "prefill", "metric_name": "prefill_tokens_per_sec",
-                "metric_component": "", "p50": 100.0, "p95": 120.0, "n": 5,
+                "engine_gdn": "cpu",
+                "engine_full_attention": "cpu",
+                "quantization": "fp16",
+                "context_length": 4096,
+                "phase": "prefill",
+                "metric_name": "prefill_tokens_per_sec",
+                "metric_component": "",
+                "p50": 100.0,
+                "p95": 120.0,
+                "n": 5,
             },
             {
-                "engine_gdn": "cpu", "engine_full_attention": "cpu",
-                "quantization": "fp16", "context_length": 4096,
-                "phase": "decode", "metric_name": "decode_tokens_per_sec",
-                "metric_component": "", "p50": 7.5, "p95": 9.0, "n": 5,
+                "engine_gdn": "cpu",
+                "engine_full_attention": "cpu",
+                "quantization": "fp16",
+                "context_length": 4096,
+                "phase": "decode",
+                "metric_name": "decode_tokens_per_sec",
+                "metric_component": "",
+                "p50": 7.5,
+                "p95": 9.0,
+                "n": 5,
             },
         ]
         table = generate_markdown_table(summaries)
@@ -279,16 +306,28 @@ class TestGenerateMarkdownTable:
         """A config with no data for a column shows an em-dash."""
         summaries = [
             {
-                "engine_gdn": "cpu", "engine_full_attention": "cpu",
-                "quantization": "fp16", "context_length": 4096,
-                "phase": "prefill", "metric_name": "prefill_tokens_per_sec",
-                "metric_component": "", "p50": 100.0, "p95": 120.0, "n": 5,
+                "engine_gdn": "cpu",
+                "engine_full_attention": "cpu",
+                "quantization": "fp16",
+                "context_length": 4096,
+                "phase": "prefill",
+                "metric_name": "prefill_tokens_per_sec",
+                "metric_component": "",
+                "p50": 100.0,
+                "p95": 120.0,
+                "n": 5,
             },
             {
-                "engine_gdn": "npu", "engine_full_attention": "cpu",
-                "quantization": "fp16", "context_length": 4096,
-                "phase": "decode", "metric_name": "decode_tokens_per_sec",
-                "metric_component": "", "p50": 7.5, "p95": 9.0, "n": 5,
+                "engine_gdn": "npu",
+                "engine_full_attention": "cpu",
+                "quantization": "fp16",
+                "context_length": 4096,
+                "phase": "decode",
+                "metric_name": "decode_tokens_per_sec",
+                "metric_component": "",
+                "p50": 7.5,
+                "p95": 9.0,
+                "n": 5,
             },
         ]
         table = generate_markdown_table(summaries)
@@ -299,10 +338,16 @@ class TestGenerateMarkdownTable:
         """Context lengths >= 1024 are shown as K notation."""
         summaries = [
             {
-                "engine_gdn": "cpu", "engine_full_attention": "cpu",
-                "quantization": "fp16", "context_length": 4096,
-                "phase": "prefill", "metric_name": "prefill_tokens_per_sec",
-                "metric_component": "", "p50": 100.0, "p95": 120.0, "n": 5,
+                "engine_gdn": "cpu",
+                "engine_full_attention": "cpu",
+                "quantization": "fp16",
+                "context_length": 4096,
+                "phase": "prefill",
+                "metric_name": "prefill_tokens_per_sec",
+                "metric_component": "",
+                "p50": 100.0,
+                "p95": 120.0,
+                "n": 5,
             },
         ]
         table = generate_markdown_table(summaries)
@@ -312,10 +357,16 @@ class TestGenerateMarkdownTable:
         """Small context lengths (< 1024) show the raw integer."""
         summaries = [
             {
-                "engine_gdn": "cpu", "engine_full_attention": "cpu",
-                "quantization": "fp16", "context_length": 64,
-                "phase": "prefill", "metric_name": "prefill_tokens_per_sec",
-                "metric_component": "", "p50": 100.0, "p95": 120.0, "n": 5,
+                "engine_gdn": "cpu",
+                "engine_full_attention": "cpu",
+                "quantization": "fp16",
+                "context_length": 64,
+                "phase": "prefill",
+                "metric_name": "prefill_tokens_per_sec",
+                "metric_component": "",
+                "p50": 100.0,
+                "p95": 120.0,
+                "n": 5,
             },
         ]
         table = generate_markdown_table(summaries)
@@ -326,10 +377,16 @@ class TestGenerateMarkdownTable:
         """metric_component appears in brackets in the column header."""
         summaries = [
             {
-                "engine_gdn": "cpu", "engine_full_attention": "cpu",
-                "quantization": "fp16", "context_length": 4096,
-                "phase": "prefill", "metric_name": "peak_memory_bytes",
-                "metric_component": "weights", "p50": 8e9, "p95": 8.1e9, "n": 5,
+                "engine_gdn": "cpu",
+                "engine_full_attention": "cpu",
+                "quantization": "fp16",
+                "context_length": 4096,
+                "phase": "prefill",
+                "metric_name": "peak_memory_bytes",
+                "metric_component": "weights",
+                "p50": 8e9,
+                "p95": 8.1e9,
+                "n": 5,
             },
         ]
         table = generate_markdown_table(summaries)
@@ -340,12 +397,11 @@ class TestGenerateMarkdownTable:
 # generate_comparison (end-to-end)
 # ---------------------------------------------------------------------------
 
+
 class TestGenerateComparison:
     def test_end_to_end_from_csv(self, tmp_path):
         """Full pipeline: CSV → summarize → markdown table."""
-        rows = [
-            _row(value=100 + i * 10, repeat=i) for i in range(5)
-        ]
+        rows = [_row(value=100 + i * 10, repeat=i) for i in range(5)]
         csv_path = tmp_path / "run.csv"
         _write_csv(csv_path, rows)
 
@@ -367,13 +423,15 @@ class TestGenerateComparison:
         for eng_gdn, eng_fa, base_val in [("cpu", "cpu", 100), ("npu", "cpu", 200)]:
             for ctx in [4096, 32768]:
                 for i in range(3):
-                    rows.append(_row(
-                        engine_gdn=eng_gdn,
-                        engine_full_attention=eng_fa,
-                        ctx=ctx,
-                        value=base_val + i * 10,
-                        repeat=i,
-                    ))
+                    rows.append(
+                        _row(
+                            engine_gdn=eng_gdn,
+                            engine_full_attention=eng_fa,
+                            ctx=ctx,
+                            value=base_val + i * 10,
+                            repeat=i,
+                        )
+                    )
         csv_path = tmp_path / "ablation.csv"
         _write_csv(csv_path, rows)
 
@@ -386,6 +444,7 @@ class TestGenerateComparison:
 # ---------------------------------------------------------------------------
 # Integration with bench.metrics.percentile
 # ---------------------------------------------------------------------------
+
 
 class TestPercentileIntegration:
     def test_p50_matches_metrics_module(self, tmp_path):
