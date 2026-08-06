@@ -151,13 +151,16 @@ class TestMemoryBytes:
         assert isinstance(mem, dict)
         assert set(mem.keys()) == {"weights", "kv_cache", "recurrent_state"}
 
-    def test_all_values_positive_ints(self):
-        """All memory values are positive integers."""
+    def test_all_values_non_negative_ints(self):
+        """All memory values are non-negative integers (kv_cache=0 at seq_len=0)."""
         backend = make_backend_with_mock()
         mem = backend.memory_bytes()
         for key, val in mem.items():
             assert isinstance(val, int), f"{key} is not int: {type(val)}"
-            assert val > 0, f"{key} is not positive: {val}"
+            assert val >= 0, f"{key} is negative: {val}"
+        # Weights and recurrent_state are always positive
+        assert mem["weights"] > 0
+        assert mem["recurrent_state"] > 0
 
     def test_weights_match_config(self):
         """Weights bytes match config-derived formula."""
