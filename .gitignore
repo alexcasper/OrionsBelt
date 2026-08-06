@@ -11,6 +11,8 @@ __pycache__/
 *.pyc
 .pytest_cache/
 .ruff_cache/
+.coverage
+htmlcov/
 dist/
 
 # Downloaded model weights — never committed (license compliance, repo size)
