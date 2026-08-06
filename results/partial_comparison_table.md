@@ -30,9 +30,9 @@ Device            run_id_sha            dirty   CumDecay  Scan    DWConv1D  GDN2
   (t4 preferred over t3 per ob-bf7: t3 scan spread=153% contaminated; t4 spread=17%)
 
   --- Fleet sweep (ob-bf7): commit 234807d, clean tree, single-thread ---
-  RK3588 t4 big (clean) 234807d             CLEAN  24.98  11.44  22.07  7.00 
+  RK3588 t4 big (clean) 234807d             CLEAN  7.29   5.27   6.98   3.22 
   RK3588 t3 big (clean) 234807d             CLEAN  6.15   2.91   5.96   2.00 
-  RK3588 t4 little (cln) 234807d             CLEAN  5.41   3.77   4.95   1.62 
+  RK3588 t4 little (cln) 234807d             CLEAN  1.41   0.81   1.12   0.50 
   RK3588 t3 little (cln) 234807d             CLEAN  1.19   0.55   1.12   0.49 
   Jetson j1 (clean)    234807d             CLEAN  1.59   1.18   1.41   1.13 
   Jetson j2 (clean)    234807d             CLEAN  1.50   1.09   0.93   1.07 
