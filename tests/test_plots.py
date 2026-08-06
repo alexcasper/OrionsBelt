@@ -13,6 +13,7 @@ from plots import (
     MicrobenchRow,
     PlotResult,
     SchemaRow,
+    _try_import_matplotlib,
     detect_format,
     generate_all,
     main,
@@ -868,3 +869,27 @@ class TestMainCLI:
         os.unlink(sc_path)
 
         assert rc == 0
+
+
+# ---------------------------------------------------------------------------
+# _try_import_matplotlib fallback
+# ---------------------------------------------------------------------------
+
+
+class TestTryImportMatplotlib:
+    """Test the matplotlib import guard."""
+
+    def test_returns_module_when_available(self):
+        """When matplotlib is installed, returns the pyplot module."""
+        plt = _try_import_matplotlib()
+        assert plt is not None
+
+    def test_returns_none_on_import_error(self, monkeypatch):
+        """When matplotlib is not available, returns None."""
+        import sys
+
+        monkeypatch.setitem(sys.modules, "matplotlib", None)
+        monkeypatch.setitem(sys.modules, "matplotlib.pyplot", None)
+        monkeypatch.setitem(sys.modules, "matplotlib.backends.backend_agg", None)
+        result = _try_import_matplotlib()
+        assert result is None

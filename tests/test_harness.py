@@ -30,6 +30,7 @@ from bench.harness import (  # noqa: E402
     compute_summaries,
     generate_prompt,
     load_config_from_dict,
+    load_config_from_hub,
     load_corpus_prompt,
     main,
     run_one_repeat,
@@ -624,6 +625,51 @@ class TestLoadConfigFromDict:
         )
         assert cfg.num_gdn_layers == 1
         assert cfg.num_full_attention_layers == 1
+
+
+class TestLoadConfigFromHub:
+    """Tests for load_config_from_hub (network function, mocked)."""
+
+    def test_fetches_and_parses_config(self, monkeypatch):
+        """load_config_from_hub fetches config.json from HF and builds a ModelConfig."""
+        import io
+        import json
+
+        fake_config = {
+            "text_config": {
+                "layer_types": ["linear_attention"] * 2 + ["full_attention"],
+                "linear_num_value_heads": 16,
+                "linear_key_head_dim": 128,
+                "linear_value_head_dim": 128,
+            }
+        }
+        fake_resp = io.BytesIO(json.dumps(fake_config).encode())
+
+        captured = {}
+
+        def fake_urlopen(url, timeout=10):
+            captured["url"] = url
+            captured["timeout"] = timeout
+            return fake_resp
+
+        monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+        cfg = load_config_from_hub("test-org/test-model", timeout=15)
+        assert cfg.num_gdn_layers == 2
+        assert cfg.num_full_attention_layers == 1
+        assert cfg.linear_num_value_heads == 16
+        assert "test-org/test-model" in captured["url"]
+        assert captured["timeout"] == 15
+
+    def test_network_error_propagates(self, monkeypatch):
+        """URLError from the network propagates as-is."""
+        import urllib.request
+
+        def fake_urlopen(url, timeout=10):
+            raise urllib.error.URLError("simulated network failure")
+
+        monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+        with pytest.raises(urllib.error.URLError):
+            load_config_from_hub("test-org/test-model")
 
 
 class TestSweepConfigValidation:

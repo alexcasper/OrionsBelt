@@ -708,8 +708,16 @@ class TestPlotCrossDevice:
         result = fa.plot_cross_device(device_data, str(tmp_path / "plot.png"))
         assert isinstance(result, bool)
 
+    def test_matplotlib_unavailable_returns_false(self, tmp_path, monkeypatch):
+        """When matplotlib/numpy can't be imported, returns False with a message."""
+        import sys
 
-# ---------------------------------------------------------------------------
+        monkeypatch.setitem(sys.modules, "matplotlib", None)
+        monkeypatch.setitem(sys.modules, "matplotlib.pyplot", None)
+        result = fa.plot_cross_device({}, str(tmp_path / "plot.png"))
+        assert result is False
+
+
 # Integration: full pipeline with real committed CSVs (if present)
 # ---------------------------------------------------------------------------
 
