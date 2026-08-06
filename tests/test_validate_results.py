@@ -16,12 +16,12 @@ if _ROOT not in sys.path:
 
 from scripts.validate_results import (  # noqa: E402
     ABSURD_THROUGHPUT,
+    STANDARD_COLS,
+    Issue,
     check_manifest_exists,
     detect_csv_type,
     expected_columns,
     find_device_spec,
-    Issue,
-    STANDARD_COLS,
     validate_standard_row,
     validate_sustained_row,
 )

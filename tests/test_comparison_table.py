@@ -111,6 +111,7 @@ class TestLoadAndSummarize:
         summaries = load_and_summarize([str(csv_path)])
         assert len(summaries) == 2
 
+        cpu_summary = [s for s in summaries if s["engine_gdn"] == "cpu"][0]
         # p50 nearest-rank of [100, 110] (n=2, rank=ceil(0.5*2)=1) → 100
         assert cpu_summary["p50"] == 100.0
         npu_summary = [s for s in summaries if s["engine_gdn"] == "npu"][0]
@@ -291,7 +292,7 @@ class TestGenerateMarkdownTable:
             },
         ]
         table = generate_markdown_table(summaries)
-        data_lines = [line for line in lines[2:] if "|" in line]
+        data_lines = [line for line in table.strip().split("\n")[2:] if "|" in line]
         assert any("—" in row for row in data_lines)
 
     def test_context_length_label(self):
