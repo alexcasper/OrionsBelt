@@ -10,12 +10,19 @@ import pytest
 
 from plots import (
     MICROBENCH_COLUMNS,
+    MicrobenchRow,
+    PlotResult,
+    SchemaRow,
     detect_format,
     generate_all,
+    main,
     microbench_bandwidth_table,
     microbench_to_markdown,
     parse_microbench,
     parse_schema,
+    plot_bandwidth_bars,
+    plot_memory_decomposition,
+    plot_throughput_curve,
     schema_memory_table,
     schema_throughput_table,
 )
@@ -418,3 +425,434 @@ class TestGenerateAll:
             # Should have at least one PNG figure
             assert len(result.figures) >= 1
             assert any(f.endswith(".png") for f in result.figures)
+
+
+# ---------------------------------------------------------------------------
+# Helpers for figure tests
+# ---------------------------------------------------------------------------
+
+
+def _mb_row(**overrides):
+    """Create a MicrobenchRow with sensible defaults."""
+    defaults = dict(
+        model="Qwen3.5-4B",
+        kernel="gdn_gated_scan",
+        dispatch_path="neon",
+        seq=64,
+        channels=4096,
+        repeats=30,
+        p50_us=4000.0,
+        p95_us=4200.0,
+        spread_pct=5.0,
+        gib_per_s=0.73,
+        gflop_per_s=0.13,
+    )
+    defaults.update(overrides)
+    return MicrobenchRow(**defaults)
+
+
+def _sc_row(**overrides):
+    """Create a SchemaRow with sensible defaults."""
+    defaults = dict(
+        run_id="run1",
+        device="rk3588-t4",
+        engine_gdn="cpu",
+        engine_full_attention="cpu",
+        model_checkpoint="Qwen/Qwen3.5-4B",
+        quantization="fp16",
+        context_length=4096,
+        phase="prefill",
+        metric_name="prefill_tokens_per_sec",
+        metric_component="",
+        unit="tokens_per_sec",
+        p50=800.0,
+        p95=820.0,
+        repeat_count=5,
+    )
+    defaults.update(overrides)
+    return SchemaRow(**defaults)
+
+
+# ---------------------------------------------------------------------------
+# plot_bandwidth_bars
+# ---------------------------------------------------------------------------
+
+
+class TestPlotBandwidthBars:
+    @pytest.fixture
+    def plt(self):
+        return pytest.importorskip("matplotlib.pyplot")
+
+    def test_none_plt_returns_none(self):
+        """If plt is None, returns None without crashing."""
+        rows = [_mb_row()]
+        assert plot_bandwidth_bars(rows, "rk3588-t4", "/tmp/out.png", plt=None) is None
+
+    def test_creates_png(self, plt, tmp_path):
+        """Valid rows produce a PNG file, returns the path."""
+        out = str(tmp_path / "bw.png")
+        rows = [_mb_row(kernel="gdn_cumdecay"), _mb_row(kernel="gdn_gated_scan")]
+        result = plot_bandwidth_bars(rows, "rk3588-t4", out, plt)
+        assert result == out
+        assert os.path.exists(out)
+        assert os.path.getsize(out) > 0
+
+    def test_spec_bandwidth_line_drawn(self, plt, tmp_path):
+        """Known device draws a spec reference line (just verifies no error)."""
+        out = str(tmp_path / "bw.png")
+        rows = [_mb_row(gib_per_s=10.0)]
+        result = plot_bandwidth_bars(rows, "jetson-j1", out, plt)
+        assert result == out
+        assert os.path.exists(out)
+
+    def test_unknown_device_no_spec_line(self, plt, tmp_path):
+        """Unknown device doesn't crash (no spec line drawn)."""
+        out = str(tmp_path / "bw.png")
+        rows = [_mb_row(gib_per_s=10.0)]
+        result = plot_bandwidth_bars(rows, "mystery-board", out, plt)
+        assert result == out
+        assert os.path.exists(out)
+
+    def test_multiple_models_same_kernel(self, plt, tmp_path):
+        """Multiple models for the same kernel are shown side by side."""
+        out = str(tmp_path / "bw.png")
+        rows = [
+            _mb_row(model="Qwen3.5-4B", gib_per_s=1.0),
+            _mb_row(model="Qwen3.5-0.8B", gib_per_s=2.0),
+        ]
+        result = plot_bandwidth_bars(rows, "rk3588-t4", out, plt)
+        assert result == out
+        assert os.path.getsize(out) > 100  # non-trivial file
+
+
+# ---------------------------------------------------------------------------
+# plot_throughput_curve
+# ---------------------------------------------------------------------------
+
+
+class TestPlotThroughputCurve:
+    @pytest.fixture
+    def plt(self):
+        return pytest.importorskip("matplotlib.pyplot")
+
+    def test_none_plt_returns_none(self):
+        assert plot_throughput_curve([_sc_row()], "/tmp/out.png", plt=None) is None
+
+    def test_empty_rows_returns_none(self, plt, tmp_path):
+        out = str(tmp_path / "tc.png")
+        assert plot_throughput_curve([], out, plt) is None
+
+    def test_no_throughput_metrics_returns_none(self, plt, tmp_path):
+        """Rows with non-throughput metric → no plot."""
+        out = str(tmp_path / "tc.png")
+        rows = [_sc_row(metric_name="peak_memory_bytes")]
+        assert plot_throughput_curve(rows, out, plt) is None
+
+    def test_creates_png_with_throughput(self, plt, tmp_path):
+        out = str(tmp_path / "tc.png")
+        rows = [
+            _sc_row(context_length=4096, p50=800.0, p95=820.0),
+            _sc_row(context_length=32768, p50=300.0, p95=320.0),
+            _sc_row(context_length=131072, p50=100.0, p95=110.0),
+        ]
+        result = plot_throughput_curve(rows, out, plt)
+        assert result == out
+        assert os.path.exists(out)
+        assert os.path.getsize(out) > 0
+
+    def test_decode_metric(self, plt, tmp_path):
+        """Decode throughput is plotted as a separate group."""
+        out = str(tmp_path / "tc.png")
+        rows = [
+            _sc_row(metric_name="decode_tokens_per_sec", context_length=4096, p50=14.0),
+            _sc_row(metric_name="decode_tokens_per_sec", context_length=32768, p50=12.0),
+        ]
+        result = plot_throughput_curve(rows, out, plt)
+        assert result == out
+        assert os.path.getsize(out) > 0
+
+
+# ---------------------------------------------------------------------------
+# plot_memory_decomposition
+# ---------------------------------------------------------------------------
+
+
+class TestPlotMemoryDecomposition:
+    @pytest.fixture
+    def plt(self):
+        return pytest.importorskip("matplotlib.pyplot")
+
+    def test_none_plt_returns_none(self):
+        assert plot_memory_decomposition([_sc_row()], "/tmp/out.png", plt=None) is None
+
+    def test_empty_rows_returns_none(self, plt, tmp_path):
+        out = str(tmp_path / "md.png")
+        assert plot_memory_decomposition([], out, plt) is None
+
+    def test_no_memory_metrics_returns_none(self, plt, tmp_path):
+        out = str(tmp_path / "md.png")
+        rows = [_sc_row(metric_name="prefill_tokens_per_sec")]
+        assert plot_memory_decomposition(rows, out, plt) is None
+
+    def test_creates_png_with_memory(self, plt, tmp_path):
+        out = str(tmp_path / "md.png")
+        rows = [
+            _sc_row(
+                metric_name="peak_memory_bytes",
+                metric_component="weights",
+                p50=10737418240.0,
+                unit="bytes",
+            ),
+            _sc_row(
+                metric_name="peak_memory_bytes",
+                metric_component="kv_cache",
+                p50=134217728.0,
+                unit="bytes",
+            ),
+            _sc_row(
+                metric_name="peak_memory_bytes",
+                metric_component="recurrent_state",
+                p50=50331648.0,
+                unit="bytes",
+            ),
+        ]
+        result = plot_memory_decomposition(rows, out, plt)
+        assert result == out
+        assert os.path.exists(out)
+        assert os.path.getsize(out) > 0
+
+    def test_multiple_context_lengths(self, plt, tmp_path):
+        """Multiple context lengths produce a curve rather than a single point."""
+        out = str(tmp_path / "md.png")
+        rows = []
+        for ctx in [4096, 32768, 131072]:
+            for comp, val in [
+                ("weights", 10737418240),
+                ("kv_cache", ctx * 32768),
+                ("recurrent_state", 50331648),
+            ]:
+                rows.append(
+                    _sc_row(
+                        context_length=ctx,
+                        metric_name="peak_memory_bytes",
+                        metric_component=comp,
+                        p50=float(val),
+                        unit="bytes",
+                    )
+                )
+        result = plot_memory_decomposition(rows, out, plt)
+        assert result == out
+        assert os.path.getsize(out) > 0
+
+
+# ---------------------------------------------------------------------------
+# _plot_cross_device (tested via generate_all with multiple devices)
+# ---------------------------------------------------------------------------
+
+
+class TestCrossDevicePlot:
+    def test_cross_device_generated(self, tmp_path):
+        """Two devices' CSVs → cross_device_bandwidth.png is created."""
+        pytest.importorskip("matplotlib")
+        out_dir = str(tmp_path / "figures")
+
+        csv_t3 = write_temp_csv(MICROBENCH_CSV)
+        csv_t4 = write_temp_csv(MICROBENCH_CSV)
+
+        result = generate_all([csv_t3, csv_t4], out_dir, text_only=False)
+
+        os.unlink(csv_t3)
+        os.unlink(csv_t4)
+
+        cross = [f for f in result.figures if "cross_device" in os.path.basename(f)]
+        assert len(cross) == 1
+        assert os.path.exists(cross[0])
+
+    def test_single_device_no_cross_plot(self, tmp_path):
+        """Single device → no cross-device plot."""
+        pytest.importorskip("matplotlib")
+        out_dir = str(tmp_path / "figures")
+        mb_path = write_temp_csv(MICROBENCH_CSV)
+
+        result = generate_all([mb_path], out_dir, text_only=False)
+        os.unlink(mb_path)
+
+        cross = [f for f in result.figures if "cross_device" in os.path.basename(f)]
+        assert len(cross) == 0
+
+    def test_cross_device_text_only_skipped(self, tmp_path):
+        """Text-only mode never produces cross-device figure."""
+        out_dir = str(tmp_path / "figures")
+        csv1 = write_temp_csv(MICROBENCH_CSV)
+        csv2 = write_temp_csv(MICROBENCH_CSV)
+
+        result = generate_all([csv1, csv2], out_dir, text_only=True)
+        os.unlink(csv1)
+        os.unlink(csv2)
+
+        cross = [f for f in result.figures if "cross_device" in os.path.basename(f)]
+        assert len(cross) == 0
+
+
+# ---------------------------------------------------------------------------
+# generate_all with schema figures
+# ---------------------------------------------------------------------------
+
+
+class TestGenerateAllSchemaFigures:
+    def test_schema_figures_generated(self, tmp_path):
+        """Schema CSV produces throughput + memory figures."""
+        pytest.importorskip("matplotlib")
+        out_dir = str(tmp_path / "figures")
+        sc_path = write_temp_csv(SCHEMA_CSV)
+
+        result = generate_all([sc_path], out_dir, text_only=False)
+        os.unlink(sc_path)
+
+        pngs = [f for f in result.figures if f.endswith(".png")]
+        assert len(pngs) >= 2
+        assert any("throughput" in f for f in pngs)
+        assert any("memory" in f for f in pngs)
+
+    def test_text_only_schema_tables(self, tmp_path):
+        """Schema data in text-only mode still produces tables."""
+        out_dir = str(tmp_path / "figures")
+        sc_path = write_temp_csv(SCHEMA_CSV)
+
+        result = generate_all([sc_path], out_dir, text_only=True)
+        os.unlink(sc_path)
+
+        assert len(result.figures) == 0
+        assert len(result.tables) >= 1
+        harness = [t for t in result.tables if "harness" in t]
+        assert len(harness) == 1
+
+    def test_unrecognised_csv_skipped(self, tmp_path):
+        """Non-matching CSV format is silently skipped."""
+        out_dir = str(tmp_path / "figures")
+        unknown = write_temp_csv("foo,bar,baz\n1,2,3\n")
+
+        result = generate_all([unknown], out_dir, text_only=True)
+        os.unlink(unknown)
+
+        assert len(result.tables) == 0
+        assert len(result.warnings) == 0
+
+    def test_summary_readme_has_figure_list(self, tmp_path):
+        """README lists generated figures when matplotlib is available."""
+        pytest.importorskip("matplotlib")
+        out_dir = str(tmp_path / "figures")
+        mb_path = write_temp_csv(MICROBENCH_CSV)
+
+        generate_all([mb_path], out_dir, text_only=False)
+        os.unlink(mb_path)
+
+        readme = os.path.join(out_dir, "README.md")
+        with open(readme) as f:
+            content = f.read()
+        assert "Figures" in content
+
+    def test_summary_readme_no_warnings(self, tmp_path):
+        """When everything works, README has no warnings section."""
+        pytest.importorskip("matplotlib")
+        out_dir = str(tmp_path / "figures")
+        mb_path = write_temp_csv(MICROBENCH_CSV)
+
+        generate_all([mb_path], out_dir, text_only=False)
+        os.unlink(mb_path)
+
+        readme = os.path.join(out_dir, "README.md")
+        with open(readme) as f:
+            content = f.read()
+        assert "Warnings" not in content
+
+
+# ---------------------------------------------------------------------------
+# PlotResult dataclass
+# ---------------------------------------------------------------------------
+
+
+class TestPlotResult:
+    def test_defaults_empty(self):
+        r = PlotResult()
+        assert r.figures == []
+        assert r.tables == []
+        assert r.warnings == []
+
+    def test_can_append(self):
+        r = PlotResult()
+        r.figures.append("a.png")
+        r.tables.append("b.md")
+        r.warnings.append("oops")
+        assert len(r.figures) == 1
+        assert len(r.tables) == 1
+        assert len(r.warnings) == 1
+
+
+# ---------------------------------------------------------------------------
+# main() CLI
+# ---------------------------------------------------------------------------
+
+
+class TestMainCLI:
+    def test_no_csv_returns_error(self):
+        """No CSV files found → returns 1."""
+        rc = main(["--output-dir", "/tmp/empty_plots_test", "/nonexistent/"])
+        assert rc == 1
+
+    def test_microbench_text_only(self, tmp_path):
+        """Basic text-only run succeeds and returns 0."""
+        out_dir = str(tmp_path / "figures")
+        csv_path = write_temp_csv(MICROBENCH_CSV)
+
+        rc = main([csv_path, "--output-dir", out_dir, "--text-only"])
+        os.unlink(csv_path)
+
+        assert rc == 0
+        assert os.path.isdir(out_dir)
+
+    def test_microbench_with_figures(self, tmp_path):
+        """Full run with matplotlib returns 0 and creates figures."""
+        pytest.importorskip("matplotlib")
+        out_dir = str(tmp_path / "figures")
+        csv_path = write_temp_csv(MICROBENCH_CSV)
+
+        rc = main([csv_path, "--output-dir", out_dir])
+        os.unlink(csv_path)
+
+        assert rc == 0
+        pngs = [f for f in os.listdir(out_dir) if f.endswith(".png")]
+        assert len(pngs) >= 1
+
+    def test_directory_expansion(self, tmp_path):
+        """Passing a directory expands to individual CSVs."""
+        pytest.importorskip("matplotlib")
+        raw_dir = str(tmp_path / "raw")
+        out_dir = str(tmp_path / "figures")
+        os.makedirs(raw_dir)
+
+        csv_path = os.path.join(raw_dir, "rk3588-t4.csv")
+        with open(csv_path, "w") as f:
+            f.write(MICROBENCH_CSV)
+
+        rc = main([raw_dir, "--output-dir", out_dir])
+        assert rc == 0
+        # Should have created the device table
+        tables = [f for f in os.listdir(out_dir) if "rk3588-t4" in f]
+        assert len(tables) >= 1
+
+    def test_mixed_dir_and_file(self, tmp_path):
+        """Passing both a directory and an explicit file works."""
+        raw_dir = str(tmp_path / "raw")
+        out_dir = str(tmp_path / "figures")
+        os.makedirs(raw_dir)
+
+        with open(os.path.join(raw_dir, "jetson-j1.csv"), "w") as f:
+            f.write(MICROBENCH_CSV)
+
+        sc_path = write_temp_csv(SCHEMA_CSV)
+
+        rc = main([raw_dir, sc_path, "--output-dir", out_dir, "--text-only"])
+        os.unlink(sc_path)
+
+        assert rc == 0
