@@ -461,3 +461,62 @@ class TestPercentileIntegration:
         expected_p95 = percentile(values, 95)
         assert summaries[0]["p50"] == expected_p50
         assert summaries[0]["p95"] == expected_p95
+
+
+# ---------------------------------------------------------------------------
+# _fmt_value edge cases
+# ---------------------------------------------------------------------------
+
+
+class TestFmtValueEdgeCases:
+    def test_peak_memory_bytes_kib(self):
+        result = _fmt_value("peak_memory_bytes", 512)
+        assert "B" in result
+
+    def test_peak_memory_bytes_tib(self):
+        """Values >= 1 TiB hit the fallback return."""
+        result = _fmt_value("peak_memory_bytes", 2 * 1024**4)
+        assert "TiB" in result
+
+    def test_peak_memory_bytes_zero(self):
+        result = _fmt_value("peak_memory_bytes", 0)
+        assert "0.0" in result
+
+    def test_negative_value_generic(self):
+        result = _fmt_value("custom_metric", -3.14)
+        assert "-3.14" in result
+
+
+# ---------------------------------------------------------------------------
+# main() CLI
+# ---------------------------------------------------------------------------
+
+
+class TestMainCLI:
+    def test_main_with_csv_arg(self, tmp_path, capsys):
+        """main() with explicit --csv paths generates a table."""
+        from bench.comparison_table import main
+
+        rows = [_row(value=100 + i * 10, repeat=i) for i in range(3)]
+        csv_path = tmp_path / "run.csv"
+        _write_csv(csv_path, rows)
+
+        rc = main(["--csv", str(csv_path)])
+        assert rc == 0
+        captured = capsys.readouterr()
+        assert "prefill_tokens_per_sec" in captured.out
+
+    def test_main_output_to_file(self, tmp_path):
+        """main() with --output writes the table to a file."""
+        from bench.comparison_table import main
+
+        rows = [_row(value=100, repeat=0)]
+        csv_path = tmp_path / "run.csv"
+        _write_csv(csv_path, rows)
+
+        out_path = tmp_path / "table.md"
+        rc = main(["--csv", str(csv_path), "--output", str(out_path)])
+        assert rc == 0
+        assert out_path.exists()
+        content = out_path.read_text()
+        assert "prefill_tokens_per_sec" in content
