@@ -816,6 +816,15 @@ give 16.6–27.7 GiB/s instead; the 3.4× gap between same-commit anchors is the
 dominant uncertainty. If the board arrives, run
 `bench_gdn_armv9sve2 --repeats 30 --csv` to check.
 
+> **Correction (ob-0h0, 2026-08-06):** The t4 CSV was subsequently overwritten
+> by commit `8f8be11` with optimized kernel data (scan now reads 11.48, not
+> 3.29). The pre-optimization t4 data exists only in git history (`6fac497`).
+> The prediction above used the original pre-optimization t4 anchor. The
+> regenerated `fleet_bandwidth_scaling.md` now scales from the Pi 5 A76 instead.
+> Treat ~5-8 GiB/s as the pre-optimization lower bound; the optimized A76
+> reference (t3: 11.07 GiB/s clean) suggests the O6 could reach significantly
+> higher once both A720 IPC gains and the optimization stack are applied.
+
 ### Optimization impact: j2 single-threaded vs 4-core OpenMP (2026-08-03)
 
 The original j2 CSV (6 rows) was captured at commit `28729f3` — before OpenMP
@@ -865,6 +874,13 @@ is clean — 6.2% spread on the big cluster, `dirty: false` manifest, thermals
 commit run reads 3.29 GiB/s with 17% spread and `dirty: true`. Both are now
 valid measurements disagreeing by 3.36×, and neither is obviously contaminated.
 
+> **Update (ob-0h0, 2026-08-06):** t4's CSV was later overwritten with optimized
+> kernel data (commit `8f8be11`); it now reads 11.48 GiB/s, not 3.29. The 3.29
+> figure above is from the pre-overwrite data (git history `6fac497`). With both
+> t3 and t4 at the optimized code level, their spread is 1.04× (big) / 1.72×
+> (little) — inter-board variance, not a code-version difference. The
+> pre-optimization t4 baseline (3.29) is preserved only in git history.
+
 The little cluster is noisier: t3's A55 gated_scan reports 46.7% spread, which
 the operator (commit 553a96e) noted as inherent to that kernel on the little
 cores — cumdecay (7.4%) and dwconv1d (6.8%) are clean on the same run.
@@ -876,9 +892,10 @@ with j1's 0.72 to ~1%. Under PLAN.md §9 the unprovenanced file is not a result.
 **What survives.** The Pi 5 beats both Jetson units on all three kernels despite
 33% less spec bandwidth, under every pairing and comfortably outside the spread.
 The pure bandwidth-bound thesis is incomplete at this working set. The O6 estimate
-is **~5-8 GiB/s** (conservative t4 anchor); the clean t3 re-run would give
-~17-28 GiB/s. The 3.4× anchor gap is now the dominant uncertainty, larger than
-the IPC/clock assumption.
+is **~5-8 GiB/s** (pre-optimization lower bound, scaled from Pi 5 A76); the clean
+t3 optimized re-run (11.07 GiB/s on A76) suggests the O6 with A720 IPC gains
+plus the optimization stack could reach significantly higher. The t4 anchor gap
+noted above (3.36×) has since collapsed to 1.04× (ob-0h0: both now optimized).
 
 Closing `ob-bf7` needs one clean-tree, commit-matched sweep across every device
 with pinning, governor and thermals recorded. The tables in
