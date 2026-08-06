@@ -409,6 +409,19 @@ class TestGenerateCorpus:
             assert p.exists()
             assert p.suffix == ".json"
 
+    def test_default_output_dir(self, tmp_path, monkeypatch):
+        """generate_corpus with output_dir=None uses _OUTPUT_DIR default."""
+        monkeypatch.setattr("bench.prompts._OUTPUT_DIR", tmp_path)
+        written = generate_corpus(
+            output_dir=None,
+            sweep_points=[128],
+            depths=[50],
+            multikey_counts=[],
+        )
+        assert len(written) > 0
+        for p in written:
+            assert tmp_path in p.parents
+
     def test_niah_filenames(self, tmp_path):
         written = generate_corpus(
             output_dir=tmp_path,

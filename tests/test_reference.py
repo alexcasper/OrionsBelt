@@ -45,8 +45,15 @@ def ref_data():
 def test_reference_has_provenance(ref_data):
     """The reference must record full provenance for reproducibility."""
     prov = ref_data["provenance"]
-    required = {"git_sha", "hostname", "torch_version", "transformers_version",
-                "device", "dtype", "model_repo"}
+    required = {
+        "git_sha",
+        "hostname",
+        "torch_version",
+        "transformers_version",
+        "device",
+        "dtype",
+        "model_repo",
+    }
     missing = required - set(prov.keys())
     assert not missing, f"Missing provenance keys: {missing}"
 
@@ -67,9 +74,15 @@ def test_reference_has_all_entries(ref_data):
 def test_each_entry_has_required_fields(ref_data):
     """Every entry must have the fields the correctness oracle needs."""
     required = {
-        "entry_id", "prompt_id", "context_length", "perplexity",
-        "avg_nll", "argmax_token", "topk_window",
-        "generated_token_ids", "generated_text",
+        "entry_id",
+        "prompt_id",
+        "context_length",
+        "perplexity",
+        "avg_nll",
+        "argmax_token",
+        "topk_window",
+        "generated_token_ids",
+        "generated_text",
         "last_position_logits_sha256",  # integrity hash for stripped logits
     }
     for entry in ref_data["entries"]:

@@ -317,6 +317,24 @@ class TestLoadDeviceCsv:
         assert len(rows) == 3
         assert all(r["model"] == "Qwen3.5-0.8B" for r in rows)
 
+    def test_filters_decode_model_with_seq64(self, tmp_path):
+        """Decode model rows with seq=64 are filtered by the _decode check.
+
+        The existing include_decode test uses seq=1 rows that get caught
+        by the seq!=64 filter first.  This test writes a decode-model row
+        with seq=64 so it passes the seq check and exercises the explicit
+        _decode guard (line 194).
+        """
+        csv_path = str(tmp_path / "test.csv")
+        with open(csv_path, "w", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=CSV_HEADER)
+            writer.writeheader()
+            writer.writerow(make_csv_row("Qwen3.5-4B", "gdn_gated_scan", 3.0, 5.0))
+            writer.writerow(make_csv_row("Qwen3.5-4B_decode", "gdn_gated_scan", 10.0, 5.0, seq=64))
+        rows = fa.load_device_csv(csv_path)
+        assert len(rows) == 1
+        assert "_decode" not in rows[0]["model"]
+
 
 # ---------------------------------------------------------------------------
 # get_gibs
@@ -716,6 +734,29 @@ class TestPlotCrossDevice:
         monkeypatch.setitem(sys.modules, "matplotlib.pyplot", None)
         result = fa.plot_cross_device({}, str(tmp_path / "plot.png"))
         assert result is False
+
+    def test_unknown_cores_gets_empty_label(self, tmp_path, monkeypatch):
+        """Device with unrecognised cores (not A57/A55/A76) gets empty label.
+
+        Exercises the else branch of the cores-label if-chain (line 246).
+        """
+        csv_path = str(tmp_path / "mystery.csv")
+        write_device_csv(csv_path, gib_overrides={"gdn_gated_scan": 2.0})
+        monkeypatch.setattr(
+            fa,
+            "DEVICES",
+            [("Mystery-Dev", str(csv_path), 50.0, "X1 Custom", "Armv9.0")],
+        )
+        device_data = {}
+        for name, path, spec, cores, isa in fa.DEVICES:
+            device_data[name] = {
+                "rows": fa.load_device_csv(path),
+                "spec": spec,
+                "cores": cores,
+                "isa": isa,
+            }
+        result = fa.plot_cross_device(device_data, str(tmp_path / "plot.png"))
+        assert result is True
 
 
 # Integration: full pipeline with real committed CSVs (if present)

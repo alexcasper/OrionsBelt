@@ -835,3 +835,40 @@ class TestSweepExceptionHandling:
         captured = capsys.readouterr()
         assert "WARNING" in captured.err
         assert "failed" in captured.err
+
+
+class TestHFBackendImportError:
+    """Cover the --backend hf ImportError fallback (lines 893-898).
+
+    When the HuggingFace backend cannot instantiate (torch/transformers
+    missing), the harness must give a clear message via parser.error
+    rather than an unhandled traceback.
+    """
+
+    def test_hf_backend_import_error_gives_clear_message(self, monkeypatch):
+        """main() with --backend hf + missing torch → parser.error (exit 2)."""
+
+        def _raise_import_error(*_args, **_kwargs):
+            raise ImportError("simulated: torch not installed")
+
+        # HFTorchBackend is imported lazily inside main(), so patching the
+        # attribute on the module is sufficient.
+        monkeypatch.setattr("bench.hf_backend.HFTorchBackend", _raise_import_error)
+
+        with pytest.raises(SystemExit) as exc_info:
+            main(
+                [
+                    "--backend",
+                    "hf",
+                    "--context-lengths",
+                    "64",
+                    "--warmup",
+                    "1",
+                    "--repeats",
+                    "5",
+                    "--decode-length",
+                    "10",
+                    "--allow-missing-sha",
+                ]
+            )
+        assert exc_info.value.code == 2
