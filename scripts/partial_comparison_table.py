@@ -67,19 +67,6 @@ def kv(rows, model, kernel, seq):
     return None
 
 
-def show_kernel_table(title, fname):
-    print(f"\n### {title} :: {fname}")
-    rows = load_kernel(fname)
-    for m in ["Qwen3.5-4B", "Qwen3.5-0.8B", "Qwen3.5-4B_decode", "Qwen3.5-0.8B_decode"]:
-        seq = 1 if "decode" in m else 64
-        for k in ["gdn_cumdecay", "gdn_gated_scan", "gdn_causal_dwconv1d"]:
-            v = kv(rows, m, k, seq)
-            if v:
-                print(
-                    f"  {m:<20} {k:<22} seq={seq:<3}  "
-                    f"GiB/s={v[0]:<6.2f}  p50us={v[1]:<9.3f}  spread={v[2]:.1f}%"
-                )
-
 
 def load_sustained(fname):
     path = os.path.join(RAW, fname)
