@@ -112,40 +112,49 @@ class TestParseISO8601:
 
 
 class TestValidateRequiredStrings:
-    @pytest.mark.parametrize("field", [
-        "run_id",
-        "timestamp",
-        "git_sha",
-        "manifest_ref",
-        "model_checkpoint",
-        "quantization",
-    ])
+    @pytest.mark.parametrize(
+        "field",
+        [
+            "run_id",
+            "timestamp",
+            "git_sha",
+            "manifest_ref",
+            "model_checkpoint",
+            "quantization",
+        ],
+    )
     def test_empty_string_rejected(self, field):
         row = make_row(**{field: ""})
         with pytest.raises(SchemaValidationError, match=field):
             validate_row(row)
 
-    @pytest.mark.parametrize("field", [
-        "run_id",
-        "timestamp",
-        "git_sha",
-        "manifest_ref",
-        "model_checkpoint",
-        "quantization",
-    ])
+    @pytest.mark.parametrize(
+        "field",
+        [
+            "run_id",
+            "timestamp",
+            "git_sha",
+            "manifest_ref",
+            "model_checkpoint",
+            "quantization",
+        ],
+    )
     def test_whitespace_only_rejected(self, field):
         row = make_row(**{field: "   "})
         with pytest.raises(SchemaValidationError, match=field):
             validate_row(row)
 
-    @pytest.mark.parametrize("field", [
-        "run_id",
-        "timestamp",
-        "git_sha",
-        "manifest_ref",
-        "model_checkpoint",
-        "quantization",
-    ])
+    @pytest.mark.parametrize(
+        "field",
+        [
+            "run_id",
+            "timestamp",
+            "git_sha",
+            "manifest_ref",
+            "model_checkpoint",
+            "quantization",
+        ],
+    )
     def test_none_rejected(self, field):
         row = make_row(**{field: None})
         with pytest.raises(SchemaValidationError, match=field):
@@ -176,21 +185,27 @@ class TestValidateTimestamp:
 
 
 class TestValidateGitSha:
-    @pytest.mark.parametrize("sha", [
-        "abc1234",       # 7 chars (short)
-        "a" * 40,        # 40 chars (full)
-        "ABC1234",       # uppercase is normalized
-        "0123456789ab",  # 12 chars
-    ])
+    @pytest.mark.parametrize(
+        "sha",
+        [
+            "abc1234",  # 7 chars (short)
+            "a" * 40,  # 40 chars (full)
+            "ABC1234",  # uppercase is normalized
+            "0123456789ab",  # 12 chars
+        ],
+    )
     def test_valid_sha(self, sha):
         validate_row(make_row(git_sha=sha))
 
-    @pytest.mark.parametrize("sha", [
-        "abc123",        # too short (6 chars)
-        "g" * 7,         # non-hex
-        "xyz",           # non-hex
-        "abc12345 ",     # trailing space
-    ])
+    @pytest.mark.parametrize(
+        "sha",
+        [
+            "abc123",  # too short (6 chars)
+            "g" * 7,  # non-hex
+            "xyz",  # non-hex
+            "abc12345 ",  # trailing space
+        ],
+    )
     def test_invalid_sha(self, sha):
         with pytest.raises(SchemaValidationError, match="git_sha"):
             validate_row(make_row(git_sha=sha))
