@@ -262,33 +262,25 @@ class TestValidateEnumFields:
 
 class TestMetricUnitConsistency:
     def test_prefill_tokens_correct_unit(self):
-        validate_row(make_row(
-            metric_name="prefill_tokens_per_sec", unit="tokens_per_sec"
-        ))
+        validate_row(make_row(metric_name="prefill_tokens_per_sec", unit="tokens_per_sec"))
 
     def test_decode_tokens_correct_unit(self):
-        validate_row(make_row(
-            phase="decode", metric_name="decode_tokens_per_sec", unit="tokens_per_sec"
-        ))
+        validate_row(
+            make_row(phase="decode", metric_name="decode_tokens_per_sec", unit="tokens_per_sec")
+        )
 
     def test_ttft_correct_unit(self):
-        validate_row(make_row(
-            metric_name="ttft_seconds", unit="seconds"
-        ))
+        validate_row(make_row(metric_name="ttft_seconds", unit="seconds"))
 
     def test_memory_correct_unit(self):
         validate_row(make_memory_row())
 
     def test_energy_correct_unit(self):
-        validate_row(make_row(
-            metric_name="energy_joules_per_token", unit="joules_per_token"
-        ))
+        validate_row(make_row(metric_name="energy_joules_per_token", unit="joules_per_token"))
 
     def test_wrong_unit_for_metric(self):
         with pytest.raises(SchemaValidationError, match="unit.*requires unit"):
-            validate_row(make_row(
-                metric_name="prefill_tokens_per_sec", unit="seconds"
-            ))
+            validate_row(make_row(metric_name="prefill_tokens_per_sec", unit="seconds"))
 
     def test_invalid_unit_value(self):
         with pytest.raises(SchemaValidationError, match="unit.*not in allowed"):
@@ -303,27 +295,33 @@ class TestMetricUnitConsistency:
 class TestMetricPhaseConsistency:
     def test_prefill_metric_in_decode_phase_rejected(self):
         with pytest.raises(SchemaValidationError, match="phase.*only valid for phase"):
-            validate_row(make_row(
-                phase="decode",
-                metric_name="prefill_tokens_per_sec",
-                unit="tokens_per_sec",
-            ))
+            validate_row(
+                make_row(
+                    phase="decode",
+                    metric_name="prefill_tokens_per_sec",
+                    unit="tokens_per_sec",
+                )
+            )
 
     def test_decode_metric_in_prefill_phase_rejected(self):
         with pytest.raises(SchemaValidationError, match="phase.*only valid for phase"):
-            validate_row(make_row(
-                phase="prefill",
-                metric_name="decode_tokens_per_sec",
-                unit="tokens_per_sec",
-            ))
+            validate_row(
+                make_row(
+                    phase="prefill",
+                    metric_name="decode_tokens_per_sec",
+                    unit="tokens_per_sec",
+                )
+            )
 
     def test_ttft_in_decode_rejected(self):
         with pytest.raises(SchemaValidationError, match="phase.*only valid for phase"):
-            validate_row(make_row(
-                phase="decode",
-                metric_name="ttft_seconds",
-                unit="seconds",
-            ))
+            validate_row(
+                make_row(
+                    phase="decode",
+                    metric_name="ttft_seconds",
+                    unit="seconds",
+                )
+            )
 
     def test_memory_metric_in_decode_phase_ok(self):
         """peak_memory_bytes is allowed in both phases."""
@@ -331,16 +329,20 @@ class TestMetricPhaseConsistency:
 
     def test_energy_metric_in_both_phases_ok(self):
         """energy_joules_per_token is allowed in both phases."""
-        validate_row(make_row(
-            phase="prefill",
-            metric_name="energy_joules_per_token",
-            unit="joules_per_token",
-        ))
-        validate_row(make_row(
-            phase="decode",
-            metric_name="energy_joules_per_token",
-            unit="joules_per_token",
-        ))
+        validate_row(
+            make_row(
+                phase="prefill",
+                metric_name="energy_joules_per_token",
+                unit="joules_per_token",
+            )
+        )
+        validate_row(
+            make_row(
+                phase="decode",
+                metric_name="energy_joules_per_token",
+                unit="joules_per_token",
+            )
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -381,30 +383,36 @@ class TestMetricComponentRules:
 
     @pytest.mark.parametrize("component", ["weights", "kv_cache", "recurrent_state"])
     def test_valid_memory_components(self, component):
-        validate_row(make_row(
-            metric_name="peak_memory_bytes",
-            metric_component=component,
-            value=1024.0,
-            unit="bytes",
-        ))
+        validate_row(
+            make_row(
+                metric_name="peak_memory_bytes",
+                metric_component=component,
+                value=1024.0,
+                unit="bytes",
+            )
+        )
 
     def test_invalid_memory_component(self):
         with pytest.raises(SchemaValidationError, match="metric_component.*not in allowed"):
-            validate_row(make_row(
-                metric_name="peak_memory_bytes",
-                metric_component="activations",
-                value=1024.0,
-                unit="bytes",
-            ))
+            validate_row(
+                make_row(
+                    metric_name="peak_memory_bytes",
+                    metric_component="activations",
+                    value=1024.0,
+                    unit="bytes",
+                )
+            )
 
     def test_non_memory_metric_with_component_rejected(self):
         """Non-memory metrics must NOT have a component."""
         with pytest.raises(SchemaValidationError, match="metric_component.*must be empty"):
-            validate_row(make_row(
-                metric_name="prefill_tokens_per_sec",
-                metric_component="weights",
-                unit="tokens_per_sec",
-            ))
+            validate_row(
+                make_row(
+                    metric_name="prefill_tokens_per_sec",
+                    metric_component="weights",
+                    unit="tokens_per_sec",
+                )
+            )
 
     def test_non_memory_metric_with_none_component_ok(self):
         validate_row(make_row(metric_component=None))
@@ -583,8 +591,10 @@ class TestMultipleErrors:
 
 class TestValidateRows:
     def test_all_valid_rows_pass(self):
-        rows = [make_row(), make_row(metric_name="decode_tokens_per_sec",
-                                      phase="decode", unit="tokens_per_sec")]
+        rows = [
+            make_row(),
+            make_row(metric_name="decode_tokens_per_sec", phase="decode", unit="tokens_per_sec"),
+        ]
         validate_rows(rows)  # should not raise
 
     def test_single_bad_row_reports_index(self):
@@ -640,8 +650,7 @@ class TestCSVSerialization:
     def test_round_trip_multiple_rows(self, tmp_path):
         rows = [
             make_row(),
-            make_row(metric_name="decode_tokens_per_sec",
-                      phase="decode", unit="tokens_per_sec"),
+            make_row(metric_name="decode_tokens_per_sec", phase="decode", unit="tokens_per_sec"),
             make_memory_row(),
         ]
         path = str(tmp_path / "multi.csv")
@@ -771,9 +780,7 @@ class TestMetricVocabularyRules:
 
     def test_every_metric_has_allowed_phases(self):
         for metric in MetricName:
-            assert (
-                metric in METRIC_ALLOWED_PHASES
-            ), f"{metric} missing from METRIC_ALLOWED_PHASES"
+            assert metric in METRIC_ALLOWED_PHASES, f"{metric} missing from METRIC_ALLOWED_PHASES"
 
     def test_metrics_requiring_component_only_memory(self):
         assert {MetricName.PEAK_MEMORY_BYTES} == METRICS_REQUIRING_COMPONENT
