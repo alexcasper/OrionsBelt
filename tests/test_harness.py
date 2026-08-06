@@ -30,6 +30,7 @@ from bench.harness import (  # noqa: E402
     compute_summaries,
     generate_prompt,
     load_config_from_dict,
+    load_corpus_prompt,
     main,
     run_one_repeat,
     run_sweep,
@@ -740,3 +741,51 @@ class TestSyntheticBackendTiming:
         token = b.decode_step(5)
         assert token == 6
         assert b._seq_len == 11
+
+
+class TestLoadCorpusPrompt:
+    """Cover load_corpus_prompt fallback when file missing (line 377)."""
+
+    def test_missing_file_falls_back_to_generate(self, tmp_path):
+        """When prompt file doesn't exist, falls back to generate_prompt."""
+        result = load_corpus_prompt("needle", 4096, str(tmp_path))
+        assert len(result) > 0  # generate_prompt returns non-empty text
+
+    def test_existing_file_loaded(self, tmp_path):
+        """When prompt file exists, its content is returned."""
+        prompt_file = tmp_path / "needle_4096.txt"
+        prompt_file.write_text("This is a test prompt.\n")
+        result = load_corpus_prompt("needle", 4096, str(tmp_path))
+        assert result == "This is a test prompt."
+
+
+class TestSweepExceptionHandling:
+    """Cover the sweep exception handler (lines 655-656)."""
+
+    def test_failing_context_length_continues(self, capsys):
+        """A failing context_length is skipped, others still produce rows."""
+        from unittest.mock import patch
+
+        original_prefill = SyntheticBackend.prefill
+        call_count = [0]
+
+        def failing_prefill(self, input_ids):
+            call_count[0] += 1
+            if call_count[0] > 3:
+                raise RuntimeError("simulated failure")
+            return original_prefill(self, input_ids)
+
+        b = SyntheticBackend(QWEN35_4B)
+        config = SweepConfig(
+            context_lengths=[64, 128],
+            warmup_count=0,
+            repeat_count=5,
+            decode_length=2,
+        )
+        with patch.object(SyntheticBackend, "prefill", failing_prefill):
+            rows = run_sweep(b, config)
+        # First context_length succeeds, second fails
+        assert len(rows) > 0
+        captured = capsys.readouterr()
+        assert "WARNING" in captured.err
+        assert "failed" in captured.err
