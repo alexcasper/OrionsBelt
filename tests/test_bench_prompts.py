@@ -377,6 +377,22 @@ class TestSweepLabel:
         assert _sweep_label(128) == "128"
 
 
+class TestSweepLabelNonExact:
+    """Cover _sweep_label for non-exact multiples of 1024 (line 463)."""
+
+    def test_non_exact_multiple(self):
+        """1536 = 1.5K → rounds to '2K'."""
+        assert _sweep_label(1536) == "2K"
+
+    def test_just_above_1024(self):
+        """1025 = ~1.0K → rounds to '1K'."""
+        assert _sweep_label(1025) == "1K"
+
+    def test_large_non_exact(self):
+        """5000 = ~4.88K → rounds to '5K'."""
+        assert _sweep_label(5000) == "5K"
+
+
 # ---------------------------------------------------------------------------
 # generate_corpus
 # ---------------------------------------------------------------------------
