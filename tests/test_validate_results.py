@@ -7,11 +7,8 @@ throughput, low repeats), manifest linkage, and end-to-end exit codes.
 from __future__ import annotations
 
 import csv
-import json
 import sys
 from pathlib import Path
-
-import pytest
 
 _ROOT = str(Path(__file__).resolve().parent.parent)
 if _ROOT not in sys.path:
@@ -19,12 +16,12 @@ if _ROOT not in sys.path:
 
 from scripts.validate_results import (  # noqa: E402
     ABSURD_THROUGHPUT,
-    STANDARD_COLS,
     check_manifest_exists,
     detect_csv_type,
     expected_columns,
     find_device_spec,
     Issue,
+    STANDARD_COLS,
     validate_standard_row,
     validate_sustained_row,
 )
@@ -285,12 +282,14 @@ class TestMainEndToEnd:
             sys.argv = orig_argv
 
     def test_clean_csv_exit_zero(self, tmp_path):
-        """A valid CSV with all good rows exits 0."""
+        """A valid CSV with a manifest exits 0."""
         csv_dir = tmp_path / "raw"
         man_dir = tmp_path / "manifests"
         csv_dir.mkdir()
         man_dir.mkdir()
         _write_std_csv(csv_dir / "jetson-j1.csv", [_std_row()])
+        # Provide a manifest so there are no warnings
+        (man_dir / "jetson-j1.json").write_text('{"git": {"sha": "abc", "dirty": false}}')
         assert self._run_main(csv_dir, man_dir) == 0
 
     def test_csv_with_error_exit_two(self, tmp_path):

@@ -10,8 +10,6 @@ import csv
 import sys
 from pathlib import Path
 
-import pytest
-
 _ROOT = str(Path(__file__).resolve().parent.parent)
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
@@ -113,10 +111,11 @@ class TestLoadAndSummarize:
         summaries = load_and_summarize([str(csv_path)])
         assert len(summaries) == 2
 
-        cpu_summary = [s for s in summaries if s["engine_gdn"] == "cpu"][0]
+        # p50 nearest-rank of [100, 110] (n=2, rank=ceil(0.5*2)=1) → 100
+        assert cpu_summary["p50"] == 100.0
         npu_summary = [s for s in summaries if s["engine_gdn"] == "npu"][0]
-        assert cpu_summary["p50"] == 105.0  # median of [100, 110]
-        assert npu_summary["p50"] == 205.0  # median of [200, 210]
+        # p50 nearest-rank of [200, 210] → 200
+        assert npu_summary["p50"] == 200.0
 
     def test_groups_by_context_length(self, tmp_path):
         """Different context lengths are separate groups."""
@@ -292,10 +291,8 @@ class TestGenerateMarkdownTable:
             },
         ]
         table = generate_markdown_table(summaries)
-        lines = table.strip().split("\n")
-        # There should be at least one "—" in the data rows (missing cell)
-        data_rows = [l for l in lines[2:] if "|" in l]
-        assert any("—" in row for row in data_rows)
+        data_lines = [line for line in lines[2:] if "|" in line]
+        assert any("—" in row for row in data_lines)
 
     def test_context_length_label(self):
         """Context lengths >= 1024 are shown as K notation."""
@@ -381,7 +378,7 @@ class TestGenerateComparison:
 
         table = generate_comparison([str(csv_path)])
         # Should have 4 rows (2 configs × 2 contexts)
-        data_lines = [l for l in table.strip().split("\n")[2:] if "|" in l]
+        data_lines = [line for line in table.strip().split("\n")[2:] if "|" in line]
         assert len(data_lines) == 4
 
 
