@@ -2,7 +2,7 @@
   "caller": {},
   "git": {
     "dirty": false,
-    "sha": "553a96efa8aa6417529740eec032fa63b9ac77da"
+    "sha": "47efdf8a885c43ed5867c05a2682cccf719541c2"
   },
   "host": {
     "core_count": 8,
@@ -80,7 +80,7 @@
   },
   "manifest_version": 1,
   "memory": {
-    "mem_available_kb": 31169368,
+    "mem_available_kb": 31134064,
     "mem_total_kb": 32550332
   },
   "parallelism": {
@@ -90,53 +90,53 @@
     "omp_proc_bind": null,
     "threads_source": "core_count_default"
   },
-  "run_id": "t3_20260806T053612Z_553a96e",
+  "run_id": "t3_20260806T163210Z_47efdf8",
   "software": {
     "packages": {
-      "numpy": null,
-      "onnxruntime": null,
-      "torch": null,
-      "transformers": null
+      "numpy": "1.26.4",
+      "onnxruntime": "1.23.2",
+      "torch": "2.5.0",
+      "transformers": "5.15.0.dev0"
     },
     "python_implementation": "CPython",
     "python_version": "3.10.12 (main, Jun 22 2026, 18:55:27) [GCC 11.4.0]"
   },
   "thermal_zones": [
     {
-      "temp_millicelsius": 37923,
+      "temp_millicelsius": 38846,
       "type": "soc-thermal",
       "zone": "thermal_zone0"
     },
     {
-      "temp_millicelsius": 37923,
+      "temp_millicelsius": 38846,
       "type": "bigcore0-thermal",
       "zone": "thermal_zone1"
     },
     {
-      "temp_millicelsius": 37923,
+      "temp_millicelsius": 38846,
       "type": "bigcore1-thermal",
       "zone": "thermal_zone2"
     },
     {
-      "temp_millicelsius": 38846,
+      "temp_millicelsius": 39769,
       "type": "littlecore-thermal",
       "zone": "thermal_zone3"
     },
     {
-      "temp_millicelsius": 37923,
+      "temp_millicelsius": 38846,
       "type": "center-thermal",
       "zone": "thermal_zone4"
     },
     {
-      "temp_millicelsius": 37000,
+      "temp_millicelsius": 38846,
       "type": "gpu-thermal",
       "zone": "thermal_zone5"
     },
     {
-      "temp_millicelsius": 37923,
+      "temp_millicelsius": 38846,
       "type": "npu-thermal",
       "zone": "thermal_zone6"
     }
   ],
-  "timestamp_utc": "2026-08-06T05:36:12Z"
+  "timestamp_utc": "2026-08-06T16:32:10Z"
 }

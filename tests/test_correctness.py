@@ -1,28 +1,18 @@
-"""Tests for bench/correctness.py — tolerance comparison framework (ob-3uh scaffolding).
+"""Tests for bench/correctness.py — tolerance comparison framework (ob-3uh).
 
 Validates logit comparison, perplexity comparison, long-context drift
-analysis, and tolerance scaling.  No torch or GPU required — pure stdlib
-+ optional numpy.
-
-Run without pytest::
-
-    PYTHONPATH=bench:. python3 tests/test_correctness.py
+analysis, golden-reference comparison, and tolerance scaling.
+No torch or GPU required — pure stdlib + optional numpy.
 """
 
-import json as _json
+import json
 import math
-import os
 import random
-import sys
-from pathlib import Path as _Path
+from pathlib import Path
 
+import bench.correctness as correctness  # for patching in TestNoNumpyFallback
 import pytest
-
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "bench"))
-
-import correctness  # noqa: E402
-from correctness import (  # noqa: E402
+from bench.correctness import (
     ComparisonMetric,
     CorrectnessReport,
     DriftPoint,
@@ -35,25 +25,14 @@ from correctness import (  # noqa: E402
     _topk_indices,
     compare_logits,
     compare_perplexity,
+    compare_reference,
     drift_summary,
     long_context_drift,
 )
-from correctness import main as correctness_main  # noqa: E402
+from bench.correctness import main as correctness_main
 
-# ---------------------------------------------------------------------------
-# Test infrastructure
-# ---------------------------------------------------------------------------
-
-_failures = []
-_passes = 0
-
-
-def check(condition, msg):
-    global _passes
-    if condition:
-        _passes += 1
-    else:
-        _failures.append(msg)
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+_REF_PATH = _REPO_ROOT / "results" / "reference" / "qwen35-0.8b_reference_compact.json"
 
 
 # ---------------------------------------------------------------------------
@@ -64,64 +43,64 @@ def check(condition, msg):
 class TestSoftmax:
     def test_sums_to_one(self):
         result = _softmax([1.0, 2.0, 3.0])
-        check(abs(sum(result) - 1.0) < 1e-12, "softmax doesn't sum to 1")
+        assert abs(sum(result) - 1.0) < 1e-12
 
     def test_all_equal(self):
         result = _softmax([5.0, 5.0, 5.0])
-        check(all(abs(r - 1 / 3) < 1e-12 for r in result), "uniform softmax incorrect")
+        assert all(abs(r - 1 / 3) < 1e-12 for r in result)
 
     def test_empty(self):
-        check(_softmax([]) == [], "empty softmax should return empty list")
+        assert _softmax([]) == []
 
     def test_large_values(self):
         """Numerical stability with large logits."""
         result = _softmax([1000.0, 1001.0, 1002.0])
-        check(all(0 <= r <= 1 for r in result), "softmax overflow on large values")
-        check(abs(sum(result) - 1.0) < 1e-12, "large-value softmax doesn't sum to 1")
+        assert all(0 <= r <= 1 for r in result)
+        assert abs(sum(result) - 1.0) < 1e-12
 
 
 class TestKLDivergence:
     def test_identical_distributions(self):
         p = _softmax([1.0, 2.0, 3.0])
-        check(abs(_kl_divergence(p, p)) < 1e-10, "KL(p||p) should be ~0")
+        assert abs(_kl_divergence(p, p)) < 1e-10
 
     def test_different_distributions(self):
         p = [0.9, 0.1]
         q = [0.5, 0.5]
         kl = _kl_divergence(p, q)
-        check(kl > 0, "KL of different distributions should be positive")
+        assert kl > 0
 
     def test_zero_handling(self):
         """Zero probability in P shouldn't cause issues."""
         p = [0.0, 1.0]
         q = [0.5, 0.5]
         kl = _kl_divergence(p, q)
-        check(kl > 0, "KL with zero in P should still compute")
+        assert kl > 0
 
     def test_zero_in_q(self):
         """Zero in Q should be handled with epsilon."""
         p = [0.5, 0.5]
         q = [1.0, 0.0]
         kl = _kl_divergence(p, q)
-        check(math.isfinite(kl), "KL with zero in Q should be finite (epsilon)")
+        assert math.isfinite(kl)
 
 
 class TestMaxAbsDiff:
     def test_identical(self):
-        check(_max_abs_diff([1.0, 2.0], [1.0, 2.0]) == 0.0, "identical max_abs_diff should be 0")
+        assert _max_abs_diff([1.0, 2.0], [1.0, 2.0]) == 0.0
 
     def test_difference(self):
-        check(_max_abs_diff([1.0, 2.0], [1.5, 2.0]) == 0.5, "max_abs_diff incorrect")
+        assert _max_abs_diff([1.0, 2.0], [1.5, 2.0]) == 0.5
 
 
 class TestTopKIndices:
     def test_basic(self):
         result = _topk_indices([1.0, 3.0, 2.0, 5.0, 4.0], 3)
-        check(result == {1, 3, 4}, f"topk_indices wrong: {result}")
+        assert result == {1, 3, 4}
 
     def test_k_equals_len(self):
         result = _topk_indices([1.0, 2.0], 2)
-        check(result == {0, 1}, "topk_indices with k=len should return all")
+        assert result == {0, 1}
 
 
 # ---------------------------------------------------------------------------
@@ -132,36 +111,36 @@ class TestTopKIndices:
 class TestToleranceConfig:
     def test_defaults(self):
         cfg = ToleranceConfig()
-        check(cfg.atol == 1e-4, "default atol wrong")
-        check(cfg.rtol == 1e-3, "default rtol wrong")
-        check(cfg.kl_div_threshold == 0.01, "default kl threshold wrong")
-        check(cfg.topk == 5, "default topk wrong")
+        assert cfg.atol == 1e-4
+        assert cfg.rtol == 1e-3
+        assert cfg.kl_div_threshold == 0.01
+        assert cfg.topk == 5
 
     def test_tolerance_for_context_no_scaling(self):
         """At base context, scale should be 1.0."""
         cfg = ToleranceConfig(drift_scale_factor=1.5)
-        check(cfg.tolerance_for_context(4096) == 1.0, "base context scale should be 1.0")
+        assert cfg.tolerance_for_context(4096) == 1.0
 
     def test_tolerance_for_context_scaling(self):
         """Larger context should get larger tolerance."""
         cfg = ToleranceConfig(drift_scale_factor=2.0)
         scale_8k = cfg.tolerance_for_context(8192)
         scale_16k = cfg.tolerance_for_context(16384)
-        check(scale_8k == 2.0, f"2x context should scale by 2.0, got {scale_8k}")
-        check(scale_16k == 4.0, f"4x context should scale by 4.0, got {scale_16k}")
+        assert scale_8k == 2.0
+        assert scale_16k == 4.0
 
     def test_tolerance_flat_when_factor_1(self):
         """With drift_scale_factor=1, tolerance should never scale."""
         cfg = ToleranceConfig(drift_scale_factor=1.0)
-        check(cfg.tolerance_for_context(1000000) == 1.0, "flat tolerance should always be 1.0")
+        assert cfg.tolerance_for_context(1000000) == 1.0
 
     def test_scaled_preserves_topk(self):
         """scaled() should not change topk or accuracy thresholds."""
         cfg = ToleranceConfig(topk=10, topk_min_accuracy=0.9)
         scaled = cfg.scaled(3.0)
-        check(scaled.topk == 10, "scaled topk changed")
-        check(scaled.topk_min_accuracy == 0.9, "scaled topk_min_accuracy changed")
-        check(scaled.atol == cfg.atol * 3.0, "scaled atol wrong")
+        assert scaled.topk == 10
+        assert scaled.topk_min_accuracy == 0.9
+        assert scaled.atol == pytest.approx(cfg.atol * 3.0)
 
 
 # ---------------------------------------------------------------------------
@@ -175,8 +154,8 @@ class TestCompareLogits:
         logits = [[1.0, 2.0, 3.0, 0.5], [0.1, 0.2, 0.3, 0.4]]
         cfg = ToleranceConfig()
         report = compare_logits(logits, logits, cfg)
-        check(report.passed, "identical logits should pass")
-        check(len(report.failures) == 0, "identical logits should have no failures")
+        assert report.passed
+        assert len(report.failures) == 0
 
     def test_small_difference_passes(self):
         """Tiny differences within tolerance should pass."""
@@ -184,7 +163,7 @@ class TestCompareLogits:
         cand = [[1.0 + 1e-6, 2.0 + 1e-6, 3.0 + 1e-6, 0.5 + 1e-6]]
         cfg = ToleranceConfig(atol=1e-4)
         report = compare_logits(ref, cand, cfg)
-        check(report.passed, "tiny difference should pass with atol=1e-4")
+        assert report.passed
 
     def test_large_difference_fails(self):
         """Large differences should fail."""
@@ -192,7 +171,7 @@ class TestCompareLogits:
         cand = [[5.0, 1.0, 0.5, 3.0]]
         cfg = ToleranceConfig(atol=1e-4, kl_div_threshold=0.01)
         report = compare_logits(ref, cand, cfg)
-        check(not report.passed, "large difference should fail")
+        assert not report.passed
 
     def test_context_scaling_relaxes_tolerance(self):
         """At large context, same difference should pass where it fails at base."""
@@ -204,11 +183,8 @@ class TestCompareLogits:
         # At 131072 with generous drift scaling, should pass
         cfg_generous = ToleranceConfig(atol=0.005, kl_div_threshold=0.001, drift_scale_factor=2.0)
         report_drift = compare_logits(ref, cand, cfg_generous, context_length=131072)
-        check(not report_base.passed, "should fail at base context with strict tol")
-        check(
-            report_drift.passed,
-            f"should pass at 131072 with drift scaling, failures: {report_drift.failures}",
-        )
+        assert not report_base.passed
+        assert report_drift.passed
 
     def test_metrics_present(self):
         """Report should have all four metric types."""
@@ -216,22 +192,22 @@ class TestCompareLogits:
         cfg = ToleranceConfig()
         report = compare_logits(logits, logits, cfg)
         names = [m.name for m in report.metrics]
-        check("max_abs_diff" in names, "missing max_abs_diff metric")
-        check("avg_kl_divergence" in names, "missing avg_kl_divergence metric")
-        check("argmax_accuracy" in names, "missing argmax_accuracy metric")
+        assert "max_abs_diff" in names
+        assert "avg_kl_divergence" in names
+        assert "argmax_accuracy" in names
 
     def test_report_has_context_length(self):
         logits = [[1.0, 2.0, 3.0]]
         cfg = ToleranceConfig()
         report = compare_logits(logits, logits, cfg, context_length=32768)
-        check(report.context_length == 32768, "context_length not set in report")
+        assert report.context_length == 32768
 
     def test_multi_position(self):
         """Should handle multiple positions (seq_len > 1)."""
         ref = [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [0.1, 0.2, 0.3]]
         cfg = ToleranceConfig()
         report = compare_logits(ref, ref, cfg)
-        check(report.passed, "multi-position identical logits should pass")
+        assert report.passed
 
 
 # ---------------------------------------------------------------------------
@@ -243,51 +219,43 @@ class TestComparePerplexity:
     def test_identical_passes(self):
         cfg = ToleranceConfig()
         report = compare_perplexity(10.5, 10.5, cfg)
-        check(report.passed, "identical perplexity should pass")
+        assert report.passed
 
     def test_small_diff_passes(self):
         cfg = ToleranceConfig(perplexity_atol=0.2)
         report = compare_perplexity(10.0, 10.1, cfg)
-        check(report.passed, "small perplexity diff should pass")
+        assert report.passed
 
     def test_large_diff_fails(self):
         cfg = ToleranceConfig(perplexity_atol=0.01, perplexity_rtol=0.001)
         report = compare_perplexity(10.0, 15.0, cfg)
-        check(not report.passed, "large perplexity diff should fail")
+        assert not report.passed
 
     def test_relative_tolerance(self):
         """Relative tolerance should scale with magnitude."""
         cfg = ToleranceConfig(perplexity_atol=0.0, perplexity_rtol=0.05)
         # 5% of 100 = 5, so 104 should pass, 106 should fail
-        check(
-            compare_perplexity(100.0, 104.0, cfg).passed, "4% relative diff should pass at 5% rtol"
-        )
-        check(
-            not compare_perplexity(100.0, 106.0, cfg).passed,
-            "6% relative diff should fail at 5% rtol",
-        )
+        assert compare_perplexity(100.0, 104.0, cfg).passed
+        assert not compare_perplexity(100.0, 106.0, cfg).passed
 
     def test_context_scaling(self):
         """Larger context should relax perplexity tolerance."""
         cfg = ToleranceConfig(perplexity_atol=0.1, perplexity_rtol=0.0, drift_scale_factor=2.0)
         # At base: atol=0.1, so diff=0.15 fails
         report_base = compare_perplexity(10.0, 10.15, cfg, context_length=4096)
-        check(not report_base.passed, "0.15 diff should fail at base with atol=0.1")
+        assert not report_base.passed
         # At 16384 (4x): scale = 2^2 = 4, atol = 0.4, so 0.15 passes
         report_ctx = compare_perplexity(10.0, 10.15, cfg, context_length=16384)
-        check(
-            report_ctx.passed,
-            f"0.15 diff should pass at 16384 with scaled atol, failures: {report_ctx.failures}",
-        )
+        assert report_ctx.passed
 
     def test_metrics_present(self):
         cfg = ToleranceConfig()
         report = compare_perplexity(10.0, 10.05, cfg)
         names = [m.name for m in report.metrics]
-        check("perplexity_abs_diff" in names, "missing perplexity_abs_diff")
-        check("perplexity_rel_diff" in names, "missing perplexity_rel_diff")
-        check("reference_perplexity" in names, "missing reference_perplexity")
-        check("candidate_perplexity" in names, "missing candidate_perplexity")
+        assert "perplexity_abs_diff" in names
+        assert "perplexity_rel_diff" in names
+        assert "reference_perplexity" in names
+        assert "candidate_perplexity" in names
 
 
 # ---------------------------------------------------------------------------
@@ -298,34 +266,34 @@ class TestComparePerplexity:
 class TestCorrectnessReport:
     def test_empty_report_passes(self):
         report = CorrectnessReport()
-        check(report.passed, "empty report should pass")
+        assert report.passed
 
     def test_add_passing_metric(self):
         report = CorrectnessReport()
         report.add_metric("test", 0.5, 1.0, True)
-        check(report.passed, "passing metric shouldn't create failure")
+        assert report.passed
 
     def test_add_failing_metric(self):
         report = CorrectnessReport()
         report.add_metric("test", 2.0, 1.0, False)
-        check(not report.passed, "failing metric should fail report")
-        check(len(report.failures) == 1, f"should have 1 failure, got {len(report.failures)}")
+        assert not report.passed
+        assert len(report.failures) == 1
 
     def test_summary_contains_status(self):
         report = CorrectnessReport(context_length=8192)
         report.add_metric("test", 0.5, 1.0, True)
         text = report.summary()
-        check("PASSED" in text, "summary should contain PASSED")
-        check("8192" in text, "summary should contain context_length")
+        assert "PASSED" in text
+        assert "8192" in text
 
     def test_to_dict_structure(self):
         report = CorrectnessReport(context_length=4096)
         report.add_metric("x", 1.0, 2.0, True)
         d = report.to_dict()
-        check(d["context_length"] == 4096, "to_dict context_length wrong")
-        check(d["passed"] is True, "to_dict passed wrong")
-        check(len(d["metrics"]) == 1, "to_dict metrics count wrong")
-        check(d["metrics"][0]["name"] == "x", "to_dict metric name wrong")
+        assert d["context_length"] == 4096
+        assert d["passed"] is True
+        assert len(d["metrics"]) == 1
+        assert d["metrics"][0]["name"] == "x"
 
 
 # ---------------------------------------------------------------------------
@@ -339,19 +307,15 @@ class TestLongContextDrift:
         cfg = ToleranceConfig(drift_scale_factor=2.0)
         reports = []
         for ctx in [4096, 8192, 16384, 32768]:
-            # Simulate increasing KL divergence with context
             r = CorrectnessReport(context_length=ctx)
             r.add_metric("avg_kl_divergence", 0.001 * (ctx / 4096), None, None)
             r.add_metric("argmax_accuracy", 1.0 - 0.01 * math.log2(ctx / 4096), None, None)
             reports.append(r)
         points = long_context_drift(reports, cfg)
-        check(len(points) == 4, f"should have 4 drift points, got {len(points)}")
-        check(points[0].context_length == 4096, "first point should be 4096")
-        check(points[-1].context_length == 32768, "last point should be 32768")
-        check(
-            points[-1].tolerance_scale > points[0].tolerance_scale,
-            "tolerance should increase with context",
-        )
+        assert len(points) == 4
+        assert points[0].context_length == 4096
+        assert points[-1].context_length == 32768
+        assert points[-1].tolerance_scale > points[0].tolerance_scale
 
     def test_skips_none_context(self):
         """Reports without context_length should be skipped."""
@@ -361,7 +325,7 @@ class TestLongContextDrift:
         r1.add_metric("argmax_accuracy", 0.99, None, None)
         r2 = CorrectnessReport(context_length=None)
         points = long_context_drift([r1, r2], cfg)
-        check(len(points) == 1, f"should skip None-context report, got {len(points)} points")
+        assert len(points) == 1
 
     def test_drift_summary_output(self):
         cfg = ToleranceConfig()
@@ -370,8 +334,154 @@ class TestLongContextDrift:
         r.add_metric("argmax_accuracy", 0.99, None, None)
         points = long_context_drift([r], cfg)
         text = drift_summary(points)
-        check("4096" in text, "drift summary should contain context length")
-        check("kl_div" in text, "drift summary should contain kl_div header")
+        assert "4096" in text
+        assert "kl_div" in text
+
+
+# ---------------------------------------------------------------------------
+# Golden-reference comparison (compare_reference)
+# ---------------------------------------------------------------------------
+
+
+def _make_ref_entry(
+    context_length=128,
+    perplexity=20.0,
+    argmax_token=42,
+    topk_window=None,
+    generated_token_ids=None,
+):
+    """Helper: build a minimal reference-style entry dict."""
+    if topk_window is None:
+        topk_window = [
+            {"position_from_end": -1, "indices": [10, 20, 30, 40, 50], "values": [5, 4, 3, 2, 1]},
+        ]
+    if generated_token_ids is None:
+        generated_token_ids = [42, 43, 44]
+    return {
+        "entry_id": "test",
+        "prompt_id": "factual",
+        "context_length": context_length,
+        "perplexity": perplexity,
+        "avg_nll": math.log(perplexity),
+        "argmax_token": argmax_token,
+        "topk_window": topk_window,
+        "generated_token_ids": generated_token_ids,
+        "generated_text": "test",
+    }
+
+
+class TestCompareReference:
+    def test_identical_entries_pass(self):
+        """Comparing an entry to itself must pass."""
+        entry = _make_ref_entry()
+        cfg = ToleranceConfig()
+        report = compare_reference(entry, entry, cfg)
+        assert report.passed
+
+    def test_perplexity_mismatch_fails(self):
+        """Large perplexity difference should fail."""
+        ref = _make_ref_entry(perplexity=10.0)
+        cand = _make_ref_entry(perplexity=50.0)
+        cfg = ToleranceConfig(perplexity_atol=0.1, perplexity_rtol=0.01)
+        report = compare_reference(ref, cand, cfg)
+        assert not report.passed
+
+    def test_argmax_token_mismatch_detected(self):
+        """Different argmax token should be flagged."""
+        ref = _make_ref_entry(argmax_token=42)
+        cand = _make_ref_entry(argmax_token=99)
+        cfg = ToleranceConfig()
+        report = compare_reference(ref, cand, cfg)
+        names = [m.name for m in report.metrics]
+        assert "argmax_token_match" in names
+        token_metric = next(m for m in report.metrics if m.name == "argmax_token_match")
+        assert token_metric.value == 0.0
+        assert not token_metric.passed
+
+    def test_topk_window_overlap_measured(self):
+        """Top-k window overlap should be computed."""
+        ref_window = {
+            "position_from_end": -1,
+            "indices": [1, 2, 3, 4, 5],
+            "values": [5, 4, 3, 2, 1],
+        }
+        # 3 of 5 overlap
+        cand_window = {
+            "position_from_end": -1,
+            "indices": [1, 2, 3, 6, 7],
+            "values": [5, 4, 3, 2, 1],
+        }
+        ref = _make_ref_entry(topk_window=[ref_window])
+        cand = _make_ref_entry(topk_window=[cand_window])
+        cfg = ToleranceConfig(topk=5, topk_min_accuracy=0.8)
+        report = compare_reference(ref, cand, cfg)
+        overlap_metric = next((m for m in report.metrics if "topk_window_overlap" in m.name), None)
+        assert overlap_metric is not None
+        assert overlap_metric.value == pytest.approx(0.6)  # 3/5
+        assert not overlap_metric.passed  # 0.6 < 0.8
+
+    def test_generated_token_accuracy(self):
+        """Generated token accuracy should be measured."""
+        ref = _make_ref_entry(generated_token_ids=[1, 2, 3, 4, 5])
+        cand = _make_ref_entry(generated_token_ids=[1, 2, 9, 4, 5])  # 4/5 match
+        cfg = ToleranceConfig(argmax_accuracy_threshold=0.8)
+        report = compare_reference(ref, cand, cfg)
+        gen_metric = next((m for m in report.metrics if m.name == "generated_token_accuracy"), None)
+        assert gen_metric is not None
+        assert gen_metric.value == pytest.approx(0.8)
+        assert gen_metric.passed  # exactly at threshold
+
+    def test_context_length_preserved(self):
+        """Report should carry the reference entry's context length."""
+        entry = _make_ref_entry(context_length=2048)
+        cfg = ToleranceConfig()
+        report = compare_reference(entry, entry, cfg)
+        assert report.context_length == 2048
+
+    def test_missing_fields_degrade_gracefully(self):
+        """Missing optional fields should not crash."""
+        ref = {"context_length": 128, "perplexity": 10.0}
+        cand = {"context_length": 128, "perplexity": 10.05}
+        cfg = ToleranceConfig()
+        report = compare_reference(ref, cand, cfg)
+        assert report.passed  # perplexity close enough, other fields absent
+
+
+class TestCompareReferenceGoldenData:
+    """End-to-end tests using the actual golden reference file."""
+
+    @pytest.fixture(scope="class")
+    def ref_data(self):
+        if not _REF_PATH.exists():
+            pytest.skip("Compact reference not generated — run scripts/generate_reference.py")
+        with open(_REF_PATH) as f:
+            return json.load(f)
+
+    def test_identity_all_entries(self, ref_data):
+        """Every entry compared against itself must pass."""
+        cfg = ToleranceConfig()
+        for entry in ref_data["entries"]:
+            report = compare_reference(entry, entry, cfg)
+            assert report.passed, f"{entry['entry_id']}: identity check failed: {report.failures}"
+
+    def test_small_perplexity_perturbation_passes(self, ref_data):
+        """Small FP-level perturbation to perplexity should still pass."""
+        cfg = ToleranceConfig()
+        for entry in ref_data["entries"]:
+            cand = dict(entry)
+            # Add 0.01 absolute noise — well within tolerance
+            cand["perplexity"] = entry["perplexity"] + 0.01
+            report = compare_reference(entry, cand, cfg)
+            assert report.passed, f"{entry['entry_id']}: small perturbation failed"
+
+    def test_large_perplexity_change_fails(self, ref_data):
+        """A 50% perplexity change should fail."""
+        cfg = ToleranceConfig()
+        entry = ref_data["entries"][0]
+        cand = dict(entry)
+        cand["perplexity"] = entry["perplexity"] * 1.5
+        report = compare_reference(entry, cand, cfg)
+        assert not report.passed
 
 
 # ---------------------------------------------------------------------------
@@ -391,7 +501,7 @@ class TestIntegrationSimulated:
         cand = [[v + random.gauss(0, 1e-6) for v in row] for row in ref]
         cfg = ToleranceConfig(atol=1e-4, rtol=1e-3, kl_div_threshold=0.01)
         report = compare_logits(ref, cand, cfg)
-        check(report.passed, f"model with 1e-6 noise should pass, failures: {report.failures}")
+        assert report.passed
 
     def test_corrupted_model_fails(self):
         """A model with shuffled logits should fail."""
@@ -402,7 +512,7 @@ class TestIntegrationSimulated:
         cand = [list(reversed(row)) for row in ref]  # completely wrong
         cfg = ToleranceConfig(atol=1e-4, rtol=1e-3, kl_div_threshold=0.01)
         report = compare_logits(ref, cand, cfg)
-        check(not report.passed, "reversed logits should fail")
+        assert not report.passed
 
     def test_drift_scenario_at_multiple_contexts(self):
         """Simulate drift: model degrades at longer contexts but stays within tolerance."""
@@ -416,7 +526,6 @@ class TestIntegrationSimulated:
         vocab = 50
         reports = []
         for ctx in [4096, 8192, 16384, 32768, 65536]:
-            # Use enough positions that a single argmax flip doesn't fail
             seq_len = 50
             noise_scale = 0.001 * math.log2(ctx / 4096 + 1)
             ref = [[random.gauss(0, 1) for _ in range(vocab)] for _ in range(seq_len)]
@@ -425,11 +534,8 @@ class TestIntegrationSimulated:
             reports.append(report)
 
         points = long_context_drift(reports, cfg)
-        # All should pass since noise is small
-        all_pass = all(p.passed for p in points)
-        check(all_pass, "small drift should stay within tolerance at all contexts")
-        # Tolerance scale should increase
-        check(points[-1].tolerance_scale > 1.0, "largest context should have scale > 1")
+        assert all(p.passed for p in points)
+        assert points[-1].tolerance_scale > 1.0
 
 
 # ---------------------------------------------------------------------------
@@ -591,7 +697,7 @@ class TestCorrectnessReportSummary:
         report.add_metric("KL", 0.01, threshold=0.1, passed=True)
         report.add_metric("Atol", 1e-5, threshold=1e-4, passed=True)
         d = report.to_dict()
-        _json.dumps(d)  # must be serializable
+        json.dumps(d)  # must be serializable
         assert d["context_length"] == 1024
         assert d["passed"] is True
         assert len(d["metrics"]) == 2
@@ -669,8 +775,8 @@ class TestMainCLI:
             cand["perplexity"] = cand_ppl
         ref_path = tmp_path / "ref.json"
         cand_path = tmp_path / "cand.json"
-        ref_path.write_text(_json.dumps(ref))
-        cand_path.write_text(_json.dumps(cand))
+        ref_path.write_text(json.dumps(ref))
+        cand_path.write_text(json.dumps(cand))
         return str(ref_path), str(cand_path)
 
     def test_logit_comparison_pass(self, tmp_path):
@@ -702,8 +808,8 @@ class TestMainCLI:
         """Files without logits or perplexity → error, return 1."""
         ref_path = tmp_path / "ref.json"
         cand_path = tmp_path / "cand.json"
-        ref_path.write_text(_json.dumps({"other": "data"}))
-        cand_path.write_text(_json.dumps({"other": "data"}))
+        ref_path.write_text(json.dumps({"other": "data"}))
+        cand_path.write_text(json.dumps({"other": "data"}))
         rc = correctness_main(["--reference", str(ref_path), "--candidate", str(cand_path)])
         assert rc == 1
 
@@ -712,8 +818,8 @@ class TestMainCLI:
         out_path = str(tmp_path / "report.json")
         rc = correctness_main(["--reference", ref, "--candidate", cand, "--output", out_path])
         assert rc == 0
-        assert _Path(out_path).exists()
-        data = _json.loads(_Path(out_path).read_text())
+        assert Path(out_path).exists()
+        data = json.loads(Path(out_path).read_text())
         assert "reports" in data
         assert "passed" in data
 
@@ -730,8 +836,8 @@ class TestMainCLI:
         cand = {"logits": [[1.0, 2.0, 3.0]], "perplexity": 5.0}
         ref_path = tmp_path / "ref.json"
         cand_path = tmp_path / "cand.json"
-        ref_path.write_text(_json.dumps(ref))
-        cand_path.write_text(_json.dumps(cand))
+        ref_path.write_text(json.dumps(ref))
+        cand_path.write_text(json.dumps(cand))
         return str(ref_path), str(cand_path)
 
 
@@ -825,12 +931,6 @@ class TestNoNumpyFallback:
         assert argmax_metric.value == 0.0
 
 
-if __name__ == "__main__" and not pytest.version_info:
+if __name__ == "__main__":
     _run_all()
-    if _failures:
-        print(f"\n✗ {len(_failures)} failures out of {_passes + len(_failures)} checks:")
-        for f in _failures:
-            print(f"  - {f}")
-        sys.exit(1)
-    else:
-        print(f"\n✓ All {_passes} checks passed.")
+    print("\n✓ All standalone checks passed.")

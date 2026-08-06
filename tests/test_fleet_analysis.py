@@ -215,8 +215,8 @@ class TestRegistryIntegrity:
     """Validate the DEVICES and REPLICATES constants are well-formed."""
 
     def test_devices_count(self):
-        """Exactly 5 devices in the fleet table."""
-        assert len(fa.DEVICES) == 5
+        """Exactly 3 devices in the fleet table (RK3588 excluded, ob-0h0)."""
+        assert len(fa.DEVICES) == 3
 
     def test_devices_tuples(self):
         """Each device entry is a 5-tuple (name, path, spec_gibs, cores, isa)."""
