@@ -30,3 +30,4 @@ artifacts/reference/
 .goose-session-created
 .goose-task.md
 .gitignore.repo
+gpu/gdn_gpu_bench
