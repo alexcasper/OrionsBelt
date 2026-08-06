@@ -347,3 +347,127 @@ class TestCLI:
         nonexistent = tmp_path / "does_not_exist"
         rc = main(["--model", "4B", "--dry-run", "--output-dir", str(nonexistent)])
         assert rc == 0
+
+
+# ---------------------------------------------------------------------------
+# Pure utility functions (_resolve_weight_files, _file_is_present, _sha256)
+# ---------------------------------------------------------------------------
+
+
+class TestResolveWeightFiles:
+    def test_filters_safetensors(self):
+        from scripts.fetch_weights import _resolve_weight_files
+
+        repo_files = [
+            "config.json",
+            "model-00001-of-00003.safetensors",
+            "tokenizer.json",
+            "model-00002-of-00003.safetensors",
+            "tokenizer_config.json",
+            "model.safetensors.index.json",
+        ]
+        result = _resolve_weight_files("Qwen/Qwen3.5-4B", repo_files)
+        assert len(result) == 2
+        assert all(f.endswith(".safetensors") for f in result)
+
+    def test_empty_repo(self):
+        from scripts.fetch_weights import _resolve_weight_files
+
+        assert _resolve_weight_files("test/repo", []) == []
+
+    def test_no_weight_files(self):
+        from scripts.fetch_weights import _resolve_weight_files
+
+        result = _resolve_weight_files("test/repo", ["config.json", "README.md"])
+        assert result == []
+
+    def test_single_shard(self):
+        from scripts.fetch_weights import _resolve_weight_files
+
+        result = _resolve_weight_files("test/repo", ["model.safetensors"])
+        assert result == ["model.safetensors"]
+
+
+class TestFileIsPresent:
+    def test_existing_nonempty_file(self, tmp_path):
+        from scripts.fetch_weights import _file_is_present
+
+        f = tmp_path / "test.bin"
+        f.write_bytes(b"hello")
+        assert _file_is_present(f) is True
+
+    def test_nonexistent_file(self, tmp_path):
+        from scripts.fetch_weights import _file_is_present
+
+        assert _file_is_present(tmp_path / "nope.bin") is False
+
+    def test_empty_file(self, tmp_path):
+        from scripts.fetch_weights import _file_is_present
+
+        f = tmp_path / "empty.bin"
+        f.write_bytes(b"")
+        assert _file_is_present(f) is False
+
+
+class TestSha256:
+    def test_known_hash(self, tmp_path):
+        from scripts.fetch_weights import _sha256
+
+        f = tmp_path / "test.bin"
+        f.write_bytes(b"hello world")
+        # Known SHA-256 of "hello world"
+        expected = "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9"
+        assert _sha256(f) == expected
+
+    def test_empty_file(self, tmp_path):
+        from scripts.fetch_weights import _sha256
+
+        f = tmp_path / "empty.bin"
+        f.write_bytes(b"")
+        # SHA-256 of empty string
+        expected = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        assert _sha256(f) == expected
+
+    def test_large_file_chunked(self, tmp_path):
+        """File larger than chunk size is read in multiple chunks."""
+        from scripts.fetch_weights import _sha256
+
+        f = tmp_path / "large.bin"
+        data = b"x" * (1 << 20) * 3  # 3 MiB
+        f.write_bytes(data)
+
+        import hashlib
+
+        expected = hashlib.sha256(data).hexdigest()
+        # Use small chunk to force multiple reads
+        assert _sha256(f, chunk=1024) == expected
+
+    def test_returns_hex_string(self, tmp_path):
+        from scripts.fetch_weights import _sha256
+
+        f = tmp_path / "test.bin"
+        f.write_bytes(b"data")
+        result = _sha256(f)
+        assert len(result) == 64
+        assert all(c in "0123456789abcdef" for c in result)
+
+
+class TestMainListFlag:
+    def test_list_flag_prints_models(self, capsys):
+        from scripts.fetch_weights import main
+
+        rc = main(["--list"])
+        assert rc == 0
+        captured = capsys.readouterr()
+        assert "Available models" in captured.out
+        assert "4B" in captured.out
+        assert "0.8B" in captured.out
+
+    def test_list_flag_with_model_ignored(self, capsys):
+        """--list takes priority over --model."""
+        from scripts.fetch_weights import main
+
+        rc = main(["--list", "--model", "0.8B"])
+        assert rc == 0
+        captured = capsys.readouterr()
+        assert "Available models" in captured.out
