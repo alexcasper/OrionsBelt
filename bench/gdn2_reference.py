@@ -235,8 +235,7 @@ def make_synthetic_input(T=8, H=2, K=8, V=8, seed=42):
     for h in range(H):
         for t in range(T):
             g[t, h] = -math.exp(float(A_log[h])) * softplus(
-                f_raw[t, h].astype(np.float64)
-                + dt_bias[h * K : (h + 1) * K].astype(np.float64)
+                f_raw[t, h].astype(np.float64) + dt_bias[h * K : (h + 1) * K].astype(np.float64)
             )
     g = g.astype(np.float32)
 
