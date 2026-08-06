@@ -32,7 +32,8 @@ from bench.harness import (  # noqa: E402
     SyntheticBackend,
     run_sweep,
 )
-from bench.manifest import capture, write as write_manifest  # noqa: E402
+from bench.manifest import capture  # noqa: E402
+from bench.manifest import write as write_manifest  # noqa: E402
 from bench.schema import write_csv  # noqa: E402
 
 # The ablation grid: each entry is one configuration to benchmark.
@@ -79,7 +80,7 @@ ABLATION_GRID = [
 
 def _write_manifest_for_rows(
     rows: list,
-    config: "SweepConfig",
+    config: SweepConfig,
     manifest_dir: str = "results/manifests",
 ) -> str | None:
     """Capture and write a provenance manifest for an ablation sweep (ob-20t).

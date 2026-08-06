@@ -30,7 +30,6 @@ Usage:
     python3 bench/gdn2_reference.py            # run built-in correctness test
     python3 bench/gdn2_reference.py --bench    # micro-benchmark on this device
 """
-from __future__ import print_function
 
 import math
 import sys
@@ -53,8 +52,17 @@ def l2_normalize(x, eps=1e-6):
     return x / math.sqrt(float(np.sum(x * x)) + eps)
 
 
-def gdn2_recurrent(q, k, v, g, b_gate, w_gate, scale=None,
-                   initial_state=None, use_qk_l2norm=True):
+def gdn2_recurrent(
+    q,
+    k,
+    v,
+    g,
+    b_gate,
+    w_gate,
+    scale=None,
+    initial_state=None,
+    use_qk_l2norm=True,
+):
     """Token-by-token GDN-2 recurrence (forward only, no gradients).
 
     Args:
@@ -73,7 +81,8 @@ def gdn2_recurrent(q, k, v, g, b_gate, w_gate, scale=None,
         final_state: [HV, K, V]
     """
     T, H, K = q.shape
-    HV, V = v.shape[1], v.shape[2]
+    HV = v.shape[1]
+    V = v.shape[2]
     assert k.shape == (T, H, K)
     assert v.shape == (T, HV, V)
     assert g.shape == (T, HV, K)
@@ -134,8 +143,16 @@ def gdn2_recurrent(q, k, v, g, b_gate, w_gate, scale=None,
     return o, S
 
 
-def gdn1_recurrent(q, k, v, alpha, beta, scale=None,
-                   initial_state=None, use_qk_l2norm=True):
+def gdn1_recurrent(
+    q,
+    k,
+    v,
+    alpha,
+    beta,
+    scale=None,
+    initial_state=None,
+    use_qk_l2norm=True,
+):
     """Token-by-token GDN-1 (Qwen3.5 / Gated DeltaNet) recurrence for comparison.
 
     GDN-1 uses scalar gates:
@@ -153,7 +170,8 @@ def gdn1_recurrent(q, k, v, alpha, beta, scale=None,
         final_state: [HV, K, V]
     """
     T, H, K = q.shape
-    HV, V = v.shape[1], v.shape[2]
+    HV = v.shape[1]
+    V = v.shape[2]
 
     if scale is None:
         scale = 1.0 / math.sqrt(K)
@@ -199,6 +217,7 @@ def gdn1_recurrent(q, k, v, alpha, beta, scale=None,
 
 # ---- Synthetic input generator (deterministic, reproducible) ----
 
+
 def make_synthetic_input(T=8, H=2, K=8, V=8, seed=42):
     """Generate deterministic synthetic inputs for testing."""
     rng = np.random.RandomState(seed)
@@ -216,7 +235,8 @@ def make_synthetic_input(T=8, H=2, K=8, V=8, seed=42):
     for h in range(H):
         for t in range(T):
             g[t, h] = -math.exp(float(A_log[h])) * softplus(
-                f_raw[t, h].astype(np.float64) + dt_bias[h * K:(h + 1) * K].astype(np.float64)
+                f_raw[t, h].astype(np.float64)
+                + dt_bias[h * K : (h + 1) * K].astype(np.float64)
             )
     g = g.astype(np.float32)
 
@@ -231,7 +251,7 @@ def test_gdn2_known_answer():
 
     With T=1, H=1, K=2, V=2 and known inputs, we can compute the output by hand.
     """
-    K, V = 2, 2
+    K = 2
     # Single token, single head
     q = np.array([[[0.6, 0.8]]], dtype=np.float64)  # already unit norm
     k_vec = np.array([[[0.8, 0.6]]], dtype=np.float64)  # already unit norm
@@ -251,20 +271,21 @@ def test_gdn2_known_answer():
     # Step 5: o = scale * q^T @ S = scale * [0.6*0.56+0.8*0.42, 0.6*0.96+0.8*0.72]
     #       = scale * [0.672, 1.152] = [0.4753..., 0.8148...]
 
-    o, S = gdn2_recurrent(q, k_vec, v_vec, g, b_gate, w_gate, scale=scale,
-                          use_qk_l2norm=False)
+    o, S = gdn2_recurrent(q, k_vec, v_vec, g, b_gate, w_gate, scale=scale, use_qk_l2norm=False)
 
     expected_S = np.array([[0.56, 0.96], [0.42, 0.72]])
     expected_o = np.array([[scale * 0.672, scale * 1.152]])
 
-    assert np.allclose(S[0], expected_S, atol=1e-10), \
-        "State mismatch:\n%s\nvs expected:\n%s" % (S[0], expected_S)
-    assert np.allclose(o[0, 0], expected_o[0], atol=1e-10), \
-        "Output mismatch: %s vs expected %s" % (o[0, 0], expected_o[0])
+    assert np.allclose(S[0], expected_S, atol=1e-10), (
+        f"State mismatch:\n{S[0]}\nvs expected:\n{expected_S}"
+    )
+    assert np.allclose(o[0, 0], expected_o[0], atol=1e-10), (
+        f"Output mismatch: {o[0, 0]} vs expected {expected_o[0]}"
+    )
 
     print("  test_gdn2_known_answer: PASS")
-    print("    S = %s" % S[0])
-    print("    o = %s" % o[0, 0])
+    print(f"    S = {S[0]}")
+    print(f"    o = {o[0, 0]}")
 
 
 def test_gdn2_vs_gdn1_uniform_gates():
@@ -292,27 +313,29 @@ def test_gdn2_vs_gdn1_uniform_gates():
     # GDN-1: alpha=1 (no decay), beta=0.5
     alpha = np.ones((T, H), dtype=np.float64)
     beta_arr = np.full((T, H), beta, dtype=np.float64)
-    o1, S1 = gdn1_recurrent(q.copy(), k_in.copy(), v_in.copy(),
-                            alpha, beta_arr, scale=1.0/math.sqrt(K),
-                            use_qk_l2norm=True)
+    o1, S1 = gdn1_recurrent(
+        q.copy(), k_in.copy(), v_in.copy(), alpha, beta_arr, scale=1.0 / math.sqrt(K),
+        use_qk_l2norm=True,
+    )
 
     # GDN-2: g=0 (no decay), b=β everywhere, w=β everywhere
     g_zero = np.zeros((T, H, K), dtype=np.float64)
     b_uniform = np.full((T, H, K), beta, dtype=np.float64)
     w_uniform = np.full((T, H, V), beta, dtype=np.float64)
 
-    o2, S2 = gdn2_recurrent(q.copy(), k_in.copy(), v_in.copy(),
-                            g_zero, b_uniform, w_uniform, scale=1.0/math.sqrt(K),
-                            use_qk_l2norm=True)
+    o2, S2 = gdn2_recurrent(
+        q.copy(), k_in.copy(), v_in.copy(), g_zero, b_uniform, w_uniform,
+        scale=1.0 / math.sqrt(K), use_qk_l2norm=True,
+    )
 
-    assert np.allclose(o1, o2, atol=1e-10), \
-        "GDN-1 vs GDN-2(uniform gates) output mismatch!\nGDN-1: %s\nGDN-2: %s" % (o1, o2)
-    assert np.allclose(S1, S2, atol=1e-10), \
-        "GDN-1 vs GDN-2(uniform gates) state mismatch!"
+    assert np.allclose(o1, o2, atol=1e-10), (
+        f"GDN-1 vs GDN-2(uniform gates) output mismatch!\nGDN-1: {o1}\nGDN-2: {o2}"
+    )
+    assert np.allclose(S1, S2, atol=1e-10), "GDN-1 vs GDN-2(uniform gates) state mismatch!"
 
     print("  test_gdn2_vs_gdn1_uniform_gates: PASS")
-    print("    max |o1 - o2| = %.2e" % np.max(np.abs(o1 - o2)))
-    print("    max |S1 - S2| = %.2e" % np.max(np.abs(S1 - S2)))
+    print(f"    max |o1 - o2| = {np.max(np.abs(o1 - o2)):.2e}")
+    print(f"    max |S1 - S2| = {np.max(np.abs(S1 - S2)):.2e}")
 
 
 def test_gdn2_multi_step_consistency():
@@ -322,12 +345,15 @@ def test_gdn2_multi_step_consistency():
     T, H, K, V = 16, 4, 16, 16
     q, k, v, g, b_gate, w_gate, _, _ = make_synthetic_input(T, H, K, V, seed=99)
 
-    o, S_final = gdn2_recurrent(q, k, v, g, b_gate, w_gate,
-                                scale=1.0/math.sqrt(K), use_qk_l2norm=True)
+    o, S_final = gdn2_recurrent(
+        q, k, v, g, b_gate, w_gate, scale=1.0 / math.sqrt(K), use_qk_l2norm=True,
+    )
 
     # Verify output shape
-    assert o.shape == (T, H, V), "Output shape %s != (%d, %d, %d)" % (o.shape, T, H, V)
-    assert S_final.shape == (H, K, V), "State shape %s != (%d, %d, %d)" % (S_final.shape, H, K, V)
+    assert o.shape == (T, H, V), f"Output shape {o.shape} != ({T}, {H}, {V})"
+    assert S_final.shape == (H, K, V), (
+        f"State shape {S_final.shape} != ({H}, {K}, {V})"
+    )
 
     # Verify no NaN / Inf
     assert np.all(np.isfinite(o)), "Output contains NaN or Inf!"
@@ -336,15 +362,16 @@ def test_gdn2_multi_step_consistency():
     # Verify incremental consistency: running with initial_state=S_final should
     # continue seamlessly
     q2, k2, v2, g2, b2, w2, _, _ = make_synthetic_input(T, H, K, V, seed=77)
-    o_cont, S_cont = gdn2_recurrent(q2, k2, v2, g2, b2, w2,
-                                    scale=1.0/math.sqrt(K),
-                                    initial_state=S_final, use_qk_l2norm=True)
+    o_cont, S_cont = gdn2_recurrent(
+        q2, k2, v2, g2, b2, w2, scale=1.0 / math.sqrt(K),
+        initial_state=S_final, use_qk_l2norm=True,
+    )
     assert np.all(np.isfinite(o_cont)), "Continued output contains NaN or Inf!"
 
     print("  test_gdn2_multi_step_consistency: PASS")
-    print("    T=%d, H=%d, K=%d, V=%d" % (T, H, K, V))
-    print("    final state norm: %.4f" % np.linalg.norm(S_final))
-    print("    output range: [%.4f, %.4f]" % (o.min(), o.max()))
+    print(f"    T={T}, H={H}, K={K}, V={V}")
+    print(f"    final state norm: {np.linalg.norm(S_final):.4f}")
+    print(f"    output range: [{o.min():.4f}, {o.max():.4f}]")
 
 
 def test_bandwidth_analysis():
@@ -376,12 +403,15 @@ def test_bandwidth_analysis():
 
     overhead_pct = 100.0 * gdn2_extra / state_bytes
 
-    print("  Bandwidth analysis (per token, one layer, %d heads × %d×%d state):" % (H, d_k, d_v))
-    print("    State R/M/W:    %8d bytes (%.1f KiB)" % (state_bytes, state_bytes / 1024.0))
-    print("    GDN-1 gates:    %8d bytes" % gdn1_extra)
-    print("    GDN-2 gates:    %8d bytes" % gdn2_extra)
-    print("    GDN-2 overhead: %.2f%% of state traffic" % overhead_pct)
-    print("    Conclusion: GDN-2 adds <%.1f%% bandwidth — negligible vs state R/M/W" % (overhead_pct + 0.5))
+    print(f"  Bandwidth analysis (per token, one layer, {H} heads × {d_k}×{d_v} state):")
+    print(f"    State R/M/W:    {state_bytes:8d} bytes ({state_bytes / 1024.0:.1f} KiB)")
+    print(f"    GDN-1 gates:    {gdn1_extra:8d} bytes")
+    print(f"    GDN-2 gates:    {gdn2_extra:8d} bytes")
+    print(f"    GDN-2 overhead: {overhead_pct:.2f}% of state traffic")
+    print(
+        f"    Conclusion: GDN-2 adds <{overhead_pct + 0.5:.1f}% bandwidth "
+        f"— negligible vs state R/M/W"
+    )
 
     assert overhead_pct < 5.0, "GDN-2 overhead unexpectedly high!"
 
@@ -411,8 +441,10 @@ def micro_benchmark():
         elapsed = (time.time() - t0) / 3.0
 
         state_kb = H * K * V * 4 / 1024.0
-        print("  %-16s T=%-3d H=%-2d K=%-3d V=%-3d  state=%.1f KiB  %.3f s/run" %
-              (name, T, H, K, V, state_kb, elapsed))
+        print(
+            f"  {name:<16s} T={T:<3d} H={H:<2d} K={K:<3d} V={V:<3d}  "
+            f"state={state_kb:.1f} KiB  {elapsed:.3f} s/run"
+        )
 
     print("\n  (Pure NumPy on this device — NOT representative of optimized C/NEON speed)")
     print("  (Purpose: correctness verification, not performance measurement)")

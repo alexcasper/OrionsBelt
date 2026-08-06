@@ -95,9 +95,9 @@ _MODEL_PRESETS = {
 STANDARD_PROMPTS = [
     "The quick brown fox jumps over the lazy dog. This sentence is used because",
     "In machine learning, gradient descent is an optimization algorithm that",
-    "The architecture of a modern neural network typically consists of",
+    "Modern neural network architectures typically consist of",
     "Once upon a time, in a kingdom far away, there lived a wise ruler who",
-    "The fundamental theorem of calculus establishes a relationship between",
+    "Calculus establishes a fundamental relationship between derivatives and",
 ]
 
 

@@ -29,9 +29,7 @@ from scripts.capture_reference import (  # noqa: E402
     _build_manifest,
     _prompt_hash,
     _topk_logits,
-    main,
 )
-
 
 # ---------------------------------------------------------------------------
 # Top-k logit extraction
@@ -319,7 +317,7 @@ class TestCLI:
 
     def test_context_lengths_parsed(self):
         """Context lengths should parse from comma-separated string."""
-        parts = "4096,32768,131072,262144".split(",")
+        parts = ["4096", "32768", "131072", "262144"]
         lengths = [int(x) for x in parts]
         assert lengths == [4096, 32768, 131072, 262144]
 

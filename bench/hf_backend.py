@@ -15,7 +15,6 @@ See ``docs/BACKEND_GUIDE.md`` (ob-xh3.1) for the method-by-method mapping.
 
 from __future__ import annotations
 
-import os
 import sys
 from pathlib import Path
 from typing import Any
