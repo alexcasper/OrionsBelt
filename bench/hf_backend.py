@@ -76,9 +76,67 @@ class HFTorchBackend(BenchmarkBackend):
         self._num_linear = 0
         self._cfg: dict = {}
 
+    @staticmethod
+    def _available_memory_bytes() -> int:
+        """Read MemAvailable from /proc/meminfo (Linux only)."""
+        try:
+            with open("/proc/meminfo") as f:
+                for line in f:
+                    if line.startswith("MemAvailable:"):
+                        return int(line.split()[1]) * 1024  # KiB → bytes
+        except (OSError, ValueError, IndexError):
+            pass
+        return 0  # unknown — skip the check
+
+    def _check_memory(self) -> None:
+        """Pre-flight: refuse to load if available RAM is insufficient.
+
+        Prevents the kernel OOM killer from silently killing the entire
+        tmux/goose supervising session (bead ob-3lq). The OOM killer targets
+        the cgroup with the most anon-rss, which is the tmux-spawn process,
+        not just the python benchmark subprocess.
+        """
+        avail = self._available_memory_bytes()
+        if avail == 0:
+            return  # can't check (non-Linux or /proc unreadable) — proceed
+
+        # Estimate: model weights + 50% overhead for activations, KV cache,
+        # gradient buffers, and tokenizer state. For Qwen3.5-0.8B fp32:
+        # weights ≈ 3.0 GiB → need ≈ 4.5 GiB free.
+        # The config's dtype field tells us the intended precision.
+        label = os.path.basename(self._model_path)
+        if "0.8B" in label or "0.8b" in label:
+            weight_est = 3_010_000_000  # 752M params × 4 bytes (fp32 worst case)
+        elif "4B" in label or "4b" in label:
+            weight_est = 8_040_000_000  # ~2B params × 4 bytes
+        else:
+            weight_est = 4_000_000_000  # conservative default
+
+        required = int(weight_est * 1.5)
+
+        if avail < required:
+            raise MemoryError(
+                f"Insufficient memory to load {label}: "
+                f"{avail / 1e9:.1f} GiB available, "
+                f"~{required / 1e9:.1f} GiB required (weights + overhead). "
+                f"This check prevents the kernel OOM killer from killing "
+                f"the supervising session (ob-3lq). "
+                f"Options: (1) free memory on this device, "
+                f"(2) run on a higher-RAM node (e.g. rk3588-t3 has 31 GB), "
+                f"(3) use ORIONS_FORCE_FP32=1 with a smaller model."
+            )
+
+        print(
+            f"  [hf] Memory check: {avail / 1e9:.1f} GiB available "
+            f"(need ~{required / 1e9:.1f} GiB) — OK",
+            flush=True,
+        )
+
     def load(self) -> None:
         import torch
         from transformers import AutoModelForCausalLM, AutoTokenizer
+
+        self._check_memory()
 
         print(f"  [hf] Loading model from {self._model_path} ...", flush=True)
 
