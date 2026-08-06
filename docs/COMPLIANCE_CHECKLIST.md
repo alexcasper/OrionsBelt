@@ -1,6 +1,6 @@
 # Submission compliance checklist
 
-**Bead:** `ob-9e2` · **Status:** In progress 2026-08-02 · **Parent:** `ob-9t0` (E9)
+**Bead:** `ob-9e2` · **Status:** Updated 2026-08-06 · **Parent:** `ob-9t0` (E9)
 
 Every item below is individually capable of disqualifying an otherwise strong entry.
 This document is the mechanical compliance pass, checked against the Devpost rules
@@ -12,21 +12,18 @@ and the challenge brief.
 
 | Track | Status | Evidence |
 |---|---|---|
-| Physical AI | ☐ Candidate | O6 board not yet acquired (ob-axq) |
-| Edge AI | ☐ Candidate | Hedge track ready, Jetson data collected (ob-8ms.3) |
-| Cloud AI | ☐ N/A | Not targeted |
+| Physical AI | ❌ Forfeited | O6 board never arrived (ADR 0007) |
+| **Edge AI** | **✓ Selected** | ADR 0007 committed 2026-08-06 (`ob-imb`) |
+| Cloud AI | ❌ N/A | Not targeted |
 
-**Decision due:** 2026-08-09 (ob-imb, hard go/no-go). Both tracks remain open
-pending hardware availability.
-
-**⚠ Action needed:** Track must be selected on the Devpost submission form before
-the deadline.
+**Done.** Track is Edge AI. The submission framing, README, and Devpost write-up
+all reflect this.
 
 ## 2. Public repository
 
 | Requirement | Status |
 |---|---|
-| Public GitHub repo | **⚠ Currently private** — maintainer must set to public before submission |
+| Public GitHub repo | **⚠ Maintainer must set to public before submission** |
 | Open source | ✓ Apache-2.0 (see §3) |
 
 **⚠ Action needed (maintainer):** `gh repo edit alexcasper/OrionsBelt --visibility public`
@@ -38,10 +35,9 @@ the deadline.
 | LICENSE file present | ✓ `LICENSE` (Apache 2.0, full text) |
 | License in pyproject.toml | ✓ `license = "Apache-2.0"` |
 | License detected by GitHub | ✓ `licenseInfo.key = "apache-2.0"` |
-| License visible in About section | ✓ Set description + topics (2026-08-03) |
-| Newness statement | ⚠ Repo is new for this submission (created 2026-08-02) |
+| License visible in About section | **⚠ Maintainer should verify after making repo public** |
 
-**⚠ Action needed (maintainer):** Set repo description and topics:
+**⚠ Suggested (maintainer):** Set repo description and topics:
 ```
 gh repo edit alexcasper/OrionsBelt \
   --description "Optimizing Qwen3.5 Gated DeltaNet for Arm edge silicon" \
@@ -50,16 +46,16 @@ gh repo edit alexcasper/OrionsBelt \
 
 ## 4. Required write-up sections
 
-Devpost requires three sections. Current status of the README:
+Devpost requires three sections. Current status:
 
 | Section | Status | Location |
 |---|---|---|
-| Project overview | ✓ | README.md §"What Gated DeltaNet is…" + §"The gap this project fills" |
-| Functionality/output | ⚠ Partial | README.md §"Status" — results table pending more device data |
-| Setup instructions | ✓ | README.md §"Reproducing" + `docs/SETUP_PORTABLE.md` (quick-start commands) |
+| Project overview | ✓ | `docs/DEVPOST_SUBMISSION.md` §Overview + README.md §"What Gated DeltaNet is…" |
+| Functionality/output | ✓ | `docs/DEVPOST_SUBMISSION.md` §Functionality + `results/figures/comparison_table.md` |
+| Setup instructions | ✓ | README.md §"Reproducing" (6 steps verified by clean-clone rehearsal ob-kdi) + `docs/SETUP_PORTABLE.md` |
 
-**⚠ Action needed:** Complete the README's "Reproducing" section with full setup
-steps (scripts/fetch_weights.py, bench/harness.py invocation, bench/plots.py).
+**Done.** All three sections complete. Clean-clone reproduction rehearsal passed (ob-kdi).
+Devpost write-up maps section-by-section to the judging rubric (ob-f7k).
 
 ## 5. Demo video (optional)
 
@@ -69,25 +65,25 @@ steps (scripts/fetch_weights.py, bench/harness.py invocation, bench/plots.py).
 | YouTube/Vimeo/Youku hosting | N/A |
 | Optional per rules | ✓ Skipping is allowed; prioritise write-up first |
 
-**Decision:** Demo video is optional. Produce only if ahead of schedule (T-1 per
-ADR 0004 descope ladder).
+**Decision:** Demo video is optional (ob-jui, P2). Skipping per ADR 0004 descope ladder.
+Produce only if ahead of schedule before deadline.
 
 ## 6. Arm Performix standardized reporting
 
 | Requirement | Status |
 |---|---|
-| Performix report generated | **⚠ Not yet** — requires O6 board or hedge target with Performix tooling |
+| Performix report generated | **⚠ Blocked** — requires O6 board or Arm Performix tooling on device |
 | `results/performix/` directory | ☐ Not created |
 
-**Status:** Blocked on hardware. The microbenchmark data in `results/raw/` covers
-the GDN kernel bandwidth story without Performix, but Performix is explicitly
-requested by the challenge brief. Add as opportunistic if hardware arrives.
+**Status:** Blocked on hardware (ADR 0007). The microbenchmark data in `results/raw/`
+covers the GDN kernel bandwidth story without Performix, but Performix is explicitly
+requested by the challenge brief. Add as opportunistic if hardware/tooling arrives.
 
 ## 7. Third-party licenses and NOTICE
 
 | Dependency | License | Status |
 |---|---|---|
-| Qwen3.5-4B / 0.8B weights | Apache-2.0 | ✓ Verified (docs/WEIGHT_LICENSE.md) |
+| Qwen3.5-4B / 0.8B weights | Apache-2.0 | ✓ Verified (`docs/WEIGHT_LICENSE.md`) |
 | numpy | BSD-3-Clause | ✓ Standard OS dep |
 | matplotlib | PSF-based (Matplotlib license) | ✓ Standard OS dep |
 | pytest | MIT | ✓ Dev dep |
@@ -113,19 +109,19 @@ requested by the challenge brief. Add as opportunistic if hardware arrives.
 
 | # | Item | Status |
 |---|---|---|
-| 1 | Track selection | ⚠ Deferred to go/no-go (Aug 9) |
+| 1 | Track selection | ✓ Edge AI (ADR 0007) |
 | 2 | Public repo | ⚠ **Maintainer action required** |
-| 3 | License visible in About | ⚠ **Maintainer action required** (set description) |
-| 4 | Write-up sections | ⚠ 2 of 3 complete, 1 partial |
-| 5 | Demo video | ✓ Optional — skipping |
+| 3 | License visible in About | ⚠ **Maintainer action required** (verify after making public) |
+| 4 | Write-up sections | ✓ All 3 complete |
+| 5 | Demo video | ✓ Optional — skipping unless ahead of schedule |
 | 6 | Arm Performix | ⚠ Blocked on hardware |
-| 7 | Third-party NOTICE | ⚠ Create NOTICE file |
+| 7 | Third-party NOTICE | ✓ Complete |
 | 8 | Weight compliance | ✓ Complete |
 
 **Items requiring maintainer action before submission:**
-1. Make repo public
-2. Set repo description and topics (About section)
-3. Select Devpost track
-4. Complete README "Reproducing" section
-5. Create NOTICE file
-6. Generate Arm Performix report (if hardware available)
+1. Make repo public (`gh repo edit alexcasper/OrionsBelt --visibility public`)
+2. Verify license is detected by GitHub after making public
+3. Select Edge AI track on the Devpost submission form (`ob-j7f`)
+
+**Items blocked on hardware (cannot complete without O6 board):**
+1. Arm Performix standardized report (§6)

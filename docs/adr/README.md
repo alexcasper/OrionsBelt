@@ -38,4 +38,8 @@ exactly the collision this table exists to prevent. Both derivations reached the
 decision independently, which is corroborating rather than contradictory; r5's text was
 kept and t3's survives in that branch's history.
 
+0007 was also written twice — by `bench/t3` and `bench/t4` — for the same decision
+(`ob-imb`). t3's version (`0007-commit-to-edge-ai-track.md`) was kept as the canonical
+text; t4's (`0007-track-selection-edge-ai.md`) is removed.
+
 The template is [`template.md`](./template.md).
