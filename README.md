@@ -182,7 +182,8 @@ for c in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do \
   echo performance | sudo tee "$c" >/dev/null; done
 
 # 3. Run the benchmark (pick the binary matching your core's ISA)
-./dist/bench_gdn_jetson_a57 --repeats 30 --csv > results/raw/my-device.csv
+#    e.g. bench_gdn_rk3588_a76, bench_gdn_pi5_a76, bench_gdn_jetson_a57
+./dist/bench_gdn_rk3588_a76 --repeats 30 --csv > results/raw/my-device.csv
 
 # 4. Capture provenance manifest
 python3 bench/manifest.py > results/manifests/my-device.json
