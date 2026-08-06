@@ -1,0 +1,13 @@
+# Post-run thermal snapshot
+# Device: rk3588-t3-quiet
+# Git SHA: 234807d
+# Timestamp: Y-08-06T19:24:38Z
+# OMP_NUM_THREADS: 1
+
+thermal_zone0 soc-thermal 48076
+thermal_zone1 bigcore0-thermal 48076
+thermal_zone2 bigcore1-thermal 48076
+thermal_zone3 littlecore-thermal 48076
+thermal_zone4 center-thermal 46230
+thermal_zone5 gpu-thermal 45307
+thermal_zone6 npu-thermal 46230
