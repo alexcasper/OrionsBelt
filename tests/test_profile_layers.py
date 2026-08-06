@@ -16,7 +16,7 @@ _ROOT = str(Path(__file__).resolve().parent.parent)
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
-from bench.profile_layers import write_csv  # noqa: E402
+from bench.profile_layers import tokenize_to_length, write_csv  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -216,3 +216,62 @@ class TestWriteCsvMultiContext:
         assert "linear_attention" in captured.out
         assert "full_attention" in captured.out
         assert "Wrote 4 rows" in captured.out
+
+
+# ---------------------------------------------------------------------------
+# tokenize_to_length() — mock tokenizer
+# ---------------------------------------------------------------------------
+
+
+class _MockTokenizer:
+    """Minimal tokenizer that returns predictable IDs."""
+
+    def __init__(self, special_id=1, pad_ids=None):
+        self._special = special_id
+        self._pad_ids = pad_ids or [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
+
+    def encode(self, text, add_special_tokens=True):
+        if add_special_tokens:
+            return [self._special] + self._pad_ids[:]
+        return self._pad_ids[:]
+
+
+class TestTokenizeToLength:
+    def test_returns_exact_length(self):
+        tok = _MockTokenizer()
+        result = tokenize_to_length(tok, 32)
+        assert len(result) == 32
+
+    def test_returns_exact_length_large(self):
+        tok = _MockTokenizer()
+        result = tokenize_to_length(tok, 500)
+        assert len(result) == 500
+
+    def test_seed_first_then_pad(self):
+        """The first call encodes with special tokens, then padding repeats."""
+        tok = _MockTokenizer(special_id=1, pad_ids=[10, 20])
+        result = tokenize_to_length(tok, 6)
+        # First call: [1, 10, 20], then extend with [10, 20], truncate to 6
+        assert result[0] == 1
+        assert result == [1, 10, 20, 10, 20, 10]
+
+    def test_shorter_than_single_encode(self):
+        """Target shorter than one encode → truncation."""
+        tok = _MockTokenizer(special_id=1, pad_ids=[10, 20, 30])
+        result = tokenize_to_length(tok, 2)
+        assert len(result) == 2
+        assert result == [1, 10]
+
+    def test_large_repeat(self):
+        """Many repetitions to reach a large target."""
+        tok = _MockTokenizer(special_id=0, pad_ids=[1])
+        result = tokenize_to_length(tok, 100)
+        assert len(result) == 100
+        assert result[0] == 0
+        assert all(r == 1 for r in result[1:])
+
+    def test_all_tokens_from_tokenizer(self):
+        """No hardcoded IDs — all come from the tokenizer."""
+        tok = _MockTokenizer(special_id=999, pad_ids=[888])
+        result = tokenize_to_length(tok, 5)
+        assert result == [999, 888, 888, 888, 888]
