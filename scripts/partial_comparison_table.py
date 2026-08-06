@@ -6,9 +6,10 @@ import csv
 import json
 import os
 import statistics
+from pathlib import Path
 
-RAW = "/home/j1/OrionsBelt/results/raw"
-MAN = "/home/j1/OrionsBelt/results/manifests"
+RAW = str(Path(__file__).resolve().parent.parent / "results" / "raw")
+MAN = str(Path(__file__).resolve().parent.parent / "results" / "manifests")
 
 
 def median(xs):
