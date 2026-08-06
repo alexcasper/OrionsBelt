@@ -94,8 +94,8 @@ def load_sustained(fname):
 PROV = {
     "jetson-j1_clean.csv": ("j1_20260804T102230Z_ba7506d", "ba7506d", False),
     "jetson-j1.csv": ("j1_20260802T235238Z_2c9ac9f", "2c9ac9f", True),
-    "jetson-j1_single.csv": ("(no manifest)", "dffac4b*", True),
-    "jetson-j1_omp.csv": ("(no manifest)", "dffac4b*", True),
+    "jetson-j1_single.csv": ("j1_20260806T110812Z_829a9c3", "829a9c3", True),
+    "jetson-j1_omp.csv": ("j1_20260806T110807Z_829a9c3", "829a9c3", True),
     "jetson-j2.csv": ("j2_20260803T144316Z_6ea1771", "6ea1771", True),
     "jetson-j2_single.csv": ("(no manifest)", "a085417*", True),
     "jetson-j2-omp.csv": ("(no manifest)", "a085417*", True),
@@ -105,8 +105,8 @@ PROV = {
     "jetson-j2-omp-unroll.csv": ("(no manifest)", "a085417*", True),
     "pi5-r5.csv": ("r5_20260802T201237Z_28729f3", "28729f3", True),
     "pi5-j1.csv": ("r5_20260803T083154Z_f127a11", "f127a11", True),
-    "rk3588-t3_big.csv": ("t3_20260802T211312Z_28729f3", "28729f3", True),
-    "rk3588-t3_little.csv": ("t3_20260802T211312Z_28729f3", "28729f3", True),
+    "rk3588-t3_big.csv": ("t3_20260806T053612Z_553a96e", "553a96e", False),
+    "rk3588-t3_little.csv": ("t3_20260806T053612Z_553a96e", "553a96e", False),
     "rk3588-t4_big.csv": ("t4_20260802T211249Z_28729f3", "28729f3", True),
     "rk3588-t4_little.csv": ("t4_20260802T211249Z_28729f3", "28729f3", True),
 }
@@ -115,7 +115,14 @@ print("=" * 90)
 print("ABLATION (model-level, tidy long, cpu/cpu hybrid, 4K)")
 ab = load_ablation()
 print("  run_id    :", ab["run_id"])
-print("  git_sha   :", ab["git_sha"], " (manifest file MISSING from results/manifests/)")
+_abl_man_exists = all(os.path.isfile(m) for m in ab["manifest_ref"])
+print(
+    "  git_sha   :",
+    ab["git_sha"],
+    " (manifest file exists)"
+    if _abl_man_exists
+    else " (manifest file MISSING from results/manifests/)",
+)
 print("  manifest  :", ab["manifest_ref"])
 print("  context   :", ab["context"], " quant:", ab["quant"], " engines:", ab["engines"])
 print("  model     :", ab["model"])
@@ -173,7 +180,7 @@ for label, fname in fleet:
     sc_s = f"{sc[0]:<5.2f}" if sc else "  —  "
     cv_s = f"{cv[0]:<5.2f}" if cv else "  —  "
     print(f"  {label:<16} {sha:<20} {ds:<6}  {cd_s}  {sc_s}  {cv_s}")
-print("  (t4 preferred over t3 per ob-bf7: t3 scan spread=153% contaminated; t4 spread=17%)")
+print("  (t4 used as conservative anchor; t3 re-run clean at 553a96e — 6% spread, 11.07 GiB/s)")
 
 print("\n" + "=" * 90)
 print("OPTIMIZATION LADDER on Jetson (Qwen3.5-4B, seq=64) — GiB/s @ p50 / p50 µs")

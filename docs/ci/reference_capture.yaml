@@ -1,0 +1,86 @@
+name: Reference Capture
+
+# Manually-triggered workflow to produce golden reference logits for the
+# correctness oracle (bead ob-aqv).  Uses a GitHub Actions runner as the
+# "commodity x86 hardware" the bead calls for.
+#
+# The 0.8B model runs in fp16 on CPU in a few minutes. The 4B model needs
+# ~8 GB RAM — use a larger runner or CUDA host for that.
+#
+# Artifacts (results/reference/*.json) are uploaded and can be committed
+# to the repo or used directly by bench/correctness.py.
+
+on:
+  workflow_dispatch:
+    inputs:
+      model:
+        description: "Model checkpoint"
+        type: choice
+        options: ["0.8b", "4b"]
+        default: "0.8b"
+      context_lengths:
+        description: "Comma-separated context lengths"
+        default: "4096"
+      prompts:
+        description: "Number of standard prompts"
+        default: "3"
+      decode_length:
+        description: "Tokens to greedily decode"
+        default: "16"
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install CPU-only torch + transformers
+        run: |
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install transformers
+
+      - name: Capture golden reference logits
+        run: |
+          python3 scripts/capture_reference.py \
+            --model "${{ inputs.model }}" \
+            --device cpu \
+            --context-lengths "${{ inputs.context_lengths }}" \
+            --prompts "${{ inputs.prompts }}" \
+            --decode-length "${{ inputs.decode_length }}"
+
+      - name: Verify outputs exist and are valid JSON
+        run: |
+          python3 - <<'PY'
+          import json, glob, sys
+          files = sorted(glob.glob("results/reference/ref_*.json"))
+          if not files:
+              print("FAIL: no reference files generated", file=sys.stderr)
+              sys.exit(1)
+          for f in files:
+              d = json.load(open(f))
+              assert "logits" in d, f"{f}: missing logits"
+              assert "perplexity" in d, f"{f}: missing perplexity"
+              assert "metadata" in d, f"{f}: missing metadata"
+              print(f"OK: {f} (ppl={d['perplexity']:.2f}, "
+                    f"ctx={d['metadata']['context_length']})")
+          manifest = json.load(open("results/reference/manifest.json"))
+          print(f"\nManifest: model={manifest.get('model_checkpoint','?')}, "
+                f"sha={manifest.get('git',{}).get('sha','?')[:8]}")
+          print(f"{len(files)} reference files captured.")
+          PY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: golden-reference-${{ inputs.model }}
+          path: results/reference/
+          retention-days: 90
