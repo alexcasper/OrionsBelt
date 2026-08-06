@@ -246,6 +246,8 @@ def main() -> int:
             print(
                 f"  {label:<38} first={s[0]:.2f} last={s[1]:.2f} median={s[2]:.2f} GiB/s  "
                 f"drift={(s[1] - s[0]) / s[0] * 100:+.1f}%  (n={s[3]} samples)"
+                if s[0]
+                else "drift=N/A"
             )
 
     print("\n" + "=" * 90)
