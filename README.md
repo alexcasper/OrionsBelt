@@ -123,7 +123,7 @@ All figures above are verified against primary sources (Radxa product page and d
 | Repository skeleton, Apache-2.0 license | Done |
 | Results schema (`docs/RESULTS_SCHEMA.md`) | Done |
 | Benchmark harness (`bench/`) + device microbenchmark (`bench_gdn.c`) | Producing data |
-| CI: lint + unit tests (733 tests) | Done — `.github/workflows/ci.yaml` |
+| CI: lint + unit tests (884 tests) | Done — `.github/workflows/ci.yaml` |
 | Device-fleet microbenchmarks (5 devices) | Done — [fleet analysis](./results/figures/fleet_bandwidth_scaling.md) |
 | Ablation matrix (6 configs, synthetic) | Done — [comparison table](./results/figures/ablation_comparison.md) |
 | Memory decomposition (analytical) | Done — [figures](./results/figures/) |
@@ -141,12 +141,12 @@ All figures above are verified against primary sources (Radxa product page and d
 | Per-layer engine mapping (NPU/GPU/CPU) | Hypothesis only — pending measurements |
 | Full inference results (tokens/sec, TTFT, memory) | **Not started — needs hardware** |
 
-> **Results so far:** 37 CSVs from the device fleet, 17 provenance manifests, 12 generated figures/tables.
+> **Results so far:** 36 CSVs from the device fleet, 22 provenance manifests, 12 generated figures/tables.
 >
 > ```
 > results/
->   raw/         <- 29 per-run CSVs across 5 devices
->   manifests/   <- 17 provenance manifests (git SHA, governor, thermals)
+>   raw/         <- 36 per-run CSVs across 5 devices
+>   manifests/   <- 22 provenance manifests (git SHA, governor, thermals)
 >   figures/     <- fleet analysis, ablation comparison, kernel/memory plots
 > ```
 >
