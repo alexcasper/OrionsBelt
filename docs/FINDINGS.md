@@ -2682,7 +2682,7 @@ run at clean commits with manifests (`dirty=false`), 20 tokens × 2 runs,
 consistent across replicates (within 1%).
 
 Achieved bandwidth: 54–57% of the RK3588 practical DRAM bandwidth ceiling
-(~25 GiB/s measured, vs 31.7 GiB/s theoretical at 2112 MHz). The remaining gap is FMA compute latency and L2 cache miss overhead.
+(~25 GiB/s measured, vs 33.8 GB/s theoretical at 2112 MHz). The remaining gap is FMA compute latency and L2 cache miss overhead.
 
 ### Correction to §12
 
