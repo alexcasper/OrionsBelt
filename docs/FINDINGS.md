@@ -2534,6 +2534,85 @@ Manifest: `results/manifests/jetson-j1_e2e.json`
 
 ---
 
+## 15. GEMV cache optimization: 10–15× e2e decode speedup from fixing the memory access pattern (2026-08-07)
+
+### Motivation
+
+The per-phase bottleneck breakdown instrumentation (added at commit `a756662`)
+revealed that >99% of e2e decode time is spent in GEMV matmuls — FFN blocks
+(72%), GDN projections (14%), and output projections (8%) — while the GDN
+recurrent kernels (conv, decay, scan) account for **<0.1% combined**.
+
+Roofline analysis of the old GEMV showed why: it achieved only **0.9–1.4 GB/s**
+on a system with ~25 GB/s LPDDR4x bandwidth. The root cause was a
+column-sweep access pattern that strides by N (up to 9216 floats = 36 KB)
+between consecutive K iterations, using only **0.17%** of each 64-byte cache
+line.
+
+### Fix
+
+Replaced the column-sweep GEMV with a **row-sweep + OpenMP-tiled** version:
+
+- **K-outer, N-inner**: each row of B is accessed sequentially, giving ~100%
+  cache-line utilization.
+- **OpenMP `parallel for`** over N-tiles (1024-element tiles, 4 KB each): all
+  4 A76 big cores participate instead of 1.
+
+The change is 20 lines of C. No weight layout change, no new dependencies.
+
+### Results — RK3588 Cortex-A76 (4 cores, FP32, governor=performance)
+
+| Model | Old GEMV tok/s | New GEMV tok/s | Speedup | Old s/tok | New s/tok | Achieved BW |
+|-------|---------------:|---------------:|--------:|----------:|----------:|------------:|
+| Qwen3.5-4B   | 0.07 | 1.04 | **14.9×** | 13.7 | 0.96 | 13.5 GB/s |
+| Qwen3.5-0.8B | 0.79 | 7.98 | **10.1×** | 1.27 | 0.125 | 14.3 GB/s |
+
+Commits: old GEMV at `a756662`; optimized GEMV at `2e752af`. Both benchmarks
+run at clean commits with manifests (`dirty=false`), 20 tokens × 2 runs,
+consistent across replicates (within 1%).
+
+Achieved bandwidth: 54–57% of the RK3588 LPDDR4x-4266 theoretical peak (~25
+GB/s). The remaining gap is FMA compute latency and L2 cache miss overhead.
+
+### Correction to §12
+
+Section 12 stated the bottleneck was "Python/PyTorch dispatch overhead." The
+naive C GEMV produced the same 0.79 tok/s as PyTorch — confirming both used
+the same pathological access pattern on ARM CPU. The optimized C GEMV is
+**10× faster** than both, proving the bottleneck was never dispatch overhead
+but a naive memory access pattern in the GEMV.
+
+### Bottleneck breakdown after optimization (unchanged proportions)
+
+The phase proportions are nearly identical before and after the GEMV fix,
+because the optimization uniformly speeds up all matmuls:
+
+| Phase | 4B share | 0.8B share |
+|-------|---------:|-----------:|
+| FFN (gate + up + down) | 72.4% | 54.1% |
+| GDN q/k/v projections | 13.8% | 29.9% |
+| GDN output projection | 8.1% | 8.2% |
+| Full-attention layers | 5.6% | 7.5% |
+| GDN conv1d | 0.1% | 0.3% |
+| GDN cumdecay | 0.0% | 0.0% |
+| GDN gated scan | 0.0% | 0.0% |
+
+**Implication**: optimizing the GDN recurrent-scan kernels (ob-8qt.1, ob-8qt.3)
+cannot move e2e tokens/sec — they are <0.4% of decode time. The next
+high-impact optimization is **INT8 weight quantization** (halves memory
+traffic) or **cache-blocking the matmul** for prefill (M>1, where the naive
+triple loop also wastes bandwidth).
+
+### Data
+
+```json
+{"device": "t3", "models": ["Qwen3.5-4B", "Qwen3.5-0.8B"],
+ "old_gemv_commit": "a756662", "new_gemv_commit": "2e752af",
+ "results_commit": "7962968 (4B), 41a847d (0.8B)",
+ "governor": "performance", "cluster": "big (A76 cores 4-7)"}
+```
+
+Files: `results/raw/rk3588-t3_e2e_raw.csv`, `results/raw/rk3588-t3_08b_e2e_raw.csv`
 ## GDN-2 vs GDN-1 Gated Scan: Operator-Level Comparison on RK3588-t4
 
 **Date:** 2026-08-07

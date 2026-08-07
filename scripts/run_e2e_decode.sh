@@ -36,7 +36,8 @@ PIN_CPUS=""
 CLUSTER="all"
 RUNS=1
 FORCE=0
-BINARY="dist/bench_gdn_e2e_decode"
+MODEL="4b"
+BINARY=""
 K=src/orionsbelt/engines/cpu/kernels
 
 # --- arg parsing ------------------------------------------------------------
@@ -48,10 +49,24 @@ while [[ $# -gt 0 ]]; do
         --cluster) CLUSTER="$2"; shift 2 ;;
         --runs)    RUNS="$2"; shift 2 ;;
         --binary)  BINARY="$2"; shift 2 ;;
+        --model)   MODEL="$2"; shift 2 ;;   # 4b (default) or 08b
         --force)   FORCE=1; shift ;;
         *) echo "Unknown option: $1" >&2; exit 1 ;;
     esac
 done
+
+case "$MODEL" in
+    4b)   MODEL_DEFINE="" ;;
+    08b)  MODEL_DEFINE="-DMODEL_08B" ;;
+    *) echo "Unknown --model: $MODEL (expected 4b or 08b)" >&2; exit 1 ;;
+esac
+if [ -z "$BINARY" ]; then
+    if [ "$MODEL" = "4b" ]; then
+        BINARY="dist/bench_gdn_e2e_decode"
+    else
+        BINARY="dist/bench_gdn_e2e_decode_${MODEL}"
+    fi
+fi
 
 # --- 1. clean tree check ----------------------------------------------------
 STATUS=$(git status --porcelain 2>/dev/null || true)
@@ -91,8 +106,12 @@ if [ -z "$DEVICE_NAME" ]; then
         *)             DEVICE_NAME="$HOST" ;;
     esac
 fi
+if [ "$MODEL" != "4b" ]; then
+    DEVICE_NAME="${DEVICE_NAME}_${MODEL}"
+fi
 
 echo "  Device:  $DEVICE_NAME"
+echo "  Model:   $MODEL"
 echo "  Cluster: $CLUSTER"
 echo ""
 
@@ -115,7 +134,7 @@ if [ ! -x "$BINARY" ]; then
     else
         ISA_FLAGS="-march=armv8-a"
     fi
-    cc -O3 -fopenmp $ISA_FLAGS -static \
+    cc -O3 -fopenmp $ISA_FLAGS $MODEL_DEFINE -static \
         -Wno-aggressive-loop-optimizations \
         "$K/gdn_sve.c" "$K/gdn_delta_matmul.c" "$K/gdn_e2e_decode.c" \
         -I"$K/" -o "$BINARY" -lm 2>&1 || {
@@ -194,7 +213,7 @@ echo ""
 
 RAW_OUT="results/raw/${DEVICE_NAME}_e2e_raw.csv"
 # Write header for raw CSV (same as binary output)
-echo "model,tokens,ttft_ms,tok_per_sec_mean,p50_us,p95_us,p99_us,mean_us" > "$RAW_OUT"
+echo "model,tokens,ttft_ms,tok_per_sec_mean,p50_us,p95_us,p99_us,mean_us,gdn_proj_pct,gdn_conv_pct,gdn_decay_pct,gdn_scan_pct,gdn_oproj_pct,full_pct,ffn_pct" > "$RAW_OUT"
 
 for run_idx in $(seq 0 $((RUNS - 1))); do
     echo "  Run $((run_idx + 1))/$RUNS..."

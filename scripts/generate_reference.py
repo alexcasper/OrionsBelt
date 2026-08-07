@@ -59,6 +59,7 @@ try:
     from transformers import AutoModelForCausalLM, AutoTokenizer
 
     _TORCH_AVAILABLE = True
+    _IMPORT_ERROR = ""
 except ImportError as e:  # pragma: no cover
     _TORCH_AVAILABLE = False
     _IMPORT_ERROR = str(e)
