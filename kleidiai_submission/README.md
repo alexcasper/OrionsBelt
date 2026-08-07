@@ -299,51 +299,12 @@ making it the worst-case portability floor.
 > double-width unrolling (8 channels/iter) and `vfmaq_n_f32` scalar FMA,
 > matching the three recurrent kernels' pattern.
 
-### A76 (Armv8.2, NEON+dotprod path) — measured on RK3588 (Turing Machines RK1)
-
-Same shapes as above; p50 of 30 repeats. The A76 is a wider, deeper OoO core
-than the A57 with double the L2 (512 KiB vs 128 KiB) and ~2× the clock. The
-NEON dispatch path is identical to the A57's — no SVE or dotprod instructions
-are used by these kernels on this core.
-
-| Kernel      | Shape (seq×ch)   | p50 (µs) | GiB/s |
-|-------------|------------------|----------|-------|
-| cumdecay    | 64×160           |     10.8 |   7.1 |
-| cumdecay    | 1×160            |      0.3 |   4.1 |
-| cumdecay    | 64×2560          |    522.7 |   2.3 |
-| cumdecay    | 1×2560           |      2.9 |   6.5 |
-| gated_scan  | 64×160           |     19.0 |   6.1 |
-| gated_scan  | 1×160            |      0.3 |  10.2 |
-| gated_scan  | 64×2560          |    176.8 |  10.5 |
-| gated_scan  | 1×2560           |      1.2 |  40.9 |
-| dwconv1d    | 64×160           |      5.3 |  15.7 |
-| dwconv1d    | 1×160            |      0.3 |  24.6 |
-| dwconv1d    | 64×2560          |    134.2 |   9.8 |
-| dwconv1d    | 1×2560           |      2.6 |  43.6 |
-| gemv        | K=128 N=128      |      3.5 |  17.7 |
-| gemv        | K=128 N=2048     |     57.8 |  17.1 |
-| gemv        | K=128 N=2560     |     71.8 |  17.2 |
-
-> **A57 vs A76:** The GEMV scales with the wider NEON pipeline and larger L2:
-> 17.1–17.7 GiB/s on A76 vs 4.7–5.3 GiB/s on A57 (3.3× speedup, matching the
-> ~3.5× clock×IPC ratio). The recurrent kernels show a smaller gap because they
-> are latency-bound at seq=1 (launch overhead dominates) and bandwidth-bound at
-> seq=64 (the RK3588's shared DRAM is the bottleneck, not the core). dwconv1d
-> at seq=64 is the standout: 15.7 GiB/s on A76 vs 4.6 GiB/s on A57 — the
-> depthwise nature (no channel-axis reduction) lets the wider core's memory
-> subsystem shine.
-> on the same kernel at the same commit, per beads ob-bf7). The numbers above
-> are from representative single runs; cross-device comparisons must use
-> matched commits with multiple replicates. The GEMV NEON path uses
-> double-width unrolling (8 channels/iter) and `vfmaq_n_f32` scalar FMA,
-> matching the three recurrent kernels' pattern.
-
 At seq=64 (prefill chunk), all three recurrent kernels are bandwidth-bound
 (1.6–6.6 GiB/s vs the A57's 25.6 GiB/s spec). At seq=1 (decode), the working
 set fits in L1 and the kernels are launch-overhead-dominated, not
 bandwidth-limited. The GEMV at all sizes is bandwidth-bound at ~5 GiB/s.
 
-### A76 (Armv8.2-A, NEON + dotprod path) — measured on RK3588
+### A76 (Armv8.2-A, NEON + dotprod path) — measured on RK3588 (device t3)
 
 All numbers are p50 of 30 repeats on a Cortex-A76 @ 2.3 GHz (RK3588, device t3).
 Governor: `performance`. The A76 has 4-wide NEON with dotprod (`asimddp`) but no
