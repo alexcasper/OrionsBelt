@@ -1,0 +1,13 @@
+# Pre-run thermal snapshot
+# Device: rk3588-t4-big-omp4
+# Git SHA: 736a4c2
+# Timestamp: Y-08-07T00:59:09Z
+# OMP_NUM_THREADS: 4
+
+thermal_zone0 package-thermal 39769
+thermal_zone1 bigcore0-thermal 39769
+thermal_zone2 bigcore2-thermal 39769
+thermal_zone3 littlecore-thermal 39769
+thermal_zone4 center-thermal 39769
+thermal_zone5 gpu-thermal 38846
+thermal_zone6 npu-thermal 39769

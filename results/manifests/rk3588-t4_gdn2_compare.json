@@ -1,8 +1,8 @@
 {
   "caller": {},
   "git": {
-    "dirty": false,
-    "sha": "f015982271a14910e6c7bae7bb49f83f195fa1cb"
+    "dirty": true,
+    "sha": "cee727340b4483193da6795b8ca3520b50602e0e"
   },
   "host": {
     "core_count": 8,
@@ -10,65 +10,65 @@
     "cpu_topology": [
       {
         "cpu": 0,
-        "cpu_capacity": 414,
+        "cpu_capacity": 397,
         "governor": "performance",
         "max_freq_khz": 1800000,
-        "min_freq_khz": 1800000
+        "min_freq_khz": 1008000
       },
       {
         "cpu": 1,
-        "cpu_capacity": 414,
+        "cpu_capacity": 397,
         "governor": "performance",
         "max_freq_khz": 1800000,
-        "min_freq_khz": 1800000
+        "min_freq_khz": 1008000
       },
       {
         "cpu": 2,
-        "cpu_capacity": 414,
+        "cpu_capacity": 397,
         "governor": "performance",
         "max_freq_khz": 1800000,
-        "min_freq_khz": 1800000
+        "min_freq_khz": 1008000
       },
       {
         "cpu": 3,
-        "cpu_capacity": 414,
+        "cpu_capacity": 397,
         "governor": "performance",
         "max_freq_khz": 1800000,
-        "min_freq_khz": 1800000
+        "min_freq_khz": 1008000
       },
       {
         "cpu": 4,
         "cpu_capacity": 1024,
         "governor": "performance",
-        "max_freq_khz": 2304000,
-        "min_freq_khz": 408000
+        "max_freq_khz": 2400000,
+        "min_freq_khz": 1200000
       },
       {
         "cpu": 5,
         "cpu_capacity": 1024,
         "governor": "performance",
-        "max_freq_khz": 2304000,
-        "min_freq_khz": 408000
+        "max_freq_khz": 2400000,
+        "min_freq_khz": 1200000
       },
       {
         "cpu": 6,
         "cpu_capacity": 1024,
         "governor": "performance",
-        "max_freq_khz": 2304000,
-        "min_freq_khz": 408000
+        "max_freq_khz": 2400000,
+        "min_freq_khz": 1200000
       },
       {
         "cpu": 7,
         "cpu_capacity": 1024,
         "governor": "performance",
-        "max_freq_khz": 2304000,
-        "min_freq_khz": 408000
+        "max_freq_khz": 2400000,
+        "min_freq_khz": 1200000
       }
     ],
-    "hostname": "t3",
-    "kernel": "5.10.160-rockchip",
+    "hostname": "t4",
+    "kernel": "6.11.0-1006-rockchip",
     "machine": "aarch64",
-    "os": "Linux-5.10.160-rockchip-aarch64-with-glibc2.35"
+    "os": "Linux-6.11.0-1006-rockchip-aarch64-with-glibc2.40"
   },
   "isa_features": {
     "asimddp": true,
@@ -80,8 +80,8 @@
   },
   "manifest_version": 1,
   "memory": {
-    "mem_available_kb": 31250828,
-    "mem_total_kb": 32550332
+    "mem_available_kb": 5039332,
+    "mem_total_kb": 8120248
   },
   "parallelism": {
     "effective_threads": 8,
@@ -90,53 +90,53 @@
     "omp_proc_bind": null,
     "threads_source": "core_count_default"
   },
-  "run_id": "t3_20260807T003151Z_f015982",
+  "run_id": "t4_20260807T002848Z_cee7273",
   "software": {
     "packages": {
-      "numpy": "1.26.4",
-      "onnxruntime": "1.23.2",
-      "torch": "2.5.0",
-      "transformers": "5.15.0.dev0"
+      "numpy": "2.5.1",
+      "onnxruntime": null,
+      "torch": null,
+      "transformers": null
     },
     "python_implementation": "CPython",
-    "python_version": "3.10.12 (main, Jun 22 2026, 18:55:27) [GCC 11.4.0]"
+    "python_version": "3.12.7 (main, Jun 18 2025, 13:16:51) [GCC 14.2.0]"
   },
   "thermal_zones": [
     {
-      "temp_millicelsius": 40692,
-      "type": "soc-thermal",
+      "temp_millicelsius": 39769,
+      "type": "package-thermal",
       "zone": "thermal_zone0"
     },
     {
-      "temp_millicelsius": 40692,
+      "temp_millicelsius": 39769,
       "type": "bigcore0-thermal",
       "zone": "thermal_zone1"
     },
     {
-      "temp_millicelsius": 40692,
-      "type": "bigcore1-thermal",
+      "temp_millicelsius": 39769,
+      "type": "bigcore2-thermal",
       "zone": "thermal_zone2"
     },
     {
-      "temp_millicelsius": 40692,
+      "temp_millicelsius": 39769,
       "type": "littlecore-thermal",
       "zone": "thermal_zone3"
     },
     {
-      "temp_millicelsius": 39769,
+      "temp_millicelsius": 38846,
       "type": "center-thermal",
       "zone": "thermal_zone4"
     },
     {
-      "temp_millicelsius": 39769,
+      "temp_millicelsius": 38846,
       "type": "gpu-thermal",
       "zone": "thermal_zone5"
     },
     {
-      "temp_millicelsius": 39769,
+      "temp_millicelsius": 38846,
       "type": "npu-thermal",
       "zone": "thermal_zone6"
     }
   ],
-  "timestamp_utc": "2026-08-07T00:31:51Z"
+  "timestamp_utc": "2026-08-07T00:28:48Z"
 }

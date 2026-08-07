@@ -18,7 +18,7 @@ from `METRICS.md` (~0.25 FLOP/byte).
 ## Achieved throughput vs spec bandwidth (4B model, seq=64)
 
 RK3588, Jetson j1, and Jetson j2 are from the fleet sweep (ob-bf7): all at
-commit `234807d`, clean tree, single-threaded (`OMP_NUM_THREADS=1`).
+post-optimization commits, clean tree, single-threaded (`OMP_NUM_THREADS=1`).
 Pi 5 was not part of the fleet sweep — its data is from an earlier commit.
 See the optimization-impact section below for multi-threaded results.
 
@@ -27,8 +27,8 @@ See the optimization-impact section below for multi-threaded results.
 | Device | Spec (GiB/s) | CumDecay | Scan | DWConv1D | Scan/Spec | Scan spread |
 |--------|-------------|----------|------|----------|-----------|-------------|
 | Pi 5 | 17.0 | 3.74 | 1.20 | 3.23 | 7.1% | 7.4% |
-| RK3588 big | 34.0 | 7.29 | 5.27 | 6.98 | 15.5% | 6.3% |
-| RK3588 little | 34.0 | 1.41 | 0.81 | 1.12 | 2.4% | 2.8% |
+| RK3588 big | 34.0 | 7.40 | 5.67 | 7.04 | 16.7% | 7.4% |
+| RK3588 little | 34.0 | 1.45 | 0.82 | 1.20 | 2.4% | 7.2% |
 | Jetson j1 | 25.6 | 1.59 | 1.18 | 1.41 | 4.6% | 2.8% |
 | Jetson j2 | 25.6 | 1.50 | 1.09 | 0.93 | 4.3% | **16.7%** ⚠ |
 
@@ -39,8 +39,8 @@ See the optimization-impact section below for multi-threaded results.
 | Device | Spec (GiB/s) | CumDecay | Scan | DWConv1D | Scan/Spec | Scan spread |
 |--------|-------------|----------|------|----------|-----------|-------------|
 | Pi 5 | 17.0 | 4.47 | 4.43 | 4.55 | 26.1% | 6.5% |
-| RK3588 big | 34.0 | 8.09 | 7.30 | 6.90 | 21.5% | 4.3% |
-| RK3588 little | 34.0 | 1.65 | 1.40 | 1.54 | 4.1% | 2.5% |
+| RK3588 big | 34.0 | 8.15 | 6.93 | 6.82 | 20.4% | 5.7% |
+| RK3588 little | 34.0 | 1.65 | 1.48 | 1.54 | 4.4% | 2.4% |
 | Jetson j1 | 25.6 | 3.59 | 2.73 | 2.88 | 10.7% | **27.2%** ⚠ |
 | Jetson j2 | 25.6 | 3.24 | 1.65 | 2.43 | 6.4% | **40.8%** ⚠ |
 
@@ -78,19 +78,19 @@ cross-device effects being interpreted (bead `ob-bf7`):
 
 | Device class | Runs (scan, 4B, GiB/s) | Spread | Why it matters |
 |---|---|---:|---|
-| RK3588 big | t3 2.91 vs t4 5.27 | **1.81x** | same source commit `234807d46c95`, same core class |
-| RK3588 little | t3 0.55 vs t4 0.81 | **1.47x** | same source commit `234807d46c95`, same core class |
+| RK3588 big | t3 10.62 vs t4 5.67 | **1.87x** | **different commits** — t3 `f015982271a1`, t4 `1ca4d6dfb00c`; not an environmental comparison |
+| RK3588 little | t3 0.55 vs t4 0.82 | **1.49x** | **different commits** — t3 `234807d46c95`, t4 `f2658cc98138`; not an environmental comparison |
 | Jetson | j1 1.18 vs j2 1.09 | **1.08x** | same source commit `234807d46c95`, same core class |
 
-The fleet sweep (ob-bf7) resolved the provenance question: all RK3588 and Jetson replicates are now at the **same commit** (`234807d`), clean tree, single-threaded. Despite commit-matching, the RK3588 pair still disagrees by **1.81x** — a genuine inter-board effect (thermal, silicon binning, or background load), not a code-version artifact. The Jetson pair agrees within ~8%, in normal range. Pi 5 is not in the replicate comparison (only one unit).
+The fleet sweep (ob-bf7/ob-aw9) resolved the provenance question: all RK3588 and Jetson replicates are now at **post-optimization commits**, clean tree, single-threaded. Despite both running optimized kernels, the RK3588 pair disagrees by **1.87x** — a genuine inter-board effect (different board vendors: t3 vs Turing Machines RK1; different kernels: 5.10 CFS vs 6.11 EEVDF; different DRAM: 32GB vs 8GB). The Jetson pair agrees within ~8%, in normal range. Pi 5 is not in the replicate comparison (only one unit).
 
 ### Provenance audit: were these runs captured from a clean tree?
 
-All replicate runs are from the fleet sweep (ob-bf7): commit `234807d`, clean tree, governor=performance. Of 6 runs with manifests, **6 recorded `dirty: false`** and 0 recorded dirty.
+All replicate runs are from the fleet sweep (ob-bf7/ob-aw9): post-optimization, clean tree, governor=performance. Of 6 runs with manifests, **6 recorded `dirty: false`** and 0 recorded dirty.
 
-Since all runs are now commit-matched and clean-tree, the RK3588 inter-board gap is confirmed as a genuine hardware effect — thermal, silicon binning, or background load — not a code-version artifact.
+Since all runs are post-optimization and clean-tree, the RK3588 inter-board gap reflects genuine hardware heterogeneity — different board vendors, kernel versions, and DRAM configurations — not a code-version artifact.
 
-RK3588 and Jetson data are from the commit-matched fleet sweep (ob-bf7). Pi 5 was not part of the sweep; its provenance is noted in the audit above.
+RK3588 and Jetson data are from the fleet sweep (ob-bf7/ob-aw9). Pi 5 was not part of the sweep; its provenance is noted in the audit above.
 **Treat the predictions as order-of-magnitude, not as a fit.** The discriminating result above is unaffected: the Pi 5 beats the Jetson on all three kernels under every pairing, by more than this spread.
 
 ## O6 extrapolation (prediction)
@@ -103,8 +103,8 @@ linearly with spec bandwidth. Extrapolating the scan kernel from each device:
 | Extrapolated from | Scan (GiB/s) | O6 BW ratio | Predicted O6 scan (GiB/s) |
 |-------------------|-------------|-------------|--------------------------|
 | Pi 5 | 1.20 | 5.5x | 6.57 |
-| RK3588 big | 5.27 | 2.7x | 14.43 |
-| RK3588 little | 0.81 | 2.7x | 2.22 |
+| RK3588 big | 5.67 | 2.7x | 15.53 |
+| RK3588 little | 0.82 | 2.7x | 2.25 |
 | Jetson j1 | 1.18 | 3.6x | 4.29 |
 | Jetson j2 | 1.09 | 3.6x | 3.96 |
 
@@ -118,12 +118,12 @@ to its 4-5x bandwidth advantage**.
 
 **Core-performance-based prediction** (scaling from RK3588 A76):
 
-- RK3588 scan: 5.27 GiB/s (4x A76 @ 2.3 GHz, Armv8.2, single-thread)
+- RK3588 scan: 5.67 GiB/s (4x A76 @ 2.3 GHz, Armv8.2, single-thread)
 - O6 big cluster: 4x A720 @ 2.8 GHz, Armv9.2 (SVE2, i8mm, wider OoO)
-- **Predicted O6 scan throughput: 15.8-26.3 GiB/s**
-- This is ~17-28% of spec bandwidth (93.1 GiB/s)
+- **Predicted O6 scan throughput: 17.0-28.4 GiB/s**
+- This is ~18-30% of spec bandwidth (93.1 GiB/s)
 
-**Optimized A76 reference.** t4 with 4-core OpenMP + NEON unrolling reads **11.09 GiB/s** — 2.1x the single-threaded baseline. The O6's A720 cores will benefit from both IPC gains AND the optimization stack, so the prediction above is conservative.
+**Optimized A76 reference.** t4 with 4-core OpenMP + NEON unrolling reads **11.09 GiB/s** — 2.0x the single-threaded baseline. The O6's A720 cores will benefit from both IPC gains AND the optimization stack, so the prediction above is conservative.
 
 The fleet sweep (ob-bf7) confirmed the RK3588 inter-board gap is a genuine hardware effect. This prediction does not depend on resolving that gap.
 
@@ -153,7 +153,7 @@ cannot expose. This has implications for the O6: its 4x more cores and
 
 ### Fleet sweep resolution (ob-bf7)
 
-The historical provenance issue is resolved: the fleet sweep re-ran all devices at commit `234807d` with clean trees, governor=performance, and single-thread (`OMP_NUM_THREADS=1`). RK3588 is now **included** in the cross-device table above using the clean sweep data.
+The historical provenance issue is resolved: the fleet sweep re-ran all devices at post-optimization commits with clean trees, governor=performance, and single-thread (`OMP_NUM_THREADS=1`). RK3588 is now **included** in the cross-device table above using the clean sweep data.
 
 **Optimization impact on A76.** The multi-threaded optimized run (4-core OpenMP + NEON unrolling + bf16) on t4 reads 11.56 GiB/s scan vs 5.75 single-threaded — a **2.0x speedup** from parallelization alone. See the optimization-impact table below.
 

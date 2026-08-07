@@ -26,8 +26,6 @@ Usage:
 Stdlib only — runs on edge devices. Bead ob-mrd.8.
 """
 
-from __future__ import annotations
-
 import argparse
 import csv
 import os
@@ -49,9 +47,7 @@ def parse_args() -> argparse.Namespace:
         required=True,
         help="Path to manifest (relative to repo root)",
     )
-    p.add_argument(
-        "--quantization", default="fp32", help="Quantization code (default: fp32)"
-    )
+    p.add_argument("--quantization", default="fp32", help="Quantization code (default: fp32)")
     p.add_argument(
         "--model-checkpoint",
         default="Qwen/Qwen3.5-4B",
@@ -184,9 +180,7 @@ def convert(raw_path: str, args: argparse.Namespace) -> None:
 
     print(f"Wrote {len(output_rows)} schema-conformant rows to {args.output}")
     for r in output_rows:
-        print(
-            f"  {r['phase']:8s} {r['metric_name']:30s} = {r['value']:>12s} {r['unit']}"
-        )
+        print(f"  {r['phase']:8s} {r['metric_name']:30s} = {r['value']:>12s} {r['unit']}")
 
 
 if __name__ == "__main__":

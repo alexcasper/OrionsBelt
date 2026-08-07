@@ -118,13 +118,21 @@ echo ""
 # --- 3. build if needed ----------------------------------------------------
 if [ ! -x "$BINARY" ]; then
     echo "  Binary not found, building..."
-    # Detect ISA and use appropriate flags
-    ISA_FLAGS="-march=armv8.2-a+dotprod"
+    # Detect ISA and use appropriate flags (mirrors detect_isa.sh logic).
+    # Must handle ARMv8.0-A cores (e.g. Cortex-A57) that lack dotprod —
+    # the old default of -march=armv8.2-a+dotprod would SIGILL on them.
     FEATURES=$(grep -m1 '^Features' /proc/cpuinfo 2>/dev/null || echo "")
-    if echo "$FEATURES" | grep -qw 'sve2'; then
+    has_feat() { echo "$FEATURES" | grep -qw "$1" 2>/dev/null; }
+    if has_feat sve2; then
         ISA_FLAGS="-march=armv9-a+sve2+i8mm+bf16"
-    elif echo "$FEATURES" | grep -qw 'sve'; then
+    elif has_feat sve; then
         ISA_FLAGS="-march=armv8.2-a+sve+bf16"
+    elif has_feat asimddp; then
+        ISA_FLAGS="-march=armv8.2-a+dotprod"
+    elif has_feat asimd; then
+        ISA_FLAGS="-march=armv8-a"
+    else
+        ISA_FLAGS="-march=armv8-a"
     fi
     cc -O3 -fopenmp $ISA_FLAGS $MODEL_DEFINE -static \
         -Wno-aggressive-loop-optimizations \

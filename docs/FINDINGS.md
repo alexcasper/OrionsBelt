@@ -2494,7 +2494,47 @@ result credible when it arrives.
 
 ---
 
-## 14. GEMV cache optimization: 10–15× e2e decode speedup from fixing the memory access pattern (2026-08-07)
+## 14. End-to-end Qwen3.5-4B C decode loop: A57 joins the fleet (2026-08-07, ob-mrd.8)
+
+### What this adds
+
+Section 12 measured the 0.8B model via PyTorch on RK3588. The C decode loop
+(`gdn_e2e_decode.c`) is a separate measurement: it runs the full Qwen3.5-4B
+forward pass (32 layers, 24 GDN + 8 full-attention + 32 FFN blocks) using the
+optimized NEON/SVE kernels directly, with random weights (benchmark only).
+This is the number the CPU-first mapping hypothesis needs.
+
+### Results
+
+| Device | Core | Commit | Tok/s (decode) | TTFT | Governor |
+|--------|------|--------|---------------:|-----:|----------|
+| RK3588 (t3) | Cortex-A76 ×4 | a086a50 | 0.08 | 13.3 s | performance |
+| Jetson Nano (j1) | Cortex-A57 ×4 | dd1fdf4 | 0.02 | 48.6 s | performance |
+
+**Caveat: different commits.** The kernel source (`gdn_sve.c`,
+`gdn_delta_matmul.c`, `gdn_e2e_decode.c`) is identical at both commits — the
+intervening changes are to scripts and documentation — so the comparison is
+valid in practice. However, per the project's results-discipline rule, this
+should be re-confirmed at a matched commit before appearing in the submission.
+
+**Only 1 run per device.** A single measurement per device is not enough to
+establish replicates (bead ob-bf7 found 1.68× spread on this fleet). These
+numbers should be treated as order-of-magnitude, not precise.
+
+### What the numbers say (and don't)
+
+The A57 is ~4× slower than the A76 (0.02 vs 0.08 tok/s), consistent with the
+core-level bandwidth ratio from the fleet kernel study (§5a). This is not
+surprising — the A57 is Armv8.0-A with NEON only, while the A76 has dotprod
+and higher clock. The result confirms the decode loop runs correctly on the
+weakest fleet device and extends the fleet e2e data set.
+
+Files: `results/raw/jetson-j1_e2e_raw.csv`, `results/raw/jetson-j1_e2e_schema.csv`
+Manifest: `results/manifests/jetson-j1_e2e.json`
+
+---
+
+## 15. GEMV cache optimization: 10–15× e2e decode speedup from fixing the memory access pattern (2026-08-07)
 
 ### Motivation
 
@@ -2573,3 +2613,285 @@ triple loop also wastes bandwidth).
 ```
 
 Files: `results/raw/rk3588-t3_e2e_raw.csv`, `results/raw/rk3588-t3_08b_e2e_raw.csv`
+## GDN-2 vs GDN-1 Gated Scan: Operator-Level Comparison on RK3588-t4
+
+**Date:** 2026-08-07
+**Device:** rk3588-t4 (RK3588, A76 big + A55 little)
+**Governor:** performance
+**Beads:** ob-82b (microbenchmark), ob-7b5 (research note)
+**Data:** `results/raw/rk3588-t4_gdn2_vs_gdn1_big_single.csv`, `_little_single.csv` (single-thread, `OMP_NUM_THREADS=1`, manifest: `rk3588-t4-gdn2-single.json`)
+**Note:** Earlier CSVs (`_big.csv`, `_little.csv` dirty-tree; `_big_clean.csv`, `_little_clean.csv` multi-thread) are superseded. The multi-thread data had identical GDN-2/GDN-1 ratios (1.55× vs 1.57× single-thread) but inflated absolute GiB/s by ~2×.
+
+### Background
+
+GDN-1 (standard GatedDeltaNet) uses a single gate `g` for both erase and
+write:
+```
+s_t = x_t + s_{t-1} * g_t          // 1 FMA/element, 3 streams
+```
+
+GDN-2 (decoupled gating, NVLabs GatedDeltaNet-2) separates the erase gate
+(`b_gate`) from the write gate (`w_gate`):
+```
+s_t = w_t·x_t + s_{t-1} * (g_t·b_t)  // 2 MUL + 1 FMA, 5 streams
+```
+
+Theoretical cost ratio: **1.67× memory traffic, 2× compute**.
+
+### Results — Big Cluster (A76, cpu4-7)
+
+| Config | GDN-1 p50 | GDN-2 p50 | Slowdown | GDN-1 GiB/s | GDN-2 GiB/s | GDN-1 GFLOP/s | GDN-2 GFLOP/s |
+|--------|-----------|-----------|----------|-------------|-------------|---------------|---------------|
+| 4B prefill (seq=64, ch=4096) | 548 µs | 1429 µs | **2.61×** | 5.40 | 3.44 | 0.96 | 0.73 |
+| 0.8B prefill (seq=64, ch=2048) | 204 µs | 447 µs | **2.19×** | 7.25 | 5.49 | 1.28 | 1.17 |
+| 4B decode (seq=1, ch=4096) | 2.33 µs | 3.50 µs | **1.50×** | 32.7 | 30.5 | 3.51 | **4.68** |
+| 0.8B decode (seq=1, ch=2048) | 1.46 µs | 1.75 µs | **1.20×** | 26.2 | 30.5 | 2.81 | **4.68** |
+
+### Results — Little Cluster (A55, cpu0-3)
+
+| Config | GDN-1 p50 | GDN-2 p50 | Slowdown | GDN-1 GiB/s | GDN-2 GiB/s |
+|--------|-----------|-----------|----------|-------------|-------------|
+| 4B prefill (seq=64, ch=4096) | 3421 µs | 9201 µs | **2.69×** | 0.87 | 0.53 |
+| 0.8B prefill (seq=64, ch=2048) | 1009 µs | 2753 µs | **2.73×** | 1.47 | 0.89 |
+| 4B decode (seq=1, ch=4096) | 15.5 µs | 33.5 µs | **2.17×** | 4.93 | 3.18 |
+| 0.8B decode (seq=1, ch=2048) | 6.42 µs | 15.2 µs | **2.36×** | 5.94 | 3.52 |
+
+### Analysis
+
+1. **Prefill penalty is severe (2.2–2.7×).** At prefill, the recurrent
+   state spans the full channel dimension and does not fit in L1. The scan
+   is bandwidth-bound, and GDN-2's 5 streams vs GDN-1's 3 directly increase
+   memory traffic. The observed slowdown (2.2–2.7×) exceeds the theoretical
+   1.67× memory ratio because the extra 2 MULs per element add arithmetic
+   latency that does not fully overlap with memory access.
+
+2. **Decode penalty is modest on big cores (1.2–1.5×), severe on little
+   cores (2.2–2.4×).** At decode (seq=1), the state is a single vector of
+   `channels` floats — 16 KiB for 4096 channels — which fits comfortably in
+   L1 cache. The kernel becomes compute-bound. On the A76, GDN-2's 2× compute
+   cost manifests as only a 1.2–1.5× slowdown. The A55 shows a much worse
+   2.2–2.4× ratio because its in-order pipeline cannot overlap the extra
+   MULs with loads at all — the compute cost is fully exposed.
+
+3. **GDN-2 achieves HIGHER GFLOP/s at decode on A76.** GDN-2 decode
+   hits 4.68 GFLOP/s vs GDN-1's 3.51. This means the A76's FMA units are
+   underutilized in GDN-1 decode — GDN-2's extra MULs fill otherwise idle
+   arithmetic slots. Both kernels are cache-resident (~30 GiB/s achieved
+   bandwidth, far above DRAM bandwidth).
+
+4. **A55 decode penalty is now exposed: 2.2–2.4×.** In the earlier
+   multi-threaded data this was only 1.5–1.8× because 4 threads masked the
+   compute cost. Single-threaded, the A55's in-order pipeline cannot hide
+   GDN-2's extra arithmetic at all. This suggests GDN-2 is a poor fit for
+   little cores under single-threaded decode.
+
+### Implication for GDN-2 adoption
+
+The decoupled gating of GDN-2 trades a 1.67× memory and 2× compute cost
+for improved model quality (separate erase/write control). At edge scale:
+
+- **Decode (the hot path for autoregressive inference):** The cost is
+  modest on big cores (1.2–1.5× on A76). If GDN-2 improves long-context
+  retrieval quality enough to justify this, it is viable.
+- **Prefill:** The 2.2–2.7× penalty is significant. For workloads with
+  long prompts, prefill latency would increase substantially. Chunkwise
+  prefill (amortizing over larger chunks) could mitigate this.
+
+This is an honest operator-level measurement. Whether the quality benefit
+justifies the cost is a model-level question (ob-zak, RULER evaluation)
+that remains open.
+
+---
+
+## Sustained-Load Thermal Characterization on RK3588-t4
+
+**Date:** 2026-08-07
+**Device:** rk3588-t4 (RK3588, A76 big + A55 little)
+**Governor:** performance
+**Bead data:** ob-dgn (thermal-throttle characterization)
+**Data:** `results/raw/rk3588-t4_sustained_thermal.txt`
+
+### Setup
+
+Ran `gdn_gated_scan` (the heaviest GDN kernel, 4B prefill config: seq=64,
+channels=4096) for 60 seconds on each cluster with throughput and
+temperature sampled every 5s. Purpose: test PLAN.md risk R7 — "burst numbers
+that cannot be sustained are misleading on passively-cooled edge hardware."
+
+### Big Cluster (A76, cpu4-7)
+
+| Elapsed | Throughput | Thermal | vs First |
+|---------|-----------|---------|----------|
+| 5s | 11.75 GiB/s | 48.1°C | baseline |
+| 30s | 11.57 GiB/s | 50.8°C | -1.6% |
+| 60s | 11.58 GiB/s | 51.8°C | -1.5% |
+
+**Result:** Temperature rises 13°C (38.8→51.8°C) over 60s but plateaus
+at ~51.8°C around the 40s mark. Throughput decay is only **1.5%** — the
+A76's burst numbers are sustainable. Active cooling (fan) on t4 is adequate.
+
+### Little Cluster (A55, cpu0-3)
+
+| Elapsed | Throughput | Thermal | vs First |
+|---------|-----------|---------|----------|
+| 5s | 3.66 GiB/s | 46.2°C | baseline |
+| 30s | 3.67 GiB/s | 46.2°C | +0.2% |
+| 60s | 3.69 GiB/s | 46.2°C | +0.9% |
+
+**Result:** No thermal rise at all. Temperature stays flat at 46.2°C.
+Throughput is completely stable (noise ~1%). The A55's power efficiency
+makes sustained workloads trivially sustainable.
+
+### Conclusion
+
+The RK3588-t4 does **not** exhibit thermal throttling under sustained
+GDN kernel load with active cooling. Burst numbers (our standard 30-repeat
+benchmarks) are valid sustained-throughput numbers. This is relevant to the
+fleet benchmark (ob-mrd.8) and the Devpost writeup — we can report burst
+numbers without a "sustained" caveat for this device class.
+
+Note: the O6 (Cortex-A720) may behave differently — it has higher peak
+power density. The thermal characterization should be repeated on O6 when
+hardware is available.
+
+---
+
+## Fleet Data Quality: Single-Core Clean Sweep Variance (ob-bf7)
+
+**Date:** 2026-08-07
+**Device:** rk3588-t4 (RK3588, A76)
+**Bead:** ob-bf7
+**Data:** `results/raw/rk3588-t4_clean_stability_check.csv`
+
+### Problem
+
+The fleet bandwidth-scaling comparison uses single-core "clean" sweeps for
+cross-device comparison. However, rk3588-t3's clean sweep shows a **29.9%
+spread** on `gdn_gated_scan` (4B prefill), making the numbers unreliable.
+The t3 number (2.91 GiB/s) appears 1.8× slower than t4 (5.27 GiB/s) on
+identical silicon at the same git SHA — this is environmental noise, not
+a real device difference.
+
+### Evidence: t4 Stability Check (3 consecutive runs)
+
+| Run | p50 (µs) | GiB/s | Spread |
+|-----|----------|-------|--------|
+| 1 (committed) | 561.2 | 5.27 | 6.3% |
+| 2 | 548.7 | 5.40 | 8.9% |
+| 3 | 516.6 | 5.73 | 6.2% |
+| **Mean** | **542** | **5.47** | — |
+| **CoV** | **4.0%** | — | — |
+
+t4 is stable: ~4% coefficient of variation across runs.
+
+### Cross-Device Comparison: Single-Core vs Multi-Core
+
+| Metric | t3 | t4 | Ratio |
+|--------|----|----|-------|
+| **Single-core clean** (gated_scan 4B) | 2.91 GiB/s (30% spread) | 5.27 GiB/s (6% spread) | **1.81×** |
+| **Multi-core big** (gated_scan 4B) | 10.33 GiB/s (8% spread) | 11.09 GiB/s (5% spread) | **1.07×** |
+
+The multi-core numbers agree within 7%, consistent with same-silicon
+expectations. The single-core discrepancy is entirely due to t3's
+anomalous clean sweep (likely wrong governor or background load).
+
+### Root Cause Analysis
+
+t3's clean sweep shows 10-30% spread across **all** kernels, not just one:
+
+| Kernel | t3 spread | t4 spread |
+|--------|-----------|-----------|
+| gated_scan | 29.9% | 6.3% |
+| gated_scan_f16 | 18.8% | 4.2% |
+| gated_scan_bf16 | 20.5% | 4.4% |
+| cumdecay | 17.6% | 9.2% |
+| causal_dwconv1d | 10.6% | 5.6% |
+
+This systemic noise pattern indicates an environmental issue (governor not
+set to performance, background processes, or thermal interference from
+prior workloads), not a kernel or measurement methodology problem.
+
+### Recommendations
+
+1. **Use multi-cluster (4-core OpenMP) numbers for fleet comparison.** They
+   are more stable (5-8% spread vs 6-30%) and less sensitive to
+   environmental interference. The single-core protocol amplifies
+   scheduling jitter on Linux edge devices.
+
+2. **t3 should re-run its clean sweep** with verified governor=performance
+   and no background load. The current numbers are not trustworthy.
+
+3. **Always capture governor state in the manifest.** Both t3 and t4 clean
+   manifests lack governor/thermal data — this makes it impossible to
+   diagnose bad runs after the fact.
+
+---
+
+## Cross-Board Gap: t4 (Turing Machines RK1) vs t3 — Fresh Data at Current HEAD
+
+**Date:** 2026-08-07  
+**Beads:** ob-aw9, ob-bf7  
+**Commits:** t4 at 8b64d1a, t3 fresh at f015982
+
+### Context
+
+Following t3's root-cause investigation (ob-bf7 FINDING 4: "residual t3/t4 gap
+unmeasurable from t3"), t4 re-ran the fleet sweep at current HEAD with optimized
+kernels. Both boards are RK3588 (4×A55 + 4×A76) but **different board vendors**:
+
+| Property | t3 | t4 |
+|----------|----|----|
+| Board | Unknown (Radxa?) | **Turing Machines RK1** |
+| SoC | RK3588 | RK3588 |
+| DRAM | 32 GB LPDDR4x | 8 GB LPDDR4x |
+| Kernel | 5.10.160-rockchip | 6.11.0-1006-rockchip |
+| Scheduler | CFS | EEVDF |
+| A76 max freq | 2304 MHz | 2400 MHz |
+| GCC | unknown | 14.2.0 |
+| OS | Ubuntu 22.04 | Ubuntu 24.04 |
+
+### Headline Numbers (A76 big cluster, single-thread, governor=performance)
+
+| Kernel | Model | Seq | t4 GiB/s | t3 GiB/s | Ratio |
+|--------|-------|-----|----------|----------|-------|
+| gdn_gated_scan | 4B | 64 | 5.67 | 10.62 | 1.87× |
+| gdn_gated_scan | 0.8B | 64 | 6.93 | 15.24 | 2.20× |
+| gdn_cumdecay | 4B | 64 | 7.40 | 21.06 | 2.85× |
+| gdn_cumdecay_f16 | 4B | 64 | 8.61 | 37.20 | 4.32× |
+| gdn_gated_scan | 4B | 1 | 32.70 | 52.33 | 1.60× |
+| gdn_gated_scan | 0.8B | 1 | 26.15 | 32.69 | 1.25× |
+| gdn_causal_dwconv1d | 4B | 64 | 7.04 | 18.73 | 2.66× |
+| gdn2_gated_scan | 4B | 64 | 3.20 | 8.97 | 2.80× |
+
+### Analysis
+
+1. **Gap is systematic, not noise.** t3 is consistently 1.25-4.87× faster
+   across all 32 kernel/model/seq combinations. Spreads on both boards are
+   under 8% (median), ruling out measurement jitter.
+
+2. **Gap worsens for cache-resident workloads.** The 0.8B seq=64 working set
+   (~0.5 MiB) shows larger gaps than 4B seq=64 (~1 MiB). This rules out DRAM
+   bandwidth as the primary cause and points to **per-core compute throughput**
+   or **scheduler overhead**.
+
+3. **t4 is clocked HIGHER** (2400 MHz vs 2304 MHz on A76) yet runs slower.
+   This is not a frequency issue.
+
+4. **Most likely causes (in order):**
+   - **Kernel 6.11 EEVDF vs 5.10 CFS**: EEVDF may impose different scheduling
+     overhead for pinned CPU-bound tasks.
+   - **Board vendor implementation**: The Turing Machines RK1 may have different
+     firmware/PMIC settings affecting internal performance states.
+   - **Compiler code generation**: Different GCC versions may produce different
+     NEON scheduling. Both use `-march=armv8.2-a+dotprod -O3` but GCC 14 vs
+     whatever t3 uses could matter.
+
+### Implications for Fleet Comparison
+
+- **The t3/t4 performance gap is REAL and hardware/environmental**, not a
+  stale-data artifact (both are now fresh at current HEAD with optimized kernels).
+- Fleet comparisons between RK3588 boards must treat t3 and t4 as **different
+  implementations**, not replicates.
+- The original ob-bf7 spread concern is RESOLVED for stale data (both boards
+  now have clean post-optimization CSVs with <8% spread), but a new
+  cross-board heterogeneity finding replaces it.
