@@ -44,10 +44,16 @@ def _write_kv_csv(path: Path, rows: list[dict]) -> Path:
 def _make_config_rows(ctx_lens: list[int]) -> list[dict]:
     """Generate rows for one quantization config."""
     return [
-        {"model": "4B", "ctx_len": str(ctx), "gdn_layer_us": "100",
-         "full_attn_us": str(200 * ctx), "ffn_us": "50",
-         "total_us": str(350 + 200 * (ctx - 1)),
-         "tok_per_sec": str(10.0 / ctx), "kv_cache_mb": str(0.5 * ctx)}
+        {
+            "model": "4B",
+            "ctx_len": str(ctx),
+            "gdn_layer_us": "100",
+            "full_attn_us": str(200 * ctx),
+            "ffn_us": "50",
+            "total_us": str(350 + 200 * (ctx - 1)),
+            "tok_per_sec": str(10.0 / ctx),
+            "kv_cache_mb": str(0.5 * ctx),
+        }
         for ctx in ctx_lens
     ]
 
@@ -56,8 +62,8 @@ def _make_config_rows(ctx_lens: list[int]) -> list[dict]:
 # read_csv
 # ---------------------------------------------------------------------------
 
-class TestReadCSV:
 
+class TestReadCSV:
     def test_missing_file_returns_empty(self, tmp_path):
         result = read_csv(str(tmp_path / "nonexistent.csv"))
         assert result == []
@@ -82,8 +88,8 @@ class TestReadCSV:
 # generate_report
 # ---------------------------------------------------------------------------
 
-class TestGenerateReport:
 
+class TestGenerateReport:
     def _run_report(self, tmp_path, monkeypatch):
         """Helper: ensure output dir exists and run report."""
         out_dir = tmp_path / "figures"
@@ -175,34 +181,52 @@ class TestGenerateReport:
         _write_kv_csv(
             results_raw / f"{device}_ctx_sweep_4b_fp32w_fp32kv.csv",
             [
-                {"model": "4B", "ctx_len": str(ctx), "gdn_layer_us": "100",
-                 "full_attn_us": str(200 * ctx), "ffn_us": "50",
-                 "total_us": str(350 + 200 * (ctx - 1)),
-                 "tok_per_sec": str(10.0 / ctx), "kv_cache_mb": str(4.0 * ctx)}
+                {
+                    "model": "4B",
+                    "ctx_len": str(ctx),
+                    "gdn_layer_us": "100",
+                    "full_attn_us": str(200 * ctx),
+                    "ffn_us": "50",
+                    "total_us": str(350 + 200 * (ctx - 1)),
+                    "tok_per_sec": str(10.0 / ctx),
+                    "kv_cache_mb": str(4.0 * ctx),
+                }
                 for ctx in ctx_lens
-            ]
+            ],
         )
         # INT8 both — 2x faster decode, 4x smaller KV
         _write_kv_csv(
             results_raw / f"{device}_ctx_sweep_4b_int8w_int8kv.csv",
             [
-                {"model": "4B", "ctx_len": str(ctx), "gdn_layer_us": "100",
-                 "full_attn_us": str(100 * ctx), "ffn_us": "50",
-                 "total_us": str(250 + 100 * (ctx - 1)),
-                 "tok_per_sec": str(20.0 / ctx), "kv_cache_mb": str(1.0 * ctx)}
+                {
+                    "model": "4B",
+                    "ctx_len": str(ctx),
+                    "gdn_layer_us": "100",
+                    "full_attn_us": str(100 * ctx),
+                    "ffn_us": "50",
+                    "total_us": str(250 + 100 * (ctx - 1)),
+                    "tok_per_sec": str(20.0 / ctx),
+                    "kv_cache_mb": str(1.0 * ctx),
+                }
                 for ctx in ctx_lens
-            ]
+            ],
         )
         # FP32 weights + INT8 KV
         _write_kv_csv(
             results_raw / f"{device}_ctx_sweep_4b_fp32w_int8kv.csv",
             [
-                {"model": "4B", "ctx_len": str(ctx), "gdn_layer_us": "100",
-                 "full_attn_us": str(150 * ctx), "ffn_us": "50",
-                 "total_us": str(300 + 150 * (ctx - 1)),
-                 "tok_per_sec": str(15.0 / ctx), "kv_cache_mb": str(1.0 * ctx)}
+                {
+                    "model": "4B",
+                    "ctx_len": str(ctx),
+                    "gdn_layer_us": "100",
+                    "full_attn_us": str(150 * ctx),
+                    "ffn_us": "50",
+                    "total_us": str(300 + 150 * (ctx - 1)),
+                    "tok_per_sec": str(15.0 / ctx),
+                    "kv_cache_mb": str(1.0 * ctx),
+                }
                 for ctx in ctx_lens
-            ]
+            ],
         )
 
         report = self._run_report(tmp_path, monkeypatch)

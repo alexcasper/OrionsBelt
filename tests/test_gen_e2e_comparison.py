@@ -216,9 +216,7 @@ class TestCheckManifestDirty:
         manifests = tmp_path / "manifests"
         manifests.mkdir()
         for name in ["dev_a_e2e.json", "dev_b_e2e.json"]:
-            (manifests / name).write_text(
-                json.dumps({"git": {"sha": "abc1234", "dirty": False}})
-            )
+            (manifests / name).write_text(json.dumps({"git": {"sha": "abc1234", "dirty": False}}))
         monkeypatch.setattr("gen_e2e_comparison.MANIFESTS_DIR", manifests)
         refs = ["results/manifests/dev_a_e2e.json", "results/manifests/dev_b_e2e.json"]
         any_dirty, all_checked = _check_manifest_dirty(refs)

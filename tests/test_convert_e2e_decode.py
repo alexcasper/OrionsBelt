@@ -95,26 +95,47 @@ def _make_args(raw_path: Path, output_path: Path, **kwargs) -> Namespace:
 # Basic conversion
 # ---------------------------------------------------------------------------
 
+
 class TestSingleRow:
     """One raw row produces two schema rows (prefill + decode)."""
 
     def test_produces_two_rows(self, tmp_path):
-        raw = _write_raw_csv(tmp_path, [
-            {"model": "Qwen3.5-4B", "tokens": "8", "ttft_ms": "1000.0",
-             "tok_per_sec_mean": "5.0", "p50_us": "1000", "p95_us": "1100",
-             "p99_us": "1200", "mean_us": "1000"}
-        ])
+        raw = _write_raw_csv(
+            tmp_path,
+            [
+                {
+                    "model": "Qwen3.5-4B",
+                    "tokens": "8",
+                    "ttft_ms": "1000.0",
+                    "tok_per_sec_mean": "5.0",
+                    "p50_us": "1000",
+                    "p95_us": "1100",
+                    "p99_us": "1200",
+                    "mean_us": "1000",
+                }
+            ],
+        )
         out = tmp_path / "out.csv"
         convert(str(raw), _make_args(raw, out))
         rows = _read_output(out)
         assert len(rows) == 2
 
     def test_phases(self, tmp_path):
-        raw = _write_raw_csv(tmp_path, [
-            {"model": "Qwen3.5-4B", "tokens": "8", "ttft_ms": "1000.0",
-             "tok_per_sec_mean": "5.0", "p50_us": "1000", "p95_us": "1100",
-             "p99_us": "1200", "mean_us": "1000"}
-        ])
+        raw = _write_raw_csv(
+            tmp_path,
+            [
+                {
+                    "model": "Qwen3.5-4B",
+                    "tokens": "8",
+                    "ttft_ms": "1000.0",
+                    "tok_per_sec_mean": "5.0",
+                    "p50_us": "1000",
+                    "p95_us": "1100",
+                    "p99_us": "1200",
+                    "mean_us": "1000",
+                }
+            ],
+        )
         out = tmp_path / "out.csv"
         convert(str(raw), _make_args(raw, out))
         rows = _read_output(out)
@@ -123,11 +144,21 @@ class TestSingleRow:
         assert "decode" in phases
 
     def test_metric_names(self, tmp_path):
-        raw = _write_raw_csv(tmp_path, [
-            {"model": "Qwen3.5-4B", "tokens": "8", "ttft_ms": "1000.0",
-             "tok_per_sec_mean": "5.0", "p50_us": "1000", "p95_us": "1100",
-             "p99_us": "1200", "mean_us": "1000"}
-        ])
+        raw = _write_raw_csv(
+            tmp_path,
+            [
+                {
+                    "model": "Qwen3.5-4B",
+                    "tokens": "8",
+                    "ttft_ms": "1000.0",
+                    "tok_per_sec_mean": "5.0",
+                    "p50_us": "1000",
+                    "p95_us": "1100",
+                    "p99_us": "1200",
+                    "mean_us": "1000",
+                }
+            ],
+        )
         out = tmp_path / "out.csv"
         convert(str(raw), _make_args(raw, out))
         rows = _read_output(out)
@@ -140,14 +171,24 @@ class TestSingleRow:
 # TTFT conversion (ms → seconds)
 # ---------------------------------------------------------------------------
 
-class TestTTFTConversion:
 
+class TestTTFTConversion:
     def test_ms_to_seconds(self, tmp_path):
-        raw = _write_raw_csv(tmp_path, [
-            {"model": "Qwen3.5-4B", "tokens": "8", "ttft_ms": "13254.09",
-             "tok_per_sec_mean": "0.08", "p50_us": "1", "p95_us": "1",
-             "p99_us": "1", "mean_us": "1"}
-        ])
+        raw = _write_raw_csv(
+            tmp_path,
+            [
+                {
+                    "model": "Qwen3.5-4B",
+                    "tokens": "8",
+                    "ttft_ms": "13254.09",
+                    "tok_per_sec_mean": "0.08",
+                    "p50_us": "1",
+                    "p95_us": "1",
+                    "p99_us": "1",
+                    "mean_us": "1",
+                }
+            ],
+        )
         out = tmp_path / "out.csv"
         convert(str(raw), _make_args(raw, out))
         rows = _read_output(out)
@@ -156,11 +197,21 @@ class TestTTFTConversion:
         assert prefill["unit"] == "seconds"
 
     def test_zero_ttft(self, tmp_path):
-        raw = _write_raw_csv(tmp_path, [
-            {"model": "Qwen3.5-4B", "tokens": "8", "ttft_ms": "0",
-             "tok_per_sec_mean": "5.0", "p50_us": "0", "p95_us": "0",
-             "p99_us": "0", "mean_us": "0"}
-        ])
+        raw = _write_raw_csv(
+            tmp_path,
+            [
+                {
+                    "model": "Qwen3.5-4B",
+                    "tokens": "8",
+                    "ttft_ms": "0",
+                    "tok_per_sec_mean": "5.0",
+                    "p50_us": "0",
+                    "p95_us": "0",
+                    "p99_us": "0",
+                    "mean_us": "0",
+                }
+            ],
+        )
         out = tmp_path / "out.csv"
         convert(str(raw), _make_args(raw, out))
         rows = _read_output(out)
@@ -172,15 +223,25 @@ class TestTTFTConversion:
 # Repeat count and indexing
 # ---------------------------------------------------------------------------
 
-class TestRepeatCount:
 
+class TestRepeatCount:
     def test_three_rows(self, tmp_path):
-        raw = _write_raw_csv(tmp_path, [
-            {"model": "Qwen3.5-4B", "tokens": "8", "ttft_ms": "1000",
-             "tok_per_sec_mean": "5.0", "p50_us": "1", "p95_us": "1",
-             "p99_us": "1", "mean_us": "1"}
-            for _ in range(3)
-        ])
+        raw = _write_raw_csv(
+            tmp_path,
+            [
+                {
+                    "model": "Qwen3.5-4B",
+                    "tokens": "8",
+                    "ttft_ms": "1000",
+                    "tok_per_sec_mean": "5.0",
+                    "p50_us": "1",
+                    "p95_us": "1",
+                    "p99_us": "1",
+                    "mean_us": "1",
+                }
+                for _ in range(3)
+            ],
+        )
         out = tmp_path / "out.csv"
         convert(str(raw), _make_args(raw, out))
         rows = _read_output(out)
@@ -189,18 +250,26 @@ class TestRepeatCount:
             assert r["repeat_count"] == "3"
 
     def test_repeat_indices(self, tmp_path):
-        raw = _write_raw_csv(tmp_path, [
-            {"model": "Qwen3.5-4B", "tokens": "8", "ttft_ms": "1000",
-             "tok_per_sec_mean": "5.0", "p50_us": "1", "p95_us": "1",
-             "p99_us": "1", "mean_us": "1"}
-            for _ in range(3)
-        ])
+        raw = _write_raw_csv(
+            tmp_path,
+            [
+                {
+                    "model": "Qwen3.5-4B",
+                    "tokens": "8",
+                    "ttft_ms": "1000",
+                    "tok_per_sec_mean": "5.0",
+                    "p50_us": "1",
+                    "p95_us": "1",
+                    "p99_us": "1",
+                    "mean_us": "1",
+                }
+                for _ in range(3)
+            ],
+        )
         out = tmp_path / "out.csv"
         convert(str(raw), _make_args(raw, out))
         rows = _read_output(out)
-        prefill_indices = sorted(
-            int(r["repeat_index"]) for r in rows if r["phase"] == "prefill"
-        )
+        prefill_indices = sorted(int(r["repeat_index"]) for r in rows if r["phase"] == "prefill")
         assert prefill_indices == [0, 1, 2]
 
 
@@ -208,15 +277,25 @@ class TestRepeatCount:
 # Model name normalization
 # ---------------------------------------------------------------------------
 
-class TestModelName:
 
+class TestModelName:
     def test_adds_qwen_prefix(self, tmp_path):
         """Model without org prefix gets 'Qwen/' prepended."""
-        raw = _write_raw_csv(tmp_path, [
-            {"model": "Qwen3.5-4B", "tokens": "8", "ttft_ms": "1000",
-             "tok_per_sec_mean": "5.0", "p50_us": "1", "p95_us": "1",
-             "p99_us": "1", "mean_us": "1"}
-        ])
+        raw = _write_raw_csv(
+            tmp_path,
+            [
+                {
+                    "model": "Qwen3.5-4B",
+                    "tokens": "8",
+                    "ttft_ms": "1000",
+                    "tok_per_sec_mean": "5.0",
+                    "p50_us": "1",
+                    "p95_us": "1",
+                    "p99_us": "1",
+                    "mean_us": "1",
+                }
+            ],
+        )
         out = tmp_path / "out.csv"
         convert(str(raw), _make_args(raw, out))
         rows = _read_output(out)
@@ -224,11 +303,21 @@ class TestModelName:
 
     def test_preserves_full_name(self, tmp_path):
         """Model with org prefix is preserved as-is."""
-        raw = _write_raw_csv(tmp_path, [
-            {"model": "Qwen/Qwen3.5-0.8B", "tokens": "8", "ttft_ms": "1000",
-             "tok_per_sec_mean": "5.0", "p50_us": "1", "p95_us": "1",
-             "p99_us": "1", "mean_us": "1"}
-        ])
+        raw = _write_raw_csv(
+            tmp_path,
+            [
+                {
+                    "model": "Qwen/Qwen3.5-0.8B",
+                    "tokens": "8",
+                    "ttft_ms": "1000",
+                    "tok_per_sec_mean": "5.0",
+                    "p50_us": "1",
+                    "p95_us": "1",
+                    "p99_us": "1",
+                    "mean_us": "1",
+                }
+            ],
+        )
         out = tmp_path / "out.csv"
         convert(str(raw), _make_args(raw, out))
         rows = _read_output(out)
@@ -236,11 +325,21 @@ class TestModelName:
 
     def test_fallback_to_args(self, tmp_path):
         """Empty model field falls back to args.model_checkpoint."""
-        raw = _write_raw_csv(tmp_path, [
-            {"model": "", "tokens": "8", "ttft_ms": "1000",
-             "tok_per_sec_mean": "5.0", "p50_us": "1", "p95_us": "1",
-             "p99_us": "1", "mean_us": "1"}
-        ])
+        raw = _write_raw_csv(
+            tmp_path,
+            [
+                {
+                    "model": "",
+                    "tokens": "8",
+                    "ttft_ms": "1000",
+                    "tok_per_sec_mean": "5.0",
+                    "p50_us": "1",
+                    "p95_us": "1",
+                    "p99_us": "1",
+                    "mean_us": "1",
+                }
+            ],
+        )
         out = tmp_path / "out.csv"
         args = _make_args(raw, out, model_checkpoint="Qwen/Qwen3.5-4B")
         convert(str(raw), args)
@@ -257,25 +356,45 @@ class TestModelName:
 # Context length
 # ---------------------------------------------------------------------------
 
-class TestContextLength:
 
+class TestContextLength:
     def test_uses_token_count_by_default(self, tmp_path):
-        raw = _write_raw_csv(tmp_path, [
-            {"model": "Qwen3.5-4B", "tokens": "512", "ttft_ms": "1000",
-             "tok_per_sec_mean": "5.0", "p50_us": "1", "p95_us": "1",
-             "p99_us": "1", "mean_us": "1"}
-        ])
+        raw = _write_raw_csv(
+            tmp_path,
+            [
+                {
+                    "model": "Qwen3.5-4B",
+                    "tokens": "512",
+                    "ttft_ms": "1000",
+                    "tok_per_sec_mean": "5.0",
+                    "p50_us": "1",
+                    "p95_us": "1",
+                    "p99_us": "1",
+                    "mean_us": "1",
+                }
+            ],
+        )
         out = tmp_path / "out.csv"
         convert(str(raw), _make_args(raw, out))
         rows = _read_output(out)
         assert int(rows[0]["context_length"]) == 512
 
     def test_override_takes_precedence(self, tmp_path):
-        raw = _write_raw_csv(tmp_path, [
-            {"model": "Qwen3.5-4B", "tokens": "8", "ttft_ms": "1000",
-             "tok_per_sec_mean": "5.0", "p50_us": "1", "p95_us": "1",
-             "p99_us": "1", "mean_us": "1"}
-        ])
+        raw = _write_raw_csv(
+            tmp_path,
+            [
+                {
+                    "model": "Qwen3.5-4B",
+                    "tokens": "8",
+                    "ttft_ms": "1000",
+                    "tok_per_sec_mean": "5.0",
+                    "p50_us": "1",
+                    "p95_us": "1",
+                    "p99_us": "1",
+                    "mean_us": "1",
+                }
+            ],
+        )
         out = tmp_path / "out.csv"
         args = _make_args(raw, out, context_length=2048)
         convert(str(raw), args)
@@ -287,14 +406,24 @@ class TestContextLength:
 # Cluster notes
 # ---------------------------------------------------------------------------
 
-class TestClusterNotes:
 
+class TestClusterNotes:
     def test_big_cluster(self, tmp_path):
-        raw = _write_raw_csv(tmp_path, [
-            {"model": "Qwen3.5-4B", "tokens": "8", "ttft_ms": "1000",
-             "tok_per_sec_mean": "5.0", "p50_us": "1", "p95_us": "1",
-             "p99_us": "1", "mean_us": "1"}
-        ])
+        raw = _write_raw_csv(
+            tmp_path,
+            [
+                {
+                    "model": "Qwen3.5-4B",
+                    "tokens": "8",
+                    "ttft_ms": "1000",
+                    "tok_per_sec_mean": "5.0",
+                    "p50_us": "1",
+                    "p95_us": "1",
+                    "p99_us": "1",
+                    "mean_us": "1",
+                }
+            ],
+        )
         out = tmp_path / "out.csv"
         args = _make_args(raw, out, cluster="big")
         convert(str(raw), args)
@@ -302,11 +431,21 @@ class TestClusterNotes:
         assert "cluster=big" in rows[0]["notes"]
 
     def test_little_cluster(self, tmp_path):
-        raw = _write_raw_csv(tmp_path, [
-            {"model": "Qwen3.5-4B", "tokens": "8", "ttft_ms": "1000",
-             "tok_per_sec_mean": "5.0", "p50_us": "1", "p95_us": "1",
-             "p99_us": "1", "mean_us": "1"}
-        ])
+        raw = _write_raw_csv(
+            tmp_path,
+            [
+                {
+                    "model": "Qwen3.5-4B",
+                    "tokens": "8",
+                    "ttft_ms": "1000",
+                    "tok_per_sec_mean": "5.0",
+                    "p50_us": "1",
+                    "p95_us": "1",
+                    "p99_us": "1",
+                    "mean_us": "1",
+                }
+            ],
+        )
         out = tmp_path / "out.csv"
         args = _make_args(raw, out, cluster="little")
         convert(str(raw), args)
@@ -314,11 +453,21 @@ class TestClusterNotes:
         assert "cluster=little" in rows[0]["notes"]
 
     def test_no_cluster_all(self, tmp_path):
-        raw = _write_raw_csv(tmp_path, [
-            {"model": "Qwen3.5-4B", "tokens": "8", "ttft_ms": "1000",
-             "tok_per_sec_mean": "5.0", "p50_us": "1", "p95_us": "1",
-             "p99_us": "1", "mean_us": "1"}
-        ])
+        raw = _write_raw_csv(
+            tmp_path,
+            [
+                {
+                    "model": "Qwen3.5-4B",
+                    "tokens": "8",
+                    "ttft_ms": "1000",
+                    "tok_per_sec_mean": "5.0",
+                    "p50_us": "1",
+                    "p95_us": "1",
+                    "p99_us": "1",
+                    "mean_us": "1",
+                }
+            ],
+        )
         out = tmp_path / "out.csv"
         args = _make_args(raw, out, cluster="all")
         convert(str(raw), args)
@@ -326,11 +475,21 @@ class TestClusterNotes:
         assert "cluster=" not in rows[0]["notes"]
 
     def test_tokens_in_notes(self, tmp_path):
-        raw = _write_raw_csv(tmp_path, [
-            {"model": "Qwen3.5-4B", "tokens": "8", "ttft_ms": "1000",
-             "tok_per_sec_mean": "5.0", "p50_us": "1", "p95_us": "1",
-             "p99_us": "1", "mean_us": "1"}
-        ])
+        raw = _write_raw_csv(
+            tmp_path,
+            [
+                {
+                    "model": "Qwen3.5-4B",
+                    "tokens": "8",
+                    "ttft_ms": "1000",
+                    "tok_per_sec_mean": "5.0",
+                    "p50_us": "1",
+                    "p95_us": "1",
+                    "p99_us": "1",
+                    "mean_us": "1",
+                }
+            ],
+        )
         out = tmp_path / "out.csv"
         convert(str(raw), _make_args(raw, out))
         rows = _read_output(out)
@@ -341,14 +500,24 @@ class TestClusterNotes:
 # Quantization passthrough
 # ---------------------------------------------------------------------------
 
-class TestQuantization:
 
+class TestQuantization:
     def test_int8(self, tmp_path):
-        raw = _write_raw_csv(tmp_path, [
-            {"model": "Qwen3.5-4B", "tokens": "8", "ttft_ms": "1000",
-             "tok_per_sec_mean": "5.0", "p50_us": "1", "p95_us": "1",
-             "p99_us": "1", "mean_us": "1"}
-        ])
+        raw = _write_raw_csv(
+            tmp_path,
+            [
+                {
+                    "model": "Qwen3.5-4B",
+                    "tokens": "8",
+                    "ttft_ms": "1000",
+                    "tok_per_sec_mean": "5.0",
+                    "p50_us": "1",
+                    "p95_us": "1",
+                    "p99_us": "1",
+                    "mean_us": "1",
+                }
+            ],
+        )
         out = tmp_path / "out.csv"
         args = _make_args(raw, out, quantization="int8")
         convert(str(raw), args)
@@ -361,14 +530,24 @@ class TestQuantization:
 # Schema conformance
 # ---------------------------------------------------------------------------
 
-class TestSchemaConformance:
 
+class TestSchemaConformance:
     def test_output_headers(self, tmp_path):
-        raw = _write_raw_csv(tmp_path, [
-            {"model": "Qwen3.5-4B", "tokens": "8", "ttft_ms": "1000",
-             "tok_per_sec_mean": "5.0", "p50_us": "1", "p95_us": "1",
-             "p99_us": "1", "mean_us": "1"}
-        ])
+        raw = _write_raw_csv(
+            tmp_path,
+            [
+                {
+                    "model": "Qwen3.5-4B",
+                    "tokens": "8",
+                    "ttft_ms": "1000",
+                    "tok_per_sec_mean": "5.0",
+                    "p50_us": "1",
+                    "p95_us": "1",
+                    "p99_us": "1",
+                    "mean_us": "1",
+                }
+            ],
+        )
         out = tmp_path / "out.csv"
         convert(str(raw), _make_args(raw, out))
         with open(out, newline="") as f:
@@ -376,11 +555,21 @@ class TestSchemaConformance:
             assert reader.fieldnames == EXPECTED_FIELDS
 
     def test_all_fields_populated(self, tmp_path):
-        raw = _write_raw_csv(tmp_path, [
-            {"model": "Qwen3.5-4B", "tokens": "8", "ttft_ms": "1000",
-             "tok_per_sec_mean": "5.0", "p50_us": "1", "p95_us": "1",
-             "p99_us": "1", "mean_us": "1"}
-        ])
+        raw = _write_raw_csv(
+            tmp_path,
+            [
+                {
+                    "model": "Qwen3.5-4B",
+                    "tokens": "8",
+                    "ttft_ms": "1000",
+                    "tok_per_sec_mean": "5.0",
+                    "p50_us": "1",
+                    "p95_us": "1",
+                    "p99_us": "1",
+                    "mean_us": "1",
+                }
+            ],
+        )
         out = tmp_path / "out.csv"
         convert(str(raw), _make_args(raw, out))
         rows = _read_output(out)
@@ -395,11 +584,21 @@ class TestSchemaConformance:
             assert r["layer_class"] == "all"
 
     def test_decode_value_is_tok_per_sec(self, tmp_path):
-        raw = _write_raw_csv(tmp_path, [
-            {"model": "Qwen3.5-4B", "tokens": "8", "ttft_ms": "1000",
-             "tok_per_sec_mean": "7.95", "p50_us": "1", "p95_us": "1",
-             "p99_us": "1", "mean_us": "1"}
-        ])
+        raw = _write_raw_csv(
+            tmp_path,
+            [
+                {
+                    "model": "Qwen3.5-4B",
+                    "tokens": "8",
+                    "ttft_ms": "1000",
+                    "tok_per_sec_mean": "7.95",
+                    "p50_us": "1",
+                    "p95_us": "1",
+                    "p99_us": "1",
+                    "mean_us": "1",
+                }
+            ],
+        )
         out = tmp_path / "out.csv"
         convert(str(raw), _make_args(raw, out))
         rows = _read_output(out)
@@ -412,8 +611,8 @@ class TestSchemaConformance:
 # Error handling
 # ---------------------------------------------------------------------------
 
-class TestEmptyCSV:
 
+class TestEmptyCSV:
     def test_exits_on_empty(self, tmp_path):
         raw = _write_raw_csv(tmp_path, [])
         out = tmp_path / "out.csv"
