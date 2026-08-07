@@ -3451,6 +3451,8 @@ thermal throttling. The burst benchmark numbers in §15–17 are steady-state
 sustainable numbers, not peak-only artifacts. This matters for the Physical AI
 submission criterion: honest sustained throughput, not a one-shot burst.
 
+**Data:** [`results/raw/rk3588-t3_sustained_thermal.txt`](../../results/raw/rk3588-t3_sustained_thermal.txt) · [`rk3588-t4_sustained_thermal.txt`](../../results/raw/rk3588-t4_sustained_thermal.txt) (independent cross-check).
+
 ---
 
 ## 19. Cross-device e2e decode comparison: A57 vs A76, 4B vs 0.8B (2026-08-07, ob-mrd.8)
