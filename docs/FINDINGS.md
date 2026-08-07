@@ -3060,8 +3060,6 @@ that the CPU decode bottleneck is addressable through memory-system
 optimization alone — the GDN recurrent-scan kernels remain <0.1% of decode
 time and are not the optimization target.
 
-
-
 ### Cross-check — rk3588-t4 (2nd RK3588 unit)
 
 t3's INT8 implementation was independently validated on rk3588-t4 (separate
@@ -3081,6 +3079,9 @@ Files: `results/raw/rk3588-t4_big_int8_e2e_raw.csv`,
 `results/raw/rk3588-t4_08b_big_int8_e2e_raw.csv`
 Manifests: `rk3588-t4_big_int8_e2e.json` (sha `591232e`, dirty=false),
 `rk3588-t4_08b_big_int8_e2e.json` (sha `246d937`, dirty=false).
+
+---
+
 ## 17. Context-length scaling: GDN O(1) vs full-attention O(n) decode cost (2026-08-07, ob-mrd.10)
 
 ### Motivation
@@ -3389,4 +3390,4 @@ sequence lengths where the KV-cache advantage materialises.
 At 2.7 tok/s with a 0.37s TTFT, the Jetson Nano (2014-era Cortex-A57,
 passively cooled at +1°C delta) can sustain real-time text generation for
 the 0.8B model. This is a usable rate for interactive chat or structured
-extraction on hardware that costs <$50 and draws ~5W.n
+extraction on hardware that costs <$50 and draws ~5W.
