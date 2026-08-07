@@ -17,8 +17,10 @@ from `METRICS.md` (~0.25 FLOP/byte).
 
 ## Achieved throughput vs spec bandwidth (4B model, seq=64)
 
-RK3588, Jetson j1, and Jetson j2 are from the fleet sweep (ob-bf7): all at
-post-optimization commits, clean tree, single-threaded (`OMP_NUM_THREADS=1`).
+RK3588 (t4-clean), Jetson j1, and Jetson j2 are from the fleet sweep (ob-bf7):
+post-optimization commits, clean tree. The RK3588 entry uses t4-clean
+(1-thread, `OMP_NUM_THREADS=1`). ⚠ t3-clean was 8-thread — see the replicate
+spread section below and the ob-mrd.12/14 correction.
 Pi 5 was not part of the fleet sweep — its data is from an earlier commit.
 See the optimization-impact section below for multi-threaded results.
 
@@ -82,13 +84,13 @@ cross-device effects being interpreted (bead `ob-bf7`):
 | RK3588 little | t3 0.55 vs t4 0.82 | **1.49x** | **different commits** — t3 `234807d46c95`, t4 `f2658cc98138`; not an environmental comparison |
 | Jetson | j1 1.18 vs j2 1.09 | **1.08x** | same source commit `234807d46c95`, same core class |
 
-The fleet sweep (ob-bf7/ob-aw9) resolved the provenance question: all RK3588 and Jetson replicates are now at **post-optimization commits**, clean tree, single-threaded. Despite both running optimized kernels, the RK3588 pair disagrees by **1.87x** — a genuine inter-board effect (different board vendors: t3 vs Turing Machines RK1; different kernels: 5.10 CFS vs 6.11 EEVDF; different DRAM: 32GB vs 8GB). The Jetson pair agrees within ~8%, in normal range. Pi 5 is not in the replicate comparison (only one unit).
+⚠ **Thread-count confound (ob-mrd.12/14):** the RK3588 replicates were **not** all single-threaded. t3-clean ran at **8 threads** while t4-clean ran at **1 thread**. The 1.87x spread is dominated by this thread-count difference, not by a hardware effect. The like-for-like comparison (both at 8 threads) shows the boards agree within ~7%. See FINDINGS.md §ob-mrd.12 correction.
 
 ### Provenance audit: were these runs captured from a clean tree?
 
 All replicate runs are from the fleet sweep (ob-bf7/ob-aw9): post-optimization, clean tree, governor=performance. Of 6 runs with manifests, **6 recorded `dirty: false`** and 0 recorded dirty.
 
-Since all runs are post-optimization and clean-tree, the RK3588 inter-board gap reflects genuine hardware heterogeneity — different board vendors, kernel versions, and DRAM configurations — not a code-version artifact.
+Since all runs are post-optimization and clean-tree, the RK3588 inter-board gap **would** reflect hardware heterogeneity — **but see the thread-count confound warning above (ob-mrd.12/14)**: t3-clean ran 8-thread while t4-clean ran 1-thread, so the raw gap overstates any real difference.
 
 RK3588 and Jetson data are from the fleet sweep (ob-bf7/ob-aw9). Pi 5 was not part of the sweep; its provenance is noted in the audit above.
 **Treat the predictions as order-of-magnitude, not as a fit.** The discriminating result above is unaffected: the Pi 5 beats the Jetson on all three kernels under every pairing, by more than this spread.
@@ -125,7 +127,7 @@ to its 4-5x bandwidth advantage**.
 
 **Optimized A76 reference.** t4 with 4-core OpenMP + NEON unrolling reads **11.09 GiB/s** — 2.0x the single-threaded baseline. The O6's A720 cores will benefit from both IPC gains AND the optimization stack, so the prediction above is conservative.
 
-The fleet sweep (ob-bf7) confirmed the RK3588 inter-board gap is a genuine hardware effect. This prediction does not depend on resolving that gap.
+⚠ The fleet sweep (ob-bf7) inter-board gap is confounded by a thread-count mismatch (t3=8, t4=1; ob-mrd.12/14). This prediction uses t4 single-thread data and does not depend on resolving that gap.
 
 To check this prediction: if the O6 board arrives, run
 `bench_gdn_armv9sve2 --repeats 30 --csv` and compare.
@@ -153,7 +155,7 @@ cannot expose. This has implications for the O6: its 4x more cores and
 
 ### Fleet sweep resolution (ob-bf7)
 
-The historical provenance issue is resolved: the fleet sweep re-ran all devices at post-optimization commits with clean trees, governor=performance, and single-thread (`OMP_NUM_THREADS=1`). RK3588 is now **included** in the cross-device table above using the clean sweep data.
+The historical provenance issue is resolved: the fleet sweep re-ran all devices at post-optimization commits with clean trees, governor=performance. RK3588 is now **included** in the cross-device table above using the clean sweep data. ⚠ However, t3-clean ran **8-thread** (OMP_NUM_THREADS unset) while t4-clean ran **1-thread** (OMP_NUM_THREADS=1) — see ob-mrd.12/14. The cross-device table uses t4-clean (1-thread); the replicate comparison is flagged accordingly.
 
 **Optimization impact on A76.** The multi-threaded optimized run (4-core OpenMP + NEON unrolling + bf16) on t4 reads 11.56 GiB/s scan vs 5.75 single-threaded — a **2.0x speedup** from parallelization alone. See the optimization-impact table below.
 

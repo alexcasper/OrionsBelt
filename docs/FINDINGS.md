@@ -862,6 +862,18 @@ narrow only for prefill chunk boundaries.
 
 ### Measurement quality: fleet sweep resolves inter-board spread (ob-bf7)
 
+> **⚠ CORRECTION (ob-mrd.12/14, 2026-08-07):** The claim below that
+> `OMP_NUM_THREADS=1` was used for all runs is **false for t3**. The
+> `rk3588-t3-clean.json` manifest records `effective_threads: 8`
+> (`threads_source: core_count_default` — `OMP_NUM_THREADS` was unset).
+> `rk3588-t4-clean.json` records `effective_threads: 1`. The "1.98×
+> genuine hardware effect" conclusion is **not supported**; the gap is
+> primarily an 8-thread-vs-1-thread confound. The like-for-like comparison
+> (both 8-thread) shows the boards agree within ~7%. See the full
+> correction at [§ob-mrd.12](#correction-ob-mrd12-2026-08-07--the-single-thread-claim-is-false-the-gap-is-a-thread-count-artifact)
+> below. The `fleet_bandwidth_scaling.md` report has been regenerated with
+> matching warnings.
+
 The fleet sweep (j2, commit `6a4d8ab`) re-ran all four devices at commit
 `234807d` with clean trees, governor=performance, and `OMP_NUM_THREADS=1`.
 This resolves the provenance question that dominated earlier analysis:
@@ -872,12 +884,17 @@ This resolves the provenance question that dominated earlier analysis:
 | RK3588 little | t3 **0.55** vs t4 **0.72** | **1.31×** | same commit, clean, single-threaded |
 | Jetson | j1 **1.18** vs j2 **1.09** | **1.08×** | same commit, clean, single-threaded |
 
+> ⚠ **The following conclusion is superseded by the correction above.** The
+> "genuine hardware effect" claim is not supported because t3 ran 8-thread
+> while t4 ran 1-thread. See ob-mrd.12/14.
+
 **The RK3588 inter-board gap is a genuine hardware effect.** Even fully
 commit-matched and clean-tree, the two RK3588 boards disagree by 1.98× on the
 big cluster. t3 also shows higher run-to-run spread (29.9% vs t4's 12.0% on
 scan). The Jetson pair agrees within ~8%, in normal range. The root cause
-(thermal, silicon binning, or background load) is not determined here — but it
-is NOT a code-version artifact.
+(thermal, silicon binning, or background load) is not determined here — but
+it is NOT a code-version artifact. **See correction above: the gap is primarily
+a thread-count confound (ob-mrd.12/14).**
 
 **Optimization impact.** The multi-threaded optimized run (4-core OpenMP + NEON
 unrolling + bf16) on t4 reads 11.56 GiB/s scan vs 5.75 single-threaded — a
