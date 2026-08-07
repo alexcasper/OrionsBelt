@@ -35,36 +35,36 @@ _Source: committed CSVs in results/raw/_
 
 ## Achieved vs Spec Bandwidth
 
-**Device spec bandwidth:** 25.6 GiB/s
+**Device spec bandwidth:** 23.8 GiB/s
 
 
 | Kernel | Achieved (GiB/s) | % of Spec | p50 (µs) | Spread |
 |---|---:|---:|---:|---:|
-| Gated Cumulative Decay | 1.32 | 5.2% | 1,485.0 | 45.5% |
-| Gated Delta-Rule Scan | 1.13 | 4.4% | 2,625.9 | 9.4% |
-| Causal Depthwise Conv1D | 1.20 | 4.7% | 1,709.8 | 22.7% |
-| gdn_cumdecay_f16 | 1.76 | 6.9% | 831.0 | 23.4% |
-| gdn_gated_scan_f16 | 1.15 | 4.5% | 2,550.9 | 4.6% |
-| gdn_cumdecay_bf16 | 1.52 | 5.9% | 963.0 | 17.5% |
-| gdn_gated_scan_bf16 | 1.13 | 4.4% | 2,605.5 | 27.8% |
-| Gated Cumulative Decay | 3.55 | 13.9% | 275.4 | 33.3% |
-| Gated Delta-Rule Scan | 2.45 | 9.6% | 603.0 | 22.9% |
-| Causal Depthwise Conv1D | 2.80 | 10.9% | 368.0 | 7.7% |
-| gdn_cumdecay_f16 | 2.46 | 9.6% | 297.6 | 20.3% |
-| gdn_gated_scan_f16 | 2.77 | 10.8% | 531.8 | 26.7% |
-| gdn_cumdecay_bf16 | 2.01 | 7.9% | 364.0 | 16.2% |
-| gdn_gated_scan_bf16 | 2.72 | 10.6% | 542.0 | 21.7% |
-| Gated Cumulative Decay | 5.33 | 20.8% | 5.7 | 3.6% |
-| Gated Delta-Rule Scan | 8.32 | 32.5% | 9.2 | 2.8% |
-| Causal Depthwise Conv1D | 4.95 | 19.3% | 27.8 | 20.3% |
-| gdn_cumdecay_f16 | 3.63 | 14.2% | 6.3 | 4.1% |
-| gdn_gated_scan_f16 | 5.98 | 23.4% | 10.2 | 3.6% |
-| gdn_cumdecay_bf16 | 2.82 | 11.0% | 8.1 | 7.7% |
-| gdn_gated_scan_bf16 | 5.23 | 20.4% | 11.7 | 3.1% |
-| Gated Cumulative Decay | 3.91 | 15.3% | 3.9 | 4.0% |
-| Gated Delta-Rule Scan | 6.37 | 24.9% | 6.0 | 2.6% |
-| Causal Depthwise Conv1D | 3.37 | 13.2% | 20.4 | 9.7% |
-| gdn_cumdecay_f16 | 2.71 | 10.6% | 4.2 | 3.7% |
-| gdn_gated_scan_f16 | 4.72 | 18.4% | 6.5 | 4.0% |
-| gdn_cumdecay_bf16 | 2.24 | 8.8% | 5.1 | 3.1% |
-| gdn_gated_scan_bf16 | 4.31 | 16.8% | 7.1 | 8.1% |
+| Gated Cumulative Decay | 1.32 | 5.5% | 1,485.0 | 45.5% |
+| Gated Delta-Rule Scan | 1.13 | 4.7% | 2,625.9 | 9.4% |
+| Causal Depthwise Conv1D | 1.20 | 5.0% | 1,709.8 | 22.7% |
+| gdn_cumdecay_f16 | 1.76 | 7.4% | 831.0 | 23.4% |
+| gdn_gated_scan_f16 | 1.15 | 4.8% | 2,550.9 | 4.6% |
+| gdn_cumdecay_bf16 | 1.52 | 6.4% | 963.0 | 17.5% |
+| gdn_gated_scan_bf16 | 1.13 | 4.7% | 2,605.5 | 27.8% |
+| Gated Cumulative Decay | 3.55 | 14.9% | 275.4 | 33.3% |
+| Gated Delta-Rule Scan | 2.45 | 10.3% | 603.0 | 22.9% |
+| Causal Depthwise Conv1D | 2.80 | 11.8% | 368.0 | 7.7% |
+| gdn_cumdecay_f16 | 2.46 | 10.3% | 297.6 | 20.3% |
+| gdn_gated_scan_f16 | 2.77 | 11.6% | 531.8 | 26.7% |
+| gdn_cumdecay_bf16 | 2.01 | 8.4% | 364.0 | 16.2% |
+| gdn_gated_scan_bf16 | 2.72 | 11.4% | 542.0 | 21.7% |
+| Gated Cumulative Decay | 5.33 | 22.4% | 5.7 | 3.6% |
+| Gated Delta-Rule Scan | 8.32 | 35.0% | 9.2 | 2.8% |
+| Causal Depthwise Conv1D | 4.95 | 20.8% | 27.8 | 20.3% |
+| gdn_cumdecay_f16 | 3.63 | 15.3% | 6.3 | 4.1% |
+| gdn_gated_scan_f16 | 5.98 | 25.1% | 10.2 | 3.6% |
+| gdn_cumdecay_bf16 | 2.82 | 11.8% | 8.1 | 7.7% |
+| gdn_gated_scan_bf16 | 5.23 | 22.0% | 11.7 | 3.1% |
+| Gated Cumulative Decay | 3.91 | 16.4% | 3.9 | 4.0% |
+| Gated Delta-Rule Scan | 6.37 | 26.8% | 6.0 | 2.6% |
+| Causal Depthwise Conv1D | 3.37 | 14.2% | 20.4 | 9.7% |
+| gdn_cumdecay_f16 | 2.71 | 11.4% | 4.2 | 3.7% |
+| gdn_gated_scan_f16 | 4.72 | 19.8% | 6.5 | 4.0% |
+| gdn_cumdecay_bf16 | 2.24 | 9.4% | 5.1 | 3.1% |
+| gdn_gated_scan_bf16 | 4.31 | 18.1% | 7.1 | 8.1% |
