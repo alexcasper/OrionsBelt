@@ -137,6 +137,18 @@ E2E_SWEEP_COLS = [
     "notes",
 ]
 
+# E2e context-sweep raw CSV (from gdn_e2e_decode.c --ctx-sweep mode)
+E2E_CTXSWEEP_RAW_COLS = [
+    "model",
+    "ctx_len",
+    "gdn_layer_us",
+    "full_attn_us",
+    "ffn_us",
+    "total_us",
+    "tok_per_sec",
+    "kv_cache_mb",
+]
+
 # Device spec bandwidth (GiB/s) for sanity-check upper bounds.
 # From DEVICE_RUNBOOK.md "What we are actually testing".
 DEVICE_SPEC_BW = {
@@ -168,6 +180,8 @@ def detect_csv_type(header):
         return "ctx_sweep"
     if cols >= {"run_id", "metric_name", "metric_component", "repeat_index"}:
         return "e2e_sweep"
+    if cols >= {"gdn_layer_us", "kv_cache_mb", "total_us"}:
+        return "e2e_ctxsweep"
     return None
 
 
@@ -188,6 +202,8 @@ def expected_columns(csv_type):
         return CTX_SWEEP_COLS
     if csv_type == "e2e_sweep":
         return E2E_SWEEP_COLS
+    if csv_type == "e2e_ctxsweep":
+        return E2E_CTXSWEEP_RAW_COLS
     return []
 
 

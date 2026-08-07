@@ -1,10 +1,10 @@
 {
   "manifest_version": 1,
-  "run_id": "rk3588-t3_big_int8_e2e_d5d867d",
-  "timestamp_utc": "2026-08-07T05:16:19Z",
+  "run_id": "rk3588-t3_big_e2e_8e7403c",
+  "timestamp_utc": "2026-08-07T05:14:23Z",
   "source": "scripts/capture_manifest.sh",
   "git": {
-    "sha": "d5d867d3197eafcdd40bae91329532f148ad81ed",
+    "sha": "8e7403c36d41957198852e99a5811a1df8ce9e15",
     "dirty": false
   },
   "host": {
@@ -24,10 +24,10 @@
     "effective_threads": 4,
     "threads_source": "OMP_NUM_THREADS"
   },
-  "thermal_zones": [{"zone":"thermal_zone0","type":"soc-thermal","temp_millicelsius":49923},{"zone":"thermal_zone1","type":"bigcore0-thermal","temp_millicelsius":49923},{"zone":"thermal_zone2","type":"bigcore1-thermal","temp_millicelsius":49923},{"zone":"thermal_zone3","type":"littlecore-thermal","temp_millicelsius":49923},{"zone":"thermal_zone4","type":"center-thermal","temp_millicelsius":49000},{"zone":"thermal_zone5","type":"gpu-thermal","temp_millicelsius":49000},{"zone":"thermal_zone6","type":"npu-thermal","temp_millicelsius":49923}],
+  "thermal_zones": [{"zone":"thermal_zone0","type":"soc-thermal","temp_millicelsius":49923},{"zone":"thermal_zone1","type":"bigcore0-thermal","temp_millicelsius":49000},{"zone":"thermal_zone2","type":"bigcore1-thermal","temp_millicelsius":49000},{"zone":"thermal_zone3","type":"littlecore-thermal","temp_millicelsius":49923},{"zone":"thermal_zone4","type":"center-thermal","temp_millicelsius":48076},{"zone":"thermal_zone5","type":"gpu-thermal","temp_millicelsius":48076},{"zone":"thermal_zone6","type":"npu-thermal","temp_millicelsius":49000}],
   "memory": {
     "mem_total_kb": 32550332,
-    "mem_available_kb": 31255048
+    "mem_available_kb": 31255376
   },
   "software": {
     "python_version": "Python 3.10.12"
