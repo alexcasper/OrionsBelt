@@ -1004,7 +1004,11 @@ int main(int argc, char **argv) {
                     double t0 = now_us();
                     ffn_forward(&w, hidden_next, hidden, 1);
                     ffn_total += now_us() - t0;
-                    float *tmp = hidden; hidden = hidden_next; hidden_next = tmp;
+                    /* No swap: after gdn writes hidden_next and ffn writes back to
+                     * hidden (with residual), hidden already holds the correct
+                     * output for the next layer. Swapping would feed the stale
+                     * attention output to the next layer, dropping the FFN
+                     * residual. */
                 }
             }
             gdn_total /= reps;
@@ -1089,7 +1093,8 @@ int main(int argc, char **argv) {
             else
                 full_attn_layer_forward(&w, &states[l], hidden, hidden_next, 1);
             ffn_forward(&w, hidden_next, hidden, 1);
-            float *tmp = hidden; hidden = hidden_next; hidden_next = tmp;
+            /* No swap — see comment in measured loop. hidden holds the
+             * correct post-FFN output for the next layer. */
         }
     }
 
@@ -1122,7 +1127,9 @@ int main(int argc, char **argv) {
             double t0 = now_us();
             ffn_forward(&w, hidden_next, hidden, 1);
             g_t_ffn += now_us() - t0;
-            float *tmp = hidden; hidden = hidden_next; hidden_next = tmp;
+            /* No swap — hidden already holds the correct post-FFN output.
+             * The previous swap was a bug: it fed the stale attention output
+             * (without the FFN residual) to the next layer. */
         }
 
         tok_times[t] = now_us() - tok_start;
