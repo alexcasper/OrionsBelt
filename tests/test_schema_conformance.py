@@ -81,6 +81,7 @@ def test_csv_header_from_existing_results():
     e2e_ctxsweep_marker = "kv_cache_mb"  # ctx-sweep e2e raw (model,ctx_len,gdn_layer_us,...)
     ctx_sweep_marker = "gdn_layer_us"  # gdn_e2e_decode.c --ctx-sweep mode (ob-mrd.10)
     delta_matmul_marker = "M"  # bench_gdn --delta-matmul mode (ob-8qt.1)
+    ctx_sweep_marker = "gdn_layer_us"  # context-length sweep (gdn_e2e_decode.c --ctx-sweep)
     result_row_columns = set(RESULT_ROW_COLUMNS)
 
     checked = 0

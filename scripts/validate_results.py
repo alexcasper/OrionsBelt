@@ -102,7 +102,7 @@ E2E_DECODE_COLS = [
     "ffn_pct",
 ]
 
-# Context-length sweep CSV (from gdn_e2e_decode.c --ctx-sweep mode)
+# Context-length sweep CSV (from gdn_e2e_decode.c --ctx-sweep mode, ob-8qt.12)
 CTX_SWEEP_COLS = [
     "model",
     "ctx_len",
@@ -426,6 +426,39 @@ def validate_delta_matmul_row(row, csv_name, issues, row_num):
         issues.append(Issue("WARNING", csv_name, f"row {row_num}: p95 ({p95}) < p50 ({p50})"))
 
 
+def validate_ctx_sweep_row(row, csv_name, issues, row_num):
+    """Validate a single row of a context-length sweep CSV (gdn_e2e_decode.c --ctx-sweep)."""
+    try:
+        ctx = int(row["ctx_len"])
+        gdn_us = float(row["gdn_layer_us"])
+        full_us = float(row["full_attn_us"])
+        ffn_us = float(row["ffn_us"])
+        total_us = float(row["total_us"])
+        tps = float(row["tok_per_sec"])
+        kv_mb = float(row["kv_cache_mb"])
+    except (ValueError, KeyError) as e:
+        issues.append(Issue("ERROR", csv_name, f"row {row_num}: cannot parse numeric fields: {e}"))
+        return
+
+    if ctx < 1:
+        issues.append(Issue("ERROR", csv_name, f"row {row_num}: non-positive ctx_len"))
+    for label, val in [
+        ("gdn_layer_us", gdn_us),
+        ("ffn_us", ffn_us),
+        ("total_us", total_us),
+    ]:
+        if val <= 0:
+            issues.append(Issue("ERROR", csv_name, f"row {row_num}: non-positive {label}"))
+    # full_attn_us is legitimately 0 for --pure-gdn sweeps (no full-attention
+    # layers exist), so only a negative value is an error.
+    if full_us < 0:
+        issues.append(Issue("ERROR", csv_name, f"row {row_num}: negative full_attn_us"))
+    if tps <= 0:
+        issues.append(Issue("ERROR", csv_name, f"row {row_num}: non-positive tok_per_sec"))
+    if kv_mb < 0:
+        issues.append(Issue("ERROR", csv_name, f"row {row_num}: negative kv_cache_mb"))
+
+
 def validate_e2e_sweep_row(row, csv_name, issues, row_num):
     """Validate a single row of an e2e context-sweep CSV (bench/schema.py format)."""
     try:
@@ -525,15 +558,7 @@ def validate_csv(path, csv_name, issues):
                     except ValueError:
                         pass
                 elif csv_type == "ctx_sweep":
-                    # Basic sanity: tok_per_sec must be positive
-                    try:
-                        tps = float(row.get("tok_per_sec", 0))
-                        if tps <= 0 or tps > 1000:
-                            issues.append(
-                                Issue("WARNING", csv_name, f"row {i}: implausible tok/s {tps}")
-                            )
-                    except ValueError:
-                        pass
+                    validate_ctx_sweep_row(row, csv_name, issues, i)
                 elif csv_type == "e2e_sweep":
                     validate_e2e_sweep_row(row, csv_name, issues, i)
                     # e2e-sweep rows embed their own manifest path (bench.schema.ResultRow) —
