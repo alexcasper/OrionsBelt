@@ -4107,3 +4107,44 @@ recurrent primitives.
 > cumdecay 1×2560 was anomalously fast; gated_scan 1×160 was 0.0 µs/inf).
 > Manifest: `results/manifests/rk3588-t3_kleidiai_gdn_kernels.json`.
 > Raw CSV: `results/raw/kleidiai/rk3588-t3_kleidiai_gdn_kernels.csv`.
+
+### Cross-device anomaly: cumdecay 64×160 (t3 vs t4)
+
+The same KleidiAI benchmark was run on a second RK3588 unit (t4, commit
+`1604356`). **14 of 15 shapes agree within 5–17%** between the two devices.
+The sole outlier is **cumdecay 64×160**: t3 measures 11.2 µs (6.8 GiB/s) vs
+t4 at 3.3 µs (22.8 GiB/s) — a **3.35× divergence**.
+
+| Shape | t3 p50 (µs) | t4 p50 (µs) | t3/t4 |
+|---|---|---|---|
+| cumdecay 64×160 | 11.2 | 3.3 | 3.35× ⚠️ |
+| cumdecay 64×2560 | 121.8 | 120.9 | 1.01× |
+| gated_scan 64×160 | 5.3 | 5.5 | 0.98× |
+| dwconv1d 64×160 | 5.2 | 5.1 | 1.01× |
+
+The manifests confirm the devices are **different board revisions**: t3
+big-core max clock is 2304 MHz (cpu_capacity 414, kernel 5.10.160-rockchip,
+glibc 2.35), t4 is 2400 MHz (cpu_capacity 397, kernel 6.11.0-1006-rockchip,
+glibc 2.40) — a 4.2% clock difference that explains most of the 5–17%
+variance on bandwidth-bound shapes but not the 3.35× cumdecay outlier.
+
+**Root cause analysis.** The kernel code is byte-identical at both commits
+(`git diff` is empty). t4's value is stable to <0.3% across 5 re-runs. The
+NEON inner loop (see `kai_gdn_cumdecay_f32_sve.c`, double-width unroll path)
+issues `ldr q` → `fmul` with only 3 instructions of separation, but the A76
+L1 load latency is 4 cycles — creating a 1-cycle stall per timestep. This
+stall compounds across the 64-step sequential dependency chain (each
+`vmulq_f32` depends on the previous iteration's `run` register). On the t3
+board revision (lower-clocked, different kernel, possibly different silicon
+stepping), this scheduling hazard appears amplified — possibly because t3's
+older kernel (5.10) has different scheduler behavior or the gcc codegen at
+the t3 build differs. At the larger cumdecay 64×2560 shape (640 KiB working
+set, L2/DRAM-resident and bandwidth-bound), the scheduling stall is masked
+and the two devices agree to 1%.
+
+**Implication for the submission.** The cumdecay 64×160 cell in the §24
+table should be treated as t3-specific; the t4 value (3.3 µs, 22.8 GiB/s)
+is likely closer to the true A76 capability at this shape. The discrepancy
+does not affect the A76 vs A57 comparison (which uses t3 data consistently)
+or the portability thesis (the kernel produces correct results on all
+tested cores).

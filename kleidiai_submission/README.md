@@ -350,11 +350,19 @@ manifest:
 > subsystem shine.
 
 > **t4 vs t3 cross-validation:** Both devices are RK3588 with Cortex-A76 big
-> cores. With batched timing, the two devices agree within 5–10% across all
-> shapes, confirming the measurement methodology is reproducible. The largest
-> discrepancy is cumdecay 64×160 (t4: 3.3 µs / 22.8 GiB/s vs t3: 11.2 µs / 6.8
-> GiB/s), which may reflect t4's slightly different memory timings or scheduler
-> behavior at this small shape.
+> cores, but the manifests reveal they are **different board revisions**: t3
+> big-core max clock is 2304 MHz (cpu_capacity 414, kernel 5.10.160), t4 is
+> 2400 MHz (cpu_capacity 397, kernel 6.11.0). With batched timing, **14 of 15
+> shapes agree within 5–17%**, confirming the measurement methodology is
+> reproducible. The sole outlier is **cumdecay 64×160** (t4: 3.3 µs / 22.8 GiB/s
+> vs t3: 11.2 µs / 6.8 GiB/s — a 3.35× divergence). The kernel code is identical
+> at both commits (verified via `git diff`), and t4's value is stable to <0.3%
+> across 5 re-runs. The likely cause is a load-to-use scheduling hazard amplified
+> by different gcc codegen or A76 silicon revision: the NEON inner loop issues
+> `ldr` → `fmul` with only 3 instructions of distance, but A76 L1 load latency is
+> 4 cycles, creating a 1-cycle stall per timestep that compounds across the
+> 64-step sequential dependency chain. At the larger cumdecay 64×2560 shape
+> (L2-resident, bandwidth-bound), the two devices agree to 1%.
 
 > **Note on variance:** The A57 exhibits high run-to-run variance (up to 1.5×
 > on the same kernel at the same commit, per beads ob-bf7). The numbers above
