@@ -163,6 +163,21 @@ Qwen3.5-4B + 0.8B, fp32, A76 big cluster (cpu4-7), governor=performance, 128 dec
 > negligible — the next high-impact optimization is INT8 weight quantization
 > (halves FFN memory traffic, the dominant phase).
 
+**After INT8 weight-only quantization (commit `bdca994`, §FINDINGS-INT8):**
+
+| Device | Model | Quant | tok/s | TTFT (ms) | Git SHA | Manifest |
+|---|---|---|---:|---:|---|---|
+| rk3588-t3 | 4B   | INT8 | 1.84 | — | `bdca994` | — |
+| rk3588-t4 | 4B   | INT8 | 1.55 | 645 | `591232e` | `rk3588-t4_big_int8_e2e.json` |
+| rk3588-t3 | 0.8B | INT8 | 10.55 | — | `bdca994` | — |
+| rk3588-t4 | 0.8B | INT8 | 7.64 | 130 | `246d937` | `rk3588-t4_08b_big_int8_e2e.json` |
+
+> INT8 weight-only quantization (per-column symmetric, NEON dequantize-on-the-fly)
+> cuts weight memory traffic 4×. t3 reported 1.79× speedup (4B) and 1.32× (0.8B)
+> over FP32 GEMV baseline. t4 cross-check confirms the optimisation direction;
+> absolute gap (16-28 %) is consistent with documented t3↔t4 board heterogeneity.
+> See FINDINGS.md "INT8 weight-only quantization" section for full analysis.
+
 ## 8. OpenMP multi-threading scaling (t4)
 
 Qwen3.5-4B, prefill (seq=64), fp32, A76 big cluster.

@@ -3060,6 +3060,28 @@ that the CPU decode bottleneck is addressable through memory-system
 optimization alone — the GDN recurrent-scan kernels remain <0.1% of decode
 time and are not the optimization target.
 
+### Cross-check — rk3588-t4 (2nd RK3588 unit)
+
+t3's INT8 implementation was independently validated on rk3588-t4 (separate
+board, same silicon, commit `bdca994` cherry-picked onto bench/t4):
+
+| Model | t3 INT8 tok/s | t4 INT8 tok/s | t4/t3 | t4 TTFT (ms) | t4 s/tok |
+|-------|-------------:|-------------:|------:|-------------:|---------:|
+| Qwen3.5-4B   | 1.84 | 1.55 | 84 % | 645 | 0.65 |
+| Qwen3.5-0.8B | 10.55 | 7.64 | 72 % | 130 | 0.13 |
+
+Results stable across 3 independent runs (within 1 %). Thermal delta +6-7 °C.
+The 16 % gap on 4B matches the known t3↔t4 board heterogeneity (§cross-board);
+the wider 28 % gap on 0.8B reflects the smaller working set being less DRAM-bound
+on t4's board. Bottleneck profile matches t3 (FFN ~69 %, GDN proj ~16 %).
+
+Files: `results/raw/rk3588-t4_big_int8_e2e_raw.csv`,
+`results/raw/rk3588-t4_08b_big_int8_e2e_raw.csv`
+Manifests: `rk3588-t4_big_int8_e2e.json` (sha `591232e`, dirty=false),
+`rk3588-t4_08b_big_int8_e2e.json` (sha `246d937`, dirty=false).
+
+---
+
 ## 17. Context-length scaling: GDN O(1) vs full-attention O(n) decode cost (2026-08-07, ob-mrd.10)
 
 ### Motivation
