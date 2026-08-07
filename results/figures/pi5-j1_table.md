@@ -13,14 +13,14 @@ _Source: committed CSVs in results/raw/_
 
 ## Achieved vs Spec Bandwidth
 
-**Device spec bandwidth:** 17.0 GiB/s
+**Device spec bandwidth:** 15.8 GiB/s
 
 
 | Kernel | Achieved (GiB/s) | % of Spec | p50 (µs) | Spread |
 |---|---:|---:|---:|---:|
-| Gated Cumulative Decay | 2.93 | 17.2% | 667.2 | 14.0% |
-| Gated Delta-Rule Scan | 1.84 | 10.8% | 1,610.7 | 5.1% |
-| Causal Depthwise Conv1D | 2.37 | 13.9% | 869.6 | 2.6% |
-| Gated Cumulative Decay | 4.51 | 26.5% | 216.3 | 0.7% |
-| Gated Delta-Rule Scan | 4.47 | 26.3% | 331.3 | 1.3% |
-| Causal Depthwise Conv1D | 4.71 | 27.7% | 218.7 | 1.8% |
+| Gated Cumulative Decay | 2.93 | 18.5% | 667.2 | 14.0% |
+| Gated Delta-Rule Scan | 1.84 | 11.6% | 1,610.7 | 5.1% |
+| Causal Depthwise Conv1D | 2.37 | 15.0% | 869.6 | 2.6% |
+| Gated Cumulative Decay | 4.51 | 28.5% | 216.3 | 0.7% |
+| Gated Delta-Rule Scan | 4.47 | 28.3% | 331.3 | 1.3% |
+| Causal Depthwise Conv1D | 4.71 | 29.8% | 218.7 | 1.8% |
