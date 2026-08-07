@@ -90,7 +90,7 @@ to devices but was never previously tested in the correctness suite).
 | gdn_causal_dwconv1d | A55 little | 0.71 | **5.30** | 7.4× |
 
 > **cumdecay at 24.3 GiB/s approaches the RK3588's practical DRAM bandwidth
-> ceiling (~25 GiB/s measured, 79% of the 33.8 GB/s theoretical spec at
+> ceiling (~25 GiB/s measured, 79% of the 31.5 GiB/s theoretical spec at
 > 2112 MHz).** The kernel is now memory-bound — the optimization has taken
 > it as far as the hardware allows.
 

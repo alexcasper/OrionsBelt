@@ -116,10 +116,10 @@ The GDN fast path depends on two optional packages, `causal_conv1d` and `fla`. W
 
 | Device | Cores | ISA | Spec BW (GiB/s) |
 |---|---|---|---|
-| Raspberry Pi 5 | 4× Cortex-A76 @ 2.4 GHz | Armv8.2-A + dotprod | 17.0 |
-| RK3588 (big cluster) | 4× Cortex-A76 @ 2.3 GHz | Armv8.2-A + dotprod | 34.0 |
-| RK3588 (little cluster) | 4× Cortex-A55 @ 1.8 GHz | Armv8.2-A | 34.0 |
-| Jetson Nano (j1/j2) | 4× Cortex-A57 @ 1.48 GHz | Armv8.0-A (NEON only) | 25.6 |
+| Raspberry Pi 5 | 4× Cortex-A76 @ 2.4 GHz | Armv8.2-A + dotprod | 15.8 |
+| RK3588 (big cluster) | 4× Cortex-A76 @ 2.3 GHz | Armv8.2-A + dotprod | 31.7 |
+| RK3588 (little cluster) | 4× Cortex-A55 @ 1.8 GHz | Armv8.2-A | 31.7 |
+| Jetson Nano (j1/j2) | 4× Cortex-A57 @ 1.48 GHz | Armv8.0-A (NEON only) | 23.8 |
 
 **Stretch target (if hardware arrives):** Radxa Orion O6, built on the **CIX P1** SoC.
 
