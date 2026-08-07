@@ -93,7 +93,7 @@ sequence models (Mamba, RWKV, RetNet, GDN all use some variant of it).
 
 ---
 
-## The NEON-Only GEMV (M=1 Decode-Path Delta-Rule Matmul)
+## The NEON GEMV (M=1 Decode-Path Delta-Rule Matmul)
 
 ```
 C[j] = Σ_k  A[k] · B[k][j]     (M=1, so this is a matrix-vector product)
@@ -112,7 +112,7 @@ break-even M is 3–6. Hand-NEON without packing wins 2.6–3.0× at M=1 — mak
 GEMV the right kernel for the decode path. See `gdn_delta_matmul.c` header for
 the full dual-path dispatch rationale.
 
-**This kernel is NEON-only** (no SME, no SVE dependency) because:
+**This kernel uses NEON FMA** (no SME, no SVE, no dotprod dependency) because:
 - The delta-rule operands are fp32 (per the project's quantization policy).
 - The decode target devices (e.g., Cortex-A76 on RK3588) predate i8mm and SVE.
 - NEON FMA at 4-wide is sufficient for the M=1 bandwidth-bound case.
@@ -132,11 +132,11 @@ kai_run_<operation>_<data-types>_<ISA>
 | `kai_run_gdn_cumdecay_f32_sve`                        | SVE (SVE1 floor)  |
 | `kai_run_gdn_gated_scan_f32_sve`                      | SVE (SVE1 floor)  |
 | `kai_run_gdn_causal_dwconv1d_f32_k4_sve`              | SVE (SVE1 floor)  |
-| `kai_run_gdn_gemv_f32_f32_f32_1x4_neon_dotprod`       | NEON + dotprod    |
+| `kai_run_gdn_gemv_f32_f32_f32_1x4_neon`             | NEON FMA          |
 
 The `_sve` suffix indicates the primary vectorization ISA (SVE1 baseline), with
-compile-time NEON and scalar fallbacks. The GEMV uses `_neon_dotprod` because
-it targets the NEON FMA path specifically. The `1x4` in the GEMV name encodes
+compile-time NEON and scalar fallbacks. The GEMV uses `_neon` because
+it targets the NEON FMA path specifically (fp32 operands, no SDOT). The `1x4` in the GEMV name encodes
 M=1 (single output row) and the 4-wide NEON accumulation.
 
 ---
@@ -214,8 +214,8 @@ kleidiai_submission/
     ├── kai_gdn_gated_scan_f32_sve.c
     ├── kai_gdn_causal_dwconv1d_f32_k4_sve.h
     ├── kai_gdn_causal_dwconv1d_f32_k4_sve.c
-    ├── kai_gdn_gemv_f32_f32_f32_1x4_neon_dotprod.h
-    └── kai_gdn_gemv_f32_f32_f32_1x4_neon_dotprod.c
+    ├── kai_gdn_gemv_f32_f32_f32_1x4_neon.h
+    └── kai_gdn_gemv_f32_f32_f32_1x4_neon.c
 ```
 
 ## Verification

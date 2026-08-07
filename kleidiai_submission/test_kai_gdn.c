@@ -6,19 +6,16 @@
 // Each kernel is compared against a naive scalar C reference implementation.
 // On success the program prints "ALL TESTS PASSED" and returns 0.
 //
-// Build:
-//   gcc -O3 -march=armv8.2-a+simd \
-//       -I kleidiai_submission \
-//       kleidiai_submission/test_kai_gdn.c \
-//       kleidiai_submission/kai/ukernels/gdn/*.c \
+// Build (native):
+//   cd kleidiai_submission && make test
+//
+// Or manually:
+//   gcc -O3 -march=armv8-a -I kleidiai_submission
+//       kleidiai_submission/test_kai_gdn.c
+//       kleidiai_submission/kai/ukernels/gdn/*.c
 //       -lm -o test_kai_gdn
 //
-// For SVE targets:
-//   aarch64-linux-gnu-gcc -O3 -march=armv8.2-a+sve \
-//       -I kleidiai_submission \
-//       kleidiai_submission/test_kai_gdn.c \
-//       kleidiai_submission/kai/ukernels/gdn/*.c \
-//       -lm -o test_kai_gdn
+// Or simply:  cd kleidiai_submission && make test
 
 #include <math.h>
 #include <stdio.h>
@@ -28,7 +25,7 @@
 #include "kai/ukernels/gdn/kai_gdn_cumdecay_f32_sve.h"
 #include "kai/ukernels/gdn/kai_gdn_gated_scan_f32_sve.h"
 #include "kai/ukernels/gdn/kai_gdn_causal_dwconv1d_f32_k4_sve.h"
-#include "kai/ukernels/gdn/kai_gdn_gemv_f32_f32_f32_1x4_neon_dotprod.h"
+#include "kai/ukernels/gdn/kai_gdn_gemv_f32_f32_f32_1x4_neon.h"
 
 /* ----------------------------------------------------------------------- */
 /* Helpers                                                                  */
@@ -288,7 +285,7 @@ static void test_gemv(void) {
             fill_random(b, k * n, -1.0f, 1.0f);
 
             ref_gemv_f32(a, b, ref_c, k, n);
-            kai_run_gdn_gemv_f32_f32_f32_1x4_neon_dotprod(a, b, got_c, k, n);
+            kai_run_gdn_gemv_f32_f32_f32_1x4_neon(a, b, got_c, k, n);
 
             if (!compare_arrays(got_c, ref_c, n, "gemv", 1e-3f, 5e-3f))
                 all_ok = 0;
@@ -377,6 +374,136 @@ static void test_dwconv1d_continuity(void) {
 }
 
 /* ----------------------------------------------------------------------- */
+/* Edge-case tests                                                          */
+/* ----------------------------------------------------------------------- */
+
+/* Test GEMV with N not divisible by 4 (tail epilogue) */
+static void test_gemv_tail(void) {
+    size_t ks[] = {1, 128, 1024};
+    size_t ns[] = {1, 3, 5, 7, 130, 257};
+    int all_ok = 1;
+
+    for (size_t ki = 0; ki < sizeof(ks)/sizeof(ks[0]); ++ki) {
+        for (size_t ni = 0; ni < sizeof(ns)/sizeof(ns[0]); ++ni) {
+            size_t k = ks[ki], n = ns[ni];
+            float *a = malloc(k * sizeof(float));
+            float *b = malloc(k * n * sizeof(float));
+            float *got_c = malloc(n * sizeof(float));
+            float *ref_c = malloc(n * sizeof(float));
+
+            fill_random(a, k, -1.0f, 1.0f);
+            fill_random(b, k * n, -1.0f, 1.0f);
+
+            ref_gemv_f32(a, b, ref_c, k, n);
+            kai_run_gdn_gemv_f32_f32_f32_1x4_neon(a, b, got_c, k, n);
+
+            if (!compare_arrays(got_c, ref_c, n, "gemv_tail", 1e-3f, 5e-3f))
+                all_ok = 0;
+
+            free(a); free(b); free(got_c); free(ref_c);
+        }
+    }
+    if (all_ok) {} else FAIL_TEST("test_gemv_tail");
+}
+
+/* Test cumdecay with channel count not divisible by 4 */
+static void test_cumdecay_tail(void) {
+    size_t seqs[] = {1, 7, 64};
+    size_t chs[] = {1, 3, 5, 17, 128, 129};
+    int all_ok = 1;
+
+    for (size_t si = 0; si < sizeof(seqs)/sizeof(seqs[0]); ++si) {
+        for (size_t ci = 0; ci < sizeof(chs)/sizeof(chs[0]); ++ci) {
+            size_t seq = seqs[si], ch = chs[ci];
+            float *a = malloc(seq * ch * sizeof(float));
+            float *got = malloc(seq * ch * sizeof(float));
+            float *ref = malloc(seq * ch * sizeof(float));
+
+            fill_random(a, seq * ch, 0.1f, 0.99f);
+
+            ref_cumdecay_f32(a, ref, seq, ch);
+            kai_run_gdn_cumdecay_f32_sve(a, got, seq, ch);
+
+            if (!compare_arrays(got, ref, seq * ch, "cumdecay_tail", 1e-6f, 1e-5f))
+                all_ok = 0;
+
+            free(a); free(got); free(ref);
+        }
+    }
+    if (all_ok) {} else FAIL_TEST("test_cumdecay_tail");
+}
+
+/* Test gated_scan with channel count not divisible by 4 */
+static void test_gated_scan_tail(void) {
+    size_t seq = 16;
+    size_t chs[] = {1, 3, 5, 17, 129, 255};
+    int all_ok = 1;
+
+    for (size_t ci = 0; ci < sizeof(chs)/sizeof(chs[0]); ++ci) {
+        size_t ch = chs[ci];
+        float *g = malloc(seq * ch * sizeof(float));
+        float *x = malloc(seq * ch * sizeof(float));
+        float *got_s = malloc(seq * ch * sizeof(float));
+        float *ref_s = malloc(seq * ch * sizeof(float));
+        float *got_state = malloc(ch * sizeof(float));
+        float *ref_state = malloc(ch * sizeof(float));
+
+        fill_random(g, seq * ch, -0.99f, 0.99f);
+        fill_random(x, seq * ch, -2.0f, 2.0f);
+        fill_random(ref_state, ch, -1.0f, 1.0f);
+        memcpy(got_state, ref_state, ch * sizeof(float));
+
+        ref_gated_scan_f32(g, x, ref_s, ref_state, seq, ch);
+        kai_run_gdn_gated_scan_f32_sve(g, x, got_s, got_state, seq, ch);
+
+        int ok = compare_arrays(got_s, ref_s, seq * ch, "gated_scan_tail", 1e-4f, 5e-4f);
+        ok = ok && compare_arrays(got_state, ref_state, ch,
+                                  "gated_scan_tail state", 1e-4f, 5e-4f);
+        if (!ok) all_ok = 0;
+
+        free(g); free(x); free(got_s); free(ref_s);
+        free(got_state); free(ref_state);
+    }
+    if (all_ok) {} else FAIL_TEST("test_gated_scan_tail");
+}
+
+/* Test dwconv1d with channel count not divisible by 4 */
+static void test_dwconv1d_tail(void) {
+    size_t seq = 16;
+    size_t chs[] = {1, 3, 5, 17, 129};
+    int all_ok = 1;
+
+    for (size_t ci = 0; ci < sizeof(chs)/sizeof(chs[0]); ++ci) {
+        size_t ch = chs[ci];
+        float *in = malloc(seq * ch * sizeof(float));
+        float *w = malloc((size_t)REF_CONV_K * ch * sizeof(float));
+        float *got_out = malloc(seq * ch * sizeof(float));
+        float *ref_out = malloc(seq * ch * sizeof(float));
+        float *got_hist = malloc((size_t)(REF_CONV_K - 1) * ch * sizeof(float));
+        float *ref_hist = malloc((size_t)(REF_CONV_K - 1) * ch * sizeof(float));
+
+        fill_random(in, seq * ch, -1.0f, 1.0f);
+        fill_random(w, (size_t)REF_CONV_K * ch, -1.0f, 1.0f);
+        fill_random(ref_hist, (size_t)(REF_CONV_K - 1) * ch, -1.0f, 1.0f);
+        memcpy(got_hist, ref_hist, (size_t)(REF_CONV_K - 1) * ch * sizeof(float));
+
+        ref_causal_dwconv1d_f32(in, w, ref_out, ref_hist, seq, ch);
+        kai_run_gdn_causal_dwconv1d_f32_k4_sve(in, w, got_out, got_hist, seq, ch);
+
+        int ok = compare_arrays(got_out, ref_out, seq * ch,
+                                "dwconv1d_tail", 1e-4f, 5e-4f);
+        ok = ok && compare_arrays(got_hist, ref_hist,
+                                  (size_t)(REF_CONV_K - 1) * ch,
+                                  "dwconv1d_tail hist", 1e-4f, 5e-4f);
+        if (!ok) all_ok = 0;
+
+        free(in); free(w); free(got_out); free(ref_out);
+        free(got_hist); free(ref_hist);
+    }
+    if (all_ok) {} else FAIL_TEST("test_dwconv1d_tail");
+}
+
+/* ----------------------------------------------------------------------- */
 /* Main                                                                     */
 /* ----------------------------------------------------------------------- */
 
@@ -389,6 +516,12 @@ int main(void) {
     RUN_TEST("test_gemv", test_gemv(););
     RUN_TEST("test_gated_scan_continuity", test_gated_scan_continuity(););
     RUN_TEST("test_dwconv1d_continuity", test_dwconv1d_continuity(););
+
+    printf("\n--- Edge-case tests (tail handling) ---\n\n");
+    RUN_TEST("test_gemv_tail", test_gemv_tail(););
+    RUN_TEST("test_cumdecay_tail", test_cumdecay_tail(););
+    RUN_TEST("test_gated_scan_tail", test_gated_scan_tail(););
+    RUN_TEST("test_dwconv1d_tail", test_dwconv1d_tail(););
 
     printf("=== Summary ===\n");
     printf("Tests run:    %d\n", g_tests_run);

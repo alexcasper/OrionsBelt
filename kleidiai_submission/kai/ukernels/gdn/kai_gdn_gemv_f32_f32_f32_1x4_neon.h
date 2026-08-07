@@ -3,7 +3,7 @@
 //
 // Origin: src/orionsbelt/engines/cpu/kernels/gdn_delta_matmul.c (OrionsBelt repository)
 //
-// KleidiAI micro-kernel: NEON-only GEMV for the M=1 decode-path delta-rule matmul.
+// KleidiAI micro-kernel: NEON GEMV for the M=1 decode-path delta-rule matmul.
 //
 //   C[j] = sum_k  A[k] * B[k][j]     (matrix-vector product, M=1)
 //
@@ -13,12 +13,12 @@
 // the extracted standalone form of that fast path.
 //
 // The "1x4" in the name encodes M=1 (single output row) and 4-wide NEON
-// accumulation.  The "dotprod" suffix indicates the target ISA class; the
-// kernel uses fp32 FMA (no int8 dot product), matching the fp32 delta-rule
-// operands.
+// accumulation.  The "neon" suffix indicates fp32 NEON FMA vectorisation —
+// no int8 dot-product (SDOT) instructions are used, because the delta-rule
+// operands are fp32.
 
-#ifndef KAI_GDN_GEMV_F32_F32_F32_1X4_NEON_DOTPROD_H
-#define KAI_GDN_GEMV_F32_F32_F32_1X4_NEON_DOTPROD_H
+#ifndef KAI_GDN_GEMV_F32_F32_F32_1X4_NEON_H
+#define KAI_GDN_GEMV_F32_F32_F32_1X4_NEON_H
 
 #include <stddef.h>
 
@@ -35,12 +35,12 @@ extern "C" {
 /// @param c Output vector (single row of C), length N.
 /// @param k Reduction dimension (head_dim, typically 128).
 /// @param n Output dimension (head_dim * n_heads).
-void kai_run_gdn_gemv_f32_f32_f32_1x4_neon_dotprod(const float *a,
-                                                    const float *b, float *c,
-                                                    size_t k, size_t n);
+void kai_run_gdn_gemv_f32_f32_f32_1x4_neon(const float *a,
+                                            const float *b, float *c,
+                                            size_t k, size_t n);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* KAI_GDN_GEMV_F32_F32_F32_1X4_NEON_DOTPROD_H */
+#endif /* KAI_GDN_GEMV_F32_F32_F32_1X4_NEON_H */

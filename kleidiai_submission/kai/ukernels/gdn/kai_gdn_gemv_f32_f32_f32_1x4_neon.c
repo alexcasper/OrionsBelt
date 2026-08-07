@@ -22,7 +22,7 @@
 #include <stddef.h>
 #include <string.h> /* memset */
 
-#include "kai_gdn_gemv_f32_f32_f32_1x4_neon_dotprod.h"
+#include "kai_gdn_gemv_f32_f32_f32_1x4_neon.h"
 
 #ifdef __ARM_FEATURE_SVE
 #include <arm_sve.h>
@@ -31,9 +31,9 @@
 #include <arm_neon.h>
 #endif
 
-void kai_run_gdn_gemv_f32_f32_f32_1x4_neon_dotprod(const float *a,
-                                                    const float *b, float *c,
-                                                    size_t k, size_t n) {
+void kai_run_gdn_gemv_f32_f32_f32_1x4_neon(const float *a,
+                                            const float *b, float *c,
+                                            size_t k, size_t n) {
 #ifdef __ARM_FEATURE_SVE
     {
         unsigned vl = (unsigned)svcntw();
