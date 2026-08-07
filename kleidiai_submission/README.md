@@ -357,6 +357,16 @@ manifest:
 > Shapes marked "—" are sub-microsecond and below timer resolution; the CSV
 > records p50=0.000 and gib_per_s_p50=inf for these rows.
 
+> **⚠ Data-quality warning (t4 table):** This t4 CSV (`rk3588-t4_kleidiai_gdn_kernels.csv`,
+> manifest dirty=true) contains the same class of measurement artifacts that the
+> t3 data had before its refresh: `cumdecay 1×160` and `gated_scan 1×160` record
+> p50=0.000 / inf (below timer resolution), `cumdecay 64×160` at 3.5 µs is
+> anomalously fast vs t3's 11.4 µs, and `cumdecay 1×2560` at 0.6 µs is anomalously
+> fast vs t3's 3.2 µs. The t3 table below (commit `78eb7e4`, dirty=false) is the
+> **authoritative A76 KleidiAI benchmark** — it was explicitly captured to fix
+> these artifacts. Treat the t4 GEMV rows (17.1–17.7 GiB/s) as cross-validated;
+> treat the t4 recurrent-kernel rows as indicative only.
+
 > **Note on variance:** The A57 exhibits high run-to-run variance (up to 1.5×
 > on the same kernel at the same commit, per beads ob-bf7). The numbers above
 > are from representative single runs; cross-device comparisons must use
