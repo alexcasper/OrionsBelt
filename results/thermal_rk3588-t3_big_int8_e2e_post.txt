@@ -1,10 +1,10 @@
 # Post-run thermal snapshot — e2e decode
 # Device: rk3588-t3_big_int8  Cluster: big
-# Git SHA: c6dbb82
-# Timestamp: 2026-08-07T02:31:25Z
+# Git SHA: d5d867d
+# Timestamp: 2026-08-07T05:16:19Z
 
 thermal_zone0 soc-thermal 52692
-thermal_zone1 bigcore0-thermal 53615
+thermal_zone1 bigcore0-thermal 52692
 thermal_zone2 bigcore1-thermal 52692
 thermal_zone3 littlecore-thermal 52692
 thermal_zone4 center-thermal 51769
