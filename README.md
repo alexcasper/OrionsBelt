@@ -12,18 +12,18 @@ Licensed under **Apache-2.0** — see [`LICENSE`](./LICENSE).
 
 ## Headline results
 
-Three GDN CPU kernels (gated cumulative decay, gated delta-rule scan, causal depthwise Conv1D), benchmarked on RK3588 Cortex-A76 at verified Qwen3.5-4B shapes:
+Three GDN CPU kernels (gated cumulative decay, gated delta-rule scan, causal depthwise Conv1D), benchmarked on RK3588 Cortex-A76 (big cluster, 8-thread) at verified Qwen3.5-4B shapes:
 
 | Kernel | GiB/s | % of 34 GB/s spec | Spread |
 |---|---:|---:|---:|
-| Cumulative decay | 21.7 | 64% | 5.2% |
-| Causal Conv1D | 21.6 | 63% | 4.3% |
-| Gated delta-rule scan | 11.1 | 33% | 6.2% |
+| Cumulative decay | 21.1 | 62% | 3.5% |
+| Causal Conv1D | 18.7 | 55% | 4.8% |
+| Gated delta-rule scan | 10.6 | 31% | 5.4% |
 
-> Decay and Conv1D achieve **~64% of theoretical DRAM bandwidth** — near the memory ceiling.
-> Scan runs at 33% because its sequential recurrence is **instruction-overhead-bound**, not
-> bandwidth-bound. fp16 state gives **1.6×** on decay; scan is compute-bound and shows no
-> bandwidth benefit. (Commit `553a96e`, dirty=false, governor=performance, 30 repeats.
+> Cumulative decay achieves **62% of theoretical DRAM bandwidth** — near the memory ceiling.
+> Scan runs at 31% because its sequential recurrence is **instruction-overhead-bound**, not
+> bandwidth-bound. fp16 state gives **1.77×** on decay; scan is compute-bound and shows no
+> bandwidth benefit. (Manifest git_sha `f015982`, dirty=false, governor=performance, 30 repeats.
 > Full table with cross-device validation: [`comparison_table.md`](./results/figures/comparison_table.md).)
 
 **Memory advantage at long context** — GDN's O(1) recurrent state vs attention's O(n) KV cache:
@@ -135,7 +135,7 @@ All figures above are verified against primary sources (Radxa product page and d
 
 ## Status
 
-**This is an in-progress research repository as of 2026-08-06.** The project has committed to the **Edge AI track** ([ADR 0007](./docs/adr/0007-commit-to-edge-ai-track.md)) after the Orion O6 board did not arrive by its last-useful-arrival date. All work continues on the portable aarch64 device fleet.
+**This is an in-progress research repository as of 2026-08-07.** The project has committed to the **Edge AI track** ([ADR 0007](./docs/adr/0007-commit-to-edge-ai-track.md)) after the Orion O6 board did not arrive by its last-useful-arrival date. All work continues on the portable aarch64 device fleet.
 
 **Device-fleet microbenchmarks are complete across five Arm devices.** Three GDN CPU kernels (gated cumulative decay, gated delta-rule scan, causal depthwise Conv1D) have been measured at verified Qwen3.5-4B and 0.8B shapes on the full fleet: Jetson Nano (Cortex-A57, NEON), Raspberry Pi 5 (Cortex-A76), and RK3588 (Cortex-A76 big + Cortex-A55 little clusters). The optimization stack (OpenMP parallelization + NEON unrolling + fp16 state) delivers 2.6–5.1× on A76 silicon and 2.6–3.1× on A57. The key cross-device finding — that these kernels are **instruction-overhead-bound, not DRAM-bandwidth-bound** at seq=64 working-set sizes — is documented in the [fleet bandwidth-scaling analysis](./results/figures/fleet_bandwidth_scaling.md).
 
@@ -156,11 +156,11 @@ All figures above are verified against primary sources (Radxa product page and d
 | Repository skeleton, Apache-2.0 license | Done |
 | Results schema (`docs/RESULTS_SCHEMA.md`) | Done |
 | Benchmark harness (`bench/`) + device microbenchmark (`bench_gdn.c`) | Producing data |
-| CI: lint + unit tests (1500 tests, 99% coverage) | Done — `.github/workflows/ci.yaml` |
+| CI: lint + unit tests (1636 tests, 99% coverage) | Done — `.github/workflows/ci.yaml` |
 | Device-fleet microbenchmarks (5 devices) | Done — [fleet analysis](./results/figures/fleet_bandwidth_scaling.md) |
 | Ablation matrix (6 configs, synthetic) | Done — [comparison table](./results/figures/ablation_comparison.md) |
 | Memory decomposition (analytical) | Done — [figures](./results/figures/) |
-| Architecture decision records (`docs/adr/`) | 10 ADRs recorded |
+| Architecture decision records (`docs/adr/`) | 8 ADRs recorded |
 | CPU GDN kernels (NEON/SVE/scalar) | Verified, benchmarked across fleet |
 | Mixed-precision state kernels (bf16/fp16) | Implemented, benchmarked on Jetson |
 | NPU operator-coverage audit (CIX NOE + RKNN) | Done — [FINDINGS.md](./docs/FINDINGS.md) §1, §7 |
@@ -172,18 +172,18 @@ All figures above are verified against primary sources (Radxa product page and d
 | INT8 KV cache quantization | Done — 1.7–2.6× full-attn speedup at long context, 4× KV memory reduction. [§20](./docs/FINDINGS.md) |
 | Sustained-load thermal characterization | Done — 0.3% throughput decay over 94s on RK3588 (§18) |
 | Track decision: Edge AI | Done — [ADR 0007](./docs/adr/0007-commit-to-edge-ai-track.md) |
-| Model survey / selection (`docs/MODEL_SURVEY.md`) | In progress |
+| Model survey / selection (`docs/MODEL_SURVEY.md`) | Done |
 | Orion O6 board bring-up | **Pending** — board not yet in hand |
 | CIX Early Bird SDK / NPU toolchain access | **Pending** — not yet approved |
 | Per-layer engine mapping (NPU/GPU/CPU) | Hypothesis only — pending measurements |
-| Full inference results (tokens/sec, TTFT, memory) | Partial — C decode loop on A57 + RK3588, ctx-length scaling proven (§17–20), [e2e comparison](./results/figures/e2e_fleet_comparison.md) |
+| Full inference results (tokens/sec, TTFT, memory) | Done — C decode loop (FP32+INT8), ctx-length scaling (§17–20), cross-device (A57+A76), sustained-load thermal stability (§18). [e2e comparison](./results/figures/e2e_fleet_comparison.md) |
 
-> **Results so far:** 75 CSVs from the device fleet, 53 provenance manifests, 69 generated figures/tables, 29 FINDINGS sections.
+> **Results so far:** 119 CSVs from the device fleet, 84 provenance manifests, 76 generated figures/tables, 35 FINDINGS sections.
 >
 > ```
 > results/
->   raw/         <- 73 per-run CSVs across 5 devices
->   manifests/   <- 48 provenance manifests (git SHA, governor, thermals)
+>   raw/         <- 119 per-run CSVs across 5 devices
+>   manifests/   <- 84 provenance manifests (git SHA, governor, thermals)
 >   figures/     <- fleet analysis, comparison table, kernel/memory plots> ```
 >
 > See [`results/README.md`](./results/README.md) for the layout, [`docs/FINDINGS.md`](./docs/FINDINGS.md) for findings, and [`results/figures/fleet_bandwidth_scaling.md`](./results/figures/fleet_bandwidth_scaling.md) for the headline cross-device analysis.
