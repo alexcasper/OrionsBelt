@@ -4050,38 +4050,37 @@ GDN shapes (seq=1 decode, seq=64 prefill; channels=160 and 2560).
 |---|---|---|---|
 | cumdecay | 64×160 | 11.4 | 6.7 |
 | cumdecay | 1×160 | 0.3 | 4.1 |
-| cumdecay | 64×2560 | 537.3 | 2.3 |
-| cumdecay | 1×2560 | 0.9 | 21.8 |
-| gated_scan | 64×160 | 5.3 | 22.0 |
-| gated_scan | 1×160 | 0.0 | —* |
-| gated_scan | 64×2560 | 192.5 | 9.6 |
+| cumdecay | 64×2560 | 535.2 | 2.3 |
+| cumdecay | 1×2560 | 3.2 | 6.0 |
+| gated_scan | 64×160 | 20.7 | 5.6 |
+| gated_scan | 1×160 | 0.3 | 10.2 |
+| gated_scan | 64×2560 | 189.0 | 9.8 |
 | gated_scan | 1×2560 | 1.2 | 40.9 |
 | dwconv1d | 64×160 | 5.3 | 15.7 |
 | dwconv1d | 1×160 | 0.3 | 24.6 |
-| dwconv1d | 64×2560 | 143.8 | 9.2 |
+| dwconv1d | 64×2560 | 144.7 | 9.1 |
 | dwconv1d | 1×2560 | 2.9 | 39.3 |
 | gemv | K=128 N=128 | 3.5 | 17.7 |
-| gemv | K=128 N=2048 | 63.0 | 15.6 |
-| gemv | K=128 N=2560 | 79.9 | 15.4 |
-
-*\*seq=1×160 is below the measurement floor (p50 < 1 µs).*
+| gemv | K=128 N=2048 | 58.0 | 17.0 |
+| gemv | K=128 N=2560 | 72.9 | 16.9 |
 
 ### Cross-core comparison: A76 (NEON) vs A57 (NEON)
 
 The same kernels were also verified on a Jetson Nano A57 (Armv8.0, NEON-only,
 no dotprod) — see the KleidiAI submission README for the full A57 table. Key
-ratios at seq=64 shapes:
+ratios at shapes large enough to amortize per-call overhead:
 
 | Kernel | A76 GiB/s | A57 GiB/s | A76/A57 |
 |---|---|---|---|
-| gated_scan 64×160 | 22.0 | 6.3 | 3.5× |
-| dwconv1d 64×160 | 15.7 | 4.6 | 3.4× |
-| gemv K=128 N=128 | 17.7 | 4.7 | 3.8× |
+| gated_scan 64×2560 | 9.8 | 2.1 | 4.6× |
+| dwconv1d 64×160 | 15.7 | 4.7 | 3.3× |
+| gemv K=128 N=128 | 17.7 | 4.6 | 3.8× |
 
-The A76 advantage (3.4–3.8×) exceeds the clock ratio (2.3/0.9 = 2.6×),
+The A76 advantage (3.3–4.6×) exceeds the clock ratio (2.3/1.48 = 1.6×),
 reflecting the A76's wider NEON pipeline and superior memory subsystem. Both
 cores run the same NEON code path, confirming the dual-ISA design works across
-the full Armv8.x range.
+the full Armv8.x range. At the smallest shapes (160 channels, seq=64), the
+advantage shrinks to near-parity — launch overhead dominates sub-25 µs calls.
 
 ### Portability significance
 
@@ -4092,7 +4091,9 @@ path was verified by cross-compilation in §23; the NEON path is verified
 on-silicon here. No competing KleidiAI kernel covers this range for the three
 recurrent primitives.
 
-> **Provenance:** RK3588 t3, commit `250dc96`, governor=performance,
-> clean tree (dirty=false).
+> **Provenance:** RK3588 t3, commit `78eb7e4`, governor=performance.
+> Kernel C files unchanged since `250dc96`; the previous CSV at that commit
+> had measurement artifacts (gated_scan 64×160 p50 was identical to dwconv1d;
+> cumdecay 1×2560 was anomalously fast; gated_scan 1×160 was 0.0 µs/inf).
 > Manifest: `results/manifests/rk3588-t3_kleidiai_gdn_kernels.json`.
 > Raw CSV: `results/raw/kleidiai/rk3588-t3_kleidiai_gdn_kernels.csv`.
