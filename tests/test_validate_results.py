@@ -17,6 +17,7 @@ if _ROOT not in sys.path:
 from scripts.validate_results import (  # noqa: E402
     ABSURD_THROUGHPUT,
     E2E_SWEEP_COLS,
+    GPU_COLS,
     LAYER_PROFILE_COLS,
     STANDARD_COLS,
     SUSTAINED_COLS,
@@ -30,6 +31,7 @@ from scripts.validate_results import (  # noqa: E402
     main,
     validate_csv,
     validate_e2e_sweep_row,
+    validate_gpu_row,
     validate_layer_profile_row,
     validate_manifest,
     validate_standard_row,
@@ -128,6 +130,25 @@ def _write_std_csv(path, rows):
             w.writerow(r)
 
 
+def _gpu_row(**overrides):
+    """A valid GPU (Mali/OpenCL) benchmark row dict.
+
+    Uses the '# kernel' key (with hash prefix) as the real CSV does.
+    p95_ms and bw_mibs default to None — some kernels omit them.
+    """
+    base = {
+        "# kernel": "gdn_gated_scan",
+        "dim1": "64",
+        "dim2": "2048",
+        "dim3": None,
+        "p50_ms": "0.5612",
+        "p95_ms": None,
+        "bw_mibs": None,
+    }
+    base.update(overrides)
+    return base
+
+
 # ---------------------------------------------------------------------------
 # detect_csv_type
 # ---------------------------------------------------------------------------
@@ -188,6 +209,15 @@ class TestDetectCsvType:
         cols = ["run_id", "metric_name", "metric_component", "repeat_index"]
         assert detect_csv_type(cols) == "e2e_sweep"
 
+    def test_gpu_detected(self):
+        """GPU (Mali/OpenCL) CSV header should be detected."""
+        assert detect_csv_type(GPU_COLS) == "gpu"
+
+    def test_gpu_minimal_cols(self):
+        """Detection only needs bw_mibs and dim1."""
+        cols = ["# kernel", "dim1", "dim2", "p50_ms", "p95_ms", "bw_mibs"]
+        assert detect_csv_type(cols) == "gpu"
+
 
 # ---------------------------------------------------------------------------
 # expected_columns
@@ -214,6 +244,10 @@ class TestExpectedColumns:
     def test_e2e_sweep_columns(self):
         assert "metric_name" in expected_columns("e2e_sweep")
         assert "context_length" in expected_columns("e2e_sweep")
+
+    def test_gpu_columns(self):
+        assert "bw_mibs" in expected_columns("gpu")
+        assert "p50_ms" in expected_columns("gpu")
 
 
 # ---------------------------------------------------------------------------
@@ -313,6 +347,58 @@ class TestValidateSustainedRow:
         issues = []
         validate_sustained_row(_sustained_row(elapsed_s="0.0"), "test.csv", issues, 2)
         assert any("elapsed" in i.message for i in issues)
+
+
+# ---------------------------------------------------------------------------
+# validate_gpu_row
+# ---------------------------------------------------------------------------
+
+
+class TestValidateGpuRow:
+    def test_valid_row_no_issues(self):
+        issues = []
+        validate_gpu_row(_gpu_row(), "test.csv", issues, 2)
+        assert issues == []
+
+    def test_valid_full_row_with_p95_and_bw(self):
+        """Row with all 7 columns (including p95_ms and bw_mibs)."""
+        issues = []
+        row = _gpu_row(p95_ms="0.7035", bw_mibs="2700.7", dim3="128")
+        validate_gpu_row(row, "test.csv", issues, 2)
+        assert issues == []
+
+    def test_non_positive_p50(self):
+        issues = []
+        validate_gpu_row(_gpu_row(p50_ms="0.0"), "test.csv", issues, 2)
+        assert any("non-positive" in i.message for i in issues)
+
+    def test_p95_less_than_p50(self):
+        issues = []
+        row = _gpu_row(p50_ms="1.0", p95_ms="0.5")
+        validate_gpu_row(row, "test.csv", issues, 2)
+        assert any("p95" in i.message and "p50" in i.message for i in issues)
+
+    def test_non_positive_bw(self):
+        issues = []
+        validate_gpu_row(_gpu_row(bw_mibs="-1.0"), "test.csv", issues, 2)
+        assert any("non-positive" in i.message and "bw" in i.message for i in issues)
+
+    def test_malformed_p50(self):
+        issues = []
+        validate_gpu_row(_gpu_row(p50_ms="not_a_number"), "test.csv", issues, 2)
+        assert any("cannot parse" in i.message for i in issues)
+
+    def test_none_p95_no_warning(self):
+        """When p95_ms is None (variable-length row), no p95 check fires."""
+        issues = []
+        validate_gpu_row(_gpu_row(p95_ms=None), "test.csv", issues, 2)
+        assert issues == []
+
+    def test_none_bw_no_warning(self):
+        """When bw_mibs is None, no bw check fires."""
+        issues = []
+        validate_gpu_row(_gpu_row(bw_mibs=None), "test.csv", issues, 2)
+        assert issues == []
 
 
 # ---------------------------------------------------------------------------
