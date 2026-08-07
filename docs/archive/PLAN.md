@@ -6,7 +6,7 @@
 **Submission deadline:** 2026-08-14, 16:00 PT
 **Plan authored:** 2026-08-02 (**T-12 days**)
 **Source brief:** [`brief.md`](./brief.md)
-**Issue tracking:** [beads](https://beads.gascity.com/) (`bd`), prefix `ob-` — see [`docs/BEADS.md`](./docs/BEADS.md)
+**Issue tracking:** [beads](https://beads.gascity.com/) (`bd`), prefix `ob-` — see [`docs/BEADS.md`](../BEADS.md)
 
 ---
 
@@ -22,7 +22,7 @@ The **schedule, not the engineering, is the primary risk.** As of today we hold 
 | **Hedge** | Generic aarch64 (Android phone via Termux, or Apple silicon / AWS Graviton) | Edge AI | Nothing — starts immediately |
 
 > **Corrected 2026-08-02:** the three tracks are Physical AI, Cloud AI, and **Edge AI**. `brief.md`'s
-> "Mobile AI" track does not exist — see [`docs/CLAIM_VERIFICATION.md`](./docs/CLAIM_VERIFICATION.md) §1.1.
+> "Mobile AI" track does not exist — see [`docs/CLAIM_VERIFICATION.md`](../CLAIM_VERIFICATION.md) §1.1.
 > Edge AI is a better fit than Mobile AI ever was: the O6 is an edge device, not a phone, so *both*
 > tracks remain open to an O6 submission and the hedge no longer requires a phone specifically.
 
@@ -59,7 +59,7 @@ The rubric is the spec. Every workstream below is justified by a line here.
 | Potential impact | 20 | Reusable reference implementation, documented op-coverage findings, migration template for GDN-class models on Arm |
 | Developer experience | 15 | Clean-clone reproduction rehearsal, scripted setup, CI, run manifests |
 
-### 2.3 Claim verification — **done**, see [`docs/CLAIM_VERIFICATION.md`](./docs/CLAIM_VERIFICATION.md)
+### 2.3 Claim verification — **done**, see [`docs/CLAIM_VERIFICATION.md`](../CLAIM_VERIFICATION.md)
 
 Bead `ob-ofk` verified `brief.md`'s load-bearing figures against primary sources on 2026-08-02.
 Summary:
@@ -142,7 +142,7 @@ ships 38 LLMs, every one a conventional full-attention transformer — Qwen3 thr
 Phi, InternLM, ERNIE. **Not one linear-attention, SSM, or recurrent-state model.** MoE is supported
 and Qwen3 is present, so neither sparsity nor recency is the barrier; the missing thing is the
 architecture class itself. Verified via the ModelScope file API — see
-[`docs/CLAIM_VERIFICATION.md`](./docs/CLAIM_VERIFICATION.md) §3.1.
+[`docs/CLAIM_VERIFICATION.md`](../CLAIM_VERIFICATION.md) §3.1.
 
 **Why this is hard on an NPU.** GDN layers are not standard attention. The chunkwise WY-style recurrent update — delta rule + gated decay + causal Conv1D — is a *sequential scan* over chunk states. NPU accelerators are tuned for dense matmuls, and the CIX NOE Compiler may have no kernel for a gated recurrent scan at all. The interesting engineering question, and the core of our contribution, is therefore:
 
@@ -151,7 +151,7 @@ architecture class itself. Verified via the ModelScope file API — see
 ### 3.1 Working hypothesis: CPU-resident GDN, accelerator-offloaded attention
 
 Adopted 2026-08-02, and **empirically confirmed the same day** by the NOE operator-coverage audit
-(`ob-t3b.1`, see [`docs/FINDINGS.md`](./docs/FINDINGS.md) §1): every arithmetic operator GDN needs is
+(`ob-t3b.1`, see [`docs/FINDINGS.md`](../FINDINGS.md) §1): every arithmetic operator GDN needs is
 natively supported by the NPU toolchain, but **the sequential recurrence is not expressible at all** —
 `Scan` is rejected, and `Loop` is accepted only when its trip count is a compile-time constant, in
 which case it is statically unrolled. A runtime-length recurrence is rejected outright. So keeping the
@@ -300,7 +300,7 @@ Two independent chains feed the same junction. The **hardware chain is externall
 ### Descope ladder (pre-agreed)
 
 Deciding this now, calmly, is worth more than deciding it at 2am on Aug 13. Ratified as
-[ADR 0004](./docs/adr/0004-descope-ladder.md).
+[ADR 0004](../adr/0004-descope-ladder.md).
 
 > **⚠ The board's usefulness cutoff is EARLIER than its abandonment date — 2026-08-08, not Aug 10.**
 > ADR 0004 separates two questions the original ladder conflated: the date we *stop pursuing* a
@@ -356,7 +356,7 @@ Anything cut gets filed as a follow-up bead rather than deleted, so the repo hon
 
 ## 9. Working agreements
 
-- **Beads is the task tracker.** No markdown TODO lists, no ad-hoc task files. `bd ready` is the source of truth for what to work on. See [`docs/BEADS.md`](./docs/BEADS.md).
+- **Beads is the task tracker.** No markdown TODO lists, no ad-hoc task files. `bd ready` is the source of truth for what to work on. See [`docs/BEADS.md`](../BEADS.md).
 - **Every benchmark run emits a manifest** — device, kernel, SDK versions, governor, clocks, thermal state, git SHA. A number without a manifest is not a result.
 - **The correctness oracle gates every optimization.** Speed that changes outputs is not speed.
 - **Report percentiles and repeat counts, never a single best run.**
