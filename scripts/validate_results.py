@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Validate benchmark result CSVs and their provenance manifests.
 
-Scans results/raw/*.csv, checks each for:
+Recursively scans results/raw/**/*.csv (including subdirectories like affinity/
+and kleidiai/), checks each for:
   1. A corresponding manifest in results/manifests/
   2. CSV schema conformance (expected columns for each CSV type)
   3. Suspicious values (impossible throughput, negative latency, p95 < p50)
@@ -160,6 +161,18 @@ GPU_MICRO_COLS = [
     "bw_mibs",
 ]
 
+# KleidiAI matmul microbenchmark CSV (from bench/kleidiai_matmul_bench.c)
+KLEIDIAI_MATMUL_COLS = [
+    "shape",
+    "impl",
+    "M",
+    "K",
+    "N",
+    "us_per_call",
+    "GiB_s",
+    "GFLOP_s",
+]
+
 # Device spec bandwidth (GiB/s) for sanity-check upper bounds.
 # From DEVICE_RUNBOOK.md "What we are actually testing".
 DEVICE_SPEC_BW = {
@@ -195,6 +208,8 @@ def detect_csv_type(header):
         return "e2e_ctxsweep"
     if cols >= {"bw_mibs", "p50_ms", "dim1"}:
         return "gpu_micro"
+    if cols >= {"shape", "impl", "GiB_s", "GFLOP_s"}:
+        return "kleidiai_matmul"
     return None
 
 
@@ -219,6 +234,8 @@ def expected_columns(csv_type):
         return E2E_CTXSWEEP_RAW_COLS
     if csv_type == "gpu_micro":
         return GPU_MICRO_COLS
+    if csv_type == "kleidiai_matmul":
+        return KLEIDIAI_MATMUL_COLS
     return []
 
 
@@ -345,7 +362,7 @@ def validate_standard_row(row, csv_name, issues, row_num):
         # so a malformed value lands in the except below as a parse error.
         float(row["gflop_per_s_p50"])
         int(row["seq"])
-    except (ValueError, KeyError) as e:
+    except (ValueError, KeyError, TypeError) as e:
         issues.append(Issue("ERROR", csv_name, f"row {row_num}: cannot parse numeric fields: {e}"))
         return
 
@@ -380,7 +397,7 @@ def validate_sustained_row(row, csv_name, issues, row_num):
         elapsed = float(row["elapsed_s"])
         tput = float(row["throughput_gibs"])
         thermal = float(row["thermal_c"])
-    except (ValueError, KeyError) as e:
+    except (ValueError, KeyError, TypeError) as e:
         issues.append(Issue("ERROR", csv_name, f"row {row_num}: cannot parse: {e}"))
         return
 
@@ -401,7 +418,7 @@ def validate_layer_profile_row(row, csv_name, issues, row_num):
         n = int(row["n_samples"])
         ctx = int(row["ctx_len"])
         layer_idx = int(row["layer_idx"])
-    except (ValueError, KeyError) as e:
+    except (ValueError, KeyError, TypeError) as e:
         issues.append(Issue("ERROR", csv_name, f"row {row_num}: cannot parse: {e}"))
         return
 
@@ -427,7 +444,7 @@ def validate_delta_matmul_row(row, csv_name, issues, row_num):
         n = int(row["N"])
         p50 = float(row["p50_us"])
         p95 = float(row["p95_us"])
-    except (ValueError, KeyError) as e:
+    except (ValueError, KeyError, TypeError) as e:
         issues.append(Issue("ERROR", csv_name, f"row {row_num}: cannot parse: {e}"))
         return
 
@@ -451,7 +468,7 @@ def validate_ctx_sweep_row(row, csv_name, issues, row_num):
         total_us = float(row["total_us"])
         tps = float(row["tok_per_sec"])
         kv_mb = float(row["kv_cache_mb"])
-    except (ValueError, KeyError) as e:
+    except (ValueError, KeyError, TypeError) as e:
         issues.append(Issue("ERROR", csv_name, f"row {row_num}: cannot parse numeric fields: {e}"))
         return
 
@@ -481,7 +498,7 @@ def validate_e2e_sweep_row(row, csv_name, issues, row_num):
         ctx = int(row["context_length"])
         repeat_idx = int(row["repeat_index"])
         repeat_count = int(row["repeat_count"])
-    except (ValueError, KeyError) as e:
+    except (ValueError, KeyError, TypeError) as e:
         issues.append(Issue("ERROR", csv_name, f"row {row_num}: cannot parse numeric fields: {e}"))
         return
 
@@ -532,7 +549,7 @@ def validate_gpu_micro_row(row, csv_name, issues, row_num):
     try:
         dim1 = int(row["dim1"])
         dim2 = int(row["dim2"])
-    except (ValueError, KeyError) as e:
+    except (ValueError, KeyError, TypeError) as e:
         issues.append(Issue("ERROR", csv_name, f"row {row_num}: cannot parse dims: {e}"))
         return
     if dim1 < 1 or dim2 < 1:
@@ -556,7 +573,7 @@ def validate_gpu_micro_row(row, csv_name, issues, row_num):
         p50 = float(row["p50_ms"])
         if p50 <= 0:
             issues.append(Issue("ERROR", csv_name, f"row {row_num}: non-positive p50_ms"))
-    except (ValueError, KeyError):
+    except (ValueError, KeyError, TypeError):
         issues.append(Issue("ERROR", csv_name, f"row {row_num}: cannot parse p50_ms"))
         return  # cannot validate p95 ordering without p50
 
@@ -578,8 +595,38 @@ def validate_gpu_micro_row(row, csv_name, issues, row_num):
         bw = float(row["bw_mibs"])
         if bw <= 0:
             issues.append(Issue("ERROR", csv_name, f"row {row_num}: non-positive bw_mibs"))
-    except (ValueError, KeyError):
+    except (ValueError, KeyError, TypeError):
         issues.append(Issue("ERROR", csv_name, f"row {row_num}: cannot parse bw_mibs"))
+
+
+def validate_kleidiai_matmul_row(row, csv_name, issues, row_num):
+    """Validate a row of a KleidiAI matmul microbenchmark CSV."""
+    try:
+        us = float(row["us_per_call"])
+    except (ValueError, KeyError, TypeError):
+        issues.append(Issue("ERROR", csv_name, f"row {row_num}: cannot parse us_per_call"))
+        return
+    if us <= 0:
+        issues.append(Issue("WARNING", csv_name, f"row {row_num}: non-positive us_per_call={us}"))
+
+    try:
+        gibs = float(row["GiB_s"])
+    except (ValueError, KeyError, TypeError):
+        issues.append(Issue("WARNING", csv_name, f"row {row_num}: cannot parse GiB_s"))
+        gibs = None
+    if gibs is not None:
+        if gibs < 0:
+            issues.append(Issue("WARNING", csv_name, f"row {row_num}: negative GiB_s={gibs}"))
+        if gibs > ABSURD_THROUGHPUT:
+            issues.append(Issue("WARNING", csv_name, f"row {row_num}: absurd GiB_s={gibs}"))
+
+    try:
+        gflops = float(row["GFLOP_s"])
+    except (ValueError, KeyError, TypeError):
+        issues.append(Issue("WARNING", csv_name, f"row {row_num}: cannot parse GFLOP_s"))
+        gflops = None
+    if gflops is not None and gflops < 0:
+        issues.append(Issue("WARNING", csv_name, f"row {row_num}: negative GFLOP_s={gflops}"))
 
 
 def validate_csv(path, csv_name, issues):
@@ -590,7 +637,35 @@ def validate_csv(path, csv_name, issues):
 
     try:
         with open(path, newline="") as f:
-            reader = csv.DictReader(f)
+            # Some CSVs (e.g. affinity studies) prefix metadata lines with '#'.
+            # Lines starting with '#' that contain commas are commented-out CSV
+            # headers — strip the '#' prefix so DictReader sees the real header.
+            # Pure metadata comments (no commas) are skipped entirely.
+            filtered_lines = []
+            for line in f:
+                if line.lstrip().startswith("#"):
+                    content = line.lstrip().lstrip("#").lstrip()
+                    if "," in content:
+                        # Only treat as a commented-out CSV header if every
+                        # field is a valid identifier (config, kernel, p50_us …).
+                        # Lines like "# (A76 on big cores, A55 on little …)" have
+                        # commas but are metadata, not headers.
+                        fields = [c.strip() for c in content.split(",")]
+                        if all(fl.isidentifier() for fl in fields):
+                            filtered_lines.append(
+                                content if content.endswith("\n") else content + "\n"
+                            )
+                else:
+                    filtered_lines.append(line)
+            # Multi-section CSVs (e.g. affinity studies) repeat the header
+            # between sections — deduplicate so DictReader doesn't treat
+            # repeated headers as data rows.
+            if filtered_lines:
+                header_line = filtered_lines[0]
+                filtered_lines = [filtered_lines[0]] + [
+                    ln for ln in filtered_lines[1:] if ln != header_line
+                ]
+            reader = csv.DictReader(filtered_lines)
             header = reader.fieldnames
             if not header:
                 issues.append(Issue("ERROR", csv_name, "empty or unreadable CSV"))
@@ -644,6 +719,8 @@ def validate_csv(path, csv_name, issues):
                         manifest_ref = row.get("manifest_ref") or None
                 elif csv_type == "gpu_micro":
                     validate_gpu_micro_row(row, csv_name, issues, i)
+                elif csv_type == "kleidiai_matmul":
+                    validate_kleidiai_matmul_row(row, csv_name, issues, i)
 
             return csv_type, row_count, manifest_ref
 
@@ -749,7 +826,18 @@ def main():
 
     head_sha = get_git_head_sha()
     all_issues = []
-    csv_files = sorted(f for f in os.listdir(args.csv_dir) if f.endswith(".csv"))
+
+    # Discover CSVs recursively (including subdirectories like affinity/ and
+    # kleidiai/).  The ablation/ subdirectory is handled separately below.
+    csv_files = []
+    for root, _dirs, files in os.walk(args.csv_dir):
+        if os.path.relpath(root, args.csv_dir) == "ablation":
+            continue
+        for fname in files:
+            if fname.endswith(".csv"):
+                rel = os.path.relpath(os.path.join(root, fname), args.csv_dir)
+                csv_files.append(rel)
+    csv_files.sort()
 
     if not csv_files:
         if not args.quiet:
@@ -770,7 +858,7 @@ def main():
             if os.path.isfile(candidate):
                 manifest_path = candidate
         if manifest_path is None:
-            manifest_path = check_manifest_exists(csv_name, args.manifest_dir)
+            manifest_path = check_manifest_exists(os.path.basename(csv_name), args.manifest_dir)
         validate_manifest(csv_name, csv_type, row_count, manifest_path, all_issues, head_sha)
 
     # Check ablation CSVs (subdirectory) — different schema, manifest_ref in rows

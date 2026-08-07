@@ -49,21 +49,23 @@ At 262K context on the 4B checkpoint, that difference is **23.95 GiB of RAM** �
 
 ### Headline: GDN kernel bandwidth on RK3588 Cortex-A76
 
-Qwen3.5-4B, prefill (seq=64), fp32 baseline, single-thread. Two independent RK3588 nodes (t3 unknown board, t4 Turing Machines RK1):
+Qwen3.5-4B, prefill (seq=64), fp32 baseline, 8-thread (big cluster). Two independent RK3588 nodes (t3, t4 Turing Machines RK1). Kernel code is byte-identical at both commits (diff in `bench_gdn.c` is empty between f015982 and 1ca4d6d).
 
-| Kernel | GiB/s (t3) | Spread | GiB/s (t4) | Spread | t3÷t4 ratio |
+| Kernel | GiB/s (t3) | Spread | GiB/s (t4) | Spread | t3÷t4 |
 |---|---:|---:|---:|---:|---:|
-| Cumulative decay | 21.06 | 3.5% | 7.40 | 5.0% | 2.85× |
-| Gated delta-rule scan | 10.62 | 5.4% | 5.67 | 7.4% | 1.87× |
-| Causal Conv1D | 18.73 | 4.8% | 7.04 | 4.3% | 2.66× |
+| Cumulative decay | 21.06 | 3.5% | 22.47 | 19.1% | 0.94× |
+| Gated delta-rule scan | 10.62 | 5.4% | 11.09 | 5.2% | 0.96× |
+| Causal Conv1D | 18.73 | 4.8% | 23.00 | 8.5% | 0.81× |
 
-> Both boards achieve well under the 34 GiB/s spec bandwidth per cluster. t3's
-> cumdecay reaches 62% of spec; t4 reaches 22%. The **cross-board gap** (t3 is
-> 1.87–2.85× faster) reflects different board vendors, kernel versions, and DRAM
-> configurations — see [comparison table](../results/figures/comparison_table.md)
-> and FINDINGS.md §"Cross-Board Gap" for the full analysis. The key finding
-> remains: gated scan runs at a lower fraction of spec because its sequential
-> recurrence is **instruction-overhead-bound, not DRAM-bandwidth-bound**.
+> t3 manifest git_sha `f015982`, dirty=false; t4 manifest git_sha `1ca4d6d`,
+> dirty=false; 30 repeats each. The boards agree within 4–19% (t4 marginally
+> faster), confirming the result is hardware-reproducible. Cumulative decay
+> reaches 62% of the 34 GiB/s spec bandwidth; gated scan runs at a lower
+> fraction because its sequential recurrence is
+> **instruction-overhead-bound, not DRAM-bandwidth-bound**.
+> (An earlier version of this table compared t3 8-thread against t4 1-thread
+> data, inflating a 2.85× "cross-board gap" that was entirely a thread-count
+> artifact — see FINDINGS §"Cross-Board Gap" and bead ob-mrd.12.)
 
 ### Optimization impact (fp16 state, t3 A76)
 

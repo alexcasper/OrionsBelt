@@ -20,8 +20,9 @@ submission), the steps in §4 become **blocking** before that flip.
 
 ## 2. What was committed
 
-The device sudo password (`cell`, used in `echo cell | sudo -S tee` to set the
-CPU governor) appears in two files:
+The device sudo password (used in an `echo <password> | sudo -S tee` pattern to
+set the CPU governor — value deliberately not repeated here; see ob-3i5 and
+each device's operator for the value) appears in two files:
 
 | File | Lines | Status |
 |---|---|---|
@@ -33,7 +34,7 @@ description) — it does not contain the password.
 
 ## 3. Exact commit-level exposure
 
-`git log --all -S 'cell'`:
+`git log --all -S '<password>'` (pickaxe search for the known password string):
 
 | Commit | File | Agent |
 |---|---|---|
