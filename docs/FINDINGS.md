@@ -2702,3 +2702,74 @@ prior workloads), not a kernel or measurement methodology problem.
 3. **Always capture governor state in the manifest.** Both t3 and t4 clean
    manifests lack governor/thermal data — this makes it impossible to
    diagnose bad runs after the fact.
+
+---
+
+## Cross-Board Gap: t4 (Turing Machines RK1) vs t3 — Fresh Data at Current HEAD
+
+**Date:** 2026-08-07  
+**Beads:** ob-aw9, ob-bf7  
+**Commits:** t4 at 8b64d1a, t3 fresh at f015982
+
+### Context
+
+Following t3's root-cause investigation (ob-bf7 FINDING 4: "residual t3/t4 gap
+unmeasurable from t3"), t4 re-ran the fleet sweep at current HEAD with optimized
+kernels. Both boards are RK3588 (4×A55 + 4×A76) but **different board vendors**:
+
+| Property | t3 | t4 |
+|----------|----|----|
+| Board | Unknown (Radxa?) | **Turing Machines RK1** |
+| SoC | RK3588 | RK3588 |
+| DRAM | 32 GB LPDDR4x | 8 GB LPDDR4x |
+| Kernel | 5.10.160-rockchip | 6.11.0-1006-rockchip |
+| Scheduler | CFS | EEVDF |
+| A76 max freq | 2304 MHz | 2400 MHz |
+| GCC | unknown | 14.2.0 |
+| OS | Ubuntu 22.04 | Ubuntu 24.04 |
+
+### Headline Numbers (A76 big cluster, single-thread, governor=performance)
+
+| Kernel | Model | Seq | t4 GiB/s | t3 GiB/s | Ratio |
+|--------|-------|-----|----------|----------|-------|
+| gdn_gated_scan | 4B | 64 | 5.67 | 10.62 | 1.87× |
+| gdn_gated_scan | 0.8B | 64 | 6.93 | 15.24 | 2.20× |
+| gdn_cumdecay | 4B | 64 | 7.40 | 21.06 | 2.85× |
+| gdn_cumdecay_f16 | 4B | 64 | 8.61 | 37.20 | 4.32× |
+| gdn_gated_scan | 4B | 1 | 32.70 | 52.33 | 1.60× |
+| gdn_gated_scan | 0.8B | 1 | 26.15 | 32.69 | 1.25× |
+| gdn_causal_dwconv1d | 4B | 64 | 7.04 | 18.73 | 2.66× |
+| gdn2_gated_scan | 4B | 64 | 3.20 | 8.97 | 2.80× |
+
+### Analysis
+
+1. **Gap is systematic, not noise.** t3 is consistently 1.25-4.87× faster
+   across all 32 kernel/model/seq combinations. Spreads on both boards are
+   under 8% (median), ruling out measurement jitter.
+
+2. **Gap worsens for cache-resident workloads.** The 0.8B seq=64 working set
+   (~0.5 MiB) shows larger gaps than 4B seq=64 (~1 MiB). This rules out DRAM
+   bandwidth as the primary cause and points to **per-core compute throughput**
+   or **scheduler overhead**.
+
+3. **t4 is clocked HIGHER** (2400 MHz vs 2304 MHz on A76) yet runs slower.
+   This is not a frequency issue.
+
+4. **Most likely causes (in order):**
+   - **Kernel 6.11 EEVDF vs 5.10 CFS**: EEVDF may impose different scheduling
+     overhead for pinned CPU-bound tasks.
+   - **Board vendor implementation**: The Turing Machines RK1 may have different
+     firmware/PMIC settings affecting internal performance states.
+   - **Compiler code generation**: Different GCC versions may produce different
+     NEON scheduling. Both use `-march=armv8.2-a+dotprod -O3` but GCC 14 vs
+     whatever t3 uses could matter.
+
+### Implications for Fleet Comparison
+
+- **The t3/t4 performance gap is REAL and hardware/environmental**, not a
+  stale-data artifact (both are now fresh at current HEAD with optimized kernels).
+- Fleet comparisons between RK3588 boards must treat t3 and t4 as **different
+  implementations**, not replicates.
+- The original ob-bf7 spread concern is RESOLVED for stale data (both boards
+  now have clean post-optimization CSVs with <8% spread), but a new
+  cross-board heterogeneity finding replaces it.
