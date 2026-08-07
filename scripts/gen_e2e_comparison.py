@@ -208,9 +208,13 @@ def _check_commit_lineage(base_commit, commits):
             continue
 
         # Check ancestry
-        is_ancestor = subprocess.run(
+        # Note: stdout/stderr=PIPE (not capture_output=True) for Python 3.6
+        # compatibility -- this script also runs on fleet nodes with old pythons.
+        is_ancestor = subprocess.run(  # noqa: UP022
             ["git", "merge-base", "--is-ancestor", full_base, resolved],
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=REPO_ROOT  # noqa: UP022
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            cwd=REPO_ROOT,
         ).returncode == 0
 
         if not is_ancestor:
@@ -221,19 +225,25 @@ def _check_commit_lineage(base_commit, commits):
         changed = _run(["git", "diff", "--name-only", full_base, resolved]).strip().splitlines()
 
         # Files that affect the benchmark binary or kernel
-        kernel_patterns = ("bench/gdn_", "bench/bench_gdn", "src/", "include/",
-                           "scripts/build_device_bench", "scripts/run_e2e_decode")
+        kernel_patterns = (
+            "bench/gdn_",
+            "bench/bench_gdn",
+            "src/",
+            "include/",
+            "scripts/build_device_bench",
+            "scripts/run_e2e_decode",
+        )
         kernel_changes = [f for f in changed if any(p in f for p in kernel_patterns)]
 
         if kernel_changes:
             results[sha] = {
                 "status": "diverged",
-                "detail": f"kernel changes: {', '.join(kernel_changes[:3])}"
+                "detail": f"kernel changes: {', '.join(kernel_changes[:3])}",
             }
         else:
             results[sha] = {
                 "status": "code-identical",
-                "detail": "results/docs/beads only" if changed else "identical tree"
+                "detail": "results/docs/beads only" if changed else "identical tree",
             }
 
     return results
@@ -267,24 +277,21 @@ def generate_table(data, base_commit=None, commit_info=None):
 
         if has_pre_matched:
             problem = sorted(
-                sha for sha, ci in commit_info.items()
+                sha
+                for sha, ci in commit_info.items()
                 if ci["status"] in ("pre-matched", "diverged")
             )
             lines.append(
                 f"> ⚠️ **Partial commit match.** Base commit: `{base_commit}`. "
                 f"Some entries pre-date or diverge from the base and are not comparable."
             )
-            lines.append(
-                f"> Flagged: {', '.join(problem)}"
-            )
+            lines.append(f"> Flagged: {', '.join(problem)}")
         else:
             lines.append(
                 f"> ✅ **Matched-commit comparison.** All devices ran code-identical "
                 f"kernels at base commit `{base_commit}`."
             )
-            non_base = sorted(
-                sha for sha in all_shas if sha != base_commit
-            )
+            non_base = sorted(sha for sha in all_shas if sha != base_commit)
             if non_base:
                 lines.append(
                     f"> Result-file commits (results/docs only, no kernel changes): "
