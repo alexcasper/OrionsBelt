@@ -16,9 +16,12 @@ if _ROOT not in sys.path:
 
 from bench.ctx_scaling_analysis import (  # noqa: E402
     CONFIGS_RK3588,
+    CONFIGS_RK3588_KV_SWEEP,
+    _ctx_lookup,
     collect_data,
     fmt_tok,
     generate_cross_device,
+    generate_cross_validation,
     generate_report,
     read_csv,
 )
@@ -164,20 +167,20 @@ class TestCollectData:
 class TestGenerateReport:
     def test_no_data_message(self, tmp_path):
         """When no CSVs exist, report says so explicitly."""
-        report = generate_report("nonexistent-device", "a76", CONFIGS_RK3588, str(tmp_path))
+        report = generate_report("nonexistent-device", "a76", "A76", CONFIGS_RK3588, str(tmp_path))
         assert "No ctx-sweep CSVs found" in report
 
     def test_report_has_title(self, tmp_path):
-        report = generate_report("rk3588-t3", "a76", CONFIGS_RK3588, str(tmp_path))
+        report = generate_report("rk3588-t3", "a76", "A76", CONFIGS_RK3588, str(tmp_path))
         assert "# Context-Length Scaling" in report
 
     def test_report_has_generated_by(self, tmp_path):
-        report = generate_report("rk3588-t3", "a76", CONFIGS_RK3588, str(tmp_path))
+        report = generate_report("rk3588-t3", "a76", "A76", CONFIGS_RK3588, str(tmp_path))
         assert "ctx_scaling_analysis.py" in report
         assert "Do not hand-edit" in report
 
     def test_report_mentions_core(self, tmp_path):
-        report = generate_report("rk3588-t3", "a76", CONFIGS_RK3588, str(tmp_path))
+        report = generate_report("rk3588-t3", "a76", "A76", CONFIGS_RK3588, str(tmp_path))
         assert "Cortex-A76" in report
 
     def test_report_with_data(self, tmp_path, monkeypatch):
@@ -201,7 +204,9 @@ class TestGenerateReport:
             ],
         )
         monkeypatch.chdir(tmp_path)
-        report = generate_report("rk3588-t3", "a76", CONFIGS_RK3588, str(tmp_path / "figures"))
+        report = generate_report(
+            "rk3588-t3", "a76", "A76", CONFIGS_RK3588, str(tmp_path / "figures")
+        )
         assert "Throughput vs context length" in report
         assert "Full-attention share" in report
         assert "KV cache memory" in report
@@ -237,7 +242,9 @@ class TestGenerateReport:
             ],
         )
         monkeypatch.chdir(tmp_path)
-        report = generate_report("rk3588-t3", "a76", CONFIGS_RK3588, str(tmp_path / "figures"))
+        report = generate_report(
+            "rk3588-t3", "a76", "A76", CONFIGS_RK3588, str(tmp_path / "figures")
+        )
         assert "10.00" in report
         assert "1.50" in report
 
@@ -261,7 +268,9 @@ class TestGenerateReport:
             ],
         )
         monkeypatch.chdir(tmp_path)
-        report = generate_report("rk3588-t3", "a76", CONFIGS_RK3588, str(tmp_path / "figures"))
+        report = generate_report(
+            "rk3588-t3", "a76", "A76", CONFIGS_RK3588, str(tmp_path / "figures")
+        )
         assert "256 MB" in report
 
     def test_headline_section(self, tmp_path, monkeypatch):
@@ -294,7 +303,9 @@ class TestGenerateReport:
             ],
         )
         monkeypatch.chdir(tmp_path)
-        report = generate_report("rk3588-t3", "a76", CONFIGS_RK3588, str(tmp_path / "figures"))
+        report = generate_report(
+            "rk3588-t3", "a76", "A76", CONFIGS_RK3588, str(tmp_path / "figures")
+        )
         assert "ctx=4096" in report
 
 
@@ -394,3 +405,181 @@ class TestGenerateCrossDevice:
         assert "A76" in result
         assert "A57" in result
         assert "slowdown" in result.lower()
+
+
+# ---------------------------------------------------------------------------
+# _ctx_lookup
+# ---------------------------------------------------------------------------
+
+
+class TestCtxLookup:
+    def test_found(self):
+        rows = [
+            {"ctx_len": "1", "tok_per_sec": "10.0"},
+            {"ctx_len": "64", "tok_per_sec": "9.5"},
+        ]
+        assert _ctx_lookup(rows, 64, "tok_per_sec") == "9.5"
+
+    def test_not_found(self):
+        rows = [{"ctx_len": "1", "tok_per_sec": "10.0"}]
+        assert _ctx_lookup(rows, 4096, "tok_per_sec") is None
+
+    def test_different_field(self):
+        rows = [{"ctx_len": "1", "total_us": "350"}]
+        assert _ctx_lookup(rows, 1, "total_us") == "350"
+
+
+# ---------------------------------------------------------------------------
+# collect_data — KV sweep (new naming) convention
+# ---------------------------------------------------------------------------
+
+
+class TestCollectDataKVSweep:
+    def test_finds_new_naming_csvs(self, tmp_path, monkeypatch):
+        """collect_data should find _ctx_sweep_ files without _e2e_raw suffix."""
+        results_raw = tmp_path / "results" / "raw"
+        results_raw.mkdir(parents=True)
+        _write_ctx_csv(
+            results_raw / "rk3588-t4_big_ctx_sweep_4b_int8w_fp32kv.csv",
+            [
+                {
+                    "model": "4B",
+                    "ctx_len": "1",
+                    "gdn_layer_us": "100",
+                    "full_attn_us": "200",
+                    "ffn_us": "50",
+                    "total_us": "350",
+                    "tok_per_sec": "1.83",
+                    "kv_cache_mb": "0.1",
+                }
+            ],
+        )
+        monkeypatch.chdir(tmp_path)
+        result = collect_data("rk3588-t4", CONFIGS_RK3588_KV_SWEEP)
+        assert "4B INT8w FP32kv" in result
+
+
+# ---------------------------------------------------------------------------
+# generate_report — KV sweep configs
+# ---------------------------------------------------------------------------
+
+
+class TestGenerateReportKVSweep:
+    def test_report_includes_kv_cache_section(self, tmp_path, monkeypatch):
+        """KV sweep report should include INT8 KV-cache benefit section."""
+        results_raw = tmp_path / "results" / "raw"
+        results_raw.mkdir(parents=True)
+        for kv in ("fp32kv", "int8kv"):
+            _write_ctx_csv(
+                results_raw / f"rk3588-t4_big_ctx_sweep_4b_int8w_{kv}.csv",
+                [
+                    {
+                        "model": "4B",
+                        "ctx_len": "1",
+                        "gdn_layer_us": "119000",
+                        "full_attn_us": "38000",
+                        "ffn_us": "389000",
+                        "total_us": "546000",
+                        "tok_per_sec": "1.83",
+                        "kv_cache_mb": "0.1",
+                    },
+                    {
+                        "model": "4B",
+                        "ctx_len": "4096",
+                        "gdn_layer_us": "120000",
+                        "full_attn_us": "189000",
+                        "ffn_us": "390000",
+                        "total_us": "699000",
+                        "tok_per_sec": "1.43" if kv == "int8kv" else "1.20",
+                        "kv_cache_mb": "64.0",
+                    },
+                ],
+            )
+        monkeypatch.chdir(tmp_path)
+        report = generate_report(
+            "rk3588-t4", "a76t4", "A76", CONFIGS_RK3588_KV_SWEEP, str(tmp_path / "figures")
+        )
+        assert "INT8 KV-cache quantization benefit" in report
+        assert "4B INT8w" in report
+        # Verify the speedup is shown
+        assert "1.19" in report or "1.20" in report  # int8kv/fp32kv ratio
+
+    def test_report_mentions_cortex_a76(self, tmp_path):
+        """KV sweep device should show 'Cortex-A76', not 'Cortex-A76T4'."""
+        report = generate_report(
+            "rk3588-t4", "a76t4", "A76", CONFIGS_RK3588_KV_SWEEP, str(tmp_path)
+        )
+        assert "Cortex-A76" in report
+        assert "A76T4" not in report
+
+
+# ---------------------------------------------------------------------------
+# generate_cross_validation
+# ---------------------------------------------------------------------------
+
+
+class TestGenerateCrossValidation:
+    def test_no_data_returns_none(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        result = generate_cross_validation(str(tmp_path))
+        assert result is None
+
+    def test_single_device_returns_none(self, tmp_path, monkeypatch):
+        """Need both t3 and t4 KV sweep data for cross-validation."""
+        results_raw = tmp_path / "results" / "raw"
+        results_raw.mkdir(parents=True)
+        _write_ctx_csv(
+            results_raw / "rk3588-t3_big_ctx_sweep_4b_int8w_fp32kv.csv",
+            [
+                {
+                    "model": "4B",
+                    "ctx_len": "1",
+                    "gdn_layer_us": "100",
+                    "full_attn_us": "200",
+                    "ffn_us": "50",
+                    "total_us": "350",
+                    "tok_per_sec": "1.84",
+                    "kv_cache_mb": "0.1",
+                }
+            ],
+        )
+        monkeypatch.chdir(tmp_path)
+        result = generate_cross_validation(str(tmp_path))
+        assert result is None
+
+    def test_two_devices_produces_table(self, tmp_path, monkeypatch):
+        """Cross-validation requires matching KV sweep CSVs for both t3 and t4."""
+        results_raw = tmp_path / "results" / "raw"
+        results_raw.mkdir(parents=True)
+        for device, tok in [("rk3588-t3", "1.84"), ("rk3588-t4", "1.83")]:
+            _write_ctx_csv(
+                results_raw / f"{device}_big_ctx_sweep_4b_int8w_fp32kv.csv",
+                [
+                    {
+                        "model": "4B",
+                        "ctx_len": "1",
+                        "gdn_layer_us": "119000",
+                        "full_attn_us": "38000",
+                        "ffn_us": "389000",
+                        "total_us": "546000",
+                        "tok_per_sec": tok,
+                        "kv_cache_mb": "0.1",
+                    },
+                    {
+                        "model": "4B",
+                        "ctx_len": "4096",
+                        "gdn_layer_us": "120000",
+                        "full_attn_us": "189000",
+                        "ffn_us": "390000",
+                        "total_us": "699000",
+                        "tok_per_sec": str(float(tok) * 0.65),
+                        "kv_cache_mb": "64.0",
+                    },
+                ],
+            )
+        monkeypatch.chdir(tmp_path)
+        result = generate_cross_validation(str(tmp_path))
+        assert result is not None
+        assert "Cross-Validation" in result
+        assert "Consistency assessment" in result
+        assert "4B INT8w FP32kv" in result
