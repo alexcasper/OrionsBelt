@@ -175,7 +175,9 @@ Qwen3.5-4B at 100 GB/s (O6 LPDDR5 spec; RK3588 shared pool is 34 GiB/s per clust
 
 ## 7. End-to-end model decode: tokens/sec (measured)
 
-Qwen3.5-4B + 0.8B, fp32, A76 big cluster (cpu4-7), governor=performance, 128 decode tokens.
+Qwen3.5-4B + 0.8B, A76 big cluster (cpu4-7), governor=performance.
+Token counts differ by device/generation: t3 FP32 = 20 tokens, t3 INT8 = 16 tokens,
+t4 = 8 tokens (re-run, see per-row manifest for details).
 
 **After GEMV row-sweep optimization (commit `2e752af`, §FINDINGS-15):**
 
