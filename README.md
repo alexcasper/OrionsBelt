@@ -205,6 +205,7 @@ Highlights:
 - [`bench/`](./bench/README.md) — measurement harness: context sweep, metrics, provenance manifests, plotting.
 - [`results/`](./results/README.md) — committed CSVs and figures, once they exist.
 - [`src/orionsbelt/`](./src/orionsbelt/) — model loading/introspection, NPU/GPU/CPU engine backends, layer partitioning, quantization policy.
+- [`kleidiai_submission/`](./kleidiai_submission/README.md) — the upstream-ready KleidiAI contribution package: four GDN micro-kernels (SVE/NEON/scalar), 14-suite test harness, micro-benchmark, and cross-ISA verification script.
 - [`CONTRIBUTING.md`](./CONTRIBUTING.md) — contribution workflow.
 
 ## Reproducing

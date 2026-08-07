@@ -504,6 +504,132 @@ static void test_dwconv1d_tail(void) {
 }
 
 /* ----------------------------------------------------------------------- */
+/* Degenerate-input tests                                                   */
+/* ----------------------------------------------------------------------- */
+
+/* All four kernels must handle zero-length dimensions gracefully (no crash,
+ * correct no-op semantics).  An upstream KleidiAI reviewer expects these. */
+
+static void test_degenerate_cumdecay(void) {
+    int all_ok = 1;
+
+    /* seq=0: no output written */
+    {
+        float a[1] = {0};
+        float got[1] = {42.0f};
+        float ref[1] = {42.0f};
+        kai_run_gdn_cumdecay_f32_sve(a, got, 0, 8);
+        ref_cumdecay_f32(a, ref, 0, 8);
+        if (!compare_arrays(got, ref, 1, "cumdecay seq=0", 0.0f, 0.0f))
+            all_ok = 0;
+    }
+    /* channels=0: no output written */
+    {
+        float a[1] = {0};
+        float got[1] = {42.0f};
+        float ref[1] = {42.0f};
+        kai_run_gdn_cumdecay_f32_sve(a, got, 8, 0);
+        ref_cumdecay_f32(a, ref, 8, 0);
+        if (!compare_arrays(got, ref, 1, "cumdecay ch=0", 0.0f, 0.0f))
+            all_ok = 0;
+    }
+    if (all_ok) {} else FAIL_TEST("test_degenerate_cumdecay");
+}
+
+static void test_degenerate_gated_scan(void) {
+    int all_ok = 1;
+
+    /* seq=0: state must be unchanged */
+    {
+        float g[1] = {0};
+        float x[1] = {0};
+        float got_state[4] = {1.0f, -2.0f, 3.0f, -4.0f};
+        float ref_state[4] = {1.0f, -2.0f, 3.0f, -4.0f};
+        float got_s[1], ref_s[1];
+        kai_run_gdn_gated_scan_f32_sve(g, x, got_s, got_state, 0, 4);
+        ref_gated_scan_f32(g, x, ref_s, ref_state, 0, 4);
+        if (!compare_arrays(got_state, ref_state, 4,
+                            "gated_scan seq=0 state", 0.0f, 0.0f))
+            all_ok = 0;
+    }
+    /* channels=0 */
+    {
+        float g[8] = {0};
+        float x[8] = {0};
+        float got_state[1] = {42.0f};
+        float ref_state[1] = {42.0f};
+        float got_s[8], ref_s[8];
+        kai_run_gdn_gated_scan_f32_sve(g, x, got_s, got_state, 8, 0);
+        ref_gated_scan_f32(g, x, ref_s, ref_state, 8, 0);
+        if (!compare_arrays(got_state, ref_state, 1,
+                            "gated_scan ch=0 state", 0.0f, 0.0f))
+            all_ok = 0;
+    }
+    if (all_ok) {} else FAIL_TEST("test_degenerate_gated_scan");
+}
+
+static void test_degenerate_dwconv1d(void) {
+    int all_ok = 1;
+
+    /* seq=0: history must be unchanged */
+    {
+        float in_[1] = {0};
+        float w[12] = {0};
+        float got_hist[6] = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f};
+        float ref_hist[6] = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f};
+        float got_out[1], ref_out[1];
+        kai_run_gdn_causal_dwconv1d_f32_k4_sve(in_, w, got_out, got_hist, 0, 2);
+        ref_causal_dwconv1d_f32(in_, w, ref_out, ref_hist, 0, 2);
+        if (!compare_arrays(got_hist, ref_hist, 6,
+                            "dwconv1d seq=0 hist", 0.0f, 0.0f))
+            all_ok = 0;
+    }
+    /* channels=0 */
+    {
+        float in_[1] = {0};
+        float w[1] = {0};
+        float got_hist[1] = {42.0f};
+        float ref_hist[1] = {42.0f};
+        float got_out[1], ref_out[1];
+        kai_run_gdn_causal_dwconv1d_f32_k4_sve(in_, w, got_out, got_hist, 4, 0);
+        ref_causal_dwconv1d_f32(in_, w, ref_out, ref_hist, 4, 0);
+        if (!compare_arrays(got_hist, ref_hist, 1,
+                            "dwconv1d ch=0 hist", 0.0f, 0.0f))
+            all_ok = 0;
+    }
+    if (all_ok) {} else FAIL_TEST("test_degenerate_dwconv1d");
+}
+
+static void test_degenerate_gemv(void) {
+    int all_ok = 1;
+
+    /* k=0: output must be all zeros (sum of zero terms) */
+    {
+        float a[1] = {0};
+        float b[1] = {0};
+        float got_c[8];
+        float ref_c[8];
+        memset(got_c, 0xFF, sizeof(got_c)); /* poison */
+        kai_run_gdn_gemv_f32_f32_f32_1x4_neon(a, b, got_c, 0, 8);
+        ref_gemv_f32(a, b, ref_c, 0, 8);
+        if (!compare_arrays(got_c, ref_c, 8, "gemv k=0", 0.0f, 0.0f))
+            all_ok = 0;
+    }
+    /* n=0: no output written (pointers may be valid but no writes) */
+    {
+        float a[4] = {1, 2, 3, 4};
+        float b[1] = {0};
+        float got_c[1] = {42.0f};
+        float ref_c[1] = {42.0f};
+        kai_run_gdn_gemv_f32_f32_f32_1x4_neon(a, b, got_c, 4, 0);
+        ref_gemv_f32(a, b, ref_c, 4, 0);
+        if (!compare_arrays(got_c, ref_c, 1, "gemv n=0", 0.0f, 0.0f))
+            all_ok = 0;
+    }
+    if (all_ok) {} else FAIL_TEST("test_degenerate_gemv");
+}
+
+/* ----------------------------------------------------------------------- */
 /* Main                                                                     */
 /* ----------------------------------------------------------------------- */
 
@@ -522,6 +648,12 @@ int main(void) {
     RUN_TEST("test_cumdecay_tail", test_cumdecay_tail(););
     RUN_TEST("test_gated_scan_tail", test_gated_scan_tail(););
     RUN_TEST("test_dwconv1d_tail", test_dwconv1d_tail(););
+
+    printf("\n--- Degenerate-input tests ---\n\n");
+    RUN_TEST("test_degenerate_cumdecay", test_degenerate_cumdecay(););
+    RUN_TEST("test_degenerate_gated_scan", test_degenerate_gated_scan(););
+    RUN_TEST("test_degenerate_dwconv1d", test_degenerate_dwconv1d(););
+    RUN_TEST("test_degenerate_gemv", test_degenerate_gemv(););
 
     printf("=== Summary ===\n");
     printf("Tests run:    %d\n", g_tests_run);

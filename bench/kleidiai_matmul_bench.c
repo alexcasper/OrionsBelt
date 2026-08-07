@@ -23,6 +23,8 @@
  *     -lm -o dist/bench_kleidiai
  */
 
+#define _POSIX_C_SOURCE 200112L  /* clock_gettime, CLOCK_MONOTONIC_RAW, rand_r */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

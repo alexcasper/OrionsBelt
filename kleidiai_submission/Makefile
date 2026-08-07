@@ -16,7 +16,7 @@
 #   make MARCH="-march=armv9-a+sve2"      # SVE2 (e.g. Cortex-A720)
 
 CC      ?= cc
-CFLAGS  ?= -O3 -Wall -Wextra -std=c11
+CFLAGS  ?= -O3 -Wall -Wextra -Wpedantic -std=c11
 MARCH   ?=
 LDFLAGS ?= -lm
 

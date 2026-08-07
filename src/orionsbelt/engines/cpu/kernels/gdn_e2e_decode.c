@@ -28,6 +28,8 @@
  *   ./gdn_e2e_decode --tokens 128           # human-readable
  *   ./gdn_e2e_decode --tokens 128 --csv     # CSV for fleet sweep
  */
+#define _POSIX_C_SOURCE 200112L  /* clock_gettime, posix_memalign, rand_r */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -877,8 +879,11 @@ int main(int argc, char **argv) {
             if (!is_gdn[l]) {
 #ifdef KV_INT8
                 /* INT8 KV cache: 1 byte per element + per-head float scale */
-                posix_memalign((void**)&states[l].kv_k_grow_q, 64, max_ctx * kv_dim);
-                posix_memalign((void**)&states[l].kv_v_grow_q, 64, max_ctx * kv_dim);
+                if (posix_memalign((void**)&states[l].kv_k_grow_q, 64, max_ctx * kv_dim) != 0 ||
+                    posix_memalign((void**)&states[l].kv_v_grow_q, 64, max_ctx * kv_dim) != 0) {
+                    fprintf(stderr, "out of memory (KV_INT8 alloc)\n");
+                    exit(1);
+                }
                 memset(states[l].kv_k_grow_q, 0, max_ctx * kv_dim);
                 memset(states[l].kv_v_grow_q, 0, max_ctx * kv_dim);
                 states[l].kv_k_scale = alloc_aligned(FULL_KV_HEADS);
