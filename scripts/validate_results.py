@@ -191,6 +191,7 @@ DEVICE_SPEC_BW = {
     "pi5": 17.0,
     "rk3588": 34.0,
     "jetson": 25.6,
+    "orion": 100.0,  # CIX P1 SoC, LPDDR5X (ADR 0005)
 }
 
 # Absolute upper bound — no device should exceed this for a single kernel.
