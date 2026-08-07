@@ -137,8 +137,8 @@ git add results/ && git commit -m "Add measured results from <device>"
 
 ## What we are actually testing
 
-Not "how fast is my board". The devices span **~17 GB/s (Pi 5) → 25.6 GB/s (Jetson) → ~34 GB/s
-(RK3588) → ~100 GB/s (Orion O6)** of spec memory bandwidth, and the hypothesis (`METRICS.md`) is that these kernels are
+Not "how fast is my board". The devices span **~15.8 GiB/s (Pi 5) → 23.8 GiB/s (Jetson) → ~31.7 GiB/s
+(RK3588) → ~93.1 GiB/s (Orion O6)** of spec memory bandwidth, and the hypothesis (`METRICS.md`) is that these kernels are
 **memory-bandwidth-bound at ~0.25 FLOP/byte**. If that holds, achieved throughput should track
 bandwidth roughly linearly and **largely ignore core generation**.
 
@@ -155,6 +155,6 @@ state variant, prioritising weight quantization) rest on it.
 
 Either outcome is publishable. Report whichever happens.
 
-The RK3588's ~34 GB/s figure is **estimated** from its quad-channel 16-bit interface, not vendor-
+The RK3588's ~31.7 GiB/s figure is **estimated** from its quad-channel 16-bit interface, not vendor-
 confirmed — the benchmark's achieved-GiB/s column is there so the spec number can be checked rather
 than trusted.

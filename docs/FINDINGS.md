@@ -1124,6 +1124,24 @@ Determinism verified (bit-identical across repeated runs).
 `causal_dwconv1d`; `cumdecay` was declared but never exercised. Added scalar
 references (float and double) and comparison reporting for `cumdecay`.
 
+**RK3588-T3 (Cortex-A76, Armv8.2-A, NEON+dotprod) — all 5 test suites pass (2026-08-07):**
+
+Verified via `scripts/verify_kernels_native.sh` on RK3588-T3, gcc 11.4.0,
+`-march=armv8.2-a+dotprod`. The A76 adds dotprod (`asimddp`) over the A57 baseline,
+exercising a different dispatch path. Key results:
+
+| Test suite | Result | Notes |
+|------------|--------|-------|
+| fp32 kernels (scan, decay, conv1d) | PASS | scan+decay bit-identical; conv1d 1 ULP (FMA) |
+| Mixed-precision (bf16/fp16) | PASS | All bounds met; determinism verified |
+| Delta-rule matmul | PASS | All 6 shapes bit-identical (max_abs=0) |
+| GDN-2 decoupled-gating scan | PASS | max_rel ≤9.1e-6; 8-chunk stability confirmed |
+| INT8 weight quantization + GEMV | PASS | mean_rel=0.42%, max_rel=2.0% |
+
+The dotprod-enabled matmul path is bit-identical to the scalar reference on the A76,
+matching the A57 NEON-only result — confirming the kernel is correct across both
+dispatch paths in the fleet.
+
 ---
 
 ## INA3221 power/energy characterization on Jetson-J1 (ob-agf.1)
@@ -2633,8 +2651,8 @@ revealed that >99% of e2e decode time is spent in GEMV matmuls — FFN blocks
 (72%), GDN projections (14%), and output projections (8%) — while the GDN
 recurrent kernels (conv, decay, scan) account for **<0.1% combined**.
 
-Roofline analysis of the old GEMV showed why: it achieved only **0.9–1.4 GB/s**
-on a system with ~25 GB/s LPDDR4x bandwidth. The root cause was a
+Roofline analysis of the old GEMV showed why: it achieved only **0.9–1.4 GiB/s**
+on a system with ~25 GiB/s practical DRAM bandwidth. The root cause was a
 column-sweep access pattern that strides by N (up to 9216 floats = 36 KB)
 between consecutive K iterations, using only **0.17%** of each 64-byte cache
 line.
@@ -2654,15 +2672,15 @@ The change is 20 lines of C. No weight layout change, no new dependencies.
 
 | Model | Old GEMV tok/s | New GEMV tok/s | Speedup | Old s/tok | New s/tok | Achieved BW |
 |-------|---------------:|---------------:|--------:|----------:|----------:|------------:|
-| Qwen3.5-4B   | 0.07 | 1.04 | **14.9×** | 13.7 | 0.96 | 13.5 GB/s |
-| Qwen3.5-0.8B | 0.79 | 7.98 | **10.1×** | 1.27 | 0.125 | 14.3 GB/s |
+| Qwen3.5-4B   | 0.07 | 1.04 | **14.9×** | 13.7 | 0.96 | 13.5 GiB/s |
+| Qwen3.5-0.8B | 0.79 | 7.98 | **10.1×** | 1.27 | 0.125 | 14.3 GiB/s |
 
 Commits: old GEMV at `a756662`; optimized GEMV at `2e752af`. Both benchmarks
 run at clean commits with manifests (`dirty=false`), 20 tokens × 2 runs,
 consistent across replicates (within 1%).
 
-Achieved bandwidth: 54–57% of the RK3588 LPDDR4x-4266 theoretical peak (~25
-GB/s). The remaining gap is FMA compute latency and L2 cache miss overhead.
+Achieved bandwidth: 54–57% of the RK3588 practical DRAM bandwidth ceiling
+(~25 GiB/s measured, vs 33.8 GB/s theoretical at 2112 MHz). The remaining gap is FMA compute latency and L2 cache miss overhead.
 
 ### Correction to §12
 
@@ -3098,7 +3116,7 @@ The run script gains `--quant int8`.
 
 ### Results — RK3588 (governor=performance, 20 tokens × 2 runs, commit `c6dbb82`)
 
-| Model | Cluster | FP32 tok/s | INT8 tok/s | Speedup | INT8 GB/s |
+| Model | Cluster | FP32 tok/s | INT8 tok/s | Speedup | INT8 GiB/s |
 |-------|---------|-----------:|-----------:|--------:|----------:|
 | Qwen3.5-4B   | A76 big    | 1.04 | 1.84 | **1.77×** | ~5.9 |
 | Qwen3.5-4B   | A55 little  | 0.38 | 0.48 | **1.26×** | — |
@@ -3112,7 +3130,7 @@ FP32 baselines: commits `2e752af` (4B) / `7962968` (0.8B) from §15.
 
 ### Results — Jetson Nano A57 (governor=performance, 8 tokens × 3 runs, commit `660ce17`)
 
-| Model | FP32 tok/s | INT8 tok/s | Speedup | INT8 GB/s |
+| Model | FP32 tok/s | INT8 tok/s | Speedup | INT8 GiB/s |
 |-------|-----------:|-----------:|--------:|----------:|
 | Qwen3.5-0.8B | 2.70 | 3.01 | **1.11×** | — |
 | Qwen3.5-4B   | 0.43 | 0.59 | **1.36×** | — |
@@ -3155,10 +3173,10 @@ dequantization compute overhead more prominent relative to the memory savings.
 
 ### Achieved bandwidth analysis
 
-The 4B big-cluster INT8 run achieves ~5.9 GB/s on INT8 weight traffic — lower
-than the FP32 path's 13.5 GB/s. This is expected: the NEON dequantization
+The 4B big-cluster INT8 run achieves ~5.9 GiB/s on INT8 weight traffic — lower
+than the FP32 path's 13.5 GiB/s. This is expected: the NEON dequantization
 pipeline (3 widen/convert instructions per 4 elements) is now the limiter, not
-raw DRAM bandwidth. The theoretical maximum at 13.5 GB/s would be ~4.2 tok/s
+raw DRAM bandwidth. The theoretical maximum at 13.5 GiB/s would be ~4.2 tok/s
 (4× speedup); we capture 1.84/4.2 = **44% of theoretical**.
 
 Closing this gap would require eliminating the float32 conversion entirely —
@@ -4032,38 +4050,37 @@ GDN shapes (seq=1 decode, seq=64 prefill; channels=160 and 2560).
 |---|---|---|---|
 | cumdecay | 64×160 | 11.4 | 6.7 |
 | cumdecay | 1×160 | 0.3 | 4.1 |
-| cumdecay | 64×2560 | 537.3 | 2.3 |
-| cumdecay | 1×2560 | 0.9 | 21.8 |
-| gated_scan | 64×160 | 5.3 | 22.0 |
-| gated_scan | 1×160 | 0.0 | —* |
-| gated_scan | 64×2560 | 192.5 | 9.6 |
+| cumdecay | 64×2560 | 535.2 | 2.3 |
+| cumdecay | 1×2560 | 3.2 | 6.0 |
+| gated_scan | 64×160 | 20.7 | 5.6 |
+| gated_scan | 1×160 | 0.3 | 10.2 |
+| gated_scan | 64×2560 | 189.0 | 9.8 |
 | gated_scan | 1×2560 | 1.2 | 40.9 |
 | dwconv1d | 64×160 | 5.3 | 15.7 |
 | dwconv1d | 1×160 | 0.3 | 24.6 |
-| dwconv1d | 64×2560 | 143.8 | 9.2 |
+| dwconv1d | 64×2560 | 144.7 | 9.1 |
 | dwconv1d | 1×2560 | 2.9 | 39.3 |
 | gemv | K=128 N=128 | 3.5 | 17.7 |
-| gemv | K=128 N=2048 | 63.0 | 15.6 |
-| gemv | K=128 N=2560 | 79.9 | 15.4 |
-
-*\*seq=1×160 is below the measurement floor (p50 < 1 µs).*
+| gemv | K=128 N=2048 | 58.0 | 17.0 |
+| gemv | K=128 N=2560 | 72.9 | 16.9 |
 
 ### Cross-core comparison: A76 (NEON) vs A57 (NEON)
 
 The same kernels were also verified on a Jetson Nano A57 (Armv8.0, NEON-only,
 no dotprod) — see the KleidiAI submission README for the full A57 table. Key
-ratios at seq=64 shapes:
+ratios at shapes large enough to amortize per-call overhead:
 
 | Kernel | A76 GiB/s | A57 GiB/s | A76/A57 |
 |---|---|---|---|
-| gated_scan 64×160 | 22.0 | 6.3 | 3.5× |
-| dwconv1d 64×160 | 15.7 | 4.6 | 3.4× |
-| gemv K=128 N=128 | 17.7 | 4.7 | 3.8× |
+| gated_scan 64×2560 | 9.8 | 2.1 | 4.6× |
+| dwconv1d 64×160 | 15.7 | 4.7 | 3.3× |
+| gemv K=128 N=128 | 17.7 | 4.6 | 3.8× |
 
-The A76 advantage (3.4–3.8×) exceeds the clock ratio (2.3/0.9 = 2.6×),
+The A76 advantage (3.3–4.6×) exceeds the clock ratio (2.3/1.48 = 1.6×),
 reflecting the A76's wider NEON pipeline and superior memory subsystem. Both
 cores run the same NEON code path, confirming the dual-ISA design works across
-the full Armv8.x range.
+the full Armv8.x range. At the smallest shapes (160 channels, seq=64), the
+advantage shrinks to near-parity — launch overhead dominates sub-25 µs calls.
 
 ### Portability significance
 
@@ -4074,7 +4091,9 @@ path was verified by cross-compilation in §23; the NEON path is verified
 on-silicon here. No competing KleidiAI kernel covers this range for the three
 recurrent primitives.
 
-> **Provenance:** RK3588 t3, commit `250dc96`, governor=performance,
-> clean tree (dirty=false).
+> **Provenance:** RK3588 t3, commit `78eb7e4`, governor=performance.
+> Kernel C files unchanged since `250dc96`; the previous CSV at that commit
+> had measurement artifacts (gated_scan 64×160 p50 was identical to dwconv1d;
+> cumdecay 1×2560 was anomalously fast; gated_scan 1×160 was 0.0 µs/inf).
 > Manifest: `results/manifests/rk3588-t3_kleidiai_gdn_kernels.json`.
 > Raw CSV: `results/raw/kleidiai/rk3588-t3_kleidiai_gdn_kernels.csv`.

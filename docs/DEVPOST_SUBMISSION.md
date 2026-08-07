@@ -97,7 +97,7 @@ This is not a bug in one toolchain — it is an **architectural constraint** of 
 
 5 devices, 3 core classes (A76, A55, A57), spec bandwidth ranging 15.8–31.7 GiB/s:
 
-- **Pi 5 (A76, 17 GB/s) vs Jetson (A57, 25.6 GB/s):** Pi 5 is faster despite less bandwidth — confirming the kernels are instruction-bound, not bandwidth-bound
+- **Pi 5 (A76, 15.8 GiB/s) vs Jetson (A57, 23.8 GiB/s):** Pi 5 is faster despite less bandwidth — confirming the kernels are instruction-bound, not bandwidth-bound
 - **big.LITTLE:** A76 big cores are 2–3× faster than A55 little cores; simultaneous big+little scheduling shows diminishing returns past 4 big cores
 
 ### GDN-2 stretch comparison

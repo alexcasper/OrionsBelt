@@ -20,10 +20,10 @@ documentation.
 
 | Device | SoC | CPU | ISA level | dotprod | i8mm | SVE | Spec bandwidth | GPU | NPU |
 |---|---|---|---|:-:|:-:|:-:|---:|---|---|
-| Jetson Nano | Tegra X1 | 4× A57 | Armv8.0-A | **no** | no | no | **25.6 GB/s** | Maxwell (CUDA) | — |
-| Raspberry Pi 5 | BCM2712 | 4× A76 | Armv8.2-A | yes | no | no | **~17 GB/s** | VideoCore VII | — |
-| RK3588 board | RK3588 | 4× A76 + 4× A55 | Armv8.2-A | yes | no | no | **~34 GB/s** (quad 16-bit LPDDR4x/5, *estimated*) | **Mali-G610 MP4** | ~6 TOPS |
-| *Orion O6 (target, absent)* | CIX P1 | 4× A720 big + 4× A720 med + 4× A520 | Armv9.2-A | yes | **yes** | **yes (SVE2)** | **100 GB/s** | Immortalis-G720 MC10 | 28.8 TOPS |
+| Jetson Nano | Tegra X1 | 4× A57 | Armv8.0-A | **no** | no | no | **23.8 GiB/s** | Maxwell (CUDA) | — |
+| Raspberry Pi 5 | BCM2712 | 4× A76 | Armv8.2-A | yes | no | no | **~15.8 GiB/s** | VideoCore VII | — |
+| RK3588 board | RK3588 | 4× A76 + 4× A55 | Armv8.2-A | yes | no | no | **~31.7 GiB/s** (quad 16-bit LPDDR4x/5, *estimated*) | **Mali-G610 MP4** | ~6 TOPS |
+| *Orion O6 (target, absent)* | CIX P1 | 4× A720 big + 4× A720 med + 4× A520 | Armv9.2-A | yes | **yes** | **yes (SVE2)** | **93.1 GiB/s** | Immortalis-G720 MC10 | 28.8 TOPS |
 
 **None of the three available devices has SVE.** All take the NEON path. That retrospectively
 justifies writing the NEON kernels — had they been SVE-only, none of this hardware could have run
@@ -67,16 +67,16 @@ The project's central technical claim is that GDN decode is **memory-bandwidth-b
 an arithmetic intensity of ~0.25 FLOP/byte ([`METRICS.md`](../METRICS.md)). So far that is an
 argument from first principles plus one upstream measurement on unrelated hardware.
 
-These three devices span **17 → 25.6 → ~34 GB/s**, roughly a 2× range, and the O6 would extend it
-to 100 GB/s — a ~6× span in total. If the kernels are genuinely bandwidth-bound, then achieved
+These three devices span **15.8 → 23.8 → ~31.7 GiB/s**, roughly a 2× range, and the O6 would extend it
+to 93.1 GiB/s — a ~6× span in total. If the kernels are genuinely bandwidth-bound, then achieved
 throughput should track spec bandwidth approximately linearly, *independent of core generation*.
 That yields three things a single-device benchmark cannot:
 
 1. **A falsifiable test of the thesis.** Three points on a bandwidth axis either line up or they do
-   not. If Pi 5 (17 GB/s, newest cores) underperforms Jetson Nano (25.6 GB/s, oldest cores) on the
+   not. If Pi 5 (15.8 GiB/s, newest cores) underperforms Jetson Nano (23.8 GiB/s, oldest cores) on the
    scan kernel, that is strong evidence for bandwidth-boundedness — the *inverted* core-generation
    ordering makes it a genuinely discriminating experiment rather than a confirmation.
-2. **A prediction for the O6 before we own one.** Extrapolating to 100 GB/s gives a number we can
+2. **A prediction for the O6 before we own one.** Extrapolating to 93.1 GiB/s gives a number we can
    publish as a prediction and later check. Predicting and then confirming is a much stronger
    result than measuring once.
 3. **A finding nobody appears to have published**: GDN kernel scaling across Arm memory systems.
