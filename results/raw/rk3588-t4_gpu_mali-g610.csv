@@ -1,0 +1,4 @@
+gdn_gated_scan,64,2048,0.8170,0.9486,1855.1
+gdn_cumdecay,64,2048,0.8188,1221.4
+gdn_causal_dwconv1d,64,2048,0.8456,1275.0
+gdn_delta_rule_decode,16,128,128,2.3632,2.4753,1705.8

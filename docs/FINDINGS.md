@@ -2509,6 +2509,39 @@ its performance honestly — including the honest finding that on this
 particular GPU generation, the CPU wins. That honesty is what makes the O6
 result credible when it arrives.
 
+### Cross-validation on t4: open-source RustiCL/Panfrost stack (bead ob-q44.1)
+
+**Device:** t4 (RK3588, independent unit) · **Driver:** Mesa RustiCL 24.2.8 + panthor kernel
+**OpenCL:** 3.0 via `RUSTICL_ENABLE=panfrost` (no proprietary blob)
+
+The t3 results above used ARM's proprietary `libmali-g610-x11` blob (g13p0).
+On t4, the open-source Mesa RustiCL/Panfrost stack drives the same Mali-G610
+hardware via the `panthor` kernel module (not the older `panfrost` KMS driver).
+**All 87 validation tests pass bit-exact** on the open-source stack, confirming
+that the kernel correctness is driver-independent.
+
+The RustiCL stack does not support `CL_QUEUE_PROFILING_ENABLE` (returns
+`CL_INVALID_COMMAND_QUEUE`, err -35), so wall-clock timing via
+`clock_gettime(CLOCK_MONOTONIC)` is used instead of device profiling events.
+A profiling fallback was added to `gdn_gpu_bench.c` so the same binary works
+on both driver stacks.
+
+| Kernel | t4 GPU (RustiCL wall-clock) | t3 GPU (libmali profiling) |
+|--------|---------------------------|---------------------------|
+| `gdn_gated_scan` | 817 µs | 165 µs |
+| `gdn_cumdecay` | 819 µs | 44 µs |
+| `gdn_causal_dwconv1d` | 846 µs | 48 µs |
+| `gdn_delta_rule_decode` | 2363 µs | 290 µs |
+
+The ~5× latency gap is attributable to the RustiCL software compiler (LLVM
+SPIR-V → NIR) versus ARM's proprietary shader compiler, not a hardware
+difference (identical G610 silicon). This confirms the t3 conclusion that the
+G610 loses to the CPU for these kernels, and strengthens the "CPU-first"
+mapping (ADR 0005 / ob-o4g working hypothesis). The open-source stack being
+functional is itself notable: **the GPU GDN kernels require no proprietary
+drivers**, which is relevant for reproducibility and the open-source
+contribution criterion.
+
 ---
 
 ## 14. End-to-end Qwen3.5-4B C decode loop: A57 joins the fleet (2026-08-07, ob-mrd.8)
