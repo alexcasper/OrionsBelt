@@ -412,7 +412,9 @@ def validate_e2e_sweep_row(row, csv_name, issues, row_num):
     if ("per_sec" in unit or "per_sec" in metric) and value <= 0:
         issues.append(Issue("WARNING", csv_name, f"row {row_num}: non-positive {metric} = {value}"))
     if "tokens_per_sec" in metric and value > 100000:
-        issues.append(Issue("WARNING", csv_name, f"row {row_num}: very high throughput {value} tokens/sec"))
+        issues.append(
+            Issue("WARNING", csv_name, f"row {row_num}: very high throughput {value} tokens/sec")
+        )
 
 
 def validate_csv(path, csv_name, issues):
