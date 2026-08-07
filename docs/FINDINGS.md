@@ -1090,6 +1090,8 @@ characterization will come from passively-cooled devices (e.g. Pi 5) where susta
 load may trigger frequency reduction. The `--sustained` flag is portable — every
 device in the fleet can produce its own decay curve.
 
+**Data:** [`results/raw/jetson-j1_sustained.csv`](../results/raw/jetson-j1_sustained.csv) · manifest `jetson-j1_sustained.json` (dirty tree, SHA `a99495f`).
+
 ## Native NEON kernel correctness verification (ob-mrd.3)
 
 The existing `verify_cpu_kernels.sh` cross-compiles for SVE and verifies under QEMU.
