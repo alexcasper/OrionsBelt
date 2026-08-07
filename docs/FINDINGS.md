@@ -3387,6 +3387,7 @@ microarchitectural.
 Data: `results/raw/jetson-j1_*_ctxsweep_e2e_raw.csv`, manifests in
 `results/manifests/jetson-j1_*_ctxsweep.json`.
 
+Per-device figures: [`A57 (Jetson)`](../results/figures/ctx_length_scaling_a57.md), [`A76 (RK3588-t3)`](../results/figures/ctx_length_scaling_a76.md).
 Cross-device figure: [`results/figures/ctx_length_scaling_cross.md`](../results/figures/ctx_length_scaling_cross.md)
 
 ### What this means for the submission
@@ -3728,6 +3729,7 @@ advantage remains.
 
 Auto-generated reports (reproducible via `python3 bench/ctx_scaling_analysis.py`):
 - t4 device report: [`results/figures/ctx_length_scaling_a76t4.md`](../results/figures/ctx_length_scaling_a76t4.md)
+- t4 KV int8 scaling: [`results/figures/kv_int8_scaling_t4.md`](../results/figures/kv_int8_scaling_t4.md)
 - t3 vs t4 cross-validation: [`results/figures/ctx_length_scaling_t3vst4.md`](../results/figures/ctx_length_scaling_t3vst4.md) — avg |Δ%|=3.6%, max 7.8%
 
 ---
