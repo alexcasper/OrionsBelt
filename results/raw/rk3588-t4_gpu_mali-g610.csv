@@ -1,0 +1,5 @@
+# kernel,dim1,dim2,dim3,p50_ms,p95_ms,bw_mibs
+gdn_gated_scan,64,2048,0.9480,1.0477,1598.8
+gdn_cumdecay,64,2048,0.8459,1182.2
+gdn_causal_dwconv1d,64,2048,0.8465,1273.7
+gdn_delta_rule_decode,16,128,128,2.4204,2.4391,1665.5

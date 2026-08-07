@@ -160,9 +160,9 @@ static void init_opencl(void) {
     clGetDeviceIDs(g_platform, CL_DEVICE_TYPE_GPU, 1, &g_device, NULL);
     g_ctx = clCreateContext(NULL, 1, &g_device, NULL, NULL, &err);
     cl_check(err, "ctx");
-    const cl_queue_properties qprops[] = {CL_QUEUE_PROPERTIES,
-        CL_QUEUE_PROFILING_ENABLE, 0};
-    g_queue = clCreateCommandQueueWithProperties(g_ctx, g_device, qprops, &err);
+    /* RustiCL/Panfrost does not support CL_QUEUE_PROFILING_ENABLE (err -35).
+     * Profiling is unused in the validate path — pass NULL properties. */
+    g_queue = clCreateCommandQueueWithProperties(g_ctx, g_device, NULL, &err);
     cl_check(err, "queue");
 
     size_t srclen;
