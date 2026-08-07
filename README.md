@@ -143,7 +143,7 @@ All figures above are verified against primary sources (Radxa product page and d
 - CIX NOE and Rockchip RKNN toolchains both reject GDN's runtime-length recurrence — the limitation generalises beyond one vendor (§1, §7)
 - KleidiAI packed GEMM wins 1.7–3.6× on matmul but packing cost dominates at decode; dual-path strategy recommended (§8)
 - big.LITTLE affinity: pinning to A76 big cores is 2–3× faster than default scheduler placement (§9)
-- GDN-2 vs GDN-1: decoupled gating costs 2.5–4.1× at prefill (bandwidth-bound), only 1.2–1.8× at decode (cache-resident); A55 penalized worse than A76 due to in-order pipeline (§10)
+- GDN-2 vs GDN-1: decoupled gating costs 2.2–2.7× at prefill (bandwidth-bound), 1.2–1.5× at decode on big cores but 2.2–2.4× on A55 little cores (compute-bound); clean-tree re-run, single-thread (§10)
 
 | Item | Status |
 |---|---|

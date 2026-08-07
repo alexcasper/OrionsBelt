@@ -32,7 +32,7 @@ At 262K context on the 4B checkpoint, that difference is **23.95 GiB of RAM** �
 - **big.LITTLE affinity policy** — pinning to A76 big cores is 2–3× faster than default scheduler placement
 - **OpenMP parallelization + NEON double-width unrolling** — 2.6–5.1× cumulative speedup on A76
 - **Cross-vendor NPU operator-coverage audit** — both CIX NOE and Rockchip RKNN reject GDN's variable-length recurrence (the "Loop" op). This generalizes: no current edge NPU compiler handles it
-- **GDN-2 vs GDN-1 comparison** — the decoupled gating in GDN-2 costs 1.2–1.8× at decode, 2.5–4.1× at prefill
+- **GDN-2 vs GDN-1 comparison** — the decoupled gating in GDN-2 costs 1.2–1.5× at decode on big cores (2.2–2.4× on little), 2.2–2.7× at prefill
 - **Analytical memory model** decomposing weights, KV cache, and recurrent state at every context length
 
 **What we did NOT achieve (stated honestly):**
@@ -99,7 +99,7 @@ This is not a bug in one toolchain — it is an **architectural constraint** of 
 
 ### GDN-2 stretch comparison
 
-GDN-2's decoupled erase/write gating costs **1.2–1.8× at decode** (cache-resident, compute-bound) and **2.5–4.1× at prefill** (bandwidth-bound) due to extra memory streams — with **up to 4.1× penalty on A55 little cores** where the in-order pipeline cannot overlap the extra MULs with loads.
+GDN-2's decoupled erase/write gating costs **1.2–1.5× at decode** on big cores (**2.2–2.4× on A55 little cores** where the in-order pipeline cannot hide extra arithmetic) and **2.2–2.7× at prefill** due to extra bandwidth streams.
 
 ---
 
