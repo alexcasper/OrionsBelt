@@ -18,6 +18,7 @@ from scripts.validate_results import (  # noqa: E402
     ABSURD_THROUGHPUT,
     E2E_SWEEP_COLS,
     GPU_MICRO_COLS,
+    KLEIDIAI_GDN_KERNEL_COLS,
     KLEIDIAI_MATMUL_COLS,
     LAYER_PROFILE_COLS,
     STANDARD_COLS,
@@ -33,6 +34,7 @@ from scripts.validate_results import (  # noqa: E402
     validate_csv,
     validate_e2e_sweep_row,
     validate_gpu_micro_row,
+    validate_kleidiai_gdn_kernel_row,
     validate_kleidiai_matmul_row,
     validate_layer_profile_row,
     validate_manifest,
@@ -210,6 +212,15 @@ class TestDetectCsvType:
         cols = ["shape", "impl", "GiB_s", "GFLOP_s"]
         assert detect_csv_type(cols) == "kleidiai_matmul"
 
+    def test_kleidiai_gdn_kernel_detected(self):
+        """KleidiAI GDN kernel CSV should be detected."""
+        assert detect_csv_type(KLEIDIAI_GDN_KERNEL_COLS) == "kleidiai_gdn_kernel"
+
+    def test_kleidiai_gdn_kernel_minimal_cols(self):
+        """Detection only needs the key columns."""
+        cols = ["kernel", "shape", "p50_us", "gib_per_s_p50"]
+        assert detect_csv_type(cols) == "kleidiai_gdn_kernel"
+
 
 # ---------------------------------------------------------------------------
 # expected_columns
@@ -245,6 +256,11 @@ class TestExpectedColumns:
         assert "us_per_call" in expected_columns("kleidiai_matmul")
         assert "GiB_s" in expected_columns("kleidiai_matmul")
         assert "GFLOP_s" in expected_columns("kleidiai_matmul")
+
+    def test_kleidiai_gdn_kernel_columns(self):
+        assert "p50_us" in expected_columns("kleidiai_gdn_kernel")
+        assert "gib_per_s_p50" in expected_columns("kleidiai_gdn_kernel")
+        assert "kernel" in expected_columns("kleidiai_gdn_kernel")
 
 
 # ---------------------------------------------------------------------------
@@ -592,6 +608,82 @@ class TestValidateKleidiaiMatmulRow:
         issues = []
         validate_kleidiai_matmul_row(_kleidiai_row(GiB_s="N/A"), "test.csv", issues, 2)
         assert any("cannot parse GiB_s" in i.message for i in issues)
+
+
+def _gdn_kernel_row(**overrides):
+    """Factory for a valid kleidiai_gdn_kernel CSV row."""
+    base = {
+        "kernel": "cumdecay",
+        "shape": "64x2560",
+        "seq": "64",
+        "channels": "2560",
+        "repeats": "30",
+        "p50_us": "536.959",
+        "gib_per_s_p50": "2.27",
+    }
+    base.update(overrides)
+    return base
+
+
+class TestValidateKleidiaiGdnKernelRow:
+    def test_valid_row_no_issues(self):
+        issues = []
+        validate_kleidiai_gdn_kernel_row(_gdn_kernel_row(), "test.csv", issues, 2)
+        assert issues == []
+
+    def test_valid_gemv_kernel(self):
+        issues = []
+        validate_kleidiai_gdn_kernel_row(
+            _gdn_kernel_row(kernel="gemv", shape="K128_N2560", gib_per_s_p50="14.65"),
+            "test.csv",
+            issues,
+            2,
+        )
+        assert issues == []
+
+    def test_inf_gibs_is_note_not_warning(self):
+        """inf GiB/s from tiny workloads should be a NOTE, not a WARNING."""
+        issues = []
+        validate_kleidiai_gdn_kernel_row(
+            _gdn_kernel_row(p50_us="0.000", gib_per_s_p50="inf"),
+            "test.csv",
+            issues,
+            2,
+        )
+        assert any("too small to measure" in i.message for i in issues)
+        assert all(i.severity == "NOTE" for i in issues)
+
+    def test_negative_us(self):
+        issues = []
+        validate_kleidiai_gdn_kernel_row(_gdn_kernel_row(p50_us="-1.0"), "test.csv", issues, 2)
+        assert any("negative p50_us" in i.message for i in issues)
+
+    def test_absurd_gibs(self):
+        issues = []
+        validate_kleidiai_gdn_kernel_row(
+            _gdn_kernel_row(gib_per_s_p50=str(ABSURD_THROUGHPUT + 1)),
+            "test.csv",
+            issues,
+            2,
+        )
+        assert any("absurd gib_per_s_p50" in i.message for i in issues)
+
+    def test_negative_gibs(self):
+        issues = []
+        validate_kleidiai_gdn_kernel_row(
+            _gdn_kernel_row(gib_per_s_p50="-1.0"), "test.csv", issues, 2
+        )
+        assert any("negative gib_per_s_p50" in i.message for i in issues)
+
+    def test_malformed_us(self):
+        issues = []
+        validate_kleidiai_gdn_kernel_row(_gdn_kernel_row(p50_us="abc"), "test.csv", issues, 2)
+        assert any("cannot parse p50_us" in i.message for i in issues)
+
+    def test_unknown_kernel(self):
+        issues = []
+        validate_kleidiai_gdn_kernel_row(_gdn_kernel_row(kernel="bogus"), "test.csv", issues, 2)
+        assert any("unknown kernel" in i.message for i in issues)
 
 
 class TestCheckManifestExists:
