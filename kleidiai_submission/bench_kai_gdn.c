@@ -26,6 +26,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <unistd.h>    /* sysconf */
 
 #ifdef __ARM_NEON
 #include <arm_neon.h>
@@ -135,6 +136,102 @@ static void run_gemv(void *c) {
 }
 
 /* ----------------------------------------------------------------------- */
+/* CPU affinity check (big.LITTLE safety)                                  */
+/* ----------------------------------------------------------------------- */
+
+/* On Arm big.LITTLE systems (e.g. RK3588: 4× A55 + 4× A76), the Linux
+ * energy-aware scheduler may place short-lived tasks (< ~10 µs) on little
+ * cores for energy efficiency.  Without taskset pinning, results for fast
+ * kernels are nondeterministic — the same binary can report 3.3 µs (big)
+ * or 10.7 µs (little) on consecutive runs.  This was the root cause of the
+ * cumdecay 64×160 "cross-device divergence" (ob-jvx).
+ *
+ * This check reads max CPU frequencies from sysfs and the process's
+ * Cpus_allowed mask.  If the allowed set spans cores with different max
+ * frequencies, we print a warning so the operator knows to use taskset. */
+
+static void check_affinity(int csv_mode) {
+    long ncpu = sysconf(_SC_NPROCESSORS_ONLN);
+    if (ncpu <= 0) return;
+
+    /* Read max freq for each CPU */
+    int max_freq[64] = {0};       /* max freq in kHz, 0 if unreadable */
+    int n_big = 0, n_little = 0;
+    int big_freq = 0, little_freq = 0;
+
+    for (long c = 0; c < ncpu && c < 64; c++) {
+        char path[128];
+        snprintf(path, sizeof(path),
+                 "/sys/devices/system/cpu/cpu%ld/cpufreq/cpuinfo_max_freq", c);
+        FILE *f = fopen(path, "r");
+        if (f) {
+            if (fscanf(f, "%d", &max_freq[c]) != 1) max_freq[c] = 0;
+            fclose(f);
+        }
+    }
+
+    /* Determine the min and max freq across all CPUs */
+    int freq_min = 0, freq_max = 0;
+    for (long c = 0; c < ncpu; c++) {
+        if (max_freq[c] == 0) continue;
+        if (freq_min == 0 || max_freq[c] < freq_min) freq_min = max_freq[c];
+        if (max_freq[c] > freq_max) freq_max = max_freq[c];
+    }
+
+    /* Not a big.LITTLE system (or sysfs unavailable) */
+    if (freq_min == 0 || freq_max == 0 || freq_min == freq_max) return;
+
+    /* Read our CPU affinity mask from /proc/self/status */
+    FILE *f = fopen("/proc/self/status", "r");
+    if (!f) return;
+
+    char line[256];
+    unsigned long allowed_mask = 0;
+    while (fgets(line, sizeof(line), f)) {
+        if (strncmp(line, "Cpus_allowed:", 13) == 0) {
+            /* Hex mask, may be 64-bit on some kernels */
+            /* Read as two hex values to handle >32 CPUs */
+            unsigned long hi = 0, lo = 0;
+            int items = sscanf(line + 13, "%lx,%lx", &hi, &lo);
+            if (items == 2)
+                allowed_mask = lo;  /* CPUs 0-31 are in the low word */
+            else
+                allowed_mask = hi;  /* single 32-bit word */
+            break;
+        }
+    }
+    fclose(f);
+
+    if (allowed_mask == 0) return;
+
+    /* Count how many big and little cores are in our allowed set */
+    for (long c = 0; c < ncpu && c < 32; c++) {
+        if (!(allowed_mask & (1UL << c))) continue;
+        if (max_freq[c] == 0) continue;
+        if (max_freq[c] == freq_max) {
+            n_big++;
+            big_freq = max_freq[c];
+        } else {
+            n_little++;
+            little_freq = max_freq[c];
+        }
+    }
+
+    if (n_big > 0 && n_little > 0) {
+        fprintf(stderr,
+            "⚠  WARNING: process affinity spans big.LITTLE cores (%d big @ %d kHz"
+            " + %d little @ %d kHz).\n"
+            "   Short kernels may be scheduled on little cores, giving "
+            "misleading results.\n"
+            "   Pin to one cluster:  taskset -c <big-cores> %s --repeats 30\n"
+            "   (See ob-jvx / FINDINGS.md §24 for the cumdecay 64×160 "
+            "methodology incident.)\n\n",
+            n_big, big_freq, n_little, little_freq, "bench_kai_gdn");
+        (void)csv_mode;  /* warning always goes to stderr */
+    }
+}
+
+/* ----------------------------------------------------------------------- */
 /* Main                                                                    */
 /* ----------------------------------------------------------------------- */
 
@@ -147,6 +244,8 @@ int main(int argc, char **argv) {
         else if (strcmp(argv[i], "--csv") == 0)
             csv = 1;
     }
+
+    check_affinity(csv);
 
     /* GDN shapes from the model architecture (hidden_size=2560, 16 heads):
      *   single-head channels = 2560 / 16 = 160
