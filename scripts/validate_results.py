@@ -362,7 +362,9 @@ def validate_delta_matmul_row(row, csv_name, issues, row_num):
         return
 
     if m < 1 or k < 1 or n < 1:
-        issues.append(Issue("ERROR", csv_name, f"row {row_num}: non-positive matmul dim M={m},K={k},N={n}"))
+        issues.append(
+            Issue("ERROR", csv_name, f"row {row_num}: non-positive matmul dim M={m},K={k},N={n}")
+        )
     if p50 <= 0:
         issues.append(Issue("ERROR", csv_name, f"row {row_num}: non-positive p50_us"))
     if p95 < p50:
