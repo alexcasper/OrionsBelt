@@ -201,7 +201,9 @@ class TestGenerateReport:
             ],
         )
         monkeypatch.chdir(tmp_path)
-        report = generate_report("rk3588-t3", "a76", "A76", CONFIGS_RK3588, str(tmp_path / "figures"))
+        report = generate_report(
+            "rk3588-t3", "a76", "A76", CONFIGS_RK3588, str(tmp_path / "figures")
+        )
         assert "Throughput vs context length" in report
         assert "Full-attention share" in report
         assert "KV cache memory" in report
@@ -237,7 +239,9 @@ class TestGenerateReport:
             ],
         )
         monkeypatch.chdir(tmp_path)
-        report = generate_report("rk3588-t3", "a76", "A76", CONFIGS_RK3588, str(tmp_path / "figures"))
+        report = generate_report(
+            "rk3588-t3", "a76", "A76", CONFIGS_RK3588, str(tmp_path / "figures")
+        )
         assert "10.00" in report
         assert "1.50" in report
 
@@ -261,7 +265,9 @@ class TestGenerateReport:
             ],
         )
         monkeypatch.chdir(tmp_path)
-        report = generate_report("rk3588-t3", "a76", "A76", CONFIGS_RK3588, str(tmp_path / "figures"))
+        report = generate_report(
+            "rk3588-t3", "a76", "A76", CONFIGS_RK3588, str(tmp_path / "figures")
+        )
         assert "256 MB" in report
 
     def test_headline_section(self, tmp_path, monkeypatch):
@@ -294,7 +300,9 @@ class TestGenerateReport:
             ],
         )
         monkeypatch.chdir(tmp_path)
-        report = generate_report("rk3588-t3", "a76", "A76", CONFIGS_RK3588, str(tmp_path / "figures"))
+        report = generate_report(
+            "rk3588-t3", "a76", "A76", CONFIGS_RK3588, str(tmp_path / "figures")
+        )
         assert "ctx=4096" in report
 
 
