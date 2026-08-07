@@ -199,7 +199,7 @@ ABSURD_THROUGHPUT = 200.0  # GiB/s
 
 
 def detect_csv_type(header):
-    """Return CSV type: standard, sustained, power, layer_profile, delta_matmul, e2e_decode, ctx_sweep, e2e_sweep, e2e_ctxsweep, gpu_micro, or None."""
+    """Return CSV type: standard, sustained, power, layer_profile, delta_matmul, e2e_decode, ctx_sweep, e2e_sweep, e2e_ctxsweep, gpu_micro, kleidiai_matmul, kleidiai_gdn, or None."""
     cols = set(header)
     if cols >= set(STANDARD_COLS):
         return "standard"

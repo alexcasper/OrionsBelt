@@ -304,6 +304,60 @@ At seq=64 (prefill chunk), all three recurrent kernels are bandwidth-bound
 set fits in L1 and the kernels are launch-overhead-dominated, not
 bandwidth-limited. The GEMV at all sizes is bandwidth-bound at ~5 GiB/s.
 
+### A76 (Armv8.2, NEON+dotprod path) — measured on RK3588-t4 (Cortex-A76, big cores)
+
+Governor: performance, pinned to CPUs 4–7 via `taskset -c 4-7`. p50 of 30
+repeats (3 warmups discarded). Provenance:
+[`results/raw/kleidiai/rk3588-t4_kleidiai_gdn_kernels.csv`](../results/raw/kleidiai/rk3588-t4_kleidiai_gdn_kernels.csv),
+manifest:
+[`results/manifests/rk3588-t4_kleidiai_gdn_kernels.json`](../results/manifests/rk3588-t4_kleidiai_gdn_kernels.json)
+(commit `a148655`, dirty=true).
+
+| Kernel      | Shape (seq×ch)   | p50 (µs) | GiB/s |
+|-------------|------------------|----------|-------|
+| cumdecay    | 64×160           |      3.5 |  21.8 |
+| cumdecay    | 1×160            |    < 1.0 |   —   |
+| cumdecay    | 64×2560          |    120.2 |  10.2 |
+| cumdecay    | 1×2560           |      0.6 |  32.7 |
+| gated_scan  | 64×160           |      5.5 |  20.9 |
+| gated_scan  | 1×160            |    < 1.0 |   —   |
+| gated_scan  | 64×2560          |    182.9 |  10.1 |
+| gated_scan  | 1×2560           |      1.2 |  40.9 |
+| dwconv1d    | 64×160           |      5.3 |  15.7 |
+| dwconv1d    | 1×160            |    < 1.0 |   —   |
+| dwconv1d    | 64×2560          |    136.2 |   9.7 |
+| dwconv1d    | 1×2560           |      2.6 |  43.6 |
+| gemv        | K=128 N=128      |      3.5 |  17.7 |
+| gemv        | K=128 N=2048     |     57.8 |  17.1 |
+| gemv        | K=128 N=2560     |     71.8 |  17.2 |
+
+> **A57 vs A76:** The GEMV scales with the wider NEON pipeline and larger L2:
+> 17.1–17.7 GiB/s on A76 vs 4.7–5.3 GiB/s on A57 (3.3× speedup, matching the
+> ~3.5× clock×IPC ratio). The recurrent kernels show a smaller gap because they
+> are latency-bound at seq=1 (launch overhead dominates) and bandwidth-bound at
+> seq=64 (the RK3588's shared DRAM is the bottleneck, not the core). dwconv1d
+> at seq=64 is the standout: 15.7 GiB/s on A76 vs 4.6 GiB/s on A57 — the
+> depthwise nature (no channel-axis reduction) lets the wider core's memory
+> subsystem shine.
+
+> **Provenance note (beads ob-ie4):** An earlier version of this table
+> contained numbers from an unpinned `make bench` run without performance
+> governor. The compute-bound prefill shapes (cumdecay, gated_scan at seq=64)
+> were 3–5× slower because the scheduler migrated the thread between big and
+> little cores and the governor ran at a lower OPP. Memory-bound kernels
+> (gemv, dwconv1d, gated_scan 64×2560) were unaffected — they match exactly
+> between pinned and unpinned runs, confirming DRAM bandwidth is the true
+> bottleneck for those shapes. The table above supersedes the earlier data.
+> Shapes marked "—" are sub-microsecond and below timer resolution; the CSV
+> records p50=0.000 and gib_per_s_p50=inf for these rows.
+
+> **Note on variance:** The A57 exhibits high run-to-run variance (up to 1.5×
+> on the same kernel at the same commit, per beads ob-bf7). The numbers above
+> are from representative single runs; cross-device comparisons must use
+> matched commits with multiple replicates. The GEMV NEON path uses
+> double-width unrolling (8 channels/iter) and `vfmaq_n_f32` scalar FMA,
+> matching the three recurrent kernels' pattern.
+
 ### A76 (Armv8.2-A, NEON + dotprod path) — measured on RK3588 (device t3)
 
 All numbers are p50 of 30 repeats on a Cortex-A76 @ 2.3 GHz (RK3588, device t3).
