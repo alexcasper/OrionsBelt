@@ -14,7 +14,7 @@ _ROOT = str(Path(__file__).resolve().parent.parent)
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
-from bench.kv_int8_analysis import generate_report, read_csv  # noqa: E402
+from bench.kv_int8_analysis import _device_tag, generate_report, read_csv  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # CSV columns matching the ctx-sweep format used by kv_int8_analysis
@@ -92,11 +92,14 @@ class TestReadCSV:
 class TestGenerateReport:
     def _run_report(self, tmp_path, monkeypatch):
         """Helper: ensure output dir exists and run report."""
+        device = "rk3588-t3_big"
         out_dir = tmp_path / "figures"
         out_dir.mkdir(parents=True)
         monkeypatch.chdir(tmp_path)
-        generate_report("rk3588-t3_big", str(out_dir))
-        report_path = out_dir / "kv_int8_scaling.md"
+        generate_report(device, str(out_dir))
+        # generate_report writes a device-suffixed filename so each fleet device
+        # gets its own report (kv_int8_scaling_{tag}.md) without collisions.
+        report_path = out_dir / f"kv_int8_scaling_{_device_tag(device)}.md"
         assert report_path.exists(), "Report file was not written"
         return report_path.read_text()
 
