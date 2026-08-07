@@ -10,6 +10,7 @@ Python 3.6 compatible (Jetson Nano rescue script).
 """
 import glob
 import os
+
 # Correct spec bandwidth in GiB/s (from bench/plots.py DEVICE_SPEC_BANDWIDTH)
 SPEC_GIBS = {
     "pi5": 15.8,
