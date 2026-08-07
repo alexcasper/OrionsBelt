@@ -109,24 +109,43 @@ static void fill_rand(float *buf, size_t n, unsigned *seed) {
 #endif
 
 static void gemv_neon(const float *a, const float *B, float *c, size_t K, size_t N) {
-    /* a is [K], B is [K x N] row-major, c is [N].
-     * Walk N in NEON-width strides, reduce over K. */
-    size_t j = 0;
-    for (; j + 4 <= N; j += 4) {
-        float32x4_t acc = vdupq_n_f32(0.0f);
+    /* a is [K], B is [K×N] row-major, c is [N].
+     *
+     * Row-sweep GEMV: K-outer, N-inner. Each row of B is accessed
+     * sequentially → ~100% cache-line utilization (vs 0.17% in the old
+     * column-sweep version that strides by N between consecutive K).
+     * Parallelized over N-tiles via OpenMP so all big cores participate.
+     *
+     * For N=9216 (4B FFN), the old version wasted 576× the memory bandwidth
+     * because it touched one float per 36 KB cache-line stride; this version
+     * touches every float in each contiguous row segment. */
+    const size_t TILE = 1024;  /* 4 KB output tile, stays in L1 */
+
+#pragma omp parallel for schedule(static)
+    for (size_t jt = 0; jt < N; jt += TILE) {
+        size_t tn = (jt + TILE <= N) ? TILE : (N - jt);
+        float *ct = c + jt;
+
+        /* Zero the output tile */
+        memset(ct, 0, tn * sizeof(float));
+
+        /* Sweep K — B row segments accessed sequentially */
         for (size_t k = 0; k < K; ++k) {
-            float32x4_t bk = vld1q_f32(B + k * N + j);
-            float32x4_t ak = vdupq_n_f32(a[k]);
-            acc = vfmaq_f32(acc, ak, bk);
+            float ak = a[k];
+            const float *Brow = B + k * N + jt;
+            size_t j = 0;
+#ifdef __ARM_NEON
+            float32x4_t akv = vdupq_n_f32(ak);
+            for (; j + 4 <= tn; j += 4) {
+                float32x4_t bk = vld1q_f32(Brow + j);
+                float32x4_t ck = vld1q_f32(ct + j);
+                ck = vfmaq_f32(ck, akv, bk);
+                vst1q_f32(ct + j, ck);
+            }
+#endif
+            for (; j < tn; ++j)
+                ct[j] += ak * Brow[j];
         }
-        vst1q_f32(c + j, acc);
-    }
-    /* Tail: remaining columns when N % 4 != 0 */
-    for (; j < N; ++j) {
-        float acc = 0.0f;
-        for (size_t k = 0; k < K; ++k)
-            acc += a[k] * B[k * N + j];
-        c[j] = acc;
     }
 }
 
