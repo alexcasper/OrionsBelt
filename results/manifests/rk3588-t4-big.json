@@ -1,0 +1,35 @@
+{
+  "manifest_version": 1,
+  "run_id": "rk3588-t4-big_sweep_1ca4d6d",
+  "timestamp_utc": "2026-08-07T00:55:34Z",
+  "source": "scripts/capture_manifest.sh",
+  "git": {
+    "sha": "1ca4d6dfb00c106d66dd431852acfca2f0b27e62",
+    "dirty": false
+  },
+  "host": {
+    "hostname": "t4",
+    "machine": "aarch64",
+    "kernel": "6.11.0-1006-rockchip",
+    "os": "Linux #6-Ubuntu SMP PREEMPT Mon Sep 16 15:20:55 UTC 2024",
+    "cpu_model": null,
+    "core_count": 1,
+    "cpu_topology": [{"cpu":0,"max_freq_khz":1800000,"min_freq_khz":1008000,"governor":"performance","cpu_capacity":397},{"cpu":1,"max_freq_khz":1800000,"min_freq_khz":1008000,"governor":"performance","cpu_capacity":397},{"cpu":2,"max_freq_khz":1800000,"min_freq_khz":1008000,"governor":"performance","cpu_capacity":397},{"cpu":3,"max_freq_khz":1800000,"min_freq_khz":1008000,"governor":"performance","cpu_capacity":397},{"cpu":4,"max_freq_khz":2400000,"min_freq_khz":1200000,"governor":"performance","cpu_capacity":1024},{"cpu":5,"max_freq_khz":2400000,"min_freq_khz":1200000,"governor":"performance","cpu_capacity":1024},{"cpu":6,"max_freq_khz":2400000,"min_freq_khz":1200000,"governor":"performance","cpu_capacity":1024},{"cpu":7,"max_freq_khz":2400000,"min_freq_khz":1200000,"governor":"performance","cpu_capacity":1024}]
+  },
+  "isa_features": {"sve":false,"sve2":false,"i8mm":false,"bf16":false,"asimddp":true,"sme":false},
+  "parallelism": {
+    "omp_num_threads": "1",
+    "omp_proc_bind": null,
+    "omp_places": null,
+    "effective_threads": 1,
+    "threads_source": "OMP_NUM_THREADS"
+  },
+  "thermal_zones": [{"zone":"thermal_zone0","type":"package-thermal","temp_millicelsius":40692},{"zone":"thermal_zone1","type":"bigcore0-thermal","temp_millicelsius":40692},{"zone":"thermal_zone2","type":"bigcore2-thermal","temp_millicelsius":40692},{"zone":"thermal_zone3","type":"littlecore-thermal","temp_millicelsius":41615},{"zone":"thermal_zone4","type":"center-thermal","temp_millicelsius":39769},{"zone":"thermal_zone5","type":"gpu-thermal","temp_millicelsius":40692},{"zone":"thermal_zone6","type":"npu-thermal","temp_millicelsius":40692}],
+  "memory": {
+    "mem_total_kb": 8120248,
+    "mem_available_kb": 5027584
+  },
+  "software": {
+    "python_version": "Python 3.12.7"
+  }
+}
