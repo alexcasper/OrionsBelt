@@ -28,15 +28,15 @@ At 262K context on the 4B checkpoint, that difference is **23.95 GiB of RAM** �
 
 **What we built:**
 - **Three GDN CPU kernels** (gated cumulative decay, gated delta-rule scan, causal depthwise Conv1D) in C with NEON intrinsics, verified against FP32 reference implementations
-- **Mixed-precision variants** (fp16, bf16 recurrent state) — fp16 gives 1.6× on the decay chain; scan is compute-bound and shows no bandwidth benefit
+- **Mixed-precision variants** (fp16, bf16 recurrent state) — fp16 gives 1.77× on the decay chain; scan is compute-bound and shows no bandwidth benefit
 - **big.LITTLE affinity policy** — pinning to A76 big cores is 2–3× faster than default scheduler placement
 - **OpenMP parallelization + NEON double-width unrolling** — 2.6–5.1× cumulative speedup on A76
 - **Cross-vendor NPU operator-coverage audit** — both CIX NOE and Rockchip RKNN reject GDN's variable-length recurrence (the "Loop" op). This generalizes: no current edge NPU compiler handles it
-- **GDN-2 vs GDN-1 comparison** — the decoupled gating in GDN-2 is free at decode, costs 2× at prefill
+- **GDN-2 vs GDN-1 comparison** — the decoupled gating in GDN-2 costs 1.2–1.8× at decode, 2.5–4.1× at prefill
 - **Analytical memory model** decomposing weights, KV cache, and recurrent state at every context length
 
 **What we did NOT achieve (stated honestly):**
-- End-to-end model-level tokens/sec — we measure at the kernel level, not the full forward pass, because no GDN inference engine exists for this silicon yet
+- End-to-end model-level tokens/sec — baseline measured at 0.09 tok/s (fp32, RK3588 A76, Qwen3.5-4B unoptimized reference decode loop); optimized inference deferred pending heterogeneous dispatch
 - NPU acceleration — both vendors' compilers reject the recurrence (see above)
 - The target Orion O6 board did not arrive in time; all results are from the portable aarch64 fleet (Pi 5, RK3588, Jetson Nano)
 
@@ -48,24 +48,30 @@ At 262K context on the 4B checkpoint, that difference is **23.95 GiB of RAM** �
 
 ### Headline: GDN kernel bandwidth on RK3588 Cortex-A76
 
-Qwen3.5-4B, prefill (seq=64), fp32 baseline. Two independent RK3588 nodes (t3 clean tree, t4 cross-check):
+Qwen3.5-4B, prefill (seq=64), fp32 baseline, single-thread. Two independent RK3588 nodes (t3 unknown board, t4 Turing Machines RK1):
 
-| Kernel | GiB/s (t3) | Spread | GiB/s (t4) | Agreement | % of 34 GB/s spec |
+| Kernel | GiB/s (t3) | Spread | GiB/s (t4) | Spread | t3÷t4 ratio |
 |---|---:|---:|---:|---:|---:|
-| Cumulative decay | 21.74 | 5.2% | 24.26 | 90% | 64% |
-| Gated delta-rule scan | 11.07 | 6.2% | 11.48 | 96% | 33% |
-| Causal Conv1D | 21.60 | 4.3% | 21.02 | 97% | 63% |
+| Cumulative decay | 21.06 | 3.5% | 7.40 | 5.0% | 2.85× |
+| Gated delta-rule scan | 10.62 | 5.4% | 5.67 | 7.4% | 1.87× |
+| Causal Conv1D | 18.73 | 4.8% | 7.04 | 4.3% | 2.66× |
 
-> Decay and Conv1D achieve **~64% of theoretical DRAM bandwidth** on a single A76 core — close to the memory ceiling. Gated scan runs at 33% because its sequential recurrence is **instruction-overhead-bound, not bandwidth-bound**. This is the key finding: the bottleneck for GDN on edge CPUs is pipeline width, not memory throughput.
+> Both boards achieve well under the 34 GiB/s spec bandwidth per cluster. t3's
+> cumdecay reaches 62% of spec; t4 reaches 22%. The **cross-board gap** (t3 is
+> 1.87–2.85× faster) reflects different board vendors, kernel versions, and DRAM
+> configurations — see [comparison table](../results/figures/comparison_table.md)
+> and FINDINGS.md §"Cross-Board Gap" for the full analysis. The key finding
+> remains: gated scan runs at a lower fraction of spec because its sequential
+> recurrence is **instruction-overhead-bound, not DRAM-bandwidth-bound**.
 
-### Optimization impact (fp16 state)
+### Optimization impact (fp16 state, t3 A76)
 
 | Kernel | fp32 | fp16 | Speedup |
 |---|---:|---:|---:|
-| Cumulative decay | 21.74 | 34.87 | **1.60×** |
-| Gated scan | 11.07 | 10.65 | 0.96× (flat) |
+| Cumulative decay | 21.06 | 37.20 | **1.77×** |
+| Gated scan | 10.62 | 10.47 | 0.99× (flat) |
 
-> fp16 halves memory traffic for the elementwise decay chain → 1.6×. Gated scan is compute-bound on the delta-rule matmul, so halving traffic doesn't help — confirming the instruction-overhead diagnosis.
+> fp16 halves memory traffic for the elementwise decay chain → 1.77× on t3. Gated scan is compute-bound on the delta-rule matmul, so halving traffic doesn't help — confirming the instruction-overhead diagnosis.
 
 ### Memory: the architectural advantage
 
@@ -93,7 +99,7 @@ This is not a bug in one toolchain — it is an **architectural constraint** of 
 
 ### GDN-2 stretch comparison
 
-GDN-2's decoupled erase/write gating is **free at decode** (same per-token latency) but costs **2× at prefill** due to extra bandwidth — and **3.1× penalty on little cores** where bandwidth is scarce.
+GDN-2's decoupled erase/write gating costs **1.2–1.8× at decode** (cache-resident, compute-bound) and **2.5–4.1× at prefill** (bandwidth-bound) due to extra memory streams — with **up to 4.1× penalty on A55 little cores** where the in-order pipeline cannot overlap the extra MULs with loads.
 
 ---
 
