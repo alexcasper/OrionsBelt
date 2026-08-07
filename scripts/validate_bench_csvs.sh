@@ -23,8 +23,9 @@ STALE_COMMITS="28729f3"
 echo "=== Benchmark CSV Validation ==="
 echo ""
 
-# Find all device CSVs (exclude intermediate optimization-stage files)
-for csv in "$RAW"/jetson-j*.csv "$RAW"/pi5-*.csv "$RAW"/rk3588-t*_big.csv "$RAW"/rk3588-t*_little.csv; do
+# Find all device CSVs — validate everything in results/raw/ except known
+# intermediate/exploratory files (skip patterns below).
+for csv in "$RAW"/*.csv; do
     [ -f "$csv" ] || continue
 
     base=$(basename "$csv" .csv)
@@ -32,6 +33,14 @@ for csv in "$RAW"/jetson-j*.csv "$RAW"/pi5-*.csv "$RAW"/rk3588-t*_big.csv "$RAW"
     # Skip intermediate/special files
     case "$base" in
         *-omp|*-omp-unroll|*-conv-unroll|*_single|*-full-optimized|*-sustained*|*_power*) continue ;;
+        # Old hyphen-format naming (rk3588-t4-big.csv etc.) superseded by _big/_little
+        rk3588-t[34]-*) continue ;;
+        # Cleanup / freshness-check runs
+        *-clean|*-fresh) continue ;;
+        # Timestamped exploratory sweeps (e.g. rk3588-t4_20260806T092103Z_...)
+        *_20[0-9][0-9][0-1][0-9][0-3][0-9]T*) continue ;;
+        # GDN1-vs-GDN2 comparison snapshots (different CSV schema)
+        *_gdn2_vs_gdn1_*) continue ;;
     esac
 
     rows=$(($(wc -l < "$csv") - 1))  # subtract header
@@ -60,7 +69,15 @@ for csv in "$RAW"/jetson-j*.csv "$RAW"/pi5-*.csv "$RAW"/rk3588-t*_big.csv "$RAW"
             *"$suffix") stripped="${stripped%$suffix}" ;;
         esac
     done
-    for m in "$MANIFESTS/$base.json" "$MANIFESTS/$stripped.json"; do
+    # ctxsweep_e2e CSVs share ctxsweep manifests (the _e2e is a pipeline qualifier,
+    # not a device identifier). Try the name without _e2e as a third candidate
+    # so we don't break *_e2e_raw -> *_e2e matching for e2e decode manifests.
+    stripped_no_e2e="$stripped"
+    case "$stripped_no_e2e" in
+        *_e2e) stripped_no_e2e="${stripped_no_e2e%_e2e}" ;;
+    esac
+    for m in "$MANIFESTS/$base.json" "$MANIFESTS/$stripped.json" \
+             "$MANIFESTS/$stripped_no_e2e.json"; do
         if [ -f "$m" ]; then
             manifest_found="$m"
             # Check for stale commit
