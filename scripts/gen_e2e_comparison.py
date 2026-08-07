@@ -150,7 +150,67 @@ def fmt_mean_std(vals):
     return f"{mean:.2f}"
 
 
-def generate_table(data):
+def _check_commit_lineage(base_commit, commits):
+    """Check whether commits descend from base_commit and whether they have
+    kernel/binary-affecting code changes.
+
+    Returns dict: {sha_short: {"status": "matched"|"code-identical"|"pre-matched",
+                                "detail": str}}
+    """
+    import subprocess
+
+    def _run(cmd):
+        r = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=REPO_ROOT)  # noqa: UP022
+        return r.stdout.decode("utf-8", errors="replace")
+
+    results = {}
+    for sha in commits:
+        if sha == base_commit:
+            results[sha] = {"status": "matched", "detail": "base commit"}
+            continue
+
+        full_base = _run(["git", "rev-parse", base_commit]).strip()
+
+        # Try to resolve the short SHA to a full SHA
+        resolved = _run(["git", "rev-parse", sha]).strip()
+
+        if not resolved or not full_base:
+            results[sha] = {"status": "unknown", "detail": "unresolvable"}
+            continue
+
+        # Check ancestry
+        is_ancestor = subprocess.run(
+            ["git", "merge-base", "--is-ancestor", full_base, resolved],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=REPO_ROOT  # noqa: UP022
+        ).returncode == 0
+
+        if not is_ancestor:
+            results[sha] = {"status": "pre-matched", "detail": "pre-dates base commit"}
+            continue
+
+        # It's a descendant — check for kernel/binary-affecting changes
+        changed = _run(["git", "diff", "--name-only", full_base, resolved]).strip().splitlines()
+
+        # Files that affect the benchmark binary or kernel
+        kernel_patterns = ("bench/gdn_", "bench/bench_gdn", "src/", "include/",
+                           "scripts/build_device_bench", "scripts/run_e2e_decode")
+        kernel_changes = [f for f in changed if any(p in f for p in kernel_patterns)]
+
+        if kernel_changes:
+            results[sha] = {
+                "status": "diverged",
+                "detail": f"kernel changes: {', '.join(kernel_changes[:3])}"
+            }
+        else:
+            results[sha] = {
+                "status": "code-identical",
+                "detail": "results/docs/beads only" if changed else "identical tree"
+            }
+
+    return results
+
+
+def generate_table(data, base_commit=None, commit_info=None):
     """Generate markdown table from extracted metrics."""
     lines = []
 
@@ -169,8 +229,38 @@ def generate_table(data):
     for entry in data.values():
         all_shas.update(entry["sha"])
 
-    if len(all_shas) > 1:
-        # Read manifest files to check dirty status
+    if base_commit and commit_info:
+        # Smart mode: classify commits by lineage
+        statuses = set(ci["status"] for ci in commit_info.values())
+        has_pre_matched = "pre-matched" in statuses or "diverged" in statuses
+
+        if has_pre_matched:
+            problem = sorted(
+                sha for sha, ci in commit_info.items()
+                if ci["status"] in ("pre-matched", "diverged")
+            )
+            lines.append(
+                f"> ⚠️ **Partial commit match.** Base commit: `{base_commit}`. "
+                f"Some entries pre-date or diverge from the base and are not comparable."
+            )
+            lines.append(
+                f"> Flagged: {', '.join(problem)}"
+            )
+        else:
+            lines.append(
+                f"> ✅ **Matched-commit comparison.** All devices ran code-identical "
+                f"kernels at base commit `{base_commit}`."
+            )
+            non_base = sorted(
+                sha for sha in all_shas if sha != base_commit
+            )
+            if non_base:
+                lines.append(
+                    f"> Result-file commits (results/docs only, no kernel changes): "
+                    f"{', '.join(non_base)}"
+                )
+    elif len(all_shas) > 1:
+        # Fallback (no --base-commit given): read manifest files to check dirty status
         import json as _json
 
         all_dirty_free = True
@@ -190,12 +280,10 @@ def generate_table(data):
 
         if manifest_found and all_dirty_free:
             lines.append(
-                "> ℹ️ **All runs built from clean trees (dirty=false).** "
-                "Result-file commits differ across devices because each device "
-                "committed its results before the next run, but the kernel code "
-                "(src/, bench/, scripts/) is identical at commit `8e7403c` (ob-52r)."
+                "> ℹ️ **All runs built from clean trees (dirty=false), but no "
+                "--base-commit was given to verify kernel-code lineage.** "
+                "Commits in play: " + ", ".join(sorted(all_shas))
             )
-            lines.append(f"> Commits in play: {', '.join(sorted(all_shas))}")
         else:
             lines.append("> ⚠️ **Commit mismatch detected.** Devices measured at different commits")
             lines.append("> are not comparable (RESULTS DISCIPLINE, bead ob-bf7).")
@@ -221,6 +309,14 @@ def generate_table(data):
                 notes.append("⚠ multi-commit")
             if any("dirty" in m for m in entry["manifests"]):
                 notes.append("⚠ dirty")
+            if commit_info:
+                for sha in sorted(entry["sha"]):
+                    ci = commit_info.get(sha)
+                    if ci:
+                        if ci["status"] == "pre-matched":
+                            notes.append(f"⚠ {sha}: pre-matched")
+                        elif ci["status"] == "diverged":
+                            notes.append(f"⚠ {sha}: kernel diverged")
             notes_str = "; ".join(notes) if notes else ""
             lines.append(f"| {device} | `{sha_str}` | {tok} | {ttft} | {runs} | {notes_str} |")
 
@@ -294,6 +390,13 @@ def main():
         default=str(DEFAULT_OUT),
         help="Output markdown file (default: results/figures/e2e_fleet_comparison.md)",
     )
+    parser.add_argument(
+        "--base-commit",
+        default=None,
+        help="Kernel base commit for matched-commit verification. When provided, "
+        "classifies each device's commit by git lineage and code-diff to determine "
+        "whether the comparison is valid.",
+    )
     args = parser.parse_args()
 
     rows = load_rows()
@@ -302,7 +405,17 @@ def main():
         sys.exit(1)
 
     data = extract_metrics(rows)
-    markdown = generate_table(data)
+
+    # Collect all SHAs for lineage check
+    all_shas = set()
+    for entry in data.values():
+        all_shas.update(entry["sha"])
+
+    commit_info = None
+    if args.base_commit:
+        commit_info = _check_commit_lineage(args.base_commit, all_shas)
+
+    markdown = generate_table(data, base_commit=args.base_commit, commit_info=commit_info)
 
     out_path = Path(args.output)
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -311,15 +424,21 @@ def main():
     print(f"  Devices: {len(set(r.get('device', '?') for r in rows))}")
     print(f"  Data rows: {len(rows)}")
 
-    # Warn about commit mismatches
-    all_shas = set()
-    for entry in data.values():
-        all_shas.update(entry["sha"])
-    if len(all_shas) > 1:
+    # Commit status summary
+    if args.base_commit and commit_info:
+        print(f"\nBase commit: {args.base_commit}")
+        for sha in sorted(all_shas):
+            ci = commit_info.get(sha, {})
+            status = ci.get("status", "?")
+            detail = ci.get("detail", "")
+            marker = "✅" if status in ("matched", "code-identical") else "⚠️"
+            print(f"  {marker} {sha}: {status} ({detail})")
+    elif len(all_shas) > 1:
         print(f"\n⚠ WARNING: {len(all_shas)} different commits in the data:")
         for sha in sorted(all_shas):
             print(f"  {sha}")
         print("Devices at different commits are NOT comparable.")
+        print("Tip: pass --base-commit <sha> to enable lineage-based verification.")
 
 
 if __name__ == "__main__":
