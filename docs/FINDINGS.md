@@ -2541,7 +2541,7 @@ Manifest: `results/manifests/jetson-j1_e2e.json`
 **Governor:** performance
 **Beads:** ob-82b (microbenchmark), ob-7b5 (research note)
 **Data:** `results/raw/rk3588-t4_gdn2_vs_gdn1_big_single.csv`, `_little_single.csv` (single-thread, `OMP_NUM_THREADS=1`, manifest: `rk3588-t4-gdn2-single.json`)
-**Note:** Earlier CSVs (`_big.csv`, `_little.csv` dirty-tree; `_big_clean.csv`, `_little_clean.csv` multi-thread) are superseded. The multi-thread data had identical GDN-2/GDN-1 ratios (1.55× vs 1.57× single-thread) but inflated absolute GiB/s by ~2×.
+**Note:** Earlier multi-thread CSVs (removed) had identical GDN-2/GDN-1 ratios (1.55× vs 1.57× single-thread) but inflated absolute GiB/s by ~2×. The canonical single-thread data above supersedes them.
 
 ### Background
 
