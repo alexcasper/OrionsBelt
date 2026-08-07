@@ -352,6 +352,10 @@ int main(int argc, char **argv) {
     cl_kernel k_conv  = clCreateKernel(g_program, "gdn_causal_dwconv1d", &err); cl_check(err, "create conv");
     cl_kernel k_delta = clCreateKernel(g_program, "gdn_delta_rule_decode", &err); cl_check(err, "create delta");
 
+    /* CSV header (comment-prefixed for readability, skipped by data parsers) */
+    if (csv_mode)
+        printf("# kernel,dim1,dim2,dim3,p50_ms,p95_ms,bw_mibs\n");
+
     /* ================================================================
      * Test 1: Gated scan — correctness
      * ================================================================ */
