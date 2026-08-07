@@ -41,6 +41,8 @@ for csv in "$RAW"/*.csv; do
         *_20[0-9][0-9][0-1][0-9][0-3][0-9]T*) continue ;;
         # GDN1-vs-GDN2 comparison snapshots (different CSV schema)
         *_gdn2_vs_gdn1_*) continue ;;
+        # GPU microbenchmarks (OpenCL Mali, different schema — validated by validate_results.py)
+        *_gpu_*) continue ;;
     esac
 
     rows=$(($(wc -l < "$csv") - 1))  # subtract header
