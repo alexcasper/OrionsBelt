@@ -116,10 +116,10 @@ The GDN fast path depends on two optional packages, `causal_conv1d` and `fla`. W
 
 | Device | Cores | ISA | Spec BW (GiB/s) |
 |---|---|---|---|
-| Raspberry Pi 5 | 4× Cortex-A76 @ 2.4 GHz | Armv8.2-A + dotprod | 17.0 |
-| RK3588 (big cluster) | 4× Cortex-A76 @ 2.3 GHz | Armv8.2-A + dotprod | 34.0 |
-| RK3588 (little cluster) | 4× Cortex-A55 @ 1.8 GHz | Armv8.2-A | 34.0 |
-| Jetson Nano (j1/j2) | 4× Cortex-A57 @ 1.48 GHz | Armv8.0-A (NEON only) | 25.6 |
+| Raspberry Pi 5 | 4× Cortex-A76 @ 2.4 GHz | Armv8.2-A + dotprod | 15.8 |
+| RK3588 (big cluster) | 4× Cortex-A76 @ 2.3 GHz | Armv8.2-A + dotprod | 31.7 |
+| RK3588 (little cluster) | 4× Cortex-A55 @ 1.8 GHz | Armv8.2-A | 31.7 |
+| Jetson Nano (j1/j2) | 4× Cortex-A57 @ 1.48 GHz | Armv8.0-A (NEON only) | 23.8 |
 
 **Stretch target (if hardware arrives):** Radxa Orion O6, built on the **CIX P1** SoC.
 
@@ -178,7 +178,7 @@ All figures above are verified against primary sources (Radxa product page and d
 | Per-layer engine mapping (NPU/GPU/CPU) | Hypothesis only — pending measurements |
 | Full inference results (tokens/sec, TTFT, memory) | Done — C decode loop (FP32+INT8), ctx-length scaling (§17–20), cross-device (A57+A76), sustained-load thermal stability (§18). [e2e comparison](./results/figures/e2e_fleet_comparison.md) |
 
-> **Results so far:** 133 CSVs from the device fleet, 113 provenance manifests, 88 generated figures/tables, 37 FINDINGS sections.
+> **Results so far:** 133 CSVs from the device fleet, 113 provenance manifests, 89 generated figures/tables, 37 FINDINGS sections.
 > (Counted recursively — `results/raw/` and `results/manifests/` include
 > subdirectories `ablation/`, `affinity/`, and `kleidiai/`, which hold real
 > fleet benchmark data, not scratch files. A non-recursive `ls *.csv` count
