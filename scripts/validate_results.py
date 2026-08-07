@@ -83,6 +83,37 @@ LAYER_PROFILE_COLS = [
     "n_samples",
 ]
 
+# End-to-end C decode-loop CSV (from gdn_e2e_decode.c)
+E2E_DECODE_COLS = [
+    "model",
+    "tokens",
+    "ttft_ms",
+    "tok_per_sec_mean",
+    "p50_us",
+    "p95_us",
+    "p99_us",
+    "mean_us",
+    "gdn_proj_pct",
+    "gdn_conv_pct",
+    "gdn_decay_pct",
+    "gdn_scan_pct",
+    "gdn_oproj_pct",
+    "full_pct",
+    "ffn_pct",
+]
+
+# Context-length sweep CSV (from gdn_e2e_decode.c --ctx-sweep mode)
+CTX_SWEEP_COLS = [
+    "model",
+    "ctx_len",
+    "gdn_layer_us",
+    "full_attn_us",
+    "ffn_us",
+    "total_us",
+    "tok_per_sec",
+    "kv_cache_mb",
+]
+
 # End-to-end context-sweep CSV (from run_ablation.py / harness.py e2e mode)
 E2E_SWEEP_COLS = [
     "run_id",
@@ -131,7 +162,7 @@ ABSURD_THROUGHPUT = 200.0  # GiB/s
 
 
 def detect_csv_type(header):
-    """Return 'standard', 'sustained', 'power', 'layer_profile', 'delta_matmul', 'e2e_sweep', or None."""
+    """Return CSV type: standard, sustained, power, layer_profile, delta_matmul, e2e_decode, ctx_sweep, e2e_sweep, or None."""
     cols = set(header)
     if cols >= set(STANDARD_COLS):
         return "standard"
@@ -143,6 +174,10 @@ def detect_csv_type(header):
         return "layer_profile"
     if cols >= {"kernel", "M", "K", "N"}:
         return "delta_matmul"
+    if cols >= {"tok_per_sec_mean", "gdn_proj_pct", "ffn_pct"}:
+        return "e2e_decode"
+    if cols >= {"ctx_len", "gdn_layer_us", "full_attn_us", "kv_cache_mb"}:
+        return "ctx_sweep"
     if cols >= {"run_id", "metric_name", "metric_component", "repeat_index"}:
         return "e2e_sweep"
     if cols >= {"gdn_layer_us", "kv_cache_mb", "total_us"}:
@@ -161,6 +196,10 @@ def expected_columns(csv_type):
         return LAYER_PROFILE_COLS
     if csv_type == "delta_matmul":
         return DELTA_MATMUL_COLS
+    if csv_type == "e2e_decode":
+        return E2E_DECODE_COLS
+    if csv_type == "ctx_sweep":
+        return CTX_SWEEP_COLS
     if csv_type == "e2e_sweep":
         return E2E_SWEEP_COLS
     if csv_type == "e2e_ctxsweep":
@@ -475,6 +514,26 @@ def validate_csv(path, csv_name, issues):
                     validate_layer_profile_row(row, csv_name, issues, i)
                 elif csv_type == "delta_matmul":
                     validate_delta_matmul_row(row, csv_name, issues, i)
+                elif csv_type == "e2e_decode":
+                    # Basic sanity: tok_per_sec_mean must be positive
+                    try:
+                        tps = float(row.get("tok_per_sec_mean", 0))
+                        if tps <= 0 or tps > 1000:
+                            issues.append(
+                                Issue("WARNING", csv_name, f"row {i}: implausible tok/s {tps}")
+                            )
+                    except ValueError:
+                        pass
+                elif csv_type == "ctx_sweep":
+                    # Basic sanity: tok_per_sec must be positive
+                    try:
+                        tps = float(row.get("tok_per_sec", 0))
+                        if tps <= 0 or tps > 1000:
+                            issues.append(
+                                Issue("WARNING", csv_name, f"row {i}: implausible tok/s {tps}")
+                            )
+                    except ValueError:
+                        pass
                 elif csv_type == "e2e_sweep":
                     validate_e2e_sweep_row(row, csv_name, issues, i)
                     # e2e-sweep rows embed their own manifest path (bench.schema.ResultRow) —

@@ -3236,6 +3236,54 @@ At ctx=1 the pure-GDN model is slightly slower than hybrid for the 0.8B model
 cheaper full-attention Q/K/V projections). But by ctx=1024 the crossover has
 occurred, and at ctx=4096 pure-GDN is 2.1× faster.
 
+### Results — Jetson Nano A57 (cross-device validation)
+
+Ran the identical ctx-sweep on the Jetson Nano (Cortex-A57, 4 cores @1.48 GHz,
+governor=performance, commit `3d83bdc`, pre-thermal 47–54 °C, post-thermal
+50–63 °C). This validates that the GDN O(1) scaling property holds across a
+second, much weaker Arm core class.
+
+#### INT8 hybrid — 0.8B model
+
+| ctx | GDN (ms) | Full-attn (ms) | FFN (ms) | Total (ms) | tok/s | Full-attn share |
+|----:|---------:|---------------:|---------:|-----------:|------:|----------------:|
+| 1 | 129 | 33 | 178 | 339 | 2.95 | 9.6% |
+| 64 | 126 | 37 | 180 | 343 | 2.91 | 10.6% |
+| 256 | 128 | 47 | 178 | 353 | 2.83 | 13.3% |
+| 512 | 129 | 66 | 179 | 375 | 2.67 | 17.7% |
+| 1024 | 130 | 96 | 183 | 409 | 2.45 | 23.5% |
+| 2048 | 130 | 160 | 178 | 468 | 2.13 | 34.1% |
+| 4096 | 129 | 288 | 180 | 598 | 1.67 | 48.2% |
+
+#### INT8 pure-GDN — 0.8B model
+
+| ctx | tok/s |
+|----:|------:|
+| 1 | 2.88 |
+| 4096 | 2.89 |
+
+Throughput variance from ctx=1 to ctx=4096: **<0.4%** — perfectly flat.
+
+#### Cross-device summary (INT8)
+
+| Config | A76 ctx=1 | A76 ctx=4096 | A57 ctx=1 | A57 ctx=4096 | A76 slowdown | A57 slowdown |
+|--------|----------:|-------------:|----------:|-------------:|-------------:|-------------:|
+| 0.8B hybrid | 10.70 | 5.01 | 2.95 | 1.67 | 2.14× | 1.77× |
+| 0.8B pure-GDN | 10.46 | 10.44 | 2.88 | 2.89 | 1.00× | 1.00× |
+| 4B hybrid | 1.84 | 1.19 | 0.57 | 0.42 | 1.55× | 1.36× |
+| 4B pure-GDN | 1.84 | 1.83 | 0.57 | 0.59 | 1.01× | 0.97× |
+
+The GDN advantage holds on both core classes: pure-GDN is flat everywhere,
+hybrid degrades everywhere. The A57's absolute throughput is ~3.6× lower than
+the A76 (consistent with §19's cross-device ratio), but the **scaling shape
+is identical** — the O(1) vs O(n) distinction is architectural, not
+microarchitectural.
+
+Data: `results/raw/jetson-j1_*_ctxsweep_e2e_raw.csv`, manifests in
+`results/manifests/jetson-j1_*_ctxsweep.json`.
+
+Cross-device figure: [`results/figures/ctx_length_scaling_cross.md`](../results/figures/ctx_length_scaling_cross.md)
+
 ### What this means for the submission
 
 This is the core GDN value proposition, measured on real silicon: **linear
