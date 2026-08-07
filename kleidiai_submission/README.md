@@ -66,7 +66,7 @@ that have no SME.
 decay[t][c] = ∏_{i=0}^{t} a[i][c]    (inclusive prefix product)
 ```
 
-An exclusive prefix product along the sequence axis. Computed as a direct
+An inclusive prefix product along the sequence axis. Computed as a direct
 running product (not `exp(cumsum(log a))`) — at typical chunk lengths of 64 the
 direct product is both cheaper and numerically stable in fp32, avoiding two
 transcendentals per element.
@@ -299,6 +299,11 @@ making it the worst-case portability floor.
 > double-width unrolling (8 channels/iter) and `vfmaq_n_f32` scalar FMA,
 > matching the three recurrent kernels' pattern.
 
+At seq=64 (prefill chunk), all three recurrent kernels are bandwidth-bound
+(1.6–6.6 GiB/s vs the A57's 25.6 GiB/s spec). At seq=1 (decode), the working
+set fits in L1 and the kernels are launch-overhead-dominated, not
+bandwidth-limited. The GEMV at all sizes is bandwidth-bound at ~5 GiB/s.
+
 ### A76 (Armv8.2, NEON+dotprod path) — measured on RK3588-t4 (Cortex-A76, big cores)
 
 Governor: performance, pinned to CPUs 4–7 via `taskset -c 4-7`. p50 of 30
@@ -352,6 +357,47 @@ manifest:
 > matched commits with multiple replicates. The GEMV NEON path uses
 > double-width unrolling (8 channels/iter) and `vfmaq_n_f32` scalar FMA,
 > matching the three recurrent kernels' pattern.
+
+### A76 (Armv8.2-A, NEON + dotprod path) — measured on RK3588 (device t3)
+
+All numbers are p50 of 30 repeats on a Cortex-A76 @ 2.3 GHz (RK3588, device t3).
+Governor: `performance`. The A76 has 4-wide NEON with dotprod (`asimddp`) but no
+SVE/SVE2 — the kernels run the NEON fallback path (`#elif __ARM_NEON`).
+
+| Kernel      | Shape (seq×ch)   | p50 (µs) | GiB/s |
+|-------------|------------------|----------|-------|
+| cumdecay    | 64×160           |     11.4 |   6.7 |
+| cumdecay    | 1×160            |      0.3 |   4.1 |
+| cumdecay    | 64×2560          |    537.3 |   2.3 |
+| cumdecay    | 1×2560           |      0.9 |  21.8 |
+| gated_scan  | 64×160           |      5.3 |  22.0 |
+| gated_scan  | 1×160            |      0.0 |    —* |
+| gated_scan  | 64×2560          |    192.5 |   9.6 |
+| gated_scan  | 1×2560           |      1.2 |  40.9 |
+| dwconv1d    | 64×160           |      5.3 |  15.7 |
+| dwconv1d    | 1×160            |      0.3 |  24.6 |
+| dwconv1d    | 64×2560          |    143.8 |   9.2 |
+| dwconv1d    | 1×2560           |      2.9 |  39.3 |
+| gemv        | K=128 N=128      |      3.5 |  17.7 |
+| gemv        | K=128 N=2048     |     63.0 |  15.6 |
+| gemv        | K=128 N=2560     |     79.9 |  15.4 |
+
+*\*The seq=1×160 shape for gated_scan is too small to measure reliably (p50 <
+1 µs); the `inf` GiB/s is treated as a measurement-floor artifact, not a real
+throughput number.*
+
+**A76 vs A57 comparison:** At seq=64 shapes, the A76 achieves 2–4× higher
+throughput than the A57 (e.g. gated_scan 64×160: 22.0 vs 6.3 GiB/s), consistent
+with the A76's wider pipeline and higher clock. The GEMV shows 3× higher
+throughput (17.7 vs 4.7 GiB/s at K=128 N=128), reflecting the A76's superior
+memory subsystem. At seq=1, the A76's advantage is even larger on
+bandwidth-fitting shapes (cumdecay 1×2560: 21.8 vs 9.2 GiB/s) because the A76's
+L1 is faster and the launch overhead is lower.
+
+> **Provenance:** Captured at commit `250dc96` on device t3 (RK3588),
+> clean tree (dirty=false). Governor: `performance`.
+> Manifest: `results/manifests/rk3588-t3_kleidiai_gdn_kernels.json`.
+> Raw CSV: `results/raw/kleidiai/rk3588-t3_kleidiai_gdn_kernels.csv`.
 
 ---
 

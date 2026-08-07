@@ -101,7 +101,9 @@ typedef struct {
 } QW;
 
 /* Quantize a [K×N] float matrix to int8 + per-column scale (symmetric).
- * B_in is read-only; q and s are allocated and filled. */
+ * B_in is read-only; q and s are allocated and filled.
+ * Only needed under -DINT8_WEIGHTS. */
+#ifdef INT8_WEIGHTS
 static void quantize_weight(const float *B_in, int8_t **q_out, float **s_out,
                             size_t K, size_t N) {
     int8_t *q = malloc(K * N);
@@ -128,6 +130,7 @@ static void quantize_weight(const float *B_in, int8_t **q_out, float **s_out,
     *q_out = q;
     *s_out = s;
 }
+#endif /* INT8_WEIGHTS */
 
 /* ---- Helpers ---- */
 static float *alloc_aligned(size_t n) {
@@ -165,7 +168,9 @@ static void gemv_neon(const float *a, const float *B, float *c, size_t K, size_t
      * touches every float in each contiguous row segment. */
     const size_t TILE = 1024;  /* 4 KB output tile, stays in L1 */
 
+#ifdef _OPENMP
 #pragma omp parallel for schedule(static)
+#endif
     for (size_t jt = 0; jt < N; jt += TILE) {
         size_t tn = (jt + TILE <= N) ? TILE : (N - jt);
         float *ct = c + jt;
@@ -201,12 +206,16 @@ static void gemv_neon(const float *a, const float *B, float *c, size_t K, size_t
  *
  * This loads 1 byte per weight element (vs 4 for FP32), cutting memory
  * traffic ~4×. NEON dequantization (int8→int16→int32→float32) adds ~3
- * cycles per 4 elements but is hidden behind memory latency. */
+ * cycles per 4 elements but is hidden behind memory latency.
+ * Only needed under -DINT8_WEIGHTS (called from matmul_int8). */
+#ifdef INT8_WEIGHTS
 static void gemv_int8_neon(const float *a, const int8_t *Bq, const float *Bs,
                            float *c, size_t K, size_t N) {
     const size_t TILE = 1024;
 
+#ifdef _OPENMP
 #pragma omp parallel for schedule(static)
+#endif
     for (size_t jt = 0; jt < N; jt += TILE) {
         size_t tn = (jt + TILE <= N) ? TILE : (N - jt);
         float *ct = c + jt;
@@ -264,6 +273,7 @@ static void gemv_int8_neon(const float *a, const int8_t *Bq, const float *Bs,
             ct[j] *= Bs[jt + j];
     }
 }
+#endif /* INT8_WEIGHTS */
 
 static void matmul(const float *A, const float *B, float *C,
                    size_t M, size_t K, size_t N) {
@@ -283,7 +293,9 @@ static void matmul(const float *A, const float *B, float *C,
     }
 }
 
-/* INT8 matmul wrapper for M=1 decode path (falls back to scalar for M>1) */
+/* INT8 matmul wrapper for M=1 decode path (falls back to scalar for M>1)
+ * Only needed under -DINT8_WEIGHTS. */
+#ifdef INT8_WEIGHTS
 static void matmul_int8(const float *A, const int8_t *Bq, const float *Bs,
                         float *C, size_t M, size_t K, size_t N) {
     if (M == 1) {
@@ -298,6 +310,7 @@ static void matmul_int8(const float *A, const int8_t *Bq, const float *Bs,
     matmul(A, Bf, C, M, K, N);
     free(Bf);
 }
+#endif /* INT8_WEIGHTS */
 
 /* Dispatch macro: uses INT8 GEMV when compiled with -DINT8_WEIGHTS,
  * otherwise falls through to the FP32 path. Bf is the float weight,
@@ -475,7 +488,9 @@ static void full_attn_layer_forward(const Weights *w, LayerState *st,
  * Used by --ctx-sweep to show full-attention's O(n) scaling vs GDN's O(1).
  * KV cache grows by one token per call; pre-filled with random data to
  * simulate prior prefill tokens.
+ * Only compiled when KV_INT8 is NOT defined (see call site #ifdef).
  */
+#ifndef KV_INT8
 static void full_attn_real_forward(const Weights *w, LayerState *st,
                                    const float *hidden_in, float *hidden_out) {
     size_t q_dim = FULL_HEADS * FULL_HEAD_DIM;
@@ -546,6 +561,7 @@ static void full_attn_real_forward(const Weights *w, LayerState *st,
 
     free(q); free(k); free(v); free(attn_out); free(scores);
 }
+#endif /* !KV_INT8 */
 
 /* ---- INT8 KV cache: real attention with quantized KV (ctx-sweep mode) ----
  *
@@ -559,7 +575,9 @@ static void full_attn_real_forward(const Weights *w, LayerState *st,
  *   out  += scale_v[kh] * weight * (float)vq[d]         ← scale folded into weight
  *
  * This avoids per-element scaling in the hot loop.
+ * Only compiled under -DKV_INT8; guarding prevents -Wunused-function.
  */
+#ifdef KV_INT8
 static void full_attn_real_forward_int8kv(const Weights *w, LayerState *st,
                                           const float *hidden_in, float *hidden_out) {
     size_t q_dim = FULL_HEADS * FULL_HEAD_DIM;
@@ -697,6 +715,7 @@ static void full_attn_real_forward_int8kv(const Weights *w, LayerState *st,
 
     free(q); free(k); free(v); free(attn_out); free(scores);
 }
+#endif /* KV_INT8 */
 
 static void ffn_forward(const Weights *w, const float *hidden_in, float *hidden_out, size_t seq) {
     float *gate = alloc_aligned(seq * INTER);

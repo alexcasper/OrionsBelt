@@ -3984,3 +3984,92 @@ device per the project's portability requirement.
 4. **Avoid all_cores for latency-sensitive single-threaded work**: the 7.5×
    p95 tail at M=64 confirms that scheduler migration is the dominant source
    of jitter on big.LITTLE hardware.
+
+---
+
+## 24. KleidiAI GDN kernel submission package: verified on A76 NEON (2026-08-07, ob-8qt.10)
+
+### Motivation
+
+Section 3.3 established that KleidiAI has no primitive for the three GDN
+recurrent operations (cumulative decay, gated scan, causal dwconv1d), and its
+only dwconv family is SME2-only. The submission package in
+`kleidiai_submission/` extracts the verified kernels from the OrionsBelt source
+tree into standalone KleidiAI-shaped micro-kernels. This section records the
+**on-silicon verification** of that package on the RK3588 Cortex-A76, which has
+NEON + dotprod (`asimddp`) but no SVE/SVE2 — making it the portable NEON-path
+verification complement to the SVE2 compilation check in §23.
+
+### Package structure
+
+Four micro-kernels with dual-ISA design (`#ifdef __ARM_FEATURE_SVE` /
+`#elif __ARM_NEON`):
+
+| Kernel | File | KleidiAI gap filled |
+|---|---|---|
+| Gated cumulative decay | `kai_gdn_cumdecay_f32_sve.{c,h}` | No prefix-product primitive exists |
+| Chunkwise gated delta-rule scan | `kai_gdn_gated_scan_f32_sve.{c,h}` | No scan/recurrent primitive exists |
+| Causal depthwise Conv1D, K=4 | `kai_gdn_causal_dwconv1d_f32_k4_sve.{c,h}` | KleidiAI dwconv is SME2-only |
+| Delta-rule GEMV (M=1 decode) | `kai_gdn_gemv_f32_f32_f32_1x4_neon.{c,h}` | No NEON-only GEMV for dotprod-class cores |
+
+### Verification on Cortex-A76 (RK3588 t3)
+
+Compiled with `gcc -O3 -march=armv8.2-a` (Makefile auto-detects ISA floor:
+SVE2 → SVE → dotprod → NEON). The A76 falls through to the NEON path.
+
+**Correctness: 14/14 test suites pass** (`make test` → ALL TESTS PASSED).
+Each suite compares the kernel output against a naive C reference at realistic
+GDN shapes (seq=1 decode, seq=64 prefill; channels=160 and 2560).
+
+### A76 NEON benchmark — p50 of 30 repeats, governor=performance
+
+| Kernel | Shape (seq×ch) | p50 (µs) | GiB/s |
+|---|---|---|---|
+| cumdecay | 64×160 | 11.4 | 6.7 |
+| cumdecay | 1×160 | 0.3 | 4.1 |
+| cumdecay | 64×2560 | 537.3 | 2.3 |
+| cumdecay | 1×2560 | 0.9 | 21.8 |
+| gated_scan | 64×160 | 5.3 | 22.0 |
+| gated_scan | 1×160 | 0.0 | —* |
+| gated_scan | 64×2560 | 192.5 | 9.6 |
+| gated_scan | 1×2560 | 1.2 | 40.9 |
+| dwconv1d | 64×160 | 5.3 | 15.7 |
+| dwconv1d | 1×160 | 0.3 | 24.6 |
+| dwconv1d | 64×2560 | 143.8 | 9.2 |
+| dwconv1d | 1×2560 | 2.9 | 39.3 |
+| gemv | K=128 N=128 | 3.5 | 17.7 |
+| gemv | K=128 N=2048 | 63.0 | 15.6 |
+| gemv | K=128 N=2560 | 79.9 | 15.4 |
+
+*\*seq=1×160 is below the measurement floor (p50 < 1 µs).*
+
+### Cross-core comparison: A76 (NEON) vs A57 (NEON)
+
+The same kernels were also verified on a Jetson Nano A57 (Armv8.0, NEON-only,
+no dotprod) — see the KleidiAI submission README for the full A57 table. Key
+ratios at seq=64 shapes:
+
+| Kernel | A76 GiB/s | A57 GiB/s | A76/A57 |
+|---|---|---|---|
+| gated_scan 64×160 | 22.0 | 6.3 | 3.5× |
+| dwconv1d 64×160 | 15.7 | 4.6 | 3.4× |
+| gemv K=128 N=128 | 17.7 | 4.7 | 3.8× |
+
+The A76 advantage (3.4–3.8×) exceeds the clock ratio (2.3/0.9 = 2.6×),
+reflecting the A76's wider NEON pipeline and superior memory subsystem. Both
+cores run the same NEON code path, confirming the dual-ISA design works across
+the full Armv8.x range.
+
+### Portability significance
+
+This verification demonstrates that the GDN micro-kernel contribution runs on
+**every AArch64 core** — from the A57 (Armv8.0 floor) through the A76
+(Armv8.2-A with dotprod) to the Cortex-A720 (Armv9.2-A with SVE2). The SVE2
+path was verified by cross-compilation in §23; the NEON path is verified
+on-silicon here. No competing KleidiAI kernel covers this range for the three
+recurrent primitives.
+
+> **Provenance:** RK3588 t3, commit `250dc96`, governor=performance,
+> clean tree (dirty=false).
+> Manifest: `results/manifests/rk3588-t3_kleidiai_gdn_kernels.json`.
+> Raw CSV: `results/raw/kleidiai/rk3588-t3_kleidiai_gdn_kernels.csv`.
