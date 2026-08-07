@@ -2578,3 +2578,56 @@ for improved model quality (separate erase/write control). At edge scale:
 This is an honest operator-level measurement. Whether the quality benefit
 justifies the cost is a model-level question (ob-zak, RULER evaluation)
 that remains open.
+
+---
+
+## Sustained-Load Thermal Characterization on RK3588-t4
+
+**Date:** 2026-08-07
+**Device:** rk3588-t4 (RK3588, A76 big + A55 little)
+**Governor:** performance
+**Bead data:** ob-dgn (thermal-throttle characterization)
+**Data:** `results/raw/rk3588-t4_sustained_thermal.txt`
+
+### Setup
+
+Ran `gdn_gated_scan` (the heaviest GDN kernel, 4B prefill config: seq=64,
+channels=4096) for 60 seconds on each cluster with throughput and
+temperature sampled every 5s. Purpose: test PLAN.md risk R7 — "burst numbers
+that cannot be sustained are misleading on passively-cooled edge hardware."
+
+### Big Cluster (A76, cpu4-7)
+
+| Elapsed | Throughput | Thermal | vs First |
+|---------|-----------|---------|----------|
+| 5s | 11.75 GiB/s | 48.1°C | baseline |
+| 30s | 11.57 GiB/s | 50.8°C | -1.6% |
+| 60s | 11.58 GiB/s | 51.8°C | -1.5% |
+
+**Result:** Temperature rises 13°C (38.8→51.8°C) over 60s but plateaus
+at ~51.8°C around the 40s mark. Throughput decay is only **1.5%** — the
+A76's burst numbers are sustainable. Active cooling (fan) on t4 is adequate.
+
+### Little Cluster (A55, cpu0-3)
+
+| Elapsed | Throughput | Thermal | vs First |
+|---------|-----------|---------|----------|
+| 5s | 3.66 GiB/s | 46.2°C | baseline |
+| 30s | 3.67 GiB/s | 46.2°C | +0.2% |
+| 60s | 3.69 GiB/s | 46.2°C | +0.9% |
+
+**Result:** No thermal rise at all. Temperature stays flat at 46.2°C.
+Throughput is completely stable (noise ~1%). The A55's power efficiency
+makes sustained workloads trivially sustainable.
+
+### Conclusion
+
+The RK3588-t4 does **not** exhibit thermal throttling under sustained
+GDN kernel load with active cooling. Burst numbers (our standard 30-repeat
+benchmarks) are valid sustained-throughput numbers. This is relevant to the
+fleet benchmark (ob-mrd.8) and the Devpost writeup — we can report burst
+numbers without a "sustained" caveat for this device class.
+
+Note: the O6 (Cortex-A720) may behave differently — it has higher peak
+power density. The thermal characterization should be repeated on O6 when
+hardware is available.
