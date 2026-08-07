@@ -51,10 +51,13 @@ run_variant() {
   echo "== $label ($march)"
 
   rm -f "$bin"
+  # `|| true` -- under `set -e`, a failed compile here would kill the whole
+  # script instead of letting the `[ ! -x "$bin" ]` check below report a
+  # graceful per-tier FAIL and continue to the next variant.
   aarch64-linux-gnu-gcc -O3 -Wall -Wextra -std=c11 -static "$march" -I "$SUB" \
     "$SUB"/test_kai_gdn.c \
     "$SUB"/kai/ukernels/gdn/*.c \
-    -o "$bin" -lm 2>&1
+    -o "$bin" -lm 2>&1 || true
 
   if [ ! -x "$bin" ]; then
     echo "  FAIL (compile failed)"
