@@ -11,6 +11,7 @@ following the documented path verbatim on a clean system.
 | `build_device_bench.sh` | Build static GDN kernel benchmark binaries for each Arm ISA variant (ArmV8-A through ArmV9.2-SVE2). Outputs to `dist/`. | `ob-8ms.2` |
 | `verify_cpu_kernels.sh` | Cross-compile SVE2 kernels and verify numerical correctness under QEMU. The project's core correctness gate — runs in CI. | `ob-8qt.3` |
 | `verify_kernels_native.sh` | Build and run kernel correctness tests natively on the device's real ISA (no QEMU). For fleet devices. | `ob-mrd.3` |
+| `verify_kleidiai_kernels.sh` | Cross-compile KleidiAI GDN submission kernels for aarch64 and verify under QEMU across 5 ISA variants (SVE2, SVE1-128/256, NEON-A57, NEON-A76). | `ob-8qt.10` |
 | `capture_manifest.sh` | Shell-based provenance capture — same JSON schema as `bench/manifest.py` but no Python dependency. For devices with Python <3.10. | `ob-mrd.4` |
 | `detect_isa.sh` | Standalone ISA feature detection for aarch64 — no Python required. Reports active dispatch features (NEON, dotprod, i8mm, SVE/SVE2, bf16) and recommends the correct bench binary. Mirrors `isa_detect.py`. | `ob-ng6` |
 | `fetch_weights.py` | Download model weights (not vendored in the repo). | `ob-del` |

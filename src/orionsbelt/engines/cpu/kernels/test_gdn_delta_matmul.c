@@ -10,6 +10,8 @@
  * any failure, matching this script family's fail-fast convention
  * (scripts/verify_cpu_kernels.sh runs with set -euo pipefail).
  */
+#define _POSIX_C_SOURCE 200112L  /* rand_r */
+
 #include <math.h>
 #include <stdint.h>
 #include <stdio.h>

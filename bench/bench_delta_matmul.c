@@ -30,6 +30,8 @@
  *   ./dist/bench_delta_matmul_a57 --repeats 30            # human-readable
  *   ./dist/bench_delta_matmul_a57 --repeats 30 --csv      # CSV to stdout
  */
+#define _POSIX_C_SOURCE 200112L  /* clock_gettime, CLOCK_MONOTONIC, rand_r */
+
 #include <math.h>
 #include <stdint.h>
 #include <stdio.h>
