@@ -115,6 +115,24 @@ else
 fi
 echo
 
+# --- Test 5: INT8 weight quantization + GEMV correctness ---
+echo "--- Test 5: INT8 weight quantization + GEMV correctness ---"
+if $CC -O3 -fopenmp -DINT8_WEIGHTS $MARCH -static \
+    "$K/gdn_sve.c" "$K/gdn_delta_matmul.c" "$K/test_gdn_e2e_int8.c" -I"$K" \
+    -o "$OUT/test_int8" -lm 2>/dev/null; then
+    OUTPUT=$("$OUT/test_int8" 2>&1) || true
+    echo "$OUTPUT" | sed 's/^/  /'
+    if echo "$OUTPUT" | grep -q "ALL TESTS PASSED"; then
+        echo "  RESULT: PASS"
+    else
+        echo "  RESULT: FAIL"
+        FAILURES=$((FAILURES + 1))
+    fi
+else
+    echo "  RESULT: SKIP (build failed — toolchain may not support $MARCH or INT8 path)"
+fi
+echo
+
 # --- Summary ---
 echo "=== Summary ==="
 if [ "$FAILURES" -eq 0 ]; then
