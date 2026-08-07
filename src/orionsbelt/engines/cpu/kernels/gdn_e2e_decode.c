@@ -566,6 +566,7 @@ int main(int argc, char **argv) {
     int num_tokens = 8;
     int csv = 0;
     int ctx_sweep = 0;
+    int pure_gdn = 0;
     const char *ctx_lens_str = NULL;
     for (int i = 1; i < argc; ++i) {
         if (strcmp(argv[i], "--tokens") == 0 && i + 1 < argc)
@@ -577,10 +578,13 @@ int main(int argc, char **argv) {
             if (i + 1 < argc && argv[i + 1][0] != '-')
                 ctx_lens_str = argv[++i];
         }
+        else if (strcmp(argv[i], "--pure-gdn") == 0)
+            pure_gdn = 1;
         else if (strcmp(argv[i], "--help") == 0) {
-            printf("Usage: %s [--tokens N] [--csv] [--ctx-sweep L1,L2,...]\n", argv[0]);
+            printf("Usage: %s [--tokens N] [--csv] [--ctx-sweep L1,L2,...] [--pure-gdn]\n", argv[0]);
             printf("  --ctx-sweep  Measure decode cost at growing context lengths\n");
             printf("               Comma-separated list, e.g. 1,64,256,1024,4096\n");
+            printf("  --pure-gdn   All layers GDN (no full-attention) — shows ideal O(1) scaling\n");
             return 0;
         }
     }
@@ -657,6 +661,12 @@ int main(int argc, char **argv) {
         for (int s = 0; s < 4; ++s)
             is_gdn[b * 4 + s] = (s < 3) ? 1 : 0;
 
+    /* --pure-gdn: override all layers to GDN (hypothetical pure-linear-attention model) */
+    if (pure_gdn) {
+        for (int l = 0; l < NUM_LAYERS; ++l)
+            is_gdn[l] = 1;
+    }
+
     /* ---- Context-length sweep mode ----
      *
      * For each context length C: pre-fill full-attention KV caches with C-1
@@ -691,7 +701,12 @@ int main(int argc, char **argv) {
 
         if (!csv) {
             printf(MODEL_NAME " context-length scaling benchmark\n");
-            printf("  layers=%d (GDN=%d, full=%d), hidden=%d\n", NUM_LAYERS, NUM_GDN, NUM_FULL, HIDDEN);
+            int n_gdn_actual = 0, n_full_actual = 0;
+            for (int l = 0; l < NUM_LAYERS; ++l)
+                if (is_gdn[l]) n_gdn_actual++; else n_full_actual++;
+            printf("  layers=%d (GDN=%d, full=%d)%s, hidden=%d\n", NUM_LAYERS,
+                   n_gdn_actual, n_full_actual,
+                   pure_gdn ? " [PURE GDN]" : "", HIDDEN);
             printf("  ctx sweep: %d points, max=%zu\n\n", n_ctx, max_ctx);
         }
 
@@ -765,8 +780,11 @@ int main(int argc, char **argv) {
             ffn_total /= reps;
             double total_us = gdn_total + full_total + ffn_total;
             double tps = 1e6 / total_us;
-            /* KV cache memory: NUM_FULL layers * C * kv_dim * 4 bytes * 2 (K+V) */
-            double kv_mb = (double)NUM_FULL * C * kv_dim * sizeof(float) * 2 / (1024 * 1024);
+            /* KV cache memory: actual full-attn layers * C * kv_dim * 4 bytes * 2 (K+V) */
+            int n_full_actual = 0;
+            for (int l2 = 0; l2 < NUM_LAYERS; ++l2)
+                if (!is_gdn[l2]) n_full_actual++;
+            double kv_mb = (double)n_full_actual * C * kv_dim * sizeof(float) * 2 / (1024 * 1024);
 
             if (csv) {
                 printf(MODEL_NAME ",%zu,%.0f,%.0f,%.0f,%.0f,%.2f,%.1f\n",
