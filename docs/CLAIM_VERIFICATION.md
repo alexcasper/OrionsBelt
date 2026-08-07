@@ -258,14 +258,17 @@ carried across invocations, and no vendor-tuned kernel to lean on. That is the s
 support for the framing in §3 — the contribution is not "we optimized a model" but "we did the
 port that had no prior art on this platform."
 
-## 4. Remaining unverified
+## 4. Previously unverified — now resolved
 
-| Item | Next step |
-|---|---|
-| NOE Compiler Python 3.8 pin | Radxa NPU SDK page 404s — re-check during `t-py38-noe` |
-| GDN-2 numeric RULER scores | Read the full paper (`t-gdn2-read`) |
-| Per-checkpoint layer counts and `layer_types` for the exact model chosen | Read `config.json` directly during `t-arch-audit` |
-| Whether `causal_conv1d` / `fla` have any aarch64 build | Investigate during `t-x86-ref` / `t-gpu-scan` — determines our baseline |
+All items below were originally open; each has since been resolved elsewhere in this
+document or in a linked source. Kept for traceability.
+
+| Item | Resolution | Where |
+|---|---|---|
+| ~~NOE Compiler Python 3.8 pin~~ | **Resolved.** The correct floor is 3.10, not 3.8. The Radxa NPU SDK page is accessible. | §2.2a |
+| ~~GDN-2 numeric RULER scores~~ | **Resolved.** Scores extracted from the paper's Table 3 (MK-NIAH-1). | §1.5 |
+| ~~Per-checkpoint layer counts and `layer_types`~~ | **Resolved.** Read from `config.json` for both 0.8B and 4B checkpoints. | [`GDN_LAYER_AUDIT.md`](GDN_LAYER_AUDIT.md) |
+| ~~Whether `causal_conv1d` / `fla` have any aarch64 build~~ | **Resolved.** Confirmed absent — no Arm/Vulkan/OpenCL build exists for either package. | [`FINDINGS.md`](FINDINGS.md), [`DEVPOST_SUBMISSION.md`](DEVPOST_SUBMISSION.md) |
 
 ## Sources
 

@@ -270,16 +270,16 @@ class TestExpectedColumns:
 
 class TestFindDeviceSpec:
     def test_jetson(self):
-        assert find_device_spec("jetson-j1.csv") == 25.6
+        assert find_device_spec("jetson-j1.csv") == 23.8
 
     def test_pi5(self):
-        assert find_device_spec("pi5-r5.csv") == 17.0
+        assert find_device_spec("pi5-r5.csv") == 15.8
 
     def test_rk3588(self):
-        assert find_device_spec("rk3588-t4_big.csv") == 34.0
+        assert find_device_spec("rk3588-t4_big.csv") == 31.7
 
     def test_orion(self):
-        assert find_device_spec("orion-o6_big.csv") == 100.0
+        assert find_device_spec("orion-o6_big.csv") == 93.1
 
     def test_unknown_returns_none(self):
         assert find_device_spec("o6-something.csv") is None

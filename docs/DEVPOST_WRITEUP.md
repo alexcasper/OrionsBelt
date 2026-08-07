@@ -89,9 +89,10 @@ to devices but was never previously tested in the correctness suite).
 | gdn_gated_scan | A55 little | 0.55 | **3.91** | 7.1× |
 | gdn_causal_dwconv1d | A55 little | 0.71 | **5.30** | 7.4× |
 
-> **cumdecay at 24.3 GiB/s approaches the RK3588's theoretical LPDDR4x
-> bandwidth ceiling (~25.6 GiB/s).** The kernel is now memory-bound — the
-> optimization has taken it as far as the hardware allows.
+> **cumdecay at 24.3 GiB/s approaches the RK3588's practical DRAM bandwidth
+> ceiling (~25 GiB/s measured, 79% of the 33.8 GB/s theoretical spec at
+> 2112 MHz).** The kernel is now memory-bound — the optimization has taken
+> it as far as the hardware allows.
 
 The OpenMP parallelization across 4 cores accounts for ~4×; NEON double-width
 unrolling adds further gains. The little cluster (A55) benefits more

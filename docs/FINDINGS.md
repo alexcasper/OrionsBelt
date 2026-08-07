@@ -753,10 +753,10 @@ Full analysis is regenerable via `python3 bench/fleet_analysis.py` and committed
 
 | Device | Cores | ISA | Spec BW (GiB/s) |
 |--------|-------|-----|-----------------|
-| Pi 5 | 4x A76 @ 2.4 GHz | Armv8.2 + dotprod | 17.0 |
-| RK3588 big | 4x A76 @ 2.4 GHz | Armv8.2 + dotprod | 34.0 |
-| RK3588 little | 4x A55 @ 1.8 GHz | Armv8.2 | 34.0 |
-| Jetson j1/j2 | 4x A57 @ 1.48 GHz | Armv8.0 (NEON only) | 25.6 |
+| Pi 5 | 4x A76 @ 2.4 GHz | Armv8.2 + dotprod | 15.8 |
+| RK3588 big | 4x A76 @ 2.4 GHz | Armv8.2 + dotprod | 31.7 |
+| RK3588 little | 4x A55 @ 1.8 GHz | Armv8.2 | 31.7 |
+| Jetson j1/j2 | 4x A57 @ 1.48 GHz | Armv8.0 (NEON only) | 23.8 |
 | **Orion O6** | 4x A720 big + 4x A720 mid + 4x A520 | Armv9.2 (SVE2) | **93.1** |
 
 ### Achieved throughput (4B model, seq=64, baseline fp32, single-threaded)
@@ -768,17 +768,17 @@ optimization-impact section below for multi-threaded results.
 
 | Device | Spec | CumDecay | Scan | DWConv1D | Scan/Spec |
 |--------|------|----------|------|----------|-----------|
-| Pi 5 | 17.0 | 3.74 | 1.20 | 3.23 | 7.1% |
-| RK3588 big | 34.0 | 7.46 | 5.75 | 6.99 | 16.9% |
-| RK3588 little | 34.0 | 1.48 | 0.72 | 0.70 | 2.1% |
-| Jetson j1 | 25.6 | 1.59 | 1.18 | 1.41 | 4.6% |
-| Jetson j2 | 25.6 | 1.50 | 1.09 | 0.93 | 4.3% |
+| Pi 5 | 15.8 | 3.74 | 1.20 | 3.23 | 7.6% |
+| RK3588 big | 31.7 | 7.46 | 5.75 | 6.99 | 18.1% |
+| RK3588 little | 31.7 | 1.48 | 0.72 | 0.70 | 2.3% |
+| Jetson j1 | 23.8 | 1.59 | 1.18 | 1.41 | 5.0% |
+| Jetson j2 | 23.8 | 1.50 | 1.09 | 0.93 | 4.6% |
 
 ### The discriminating test: Pi 5 (A76, less BW) vs Jetson (A57, more BW)
 
 The `DEVICE_RUNBOOK` poses the key question: if the scan kernel is
-bandwidth-bound, the Jetson (25.6 GiB/s, oldest A57 cores) should beat the
-Pi 5 (17.0 GiB/s, newest A76 cores).
+bandwidth-bound, the Jetson (23.8 GiB/s, oldest A57 cores) should beat the
+Pi 5 (15.8 GiB/s, newest A76 cores).
 
 | Kernel | Pi 5 | Jetson j1 | Jetson j2 | Winner | Pi5/J1 |
 |--------|------|-----------|-----------|--------|--------|
@@ -1315,9 +1315,14 @@ pinning, 30 repeats, 3 warmups).
    variance.
 
 4. **cumdecay is now bandwidth-saturated**: 24.3 GiB/s on the A76 big cluster
-   approaches the RK3588's theoretical LPDDR4x bandwidth (~25.6 GiB/s at
-   1600 MHz dual-channel), confirming the kernel is now memory-bound rather
-   than instruction-overhead-bound.
+   approaches the RK3588's **practical** DRAM bandwidth ceiling (~25 GiB/s
+   measured on t3, vs 33.8 GB/s theoretical at 2112 MHz — 79% STREAM
+   efficiency is typical for LPDDR4x). The theoretical spec is higher, but
+   sustained workload bandwidth saturates well below it. Measurement:
+   2026-08-07 on t3 (Turing RK1), DMC at 2112 MHz / performance governor,
+   `scripts/mem_bw_probe.c` (4-thread sequential read: 25.0 GiB/s peak).
+   This confirms the kernel is now memory-bound rather than
+   instruction-overhead-bound.
 
 This re-run addresses ob-bf7's "cross-code-version" concern: the prior t4 CSVs
 were at the unoptimized baseline. Manifest:
