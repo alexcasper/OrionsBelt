@@ -77,6 +77,18 @@ taskset -c <little-cores> /tmp/bench_gdn_armv8a --repeats 30 --csv > bench_orion
 
 ## 2. Capture provenance
 
+**For the Orion O6** (or any new Arm device), run the automated system baseline first
+to detect cluster topology, set the governor, and capture thermal/memory state in one
+command — it auto-detects clusters by `cpuinfo_max_freq` and prints ready-to-paste
+`taskset` commands:
+
+```bash
+sudo bash scripts/o6_system_baseline.sh             # human-readable
+sudo bash scripts/o6_system_baseline.sh --json      # machine-readable
+```
+
+Tested on RK3588 (2-cluster), works unchanged on the O6 (3-cluster).
+
 A number without a manifest is not a result (`PLAN.md` §9). If the device has Python 3.10+:
 
 ```bash

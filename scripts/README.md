@@ -20,6 +20,7 @@ following the documented path verbatim on a clean system.
 | `run_op_probe_audit.py` | Drive the NOE Compiler (cixparse) over the probe graphs and record results. | `ob-t3b.1` |
 | `generate_memory_plots.py` | Generate memory scaling figures (stacked bar + area chart + comparison table) from the analytical model in `memory.py`. Shows GDN O(1) state vs attention O(n) KV cache. | `ob-9t0.4` |
 | `check_submission_readiness.sh` | Verify the repo is ready for Devpost submission: tests, lint, format, memory plots, fleet analysis, deliverable files, credential scan, CSV validation. | `ob-9t0.5` |
+| `o6_system_baseline.sh` | System baseline automation for the Orion O6 (and any Arm big.LITTLE device). Detects CPU clusters by max frequency, sets performance governor, captures thermal baseline, reports memory/OPPs, generates ready-to-paste taskset commands. Dual output: human-readable or JSON (`--json`). | `ob-41j.1` |
 | `fleet_sweep.sh` | Turnkey clean-tree, commit-matched benchmark run for the fleet sweep (ob-bf7). Enforces clean tree, sets governor, records pre/post thermals, handles taskset pinning, captures manifest — one command per device. | `ob-0h0` |
 
 ## Principles
