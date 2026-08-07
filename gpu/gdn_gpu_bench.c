@@ -167,6 +167,7 @@ static cl_command_queue g_queue;
 static cl_program       g_program;
 static char             g_dev_name[128];
 static char             g_dev_version[128];
+static int              g_use_profiling = 0;  /* set in init_opencl() */
 
 static void init_opencl(const char *kernel_path) {
     cl_int err;
@@ -197,11 +198,19 @@ static void init_opencl(const char *kernel_path) {
     g_ctx = clCreateContext(NULL, 1, &g_device, NULL, NULL, &err);
     cl_check(err, "clCreateContext");
 
-    /* Queue (OpenCL 3.0: explicit properties needed for profiling) */
+    /* Queue: try profiling first; fall back to plain queue for drivers
+     * like RustiCL/Panfrost that reject CL_QUEUE_PROFILING_ENABLE (err -35). */
     const cl_queue_properties qprops[] = {CL_QUEUE_PROPERTIES,
         CL_QUEUE_PROFILING_ENABLE, 0};
     g_queue = clCreateCommandQueueWithProperties(g_ctx, g_device, qprops, &err);
-    cl_check(err, "clCreateCommandQueueWithProperties");
+    if (err != CL_SUCCESS) {
+        g_use_profiling = 0;
+        g_queue = clCreateCommandQueueWithProperties(g_ctx, g_device, NULL, &err);
+        cl_check(err, "clCreateCommandQueueWithProperties (no profiling)");
+        printf("  [info] GPU profiling not supported; using wall-clock timing\n");
+    } else {
+        g_use_profiling = 1;
+    }
 
     /* Build program from source */
     size_t src_len;
@@ -237,18 +246,30 @@ static double run_kernel_timed(cl_kernel kern, cl_uint nargs,
         cl_check(err, "clSetKernelArg");
     }
     cl_event ev;
-    err = clEnqueueNDRangeKernel(g_queue, kern, (local ? 2 : 1), NULL,
-                                 global, local, 0, NULL, &ev);
-    cl_check(err, "clEnqueueNDRangeKernel");
-    clFinish(g_queue);
+    double t0, t1;
+    if (g_use_profiling) {
+        err = clEnqueueNDRangeKernel(g_queue, kern, (local ? 2 : 1), NULL,
+                                     global, local, 0, NULL, &ev);
+        cl_check(err, "clEnqueueNDRangeKernel");
+        clFinish(g_queue);
 
-    cl_ulong t_start, t_end;
-    clGetEventProfilingInfo(ev, CL_PROFILING_COMMAND_START, sizeof(t_start),
-                            &t_start, NULL);
-    clGetEventProfilingInfo(ev, CL_PROFILING_COMMAND_END, sizeof(t_end),
-                            &t_end, NULL);
-    clReleaseEvent(ev);
-    return (double)(t_end - t_start) * 1e-6;  /* ns → ms */
+        cl_ulong t_start, t_end;
+        clGetEventProfilingInfo(ev, CL_PROFILING_COMMAND_START, sizeof(t_start),
+                                &t_start, NULL);
+        clGetEventProfilingInfo(ev, CL_PROFILING_COMMAND_END, sizeof(t_end),
+                                &t_end, NULL);
+        clReleaseEvent(ev);
+        return (double)(t_end - t_start) * 1e-6;  /* ns → ms */
+    } else {
+        t0 = now_s();
+        err = clEnqueueNDRangeKernel(g_queue, kern, (local ? 2 : 1), NULL,
+                                     global, local, 0, NULL, &ev);
+        cl_check(err, "clEnqueueNDRangeKernel");
+        clFinish(g_queue);
+        t1 = now_s();
+        clReleaseEvent(ev);
+        return (t1 - t0) * 1e3;  /* s → ms */
+    }
 }
 
 /* For 1D kernels with scalar args (uint/float), we set args differently. */
@@ -267,18 +288,30 @@ static double run_kernel_1d(cl_kernel kern, cl_uint n_buf_args, cl_mem *bufs,
         cl_check(err, "clSetKernelArg(scalar)");
     }
     cl_event ev;
-    err = clEnqueueNDRangeKernel(g_queue, kern, 1, NULL, &global_size, NULL,
-                                 0, NULL, &ev);
-    cl_check(err, "clEnqueueNDRangeKernel");
-    clFinish(g_queue);
+    double t0, t1;
+    if (g_use_profiling) {
+        err = clEnqueueNDRangeKernel(g_queue, kern, 1, NULL, &global_size, NULL,
+                                     0, NULL, &ev);
+        cl_check(err, "clEnqueueNDRangeKernel");
+        clFinish(g_queue);
 
-    cl_ulong t_start, t_end;
-    clGetEventProfilingInfo(ev, CL_PROFILING_COMMAND_START, sizeof(t_start),
-                            &t_start, NULL);
-    clGetEventProfilingInfo(ev, CL_PROFILING_COMMAND_END, sizeof(t_end),
-                            &t_end, NULL);
-    clReleaseEvent(ev);
-    return (double)(t_end - t_start) * 1e-6;
+        cl_ulong t_start, t_end;
+        clGetEventProfilingInfo(ev, CL_PROFILING_COMMAND_START, sizeof(t_start),
+                                &t_start, NULL);
+        clGetEventProfilingInfo(ev, CL_PROFILING_COMMAND_END, sizeof(t_end),
+                                &t_end, NULL);
+        clReleaseEvent(ev);
+        return (double)(t_end - t_start) * 1e-6;
+    } else {
+        t0 = now_s();
+        err = clEnqueueNDRangeKernel(g_queue, kern, 1, NULL, &global_size, NULL,
+                                     0, NULL, &ev);
+        cl_check(err, "clEnqueueNDRangeKernel");
+        clFinish(g_queue);
+        t1 = now_s();
+        clReleaseEvent(ev);
+        return (t1 - t0) * 1e3;  /* s → ms */
+    }
 }
 
 /* ------------------------------------------------------------------ */
@@ -318,6 +351,10 @@ int main(int argc, char **argv) {
     cl_kernel k_decay = clCreateKernel(g_program, "gdn_cumdecay", &err);   cl_check(err, "create decay");
     cl_kernel k_conv  = clCreateKernel(g_program, "gdn_causal_dwconv1d", &err); cl_check(err, "create conv");
     cl_kernel k_delta = clCreateKernel(g_program, "gdn_delta_rule_decode", &err); cl_check(err, "create delta");
+
+    /* CSV header (comment-prefixed for readability, skipped by data parsers) */
+    if (csv_mode)
+        printf("# kernel,dim1,dim2,dim3,p50_ms,p95_ms,bw_mibs\n");
 
     /* ================================================================
      * Test 1: Gated scan — correctness
@@ -572,13 +609,21 @@ int main(int argc, char **argv) {
             clSetKernelArg(k_delta, 6, sizeof(cl_mem), &out_d);
 
             clEnqueueNDRangeKernel(g_queue, k_delta, 2, NULL, global2d, local2d, 0, NULL, &ev);
-            clFinish(g_queue);
 
-            cl_ulong t_s, t_e;
-            clGetEventProfilingInfo(ev, CL_PROFILING_COMMAND_START, sizeof(t_s), &t_s, NULL);
-            clGetEventProfilingInfo(ev, CL_PROFILING_COMMAND_END, sizeof(t_e), &t_e, NULL);
-            clReleaseEvent(ev);
-            if (r >= WARMUPS) times[r - WARMUPS] = (double)(t_e - t_s) * 1e-6;
+            if (g_use_profiling) {
+                clFinish(g_queue);
+                cl_ulong t_s, t_e;
+                clGetEventProfilingInfo(ev, CL_PROFILING_COMMAND_START, sizeof(t_s), &t_s, NULL);
+                clGetEventProfilingInfo(ev, CL_PROFILING_COMMAND_END, sizeof(t_e), &t_e, NULL);
+                clReleaseEvent(ev);
+                if (r >= WARMUPS) times[r - WARMUPS] = (double)(t_e - t_s) * 1e-6;
+            } else {
+                double t0 = now_s();
+                clFinish(g_queue);
+                double t1 = now_s();
+                clReleaseEvent(ev);
+                if (r >= WARMUPS) times[r - WARMUPS] = (t1 - t0) * 1e3;  /* s → ms */
+            }
         }
         qsort(times, repeats, sizeof(double), cmp_double);
         double p50 = pct(times, repeats, 0.50);
