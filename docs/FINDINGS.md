@@ -3060,9 +3060,222 @@ that the CPU decode bottleneck is addressable through memory-system
 optimization alone — the GDN recurrent-scan kernels remain <0.1% of decode
 time and are not the optimization target.
 
+## 17. Context-length scaling: GDN O(1) vs full-attention O(n) decode cost (2026-08-07, ob-mrd.10)
+
+### Motivation
+
+The e2e decode benchmark (§12–16) used a *simulated* full-attention path: the
+KV cache held a single token and no attention scores were computed. This made
+it impossible to answer the question that matters most for a long-context
+submission: **how does decode cost scale as the conversation grows?** GDN's
+core claim is O(1) recurrent state vs full-attention's O(n) KV cache. Without
+measuring both at growing context lengths, the claim is asserted, not shown.
+
+This section implements proper grouped-query attention (GQA) with a growing KV
+cache in the full-attention layers, then sweeps context length from 1 to 4096
+tokens to measure the scaling behavior of each layer type independently.
+
+### Method
+
+Added `--ctx-sweep` mode to `gdn_e2e_decode.c` (commit `c4cc9be`). For each
+context length C in the sweep:
+
+1. Pre-fill each full-attention layer's KV cache with C−1 random tokens
+   (simulating prior prefill).
+2. Decode 1 token at position C−1, timing GDN layers, full-attention layers,
+   and FFN blocks separately.
+3. Average over 3–5 repetitions for stability.
+
+The attention implementation is standard GQA: Q·K^T → scale → softmax →
+weighted-V, with `FULL_HEADS/FULL_KV_HEADS` query heads sharing each KV head.
+No NEON optimization on the attention inner loop — the point is to measure
+the scaling shape, not absolute attention throughput.
+
+GDN layers need no modification: their recurrent state is a fixed-size
+`NUM_V_HEADS × HEAD_DIM` matrix that does not grow with context.
+
+All measurements: RK3588-t3, governor=performance, commit `c4cc9be`,
+pre-thermal 38–39 °C, post-thermal 51–54 °C.
+
+### Results — 4B model (big cluster, A76, cpu4-7)
+
+#### FP32
+
+| ctx | GDN (ms) | Full-attn (ms) | FFN (ms) | Total (ms) | tok/s | Full-attn share | KV cache |
+|----:|---------:|---------------:|---------:|-----------:|------:|----------------:|---------:|
+| 1 | 213 | 54 | 696 | 963 | 1.04 | 5.6% | 0.1 MB |
+| 64 | 213 | 58 | 696 | 967 | 1.03 | 6.0% | 4 MB |
+| 256 | 213 | 71 | 696 | 980 | 1.02 | 7.2% | 16 MB |
+| 512 | 213 | 89 | 696 | 998 | 1.00 | 8.9% | 32 MB |
+| 1024 | 213 | 128 | 697 | 1038 | 0.96 | 12.3% | 64 MB |
+| 2048 | 213 | 203 | 696 | 1112 | 0.90 | 18.3% | 128 MB |
+| 4096 | 213 | 352 | 696 | 1260 | 0.79 | 27.9% | 256 MB |
+
+#### INT8
+
+| ctx | GDN (ms) | Full-attn (ms) | FFN (ms) | Total (ms) | tok/s | Full-attn share | KV cache |
+|----:|---------:|---------------:|---------:|-----------:|------:|----------------:|---------:|
+| 1 | 115 | 37 | 391 | 543 | 1.84 | 6.8% | 0.1 MB |
+| 64 | 115 | 40 | 389 | 545 | 1.84 | 7.4% | 4 MB |
+| 256 | 116 | 53 | 390 | 559 | 1.79 | 9.6% | 16 MB |
+| 512 | 116 | 72 | 390 | 577 | 1.73 | 12.5% | 32 MB |
+| 1024 | 116 | 110 | 390 | 616 | 1.62 | 17.9% | 64 MB |
+| 2048 | 116 | 185 | 390 | 690 | 1.45 | 26.8% | 128 MB |
+| 4096 | 116 | 333 | 392 | 841 | 1.19 | 39.7% | 256 MB |
+
+### Results — 0.8B model (big cluster, A76, cpu4-7)
+
+#### FP32
+
+| ctx | GDN (ms) | Full-attn (ms) | FFN (ms) | Total (ms) | tok/s | Full-attn share |
+|----:|---------:|---------------:|---------:|-----------:|------:|----------------:|
+| 1 | 48 | 9 | 68 | 125 | 8.01 | 7.5% |
+| 64 | 48 | 10 | 68 | 126 | 7.94 | 8.3% |
+| 256 | 48 | 15 | 68 | 131 | 7.64 | 11.7% |
+| 512 | 48 | 22 | 68 | 137 | 7.28 | 15.8% |
+| 1024 | 48 | 35 | 68 | 151 | 6.64 | 23.2% |
+| 2048 | 48 | 62 | 68 | 178 | 5.61 | 35.0% |
+| 4096 | 48 | 116 | 68 | 231 | 4.33 | 50.0% |
+
+#### INT8
+
+| ctx | GDN (ms) | Full-attn (ms) | FFN (ms) | Total (ms) | tok/s | Full-attn share |
+|----:|---------:|---------------:|---------:|-----------:|------:|----------------:|
+| 1 | 35 | 9 | 50 | 93 | 10.70 | 9.5% |
+| 64 | 35 | 10 | 50 | 94 | 10.59 | 10.5% |
+| 256 | 35 | 15 | 50 | 99 | 10.07 | 14.9% |
+| 512 | 35 | 20 | 50 | 105 | 9.55 | 19.3% |
+| 1024 | 35 | 34 | 50 | 119 | 8.42 | 28.8% |
+| 2048 | 35 | 62 | 50 | 147 | 6.82 | 42.3% |
+| 4096 | 35 | 116 | 50 | 200 | 4.99 | 57.7% |
+
+### Key findings
+
+**1. GDN decode cost is truly O(1).** Across all model sizes, quantization
+modes, and clusters, GDN-layer latency is flat to within measurement noise
+(±2%) from ctx=1 to ctx=4096. The recurrent state matrix does not grow.
+
+**2. Full-attention cost grows linearly with context.** For the 4B INT8 model,
+full-attention latency goes from 37 ms (ctx=1) to 333 ms (ctx=4096) — a **9.0×
+increase**. For the 0.8B INT8 model, it goes from 9 ms to 116 ms — a **12.9×
+increase**. The scaling is linear in context length as expected (each decode
+step reads all cached K/V vectors).
+
+**3. INT8 optimization effectiveness decreases with context length.** INT8
+accelerates the constant parts (GDN projections, FFN matmuls) by reducing
+weight memory traffic 4×. But full-attention KV cache reads are FP32 and
+unaffected. As context grows and full-attention dominates, the INT8 speedup
+shrinks:
+
+| ctx | 4B FP32 tok/s | 4B INT8 tok/s | INT8 speedup |
+|----:|--------------:|--------------:|-------------:|
+| 1 | 1.04 | 1.84 | 1.78× |
+| 1024 | 0.96 | 1.62 | 1.69× |
+| 4096 | 0.79 | 1.19 | 1.51× |
+
+This is not a limitation of the quantization scheme — it is the fundamental
+property that KV cache reads are activation traffic, not weight traffic.
+
+**4. At 4K context, full-attention becomes the dominant cost.** For the 0.8B
+INT8 model, full-attention layers consume 58% of decode time at ctx=4096,
+versus 9.5% at ctx=1. The throughput drops from 10.7 to 5.0 tok/s — a **2.1×
+slowdown** — entirely from the full-attention layers that GDN replaces.
+
+**5. KV cache memory grows linearly.** At ctx=4096 the 4B model's KV cache is
+256 MB across 8 full-attention layers. The 24 GDN layers' recurrent state is
+constant at ~1.2 MB total (24 × 4096 × 4 bytes). In a pure-GDN model (no
+full-attention layers), decode cost and memory would both remain flat at any
+context length.
+
+### Pure-GDN comparison: what if all layers were GDN?
+
+To isolate the cost of the full-attention layers, we ran the same sweep with
+`--pure-gdn` (all NUM_LAYERS layers are GDN type, zero full-attention layers).
+This is a hypothetical architecture — Qwen3.5 uses a 3:1 hybrid — but it shows
+the ceiling: what a pure-linear-attention model would achieve.
+
+#### INT8, big cluster (A76, cpu4-7)
+
+| ctx | 0.8B hybrid tok/s | 0.8B pure-GDN tok/s | 4B hybrid tok/s | 4B pure-GDN tok/s |
+|----:|------------------:|--------------------:|----------------:|------------------:|
+| 1 | 10.70 | 10.48 | 1.84 | 1.85 |
+| 64 | 10.59 | 10.48 | 1.84 | 1.85 |
+| 256 | 10.07 | 10.47 | 1.79 | 1.85 |
+| 1024 | 8.42 | 10.46 | 1.62 | 1.84 |
+| 2048 | 6.82 | 10.46 | 1.45 | 1.84 |
+| 4096 | 4.99 | 10.45 | 1.19 | 1.84 |
+
+Pure-GDN throughput is **flat to within 0.3%** across all context lengths.
+The hybrid model degrades by 1.55× (4B) to 2.1× (0.8B) at ctx=4096 — entirely
+from the full-attention layers. KV cache memory is zero for pure-GDN.
+
+At ctx=1 the pure-GDN model is slightly slower than hybrid for the 0.8B model
+(10.48 vs 10.70 tok/s) because it has 6 additional GDN layers (replacing 6
+cheaper full-attention Q/K/V projections). But by ctx=1024 the crossover has
+occurred, and at ctx=4096 pure-GDN is 2.1× faster.
+
+### What this means for the submission
+
+This is the core GDN value proposition, measured on real silicon: **linear
+attention trades a constant per-token cost for the ability to process
+arbitrarily long contexts without throughput degradation or memory growth.**
+The 3:1 GDN:full-attention hybrid already captures most of the benefit — 75%
+of layers have O(1) cost. A pure-GDN architecture would eliminate the O(n)
+component entirely, maintaining flat throughput at any context length (measured:
+0.3% variance from ctx=1 to ctx=4096).
+
+### Data
+
+- `results/raw/rk3588-t3_big_ctxsweep_e2e_raw.csv` — 4B FP32 big
+- `results/raw/rk3588-t3_big_int8_ctxsweep_e2e_raw.csv` — 4B INT8 big
+- `results/raw/rk3588-t3_08b_big_ctxsweep_e2e_raw.csv` — 0.8B FP32 big
+- `results/raw/rk3588-t3_08b_big_int8_ctxsweep_e2e_raw.csv` — 0.8B INT8 big
+- `results/raw/rk3588-t3_08b_little_ctxsweep_e2e_raw.csv` — 0.8B FP32 little
+- `results/raw/rk3588-t3_08b_little_int8_ctxsweep_e2e_raw.csv` — 0.8B INT8 little
+- `results/raw/rk3588-t3_big_int8_puregdn_ctxsweep_e2e_raw.csv` — 4B INT8 pure-GDN big
+- `results/raw/rk3588-t3_08b_big_int8_puregdn_ctxsweep_e2e_raw.csv` — 0.8B INT8 pure-GDN big
+- `results/raw/rk3588-t3_big_puregdn_ctxsweep_e2e_raw.csv` — 4B FP32 pure-GDN big
+- `results/raw/rk3588-t3_08b_big_puregdn_ctxsweep_e2e_raw.csv` — 0.8B FP32 pure-GDN big
+
+All at commit `c4cc9be`, governor=performance. Manifests in `results/manifests/`.
+
+### Reproducing
+
+```bash
+# Build (on aarch64)
+cc -O3 -fopenmp -march=armv8.2-a+dotprod -static \
+  gdn_sve.c gdn_delta_matmul.c gdn_e2e_decode.c -I. -o bench_e2e_ctx -lm
+# 0.8B variant: add -DMODEL_08B
+# INT8 variant: add -DINT8_WEIGHTS
+
+# Run sweep (big cluster on RK3588)
+taskset -c 4-7 ./bench_e2e_ctx --ctx-sweep 1,64,256,512,1024,2048,4096 --csv
+```
+
+## 18. Sustained-load thermal stability: no throttling on RK3588 (2026-08-07)
+
+**Addresses PLAN.md risk R7: burst numbers must be sustainable.**
+
+Ran two back-to-back sustained bursts of 500 tokens each (94s total sustained
+decode) on the 0.8B INT8 model, big cluster (A76, 4 cores, governor=performance).
+
+| Run | Pre-thermal | Tokens | tok/s | p50 (us) | p99 (us) | p99/p50 | Post-thermal |
+|-----|-----------:|-------:|------:|---------:|---------:|--------:|-----------:|
+| 1 (cold) | 39 °C | 500 | 10.56 | 94712 | 95055 | 1.004× | 53 °C |
+| 2 (hot) | 53 °C | 500 | 10.53 | 94961 | 95307 | 1.004× | 56 °C |
+
+Throughput decay across the two runs: **0.3%** — within measurement noise.
+Per-token latency spread (p99/p50) is 0.4% in both runs, confirming flat
+throughput throughout each burst.
+
+**Conclusion**: the RK3588's active cooling handles sustained decode without
+thermal throttling. The burst benchmark numbers in §15–17 are steady-state
+sustainable numbers, not peak-only artifacts. This matters for the Physical AI
+submission criterion: honest sustained throughput, not a one-shot burst.
+
 ---
 
-## 17. Cross-device e2e decode comparison: A57 vs A76, 4B vs 0.8B (2026-08-07, ob-mrd.8)
+## 19. Cross-device e2e decode comparison: A57 vs A76, 4B vs 0.8B (2026-08-07, ob-mrd.8)
 
 ### Motivation
 
