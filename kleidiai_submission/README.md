@@ -63,7 +63,7 @@ that have no SME.
 ### 2. Gated Cumulative Decay
 
 ```
-decay[t][c] = ∏_{i=0}^{t} a[i][c]    (exclusive prefix product)
+decay[t][c] = ∏_{i=0}^{t} a[i][c]    (inclusive prefix product)
 ```
 
 An exclusive prefix product along the sequence axis. Computed as a direct
@@ -266,7 +266,7 @@ bash scripts/verify_kleidiai_kernels.sh
 
 This exercises SVE2 (128-bit), SVE1 (128/256-bit), NEON-only (A57 floor),
 and NEON+dotprod (A76) paths — confirming the dispatch is correct at every
-ISA level.  CI runs this on every push (`.github/workflows/ci.yaml`).
+ISA level.
 
 ### A57 (Armv8.0, NEON path) — measured on Jetson Nano
 
