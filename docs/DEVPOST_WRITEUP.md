@@ -297,8 +297,9 @@ for the step-by-step path for any aarch64 device.
   specs, governor state, and thermal readings
 - `scripts/validate_bench_csvs.sh` checks that every CSV has a manifest, the
   expected kernel variants, and that the git SHA is not a known-stale commit
-- `scripts/verify_cpu_kernels_native.sh` runs the 9-target correctness matrix
-  including OpenMP paths that ship to devices but were previously untested
+- `scripts/verify_cpu_kernels.sh` runs the 9-target portability matrix under QEMU
+  (SVE1, SVE2, NEON, scalar, OpenMP) with bit-identical checks — proving the kernels
+  are correct across every ISA level in the fleet
 
 **Device fleet running today:**
 
@@ -339,8 +340,8 @@ python3 bench/manifest.py > results/manifests/my_run.json
 # 5. Validate
 bash scripts/validate_bench_csvs.sh
 
-# 6. Verify kernel correctness (9 targets, bit-identical check)
-bash scripts/verify_cpu_kernels_native.sh
+# 6. Verify kernel correctness on this device (bit-identical checks)
+bash scripts/verify_kernels_native.sh
 ```
 
 ### End-to-end model inference (requires PyTorch + transformers)
