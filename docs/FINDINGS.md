@@ -4046,7 +4046,7 @@ SVE2 → SVE → dotprod → NEON). The A76 falls through to the NEON path.
 Each suite compares the kernel output against a naive C reference at realistic
 GDN shapes (seq=1 decode, seq=64 prefill; channels=160 and 2560).
 
-### A76 NEON benchmark — p50 of 30 repeats, governor=performance
+### A76 NEON benchmark — p50 of 30 repeats (batched ×100 calls, post clock-quantization fix), governor=performance
 
 | Kernel | Shape (seq×ch) | p50 (µs) | GiB/s |
 |---|---|---|---|
@@ -4099,11 +4099,11 @@ path was verified by cross-compilation in §23; the NEON path is verified
 on-silicon here. No competing KleidiAI kernel covers this range for the three
 recurrent primitives.
 
-> **Provenance:** RK3588 t3, commit `7f418d2`, governor=performance, ~43°C.
-> Uses batched timing (100 calls per measurement) to overcome RK3588's ~291 ns
-> `CLOCK_MONOTONIC_RAW` granularity — single-call timing produced impossible
-> values (0.000 µs / inf GiB/s) on fast kernels. GEMV and large-shape values
-> are stable across single-call and batched methods; only fast/small shapes
-> changed. GEMV rows cross-validate with t4 within 2%.
+> **Provenance:** RK3588 t3, commit `7f418d2`, governor=performance.
+> Batched-timing methodology: 100 calls per measurement, divided by 100, to
+> overcome the RK3588's ~291 ns `CLOCK_MONOTONIC_RAW` granularity (PR #111).
+> The previous CSV at commit `78eb7e4` used single-call timing, which produced
+> measurement artifacts (gated_scan 64×160 p50 was identical to dwconv1d;
+> cumdecay 1×2560 was anomalously fast; gated_scan 1×160 was 0.0 µs/inf).
 > Manifest: `results/manifests/rk3588-t3_kleidiai_gdn_kernels.json`.
 > Raw CSV: `results/raw/kleidiai/rk3588-t3_kleidiai_gdn_kernels.csv`.

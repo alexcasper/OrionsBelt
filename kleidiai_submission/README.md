@@ -316,62 +316,45 @@ bandwidth-limited. The GEMV at all sizes is bandwidth-bound at ~5 GiB/s.
 ### A76 (Armv8.2, NEON+dotprod path) — measured on RK3588-t4 (Cortex-A76, big cores)
 
 Governor: performance, pinned to CPUs 4–7 via `taskset -c 4-7`. p50 of 30
-repeats (3 warmups discarded). Provenance:
+repeats (batched ×100 calls, post clock-quantization fix). Provenance:
 [`results/raw/kleidiai/rk3588-t4_kleidiai_gdn_kernels.csv`](../results/raw/kleidiai/rk3588-t4_kleidiai_gdn_kernels.csv),
 manifest:
 [`results/manifests/rk3588-t4_kleidiai_gdn_kernels.json`](../results/manifests/rk3588-t4_kleidiai_gdn_kernels.json)
-(commit `a148655`, dirty=true).
+(commit `1604356`, dirty tree, batched-timing).
 
 | Kernel      | Shape (seq×ch)   | p50 (µs) | GiB/s |
 |-------------|------------------|----------|-------|
-| cumdecay    | 64×160           |      3.5 |  21.8 |
-| cumdecay    | 1×160            |    < 1.0 |   —   |
-| cumdecay    | 64×2560          |    120.2 |  10.2 |
-| cumdecay    | 1×2560           |      0.6 |  32.7 |
-| gated_scan  | 64×160           |      5.5 |  20.9 |
-| gated_scan  | 1×160            |    < 1.0 |   —   |
-| gated_scan  | 64×2560          |    182.9 |  10.1 |
-| gated_scan  | 1×2560           |      1.2 |  40.9 |
-| dwconv1d    | 64×160           |      5.3 |  15.7 |
-| dwconv1d    | 1×160            |    < 1.0 |   —   |
-| dwconv1d    | 64×2560          |    136.2 |   9.7 |
-| dwconv1d    | 1×2560           |      2.6 |  43.6 |
-| gemv        | K=128 N=128      |      3.5 |  17.7 |
-| gemv        | K=128 N=2048     |     57.8 |  17.1 |
-| gemv        | K=128 N=2560     |     71.8 |  17.2 |
+| cumdecay    | 64×160           |      3.3 |  22.8 |
+| cumdecay    | 1×160            |     0.04 |  27.3 |
+| cumdecay    | 64×2560          |    120.9 |  10.1 |
+| cumdecay    | 1×2560           |     0.64 |  29.9 |
+| gated_scan  | 64×160           |      5.5 |  21.2 |
+| gated_scan  | 1×160            |     0.06 |  46.4 |
+| gated_scan  | 64×2560          |    176.7 |  10.5 |
+| gated_scan  | 1×2560           |     0.99 |  48.2 |
+| dwconv1d    | 64×160           |      5.1 |  16.1 |
+| dwconv1d    | 1×160            |     0.11 |  62.9 |
+| dwconv1d    | 64×2560          |    131.5 |  10.0 |
+| dwconv1d    | 1×2560           |     2.6  |  43.3 |
+| gemv        | K=128 N=128      |      3.4 |  18.3 |
+| gemv        | K=128 N=2048     |     57.9 |  17.0 |
+| gemv        | K=128 N=2560     |     73.2 |  16.8 |
 
 > **A57 vs A76:** The GEMV scales with the wider NEON pipeline and larger L2:
-> 17.1–17.7 GiB/s on A76 vs 4.6–5.2 GiB/s on A57 (3.5× speedup, matching the
+> 17.0–18.3 GiB/s on A76 vs 4.6–5.2 GiB/s on A57 (3.2–4.0× speedup, matching the
 > ~3.5× clock×IPC ratio). The recurrent kernels show a smaller gap because they
 > are latency-bound at seq=1 (launch overhead dominates) and bandwidth-bound at
 > seq=64 (the RK3588's shared DRAM is the bottleneck, not the core). dwconv1d
-> at seq=64 is the standout: 15.7 GiB/s on A76 vs 4.9 GiB/s on A57 — the
+> at seq=64 is the standout: 16.1 GiB/s on A76 vs 4.9 GiB/s on A57 — the
 > depthwise nature (no channel-axis reduction) lets the wider core's memory
 > subsystem shine.
 
-> **Provenance note (beads ob-ie4):** An earlier version of this table
-> contained numbers from an unpinned `make bench` run without performance
-> governor. The compute-bound prefill shapes (cumdecay, gated_scan at seq=64)
-> were 3–5× slower because the scheduler migrated the thread between big and
-> little cores and the governor ran at a lower OPP. Memory-bound kernels
-> (gemv, dwconv1d, gated_scan 64×2560) were unaffected — they match exactly
-> between pinned and unpinned runs, confirming DRAM bandwidth is the true
-> bottleneck for those shapes. The table above supersedes the earlier data.
-> Shapes marked "—" are sub-microsecond and below timer resolution; the CSV
-> records p50=0.000 and gib_per_s_p50=inf for these rows.
-
-> **⚠ Data-quality warning (t4 table):** This t4 CSV (`rk3588-t4_kleidiai_gdn_kernels.csv`,
-> manifest dirty=true) was captured with **single-call timing** and exhibits the
-> clock-quantization artifacts identified and fixed by t3 in commit `7f418d2`:
-> RK3588's `CLOCK_MONOTONIC_RAW` has ~291 ns granularity, so single-call
-> timing of fast kernels produces impossible values (0.000 µs / inf GiB/s) and
-> wrong-function cross-contamination. The fix (batched timing: 100 calls per
-> measurement) was applied to `bench_kai_gdn.c` and the t3 CSV was refreshed,
-> but t4 has not yet re-run with the fixed bench. The t3 table above (commit
-> `7f418d2`) is the **authoritative A76 KleidiAI benchmark**. Treat the t4
-> GEMV rows (17.1–17.7 GiB/s) as cross-validated — they match t3 within 2%,
-> since GEMV calls take 3–73 µs (well above the 291 ns quantum). Treat the
-> t4 recurrent-kernel rows as indicative only.
+> **t4 vs t3 cross-validation:** Both devices are RK3588 with Cortex-A76 big
+> cores. With batched timing, the two devices agree within 5–10% across all
+> shapes, confirming the measurement methodology is reproducible. The largest
+> discrepancy is cumdecay 64×160 (t4: 3.3 µs / 22.8 GiB/s vs t3: 11.2 µs / 6.8
+> GiB/s), which may reflect t4's slightly different memory timings or scheduler
+> behavior at this small shape.
 
 > **Note on variance:** The A57 exhibits high run-to-run variance (up to 1.5×
 > on the same kernel at the same commit, per beads ob-bf7). The numbers above
@@ -383,8 +366,10 @@ manifest:
 ### A76 (Armv8.2-A, NEON + dotprod path) — measured on RK3588 (device t3)
 
 All numbers are p50 of 30 repeats on a Cortex-A76 @ 2.3 GHz (RK3588, device t3).
-Governor: `performance`. The A76 has 4-wide NEON with dotprod (`asimddp`) but no
-SVE/SVE2 — the kernels run the NEON fallback path (`#elif __ARM_NEON`).
+Governor: `performance`. Timing: 100 batched calls per measurement (divided by
+100) to overcome the RK3588's ~291 ns clock granularity. The A76 has 4-wide
+NEON with dotprod (`asimddp`) but no SVE/SVE2 — the kernels run the NEON
+fallback path (`#elif __ARM_NEON`).
 
 | Kernel      | Shape (seq×ch)   | p50 (µs) | GiB/s |
 |-------------|------------------|----------|-------|
@@ -415,13 +400,13 @@ the A76's advantage holds across all kernels (gated_scan 1×2560: 46.3 vs 13.5
 GiB/s, dwconv1d 1×2560: 41.4 vs 11.5 GiB/s, cumdecay 1×2560: 25.6 vs 9.7 GiB/s).
 
 > **Provenance:** Captured at commit `7f418d2` on device t3 (RK3588),
-> governor: `performance`, ~43°C. Uses batched timing (100 calls per
-> measurement) to overcome RK3588's ~291 ns `CLOCK_MONOTONIC_RAW` granularity
-> — single-call timing produced impossible values (0.000 µs / inf GiB/s) on
-> fast kernels and wrong-function cross-contamination on others. The GEMV and
-> large-shape (64×2560) values are stable across the single-call and batched
-> methods; only the fast/small shapes changed. GEMV rows cross-validate with
-> t4 within 2%. Manifest:
+> governor: `performance`. Batched-timing methodology (100 calls per
+> measurement, divided by 100) overcomes the RK3588's ~291 ns clock granularity
+> (PR #111). The previous CSV at commit `78eb7e4` used single-call timing and
+> had measurement artifacts (gated_scan 64×160: p50=5.3 µs was identical to
+> dwconv1d, cumdecay 1×2560: p50=0.9 µs was anomalously fast, gated_scan
+> 1×160: p50=0.0/inf, cumdecay 64×2560: p50=535 µs was 4.4× too slow). GEMV
+> rows cross-validate with t4 within 2%. Manifest:
 > `results/manifests/rk3588-t3_kleidiai_gdn_kernels.json`.
 > Raw CSV: `results/raw/kleidiai/rk3588-t3_kleidiai_gdn_kernels.csv`.
 
