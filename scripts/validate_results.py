@@ -558,6 +558,7 @@ def validate_gpu_micro_row(row, csv_name, issues, row_num):
             issues.append(Issue("ERROR", csv_name, f"row {row_num}: non-positive p50_ms"))
     except (ValueError, KeyError):
         issues.append(Issue("ERROR", csv_name, f"row {row_num}: cannot parse p50_ms"))
+        return  # cannot validate p95 ordering without p50
 
     # p95 is optional — some kernels don't report it
     p95_str = row.get("p95_ms", "")
