@@ -170,14 +170,14 @@ All figures above are verified against primary sources (Radxa product page and d
 | Orion O6 board bring-up | **Pending** — board not yet in hand |
 | CIX Early Bird SDK / NPU toolchain access | **Pending** — not yet approved |
 | Per-layer engine mapping (NPU/GPU/CPU) | Hypothesis only — pending measurements |
-| Optimized full inference (tokens/sec, TTFT, memory) | **Not started — needs hardware** |
+| Full inference results (tokens/sec, TTFT, memory) | Partial — C decode loop on A57 + RK3588 ([FINDINGS.md](./docs/FINDINGS.md) §14) |
 
-> **Results so far:** 64 CSVs from the device fleet, 67 generated figures/tables, 26 FINDINGS sections.
+> **Results so far:** 71 CSVs from the device fleet, 47 provenance manifests, 67 generated figures/tables, 28 FINDINGS sections.
 >
 > ```
 > results/
->   raw/         <- 64 per-run CSVs across 5 devices
->   manifests/   <- provenance manifests (git SHA, governor, thermals)
+>   raw/         <- 71 per-run CSVs across 5 devices
+>   manifests/   <- 47 provenance manifests (git SHA, governor, thermals)
 >   figures/     <- fleet analysis, comparison table, kernel/memory plots
 > ```
 >
