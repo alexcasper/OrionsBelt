@@ -3648,7 +3648,7 @@ only 1.7–2.6×. Three reasons:
    overhead entirely. On Cortex-A720/A77+ with dotprod, the speedup would be
    closer to 3–4×.
 
-Generated comparison: [`results/figures/kv_int8_scaling.md`](../results/figures/kv_int8_scaling.md)
+Generated comparison: [`results/figures/kv_int8_scaling_t3.md`](../results/figures/kv_int8_scaling_t3.md)
 (generator: `bench/kv_int8_analysis.py` — do not hand-edit).
 
 ---
