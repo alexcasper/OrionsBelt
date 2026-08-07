@@ -233,7 +233,7 @@ def _check_commit_lineage(base_commit, commits):
         else:
             results[sha] = {
                 "status": "code-identical",
-                "detail": "results/docs/beads only" if changed else "identical tree"
+                "detail": "results/docs/beads only" if changed else "identical tree",
             }
 
     return results
@@ -267,24 +267,21 @@ def generate_table(data, base_commit=None, commit_info=None):
 
         if has_pre_matched:
             problem = sorted(
-                sha for sha, ci in commit_info.items()
+                sha
+                for sha, ci in commit_info.items()
                 if ci["status"] in ("pre-matched", "diverged")
             )
             lines.append(
                 f"> ⚠️ **Partial commit match.** Base commit: `{base_commit}`. "
                 f"Some entries pre-date or diverge from the base and are not comparable."
             )
-            lines.append(
-                f"> Flagged: {', '.join(problem)}"
-            )
+            lines.append(f"> Flagged: {', '.join(problem)}")
         else:
             lines.append(
                 f"> ✅ **Matched-commit comparison.** All devices ran code-identical "
                 f"kernels at base commit `{base_commit}`."
             )
-            non_base = sorted(
-                sha for sha in all_shas if sha != base_commit
-            )
+            non_base = sorted(sha for sha in all_shas if sha != base_commit)
             if non_base:
                 lines.append(
                     f"> Result-file commits (results/docs only, no kernel changes): "
