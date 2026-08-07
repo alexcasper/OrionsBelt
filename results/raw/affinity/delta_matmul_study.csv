@@ -1,0 +1,28 @@
+# delta_matmul_affinity_study (ob-8qt.1)
+# device: RK3588 (4xA76@2.3GHz + 4xA55@1.8GHz)
+# repeats: 30
+# thermal_before: 39769  thermal_after: 41615  delta: 1°C
+# governor: performance
+# git_sha: f6f5854
+# timestamp: 2026-08-07T11:51:46Z
+# config,binary,affinity,kernel,M,K,N,repeats,p50_us,p95_us,gib_per_s_p50
+big_only_a76,a76,4-7,gdn_delta_rule_matmul,1,128,128,30,3.500,3.501,17.71
+big_only_a76,a76,4-7,gdn_delta_rule_matmul,64,128,128,30,214.390,227.515,0.57
+big_only_a76,a76,4-7,gdn_delta_rule_matmul,1,128,2048,30,52.796,56.587,18.65
+big_only_a76,a76,4-7,gdn_delta_rule_matmul,64,128,2048,30,3396.978,3400.478,0.44
+all_cores_a76,a76,all,gdn_delta_rule_matmul,1,128,128,30,25.668,25.669,2.42
+all_cores_a76,a76,all,gdn_delta_rule_matmul,64,128,128,30,215.556,1624.110,0.57
+all_cores_a76,a76,all,gdn_delta_rule_matmul,1,128,2048,30,52.795,53.087,18.65
+all_cores_a76,a76,all,gdn_delta_rule_matmul,64,128,2048,30,3418.855,3425.564,0.44
+big_on_little,a76,0-3,gdn_delta_rule_matmul,1,128,128,30,25.377,25.377,2.44
+big_on_little,a76,0-3,gdn_delta_rule_matmul,64,128,128,30,1618.567,1624.693,0.08
+big_on_little,a76,0-3,gdn_delta_rule_matmul,1,128,2048,30,405.444,425.862,2.43
+big_on_little,a76,0-3,gdn_delta_rule_matmul,64,128,2048,30,28797.896,28818.897,0.05
+little_only_a55,a55,0-3,gdn_delta_rule_matmul,1,128,128,30,25.377,25.669,2.44
+little_only_a55,a55,0-3,gdn_delta_rule_matmul,64,128,128,30,1642.194,1688.281,0.07
+little_only_a55,a55,0-3,gdn_delta_rule_matmul,1,128,2048,30,404.861,422.362,2.43
+little_only_a55,a55,0-3,gdn_delta_rule_matmul,64,128,2048,30,28779.811,28821.231,0.05
+little_on_big,a55,4-7,gdn_delta_rule_matmul,1,128,128,30,4.084,4.084,15.18
+little_on_big,a55,4-7,gdn_delta_rule_matmul,64,128,128,30,256.976,261.351,0.48
+little_on_big,a55,4-7,gdn_delta_rule_matmul,1,128,2048,30,59.504,59.796,16.55
+little_on_big,a55,4-7,gdn_delta_rule_matmul,64,128,2048,30,3845.592,3852.010,0.39
