@@ -993,12 +993,12 @@ Prefill (Qwen3.5-4B, seq=64, single-threaded p50 µs):
 
 | Kernel | Jetson A57 | RK3588 A76 | RK3588 A55 |
 |---|---:|---:|---:|
-| cumdecay fp32 | 1800 | 271.0 | 1422.0 |
-| cumdecay f16-output | 1006 (1.45×) | **171.5 (1.58×)** | 932.2 (1.53×) |
-| cumdecay bf16-output | 1259 (1.42×) | **247.1 (1.10×)** | 970.1 (1.47×) |
-| gated_scan fp32 | 3925 | 559.5 | 3875.3 |
-| gated_scan f16-state | 3948 (1.00×) | 558.6 (1.00×) | 3642.6 (1.06×) |
-| gated_scan bf16-state | 3987 (1.00×) | 548.7 (1.02×) | 3665.6 (1.06×) |
+| cumdecay fp32 | 1800 | 264.0 | 1349.9 |
+| cumdecay f16-output | 1006 (1.45×) | **170.1 (1.55×)** | 882.6 (1.53×) |
+| cumdecay bf16-output | 1259 (1.42×) | **243.6 (1.08×)** | 963.2 (1.40×) |
+| gated_scan fp32 | 3925 | 522.4 | 3604.1 |
+| gated_scan f16-state | 3948 (1.00×) | 520.4 (1.00×) | 3588.9 (1.00×) |
+| gated_scan bf16-state | 3987 (1.00×) | 519.5 (1.01×) | 3578.7 (1.01×) |
 
 **Findings confirmed and refined cross-device:**
 
@@ -1016,8 +1016,8 @@ RK3588 big cluster) — **prefer fp16 over bf16** for narrowed state/output. bf1
 hardware support (Armv8.6-A+, e.g. Graviton / the O6's A720) or where the core is slow enough to
 amortize software conversion. The optimal narrow format is **core-class-dependent, not universal.**
 
-Raw CSVs: `results/raw/rk3588-t4_{big,little}_singlethread.csv`; manifest
-`results/manifests/rk3588-t4_mixedprec.json` (git SHA `aad6189`, governor=performance).
+Raw CSV: `results/raw/rk3588-t4-clean.csv` (A76 big cluster);
+manifest `results/manifests/rk3588-t4-clean.json` (git SHA `1ca4d6d`, clean tree, governor=performance).
 
 ### Decode-phase narrow-format penalty (ob-mrd.6)
 
