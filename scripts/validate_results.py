@@ -20,6 +20,7 @@ Usage:
 import argparse
 import csv
 import json
+import math
 import os
 import subprocess
 import sys
@@ -173,6 +174,17 @@ KLEIDIAI_MATMUL_COLS = [
     "GFLOP_s",
 ]
 
+# KleidiAI GDN kernel microbenchmark CSV (from kleidiai_submission/bench_kai_gdn.c)
+KLEIDIAI_GDN_KERNEL_COLS = [
+    "kernel",
+    "shape",
+    "seq",
+    "channels",
+    "repeats",
+    "p50_us",
+    "gib_per_s_p50",
+]
+
 # Device spec bandwidth (GiB/s) for sanity-check upper bounds.
 # From DEVICE_RUNBOOK.md "What we are actually testing".
 DEVICE_SPEC_BW = {
@@ -211,6 +223,8 @@ def detect_csv_type(header):
         return "gpu_micro"
     if cols >= {"shape", "impl", "GiB_s", "GFLOP_s"}:
         return "kleidiai_matmul"
+    if cols >= {"kernel", "shape", "p50_us", "gib_per_s_p50"}:
+        return "kleidiai_gdn_kernel"
     return None
 
 
@@ -237,6 +251,8 @@ def expected_columns(csv_type):
         return GPU_MICRO_COLS
     if csv_type == "kleidiai_matmul":
         return KLEIDIAI_MATMUL_COLS
+    if csv_type == "kleidiai_gdn_kernel":
+        return KLEIDIAI_GDN_KERNEL_COLS
     return []
 
 
@@ -630,6 +646,43 @@ def validate_kleidiai_matmul_row(row, csv_name, issues, row_num):
         issues.append(Issue("WARNING", csv_name, f"row {row_num}: negative GFLOP_s={gflops}"))
 
 
+def validate_kleidiai_gdn_kernel_row(row, csv_name, issues, row_num):
+    """Validate a row of a KleidiAI GDN kernel microbenchmark CSV."""
+    try:
+        us = float(row["p50_us"])
+    except (ValueError, KeyError, TypeError):
+        issues.append(Issue("ERROR", csv_name, f"row {row_num}: cannot parse p50_us"))
+        return
+    if us < 0:
+        issues.append(Issue("WARNING", csv_name, f"row {row_num}: negative p50_us={us}"))
+
+    try:
+        gibs = float(row["gib_per_s_p50"])
+    except (ValueError, KeyError, TypeError):
+        issues.append(Issue("WARNING", csv_name, f"row {row_num}: cannot parse gib_per_s_p50"))
+        gibs = None
+    if gibs is not None:
+        if gibs < 0:
+            issues.append(
+                Issue("WARNING", csv_name, f"row {row_num}: negative gib_per_s_p50={gibs}")
+            )
+        elif math.isinf(gibs):
+            issues.append(
+                Issue(
+                    "NOTE",
+                    csv_name,
+                    f"row {row_num}: inf gib_per_s_p50 (workload too small to measure)",
+                )
+            )
+        elif gibs > ABSURD_THROUGHPUT:
+            issues.append(Issue("WARNING", csv_name, f"row {row_num}: absurd gib_per_s_p50={gibs}"))
+
+    kernel = row.get("kernel", "")
+    valid_kernels = {"cumdecay", "gated_scan", "dwconv1d", "gemv"}
+    if kernel and kernel not in valid_kernels:
+        issues.append(Issue("WARNING", csv_name, f"row {row_num}: unknown kernel '{kernel}'"))
+
+
 def validate_csv(path, csv_name, issues):
     """Validate CSV schema and row-level data. Return (csv_type, row_count, manifest_ref)."""
     if not os.path.isfile(path):
@@ -722,6 +775,8 @@ def validate_csv(path, csv_name, issues):
                     validate_gpu_micro_row(row, csv_name, issues, i)
                 elif csv_type == "kleidiai_matmul":
                     validate_kleidiai_matmul_row(row, csv_name, issues, i)
+                elif csv_type == "kleidiai_gdn_kernel":
+                    validate_kleidiai_gdn_kernel_row(row, csv_name, issues, i)
 
             return csv_type, row_count, manifest_ref
 
