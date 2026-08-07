@@ -2491,3 +2491,214 @@ GPU. We wrote one from scratch, validated it bit-exact, and characterised
 its performance honestly — including the honest finding that on this
 particular GPU generation, the CPU wins. That honesty is what makes the O6
 result credible when it arrives.
+
+---
+
+## GDN-2 vs GDN-1 Gated Scan: Operator-Level Comparison on RK3588-t4
+
+**Date:** 2026-08-07
+**Device:** rk3588-t4 (RK3588, A76 big + A55 little)
+**Governor:** performance
+**Beads:** ob-82b (microbenchmark), ob-7b5 (research note)
+**Data:** `results/raw/rk3588-t4_gdn2_vs_gdn1_big.csv`, `_little.csv`
+
+### Background
+
+GDN-1 (standard GatedDeltaNet) uses a single gate `g` for both erase and
+write:
+```
+s_t = x_t + s_{t-1} * g_t          // 1 FMA/element, 3 streams
+```
+
+GDN-2 (decoupled gating, NVLabs GatedDeltaNet-2) separates the erase gate
+(`b_gate`) from the write gate (`w_gate`):
+```
+s_t = w_t·x_t + s_{t-1} * (g_t·b_t)  // 2 MUL + 1 FMA, 5 streams
+```
+
+Theoretical cost ratio: **1.67× memory traffic, 2× compute**.
+
+### Results — Big Cluster (A76, cpu4-7)
+
+| Config | GDN-1 p50 | GDN-2 p50 | Slowdown | GDN-1 GiB/s | GDN-2 GiB/s | GDN-1 GFLOP/s | GDN-2 GFLOP/s |
+|--------|-----------|-----------|----------|-------------|-------------|---------------|---------------|
+| 4B prefill (seq=64, ch=4096) | 257 µs | 688 µs | **2.68×** | 11.5 | 7.1 | 2.04 | 1.52 |
+| 0.8B prefill (seq=64, ch=2048) | 139 µs | 317 µs | **2.29×** | 10.7 | 7.7 | 1.89 | 1.65 |
+| 4B decode (seq=1, ch=4096) | 1.75 µs | 2.33 µs | **1.33×** | 43.6 | 45.8 | 4.68 | **7.02** |
+| 0.8B decode (seq=1, ch=2048) | 1.46 µs | 1.75 µs | **1.20×** | 26.2 | 30.5 | 2.81 | **4.68** |
+
+### Results — Little Cluster (A55, cpu0-3)
+
+| Config | GDN-1 p50 | GDN-2 p50 | Slowdown | GDN-1 GiB/s | GDN-2 GiB/s |
+|--------|-----------|-----------|----------|-------------|-------------|
+| 4B prefill (seq=64, ch=4096) | 800 µs | 2912 µs | **3.64×** | 3.7 | 1.7 |
+| 0.8B prefill (seq=64, ch=2048) | 256 µs | 564 µs | **2.20×** | 5.8 | 4.4 |
+| 4B decode (seq=1, ch=4096) | 5.83 µs | 10.21 µs | **1.75×** | 13.1 | 10.5 |
+| 0.8B decode (seq=1, ch=2048) | 4.67 µs | 6.71 µs | **1.44×** | 8.2 | 8.0 |
+
+### Analysis
+
+1. **Prefill penalty is severe (2.2–3.6×).** At prefill, the recurrent
+   state spans the full channel dimension and does not fit in L1. The scan
+   is bandwidth-bound, and GDN-2's 5 streams vs GDN-1's 3 directly increase
+   memory traffic. The observed slowdown (2.2–3.6×) exceeds the theoretical
+   1.67× memory ratio because the extra 2 MULs per element add arithmetic
+   latency that does not fully overlap with memory access.
+
+2. **Decode penalty is modest (1.2–1.75×).** At decode (seq=1), the state
+   is a single vector of `channels` floats — 16 KiB for 4096 channels —
+   which fits comfortably in L1 cache. The kernel becomes compute-bound,
+   and GDN-2's 2× compute cost manifests as only a 1.2–1.3× slowdown on A76.
+   The A55 shows a slightly worse 1.4–1.75× ratio due to its simpler NEON
+   FMA pipeline.
+
+3. **GDN-2 achieves HIGHER GFLOP/s at decode.** On the A76, GDN-2 decode
+   hits 7.02 GFLOP/s vs GDN-1's 4.68. This means the A76's FMA units are
+   underutilized in GDN-1 decode — GDN-2's extra MULs fill otherwise idle
+   arithmetic slots. Both kernels are cache-resident (~45 GiB/s achieved
+   bandwidth, far above DRAM bandwidth).
+
+4. **A55 prefill penalty is disproportionate.** The 4B prefill slowdown is
+   3.64× on A55 vs 2.68× on A76. The A55's in-order pipeline cannot overlap
+   the extra MULs with loads as effectively as the A76's out-of-order
+   execution. This suggests GDN-2 is a worse fit for little cores.
+
+### Implication for GDN-2 adoption
+
+The decoupled gating of GDN-2 trades a 1.67× memory and 2× compute cost
+for improved model quality (separate erase/write control). At edge scale:
+
+- **Decode (the hot path for autoregressive inference):** The cost is
+  modest (1.2–1.3× on big cores). If GDN-2 improves long-context retrieval
+  quality enough to justify this, it is viable.
+- **Prefill:** The 2.2–3.6× penalty is significant. For workloads with
+  long prompts, prefill latency would increase substantially. Chunkwise
+  prefill (amortizing over larger chunks) could mitigate this.
+
+This is an honest operator-level measurement. Whether the quality benefit
+justifies the cost is a model-level question (ob-zak, RULER evaluation)
+that remains open.
+
+---
+
+## Sustained-Load Thermal Characterization on RK3588-t4
+
+**Date:** 2026-08-07
+**Device:** rk3588-t4 (RK3588, A76 big + A55 little)
+**Governor:** performance
+**Bead data:** ob-dgn (thermal-throttle characterization)
+**Data:** `results/raw/rk3588-t4_sustained_thermal.txt`
+
+### Setup
+
+Ran `gdn_gated_scan` (the heaviest GDN kernel, 4B prefill config: seq=64,
+channels=4096) for 60 seconds on each cluster with throughput and
+temperature sampled every 5s. Purpose: test PLAN.md risk R7 — "burst numbers
+that cannot be sustained are misleading on passively-cooled edge hardware."
+
+### Big Cluster (A76, cpu4-7)
+
+| Elapsed | Throughput | Thermal | vs First |
+|---------|-----------|---------|----------|
+| 5s | 11.75 GiB/s | 48.1°C | baseline |
+| 30s | 11.57 GiB/s | 50.8°C | -1.6% |
+| 60s | 11.58 GiB/s | 51.8°C | -1.5% |
+
+**Result:** Temperature rises 13°C (38.8→51.8°C) over 60s but plateaus
+at ~51.8°C around the 40s mark. Throughput decay is only **1.5%** — the
+A76's burst numbers are sustainable. Active cooling (fan) on t4 is adequate.
+
+### Little Cluster (A55, cpu0-3)
+
+| Elapsed | Throughput | Thermal | vs First |
+|---------|-----------|---------|----------|
+| 5s | 3.66 GiB/s | 46.2°C | baseline |
+| 30s | 3.67 GiB/s | 46.2°C | +0.2% |
+| 60s | 3.69 GiB/s | 46.2°C | +0.9% |
+
+**Result:** No thermal rise at all. Temperature stays flat at 46.2°C.
+Throughput is completely stable (noise ~1%). The A55's power efficiency
+makes sustained workloads trivially sustainable.
+
+### Conclusion
+
+The RK3588-t4 does **not** exhibit thermal throttling under sustained
+GDN kernel load with active cooling. Burst numbers (our standard 30-repeat
+benchmarks) are valid sustained-throughput numbers. This is relevant to the
+fleet benchmark (ob-mrd.8) and the Devpost writeup — we can report burst
+numbers without a "sustained" caveat for this device class.
+
+Note: the O6 (Cortex-A720) may behave differently — it has higher peak
+power density. The thermal characterization should be repeated on O6 when
+hardware is available.
+
+---
+
+## Fleet Data Quality: Single-Core Clean Sweep Variance (ob-bf7)
+
+**Date:** 2026-08-07
+**Device:** rk3588-t4 (RK3588, A76)
+**Bead:** ob-bf7
+**Data:** `results/raw/rk3588-t4_clean_stability_check.csv`
+
+### Problem
+
+The fleet bandwidth-scaling comparison uses single-core "clean" sweeps for
+cross-device comparison. However, rk3588-t3's clean sweep shows a **29.9%
+spread** on `gdn_gated_scan` (4B prefill), making the numbers unreliable.
+The t3 number (2.91 GiB/s) appears 1.8× slower than t4 (5.27 GiB/s) on
+identical silicon at the same git SHA — this is environmental noise, not
+a real device difference.
+
+### Evidence: t4 Stability Check (3 consecutive runs)
+
+| Run | p50 (µs) | GiB/s | Spread |
+|-----|----------|-------|--------|
+| 1 (committed) | 561.2 | 5.27 | 6.3% |
+| 2 | 548.7 | 5.40 | 8.9% |
+| 3 | 516.6 | 5.73 | 6.2% |
+| **Mean** | **542** | **5.47** | — |
+| **CoV** | **4.0%** | — | — |
+
+t4 is stable: ~4% coefficient of variation across runs.
+
+### Cross-Device Comparison: Single-Core vs Multi-Core
+
+| Metric | t3 | t4 | Ratio |
+|--------|----|----|-------|
+| **Single-core clean** (gated_scan 4B) | 2.91 GiB/s (30% spread) | 5.27 GiB/s (6% spread) | **1.81×** |
+| **Multi-core big** (gated_scan 4B) | 10.33 GiB/s (8% spread) | 11.09 GiB/s (5% spread) | **1.07×** |
+
+The multi-core numbers agree within 7%, consistent with same-silicon
+expectations. The single-core discrepancy is entirely due to t3's
+anomalous clean sweep (likely wrong governor or background load).
+
+### Root Cause Analysis
+
+t3's clean sweep shows 10-30% spread across **all** kernels, not just one:
+
+| Kernel | t3 spread | t4 spread |
+|--------|-----------|-----------|
+| gated_scan | 29.9% | 6.3% |
+| gated_scan_f16 | 18.8% | 4.2% |
+| gated_scan_bf16 | 20.5% | 4.4% |
+| cumdecay | 17.6% | 9.2% |
+| causal_dwconv1d | 10.6% | 5.6% |
+
+This systemic noise pattern indicates an environmental issue (governor not
+set to performance, background processes, or thermal interference from
+prior workloads), not a kernel or measurement methodology problem.
+
+### Recommendations
+
+1. **Use multi-cluster (4-core OpenMP) numbers for fleet comparison.** They
+   are more stable (5-8% spread vs 6-30%) and less sensitive to
+   environmental interference. The single-core protocol amplifies
+   scheduling jitter on Linux edge devices.
+
+2. **t3 should re-run its clean sweep** with verified governor=performance
+   and no background load. The current numbers are not trustworthy.
+
+3. **Always capture governor state in the manifest.** Both t3 and t4 clean
+   manifests lack governor/thermal data — this makes it impossible to
+   diagnose bad runs after the fact.

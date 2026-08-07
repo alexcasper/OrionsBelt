@@ -1,0 +1,10 @@
+# RK3588-t4 single-core clean sweep stability check (ob-bf7)
+# Three consecutive runs, governor=performance, cpu4 only, thermals 39-42C
+# Purpose: establish run-to-run variance baseline for fleet data quality
+run,model,kernel,seq,channels,p50_us,spread_pct,gib_per_s
+1,Qwen3.5-4B,gdn_gated_scan,64,4096,561.206,6.3,5.27
+2,Qwen3.5-4B,gdn_gated_scan,64,4096,548.663,8.9,5.40
+3,Qwen3.5-4B,gdn_gated_scan,64,4096,516.577,6.2,5.73
+1,Qwen3.5-4B,gdn_cumdecay,64,4096,267.769,9.2,7.29
+1,Qwen3.5-4B,gdn_causal_dwconv1d,64,4096,295.187,5.6,6.98
+1,Qwen3.5-4B,gdn2_gated_scan,64,4096,1525.523,1.8,3.22
