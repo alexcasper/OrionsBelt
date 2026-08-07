@@ -3629,3 +3629,94 @@ with INT8 KV, full-attention's decode cost at ctx=4096 is 189k µs on t4
 (vs GDN's 120k µs for all 24 GDN layers). The crossover where full-attention
 overtakes GDN on throughput is pushed further by INT8 KV, but the asymptotic
 advantage remains.
+
+---
+
+## 22. Matched-commit fleet e2e comparison: final submission-quality cross-device table (2026-08-07, ob-52r)
+
+### Motivation
+
+Section 19 reported a cross-device comparison that mixed commits — t4 at
+pre-GEMV-opt commits, j1 at scattered SHAs — making cross-device ratios
+unreliable. Bead ob-52r required every fleet device to re-run the e2e
+decode benchmark at the SAME kernel code (commit `8e7403c`) with freshly
+built binaries and `dirty=false` manifests, 3 runs each. This section
+supersedes §19's tables with the clean matched-commit numbers.
+
+### Method
+
+All devices ran `./scripts/run_e2e_decode.sh --device <dev> --cluster big
+--rebuild --runs 3` for each model/quantization combination, after pinning
+the CPU governor to `performance` and recording thermals before/after.
+The t4 results were committed at `3d914b6` (kernel-identical to `8e7403c` —
+only results/docs/beads on top); t3 and j1 results were committed at
+results-only SHAs above the same `8e7403c` kernel.
+
+### Data — all entries at matched commit, governor=performance, dirty=false
+
+| Device | SoC | Cores | Model | Quant | Tok/s | TTFT (ms) | Runs | INT8 speedup |
+|--------|-----|-------|-------|-------|------:|----------:|-----:|-------------:|
+| rk3588-t4 | RK3588 | 4× A76 @2.4 GHz | 4B | fp32 | 1.11 | 901 | 3 | — |
+| rk3588-t4 | RK3588 | 4× A76 @2.4 GHz | 4B | int8 | 1.83 | 545 | 3 | **1.65×** |
+| rk3588-t3 | RK3588 | 4× A76 @2.4 GHz | 4B | fp32 | 1.04 | 960 | 3 | — |
+| rk3588-t3 | RK3588 | 4× A76 @2.4 GHz | 4B | int8 | 1.84 | 542 | 3 | **1.77×** |
+| jetson-j1 | TX1 | 4× A57 @1.48 GHz | 4B | fp32 | 0.43 | 2344 | 3 | — |
+| jetson-j1 | TX1 | 4× A57 @1.48 GHz | 4B | int8 | 0.51 | 1788 | 3 | **1.19×** |
+| rk3588-t4 | RK3588 | 4× A76 @2.4 GHz | 0.8B | fp32 | 8.25 | 121 | 3 | — |
+| rk3588-t4 | RK3588 | 4× A76 @2.4 GHz | 0.8B | int8 | 10.03 | 100 | 3 | **1.22×** |
+| rk3588-t3 | RK3588 | 4× A76 @2.4 GHz | 0.8B | fp32 | 7.95 | 126 | 3 | — |
+| rk3588-t3 | RK3588 | 4× A76 @2.4 GHz | 0.8B | int8 | 10.61 | 94 | 3 | **1.33×** |
+| jetson-j1 | TX1 | 4× A57 @1.48 GHz | 0.8B | fp32 | 2.06 | 469 | 3 | — |
+| jetson-j1 | TX1 | 4× A57 @1.48 GHz | 0.8B | int8 | 2.45 | 375 | 3 | **1.19×** |
+
+### Cross-device validation (RK3588 t4 vs t3 — same SoC class)
+
+| Config | t3 tok/s | t4 tok/s | t4/t3 | Match? |
+|--------|---------:|---------:|------:|--------|
+| 4B FP32 | 1.04 | 1.11 | 107% | ✓ |
+| 4B INT8 | 1.84 | 1.83 | 99% | ✓ |
+| 0.8B FP32 | 7.95 | 8.25 | 104% | ✓ |
+| 0.8B INT8 | 10.61 | 10.03 | 95% | ✓ |
+
+All four configurations match within 95–107% on independent RK3588 hardware.
+This confirms the results generalise across boards of the same class and
+validates the measurement methodology.
+
+### Cross-architecture comparison (A76 vs A57)
+
+| Model | Quant | A76 (t3) | A76 (t4) | A57 (j1) | A76/A57 (avg) |
+|-------|-------|---------:|---------:|---------:|--------------:|
+| 4B | fp32 | 1.04 | 1.11 | 0.43 | **2.5×** |
+| 4B | int8 | 1.84 | 1.83 | 0.51 | **3.6×** |
+| 0.8B | fp32 | 7.95 | 8.25 | 2.06 | **3.9×** |
+| 0.8B | int8 | 10.61 | 10.03 | 2.45 | **4.2×** |
+
+The A76 advantage over the A57 grows with INT8 and with smaller models:
+- **FP32**: 2.5–3.9× (clock + pipeline advantage)
+- **INT8**: 3.6–4.2× (A76's wider NEON/dotprod units amplify the bandwidth
+  benefit of INT8 weights — 8 bytes/cycle vs 4 bytes/cycle at FP32)
+- **0.8B vs 4B**: larger advantage on 0.8B because the smaller working set
+  fits better in A76's superior L1/L2 cache, maximizing compute efficiency
+
+### INT8 speedup varies by architecture
+
+| Device | 4B speedup | 0.8B speedup |
+|--------|-----------:|-------------:|
+| rk3588-t3 | 1.77× | 1.33× |
+| rk3588-t4 | 1.65× | 1.22× |
+| jetson-j1 | 1.19× | 1.19× |
+
+INT8 weight-only quantization provides 1.65–1.77× on the A76 but only 1.19×
+on the A57. The A76's dotprod/i8mm pipeline can execute two INT8 FMAs per
+cycle versus one FP32 FMA, while the A57 (Armv8.0, no dotprod) must emulate
+INT8 via NEON byte operations — extracting less benefit from the compressed
+format. This validates the choice of RK3588 as the primary edge benchmark
+platform: it demonstrates the INT8 advantage that the Arm optimization
+criterion rewards.
+
+### Supersedes §19
+
+The earlier §19 table reported t4 at 0.69 tok/s (4B FP32, commit `a42566d`)
+and 2.55 tok/s (0.8B FP32, commit `3b6102a`), which were pre-optimization
+or non-representative commits. The matched-commit data above (1.11 and 8.25
+tok/s respectively) are the authoritative numbers for submission.

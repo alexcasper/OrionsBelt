@@ -1,6 +1,6 @@
 # Devpost Submission Write-Up
 
-**Bead:** `ob-f7k` · **Track:** Edge AI ([ADR 0007](./adr/0007-track-selection-edge-ai.md))
+**Bead:** `ob-f7k` · **Track:** Edge AI ([ADR 0007](./adr/0007-commit-to-edge-ai-track.md))
 
 This document maps section-by-section to the Devpost submission requirements
 (project overview, functionality/output, setup instructions) and the four
@@ -53,7 +53,7 @@ OrionsBelt fills that gap with:
 
 The Radxa Orion O6 (CIX P1: Cortex-A720 + Immortalis G720 + 28.8 TOPS NPU)
 has not arrived since project start (externally gated procurement). Per
-[ADR 0007](./adr/0007-track-selection-edge-ai.md), we committed to the Edge
+[ADR 0007](./adr/0007-commit-to-edge-ai-track.md), we committed to the Edge
 AI track on the RK3588 — a legitimate prize category — because the GDN
 memory-scaling story is fully demonstrable on any aarch64 device, and the
 hedge work already produces real results. If the O6 arrives before the
@@ -166,7 +166,7 @@ changes to the model. GDN's novel recurrent kernels (conv, decay, scan)
 remain <1% of decode time; the bottleneck is weight-loading matmuls (FFN
 54–72%), exactly as the bandwidth analysis predicts. See
 [FINDINGS.md §15–16](./FINDINGS.md) and the
-[e2e fleet comparison](./results/figures/e2e_fleet_comparison.md).
+[e2e fleet comparison](../results/figures/e2e_fleet_comparison.md).
 
 **Context-length scaling: GDN is O(1), full-attention is O(n) — measured on silicon.**
 
@@ -363,7 +363,7 @@ ORIONS_FORCE_FP32=1 python3 bench/harness.py \
 | Document | What it contains |
 |----------|-----------------|
 | [`README.md`](../README.md) | Project overview, claims, status table |
-| [`PLAN.md`](../PLAN.md) | Implementation plan, rubric mapping, risk register |
+| [`PLAN.md`](./archive/PLAN.md) | Implementation plan, rubric mapping, risk register |
 | [`docs/FINDINGS.md`](./FINDINGS.md) | All measured results with analysis (11 sections) |
 | [`docs/SETUP_PORTABLE.md`](./SETUP_PORTABLE.md) | Step-by-step device setup |
 | [`docs/adr/`](./adr/) | 7 architecture decision records |
@@ -393,8 +393,10 @@ ORIONS_FORCE_FP32=1 python3 bench/harness.py \
   speedup at ctx=4096 (FINDINGS.md §20)
 - Sustained-load thermal stability: 0.3% throughput decay over 94s on RK3588,
   confirming burst numbers are steady-state sustainable (FINDINGS.md §18)
-- Cross-device decode comparison: A76 is 2.4–3.0× faster than A57, consistent
-  with clock and pipeline width (FINDINGS.md §19)
+- Cross-device decode comparison: A76 is 2.4–4.3× faster than A57, consistent
+  with clock and pipeline width; INT8 weight quantization amplifies the gap
+  (dotprod-capable A76 gains 1.65–1.77× vs 1.19× on A57). Validated on two
+  independent RK3588 boards (FINDINGS.md §22)
 - Three-component memory decomposition confirmed on real model weights
   (analytical = measured)
 - big.LITTLE affinity policy: 2–3× from pinning, validated across 6 configs
