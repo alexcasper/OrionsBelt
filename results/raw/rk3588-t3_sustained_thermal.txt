@@ -1,0 +1,26 @@
+RK3588-t3 sustained-load thermal characterization (2026-08-07)
+Governor: performance, 0.8B INT8, big cluster (A76, cpu4-7, OpenMP 4 threads)
+Commit: 9811ec2
+
+RUN 1 (cold start):
+  Pre-thermal: 39°C (max zone)
+  Tokens: 500 (~47s sustained)
+  Throughput: 10.56 tok/s (mean=94715 us)
+  p50=94712 us  p95=94968 us  p99=95055 us
+  Spread (p99/p50): 0.4%
+  Post-thermal: 53°C
+
+RUN 2 (immediately after, cumulative):
+  Pre-thermal: 53°C
+  Tokens: 500 (~47s sustained)
+  Throughput: 10.53 tok/s (mean=94949 us)
+  p50=94961 us  p95=95150 us  p99=95307 us
+  Spread (p99/p50): 0.4%
+  Post-thermal: 56°C
+
+THROUGHPUT DECAY (run1 → run2): 0.3%
+THERMAL RISE: 39°C → 56°C (17°C over ~94s sustained)
+
+CONCLUSION: No thermal throttling detected. The RK3588's active cooling
+maintains stable throughput over 94 seconds of sustained decode (~1000 tokens).
+The burst benchmark numbers (§15, §16) are sustainable steady-state numbers.

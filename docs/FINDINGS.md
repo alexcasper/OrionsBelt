@@ -3205,3 +3205,24 @@ cc -O3 -fopenmp -march=armv8.2-a+dotprod -static \
 # Run sweep (big cluster on RK3588)
 taskset -c 4-7 ./bench_e2e_ctx --ctx-sweep 1,64,256,512,1024,2048,4096 --csv
 ```
+
+## 18. Sustained-load thermal stability: no throttling on RK3588 (2026-08-07)
+
+**Addresses PLAN.md risk R7: burst numbers must be sustainable.**
+
+Ran two back-to-back sustained bursts of 500 tokens each (94s total sustained
+decode) on the 0.8B INT8 model, big cluster (A76, 4 cores, governor=performance).
+
+| Run | Pre-thermal | Tokens | tok/s | p50 (us) | p99 (us) | p99/p50 | Post-thermal |
+|-----|-----------:|-------:|------:|---------:|---------:|--------:|-----------:|
+| 1 (cold) | 39 °C | 500 | 10.56 | 94712 | 95055 | 1.004× | 53 °C |
+| 2 (hot) | 53 °C | 500 | 10.53 | 94961 | 95307 | 1.004× | 56 °C |
+
+Throughput decay across the two runs: **0.3%** — within measurement noise.
+Per-token latency spread (p99/p50) is 0.4% in both runs, confirming flat
+throughput throughout each burst.
+
+**Conclusion**: the RK3588's active cooling handles sustained decode without
+thermal throttling. The burst benchmark numbers in §15–17 are steady-state
+sustainable numbers, not peak-only artifacts. This matters for the Physical AI
+submission criterion: honest sustained throughput, not a one-shot burst.
