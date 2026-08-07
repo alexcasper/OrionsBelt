@@ -2506,10 +2506,24 @@ This is the number the CPU-first mapping hypothesis needs.
 
 ### Results
 
-| Device | Core | Commit | Tok/s (decode) | TTFT | Governor |
-|--------|------|--------|---------------:|-----:|----------|
-| RK3588 (t3) | Cortex-A76 ×4 | a086a50 | 0.08 | 13.3 s | performance |
-| Jetson Nano (j1) | Cortex-A57 ×4 | dd1fdf4 | 0.02 | 48.6 s | performance |
+| Device | Core | Commit | Runs | Tok/s (decode) | TTFT range | Governor |
+|--------|------|--------|-----:|---------------:|-----------:|----------|
+| RK3588 (t3) | Cortex-A76 ×4 | a086a50 | 1 | 0.08 | 13.3 s | performance |
+| Jetson Nano (j1) | Cortex-A57 ×4 | a8b5195 | 3 | 0.022–0.024 | 41.4–47.8 s | performance |
+
+**A57 replicate detail (3 runs, commit `a8b5195`, clean tree):**
+
+| Run | TTFT (s) | Per-token mean (s) | Tok/s |
+|----:|---------:|-------------------:|------:|
+| 1 | 47.8 | 46.4 | 0.022 |
+| 2 | 44.2 | 44.0 | 0.023 |
+| 3 | 41.4 | 41.2 | 0.024 |
+
+TTFT spread: **1.15×** (47.8 / 41.4). Per-token mean spread: **1.13×**.
+Thermal delta over all 3 runs: +3 °C (47.5 → 50.5 °C CPU-therm) — no throttling.
+This is well within the stability range for a passively-cooled edge device,
+and far tighter than the 1.68× inter-board spread found in the kernel-level
+fleet sweep (bead ob-bf7).
 
 **Caveat: different commits.** The kernel source (`gdn_sve.c`,
 `gdn_delta_matmul.c`, `gdn_e2e_decode.c`) is identical at both commits — the
@@ -2517,14 +2531,13 @@ intervening changes are to scripts and documentation — so the comparison is
 valid in practice. However, per the project's results-discipline rule, this
 should be re-confirmed at a matched commit before appearing in the submission.
 
-**Only 1 run per device.** A single measurement per device is not enough to
-establish replicates (bead ob-bf7 found 1.68× spread on this fleet). These
-numbers should be treated as order-of-magnitude, not precise.
+**RK3588 (t3) is still single-run.** The A57 now has 3 replicates; the RK3588
+data point should be re-run with multiple measurements for a matched comparison.
 
 ### What the numbers say (and don't)
 
-The A57 is ~4× slower than the A76 (0.02 vs 0.08 tok/s), consistent with the
-core-level bandwidth ratio from the fleet kernel study (§5a). This is not
+The A57 is ~4× slower than the A76 (0.022–0.024 vs 0.08 tok/s), consistent with
+the core-level bandwidth ratio from the fleet kernel study (§5a). This is not
 surprising — the A57 is Armv8.0-A with NEON only, while the A76 has dotprod
 and higher clock. The result confirms the decode loop runs correctly on the
 weakest fleet device and extends the fleet e2e data set.
