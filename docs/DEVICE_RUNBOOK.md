@@ -20,6 +20,8 @@ libraries — just `scp` and run.
 | RK3588 big cluster | `dist/bench_gdn_rk3588_a76` | pin to the A76s |
 | RK3588 little cluster | `dist/bench_gdn_rk3588_a55` | pin to the A55s |
 | Jetson Nano | `dist/bench_gdn_jetson_a57` | Armv8.0, no dotprod |
+| Orion O6 (A720 big) | `dist/bench_gdn_orion_a720` | CIX P1, Armv9.2-A, SVE2 — pin to the 4× A720 big cores |
+| Orion O6 (A520 little) | `dist/bench_gdn_armv8a` | A520 little cluster (no SVE2 — use armv8a binary) |
 
 ## 1. Per device
 
@@ -56,6 +58,21 @@ done
 
 taskset -c 4-7 /tmp/bench_gdn_rk3588_a76 --repeats 30 --csv > bench_rk3588_big.csv
 taskset -c 0-3 /tmp/bench_gdn_rk3588_a55 --repeats 30 --csv > bench_rk3588_little.csv
+```
+
+**Pin on the Orion O6** — it has a **3-cluster** design (unlike the RK3588's 2):
+
+```bash
+# Identify clusters by max frequency (4× A720 big + 4× A720 med + 4× A520 little):
+for c in /sys/devices/system/cpu/cpu[0-9]*/cpufreq/cpuinfo_max_freq; do
+  echo "$c $(cat "$c")"
+done
+# Expect three distinct frequencies. Highest = A720 big, mid = A720 med, lowest = A520.
+
+# Pin to the A720 big cluster (highest-frequency cores) for SVE2 kernels:
+taskset -c <big-cores> /tmp/bench_gdn_orion_a720 --repeats 30 --csv > bench_orion_o6_big.csv
+# Pin to the A520 little cluster for the Armv8-A fallback path:
+taskset -c <little-cores> /tmp/bench_gdn_armv8a --repeats 30 --csv > bench_orion_o6_little.csv
 ```
 
 ## 2. Capture provenance
@@ -109,7 +126,7 @@ git add results/ && git commit -m "Add measured results from <device>"
 ## What we are actually testing
 
 Not "how fast is my board". The devices span **~17 GB/s (Pi 5) → 25.6 GB/s (Jetson) → ~34 GB/s
-(RK3588)** of spec memory bandwidth, and the hypothesis (`METRICS.md`) is that these kernels are
+(RK3588) → ~100 GB/s (Orion O6)** of spec memory bandwidth, and the hypothesis (`METRICS.md`) is that these kernels are
 **memory-bandwidth-bound at ~0.25 FLOP/byte**. If that holds, achieved throughput should track
 bandwidth roughly linearly and **largely ignore core generation**.
 
