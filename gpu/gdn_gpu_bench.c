@@ -352,9 +352,9 @@ int main(int argc, char **argv) {
     cl_kernel k_conv  = clCreateKernel(g_program, "gdn_causal_dwconv1d", &err); cl_check(err, "create conv");
     cl_kernel k_delta = clCreateKernel(g_program, "gdn_delta_rule_decode", &err); cl_check(err, "create delta");
 
-    /* CSV header (comment-prefixed for readability, skipped by data parsers) */
+    /* CSV header — standard (no # prefix so csv.DictReader and validate_results.py parse it) */
     if (csv_mode)
-        printf("# kernel,dim1,dim2,dim3,p50_ms,p95_ms,bw_mibs\n");
+        printf("kernel,dim1,dim2,dim3,p50_ms,p95_ms,bw_mibs\n");
 
     /* ================================================================
      * Test 1: Gated scan — correctness
@@ -409,7 +409,7 @@ int main(int argc, char **argv) {
             printf("  bench: p50=%.4f ms  p95=%.4f ms  bw=%.1f MiB/s\n\n",
                    p50, p95, bytes / (p50 * 1e-3) / (1024 * 1024));
         else
-            printf("gdn_gated_scan,%zu,%zu,%.4f,%.4f,%.1f\n", T, C, p50, p95,
+            printf("gdn_gated_scan,%zu,%zu,,%.4f,%.4f,%.1f\n", T, C, p50, p95,
                    bytes / (p50 * 1e-3) / (1024 * 1024));
 
         clReleaseMemObject(g_d); clReleaseMemObject(x_d);
@@ -454,7 +454,7 @@ int main(int argc, char **argv) {
             printf("  bench: p50=%.4f ms  bw=%.1f MiB/s\n\n", p50,
                    bytes / (p50 * 1e-3) / (1024 * 1024));
         else
-            printf("gdn_cumdecay,%zu,%zu,%.4f,%.1f\n", T, C, p50,
+            printf("gdn_cumdecay,%zu,%zu,,%.4f,,%.1f\n", T, C, p50,
                    bytes / (p50 * 1e-3) / (1024 * 1024));
 
         clReleaseMemObject(a_d); clReleaseMemObject(d_d);
@@ -509,7 +509,7 @@ int main(int argc, char **argv) {
             printf("  bench: p50=%.4f ms  bw=%.1f MiB/s\n\n", p50,
                    bytes / (p50 * 1e-3) / (1024 * 1024));
         else
-            printf("gdn_causal_dwconv1d,%zu,%zu,%.4f,%.1f\n", T, C, p50,
+            printf("gdn_causal_dwconv1d,%zu,%zu,,%.4f,,%.1f\n", T, C, p50,
                    bytes / (p50 * 1e-3) / (1024 * 1024));
 
         clReleaseMemObject(in_d); clReleaseMemObject(w_d);

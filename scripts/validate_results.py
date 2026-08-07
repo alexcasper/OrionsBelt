@@ -149,6 +149,17 @@ E2E_CTXSWEEP_RAW_COLS = [
     "kv_cache_mb",
 ]
 
+# GPU microbenchmark CSV (from gpu/gdn_gpu_bench.c --csv, Mali-G610 OpenCL)
+GPU_MICRO_COLS = [
+    "kernel",
+    "dim1",
+    "dim2",
+    "dim3",
+    "p50_ms",
+    "p95_ms",
+    "bw_mibs",
+]
+
 # Device spec bandwidth (GiB/s) for sanity-check upper bounds.
 # From DEVICE_RUNBOOK.md "What we are actually testing".
 DEVICE_SPEC_BW = {
@@ -182,6 +193,8 @@ def detect_csv_type(header):
         return "e2e_sweep"
     if cols >= {"gdn_layer_us", "kv_cache_mb", "total_us"}:
         return "e2e_ctxsweep"
+    if cols >= {"bw_mibs", "p50_ms", "dim1"}:
+        return "gpu_micro"
     return None
 
 
@@ -204,6 +217,8 @@ def expected_columns(csv_type):
         return E2E_SWEEP_COLS
     if csv_type == "e2e_ctxsweep":
         return E2E_CTXSWEEP_RAW_COLS
+    if csv_type == "gpu_micro":
+        return GPU_MICRO_COLS
     return []
 
 
@@ -505,6 +520,59 @@ def validate_e2e_sweep_row(row, csv_name, issues, row_num):
         )
 
 
+_GPU_KERNELS = {"gdn_gated_scan", "gdn_cumdecay", "gdn_causal_dwconv1d", "gdn_delta_rule_decode"}
+
+
+def validate_gpu_micro_row(row, csv_name, issues, row_num):
+    """Validate a single row of a GPU microbenchmark CSV (gpu/gdn_gpu_bench.c)."""
+    kernel = row.get("kernel", "")
+    if kernel not in _GPU_KERNELS:
+        issues.append(Issue("WARNING", csv_name, f"row {row_num}: unknown kernel '{kernel}'"))
+
+    try:
+        dim1 = int(row["dim1"])
+        dim2 = int(row["dim2"])
+    except (ValueError, KeyError) as e:
+        issues.append(Issue("ERROR", csv_name, f"row {row_num}: cannot parse dims: {e}"))
+        return
+    if dim1 < 1 or dim2 < 1:
+        issues.append(Issue("ERROR", csv_name, f"row {row_num}: non-positive dims dim1={dim1},dim2={dim2}"))
+
+    # dim3 is optional — some kernels only use 2 dims
+    dim3_str = row.get("dim3", "")
+    if dim3_str:
+        try:
+            dim3 = int(dim3_str)
+            if dim3 < 1:
+                issues.append(Issue("ERROR", csv_name, f"row {row_num}: non-positive dim3={dim3}"))
+        except ValueError:
+            issues.append(Issue("WARNING", csv_name, f"row {row_num}: non-integer dim3='{dim3_str}'"))
+
+    try:
+        p50 = float(row["p50_ms"])
+        if p50 <= 0:
+            issues.append(Issue("ERROR", csv_name, f"row {row_num}: non-positive p50_ms"))
+    except (ValueError, KeyError):
+        issues.append(Issue("ERROR", csv_name, f"row {row_num}: cannot parse p50_ms"))
+
+    # p95 is optional — some kernels don't report it
+    p95_str = row.get("p95_ms", "")
+    if p95_str:
+        try:
+            p95 = float(p95_str)
+            if p95 < p50:
+                issues.append(Issue("WARNING", csv_name, f"row {row_num}: p95 ({p95}) < p50 ({p50})"))
+        except ValueError:
+            issues.append(Issue("WARNING", csv_name, f"row {row_num}: non-numeric p95_ms='{p95_str}'"))
+
+    try:
+        bw = float(row["bw_mibs"])
+        if bw <= 0:
+            issues.append(Issue("ERROR", csv_name, f"row {row_num}: non-positive bw_mibs"))
+    except (ValueError, KeyError):
+        issues.append(Issue("ERROR", csv_name, f"row {row_num}: cannot parse bw_mibs"))
+
+
 def validate_csv(path, csv_name, issues):
     """Validate CSV schema and row-level data. Return (csv_type, row_count, manifest_ref)."""
     if not os.path.isfile(path):
@@ -565,6 +633,8 @@ def validate_csv(path, csv_name, issues):
                     # every row in one sweep CSV shares the same manifest, so the first is enough.
                     if manifest_ref is None:
                         manifest_ref = row.get("manifest_ref") or None
+                elif csv_type == "gpu_micro":
+                    validate_gpu_micro_row(row, csv_name, issues, i)
 
             return csv_type, row_count, manifest_ref
 
