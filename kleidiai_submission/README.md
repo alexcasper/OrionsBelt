@@ -206,7 +206,9 @@ the library), not a performance bottleneck.
 ```
 kleidiai_submission/
 ├── README.md                                         (this file)
-├── test_kai_gdn.c                                    (test harness)
+├── Makefile                                          (build: test, bench, clean)
+├── test_kai_gdn.c                                    (test harness, 10 suites)
+├── bench_kai_gdn.c                                   (micro-benchmark, CSV output)
 └── kai/ukernels/gdn/
     ├── kai_gdn_cumdecay_f32_sve.h
     ├── kai_gdn_cumdecay_f32_sve.c
@@ -221,11 +223,16 @@ kleidiai_submission/
 ## Verification
 
 The test harness compares each kernel against a naive C reference implementation
-and prints `ALL TESTS PASSED` on success:
+and prints `ALL TESTS PASSED` on success (10 test suites: 6 correctness +
+4 edge-case tail-handling):
 
 ```bash
-gcc -O3 -march=armv8.2-a+simd \
-    -I kleidiai_submission \
+cd kleidiai_submission && make test
+```
+
+Or manually:
+```bash
+gcc -O3 -march=armv8-a -I kleidiai_submission \
     kleidiai_submission/test_kai_gdn.c \
     kleidiai_submission/kai/ukernels/gdn/*.c \
     -lm -o test_kai_gdn
@@ -240,6 +247,42 @@ aarch64-linux-gnu-gcc -O3 -march=armv8.2-a+sve \
     kleidiai_submission/kai/ukernels/gdn/*.c \
     -lm -o test_kai_gdn
 ```
+
+A micro-benchmark (`bench_kai_gdn`) measures per-kernel latency and
+achieved bandwidth at realistic GDN shapes:
+
+```bash
+cd kleidiai_submission && make bench
+```
+
+### A57 (Armv8.0, NEON path) — measured on Jetson Nano
+
+All numbers are p50 of 30 repeats (3 warmups discarded). The A57 is the
+lowest-end core in the test fleet (Armv8.0, 4-wide NEON, no dotprod/SVE),
+making it the worst-case portability floor.
+
+| Kernel      | Shape (seq×ch)   | p50 (µs) | GiB/s |
+|-------------|------------------|----------|-------|
+| cumdecay    | 64×160           |     11.8 |   6.5 |
+| cumdecay    | 1×160            |      0.3 |   4.6 |
+| cumdecay    | 64×2560          |    433.6 |   2.8 |
+| cumdecay    | 1×2560           |      2.1 |   9.2 |
+| gated_scan  | 64×160           |     18.2 |   6.3 |
+| gated_scan  | 1×160            |      0.3 |   9.5 |
+| gated_scan  | 64×2560          |    757.0 |   2.4 |
+| gated_scan  | 1×2560           |      3.8 |  12.5 |
+| dwconv1d    | 64×160           |     17.8 |   4.6 |
+| dwconv1d    | 1×160            |      0.7 |  10.6 |
+| dwconv1d    | 64×2560          |    475.5 |   2.8 |
+| dwconv1d    | 1×2560           |     10.2 |  11.3 |
+| gemv        | K=128 N=128      |     12.1 |   5.1 |
+| gemv        | K=128 N=2048     |    192.1 |   5.1 |
+| gemv        | K=128 N=2560     |    253.6 |   4.9 |
+
+At seq=64 (prefill chunk), all three recurrent kernels are bandwidth-bound
+(2.4–6.5 GiB/s vs the A57's 25.6 GiB/s spec). At seq=1 (decode), the working
+set fits in L1 and the kernels are launch-overhead-dominated, not
+bandwidth-limited. The GEMV at all sizes is bandwidth-bound at ~5 GiB/s.
 
 ---
 
