@@ -2536,6 +2536,8 @@ functional is itself notable: **the GPU GDN kernels require no proprietary
 drivers**, which is relevant for reproducibility and the open-source
 contribution criterion.
 
+**Data:** [`results/raw/rk3588-t4_gpu_mali-g610.csv`](../../results/raw/rk3588-t4_gpu_mali-g610.csv) · manifest [`rk3588-t4_gpu_mali-g610.json`](../../results/manifests/rk3588-t4_gpu_mali-g610.json) (dirty tree, SHA `e6aea70`).
+
 ---
 
 ## 14. End-to-end Qwen3.5-4B C decode loop: A57 joins the fleet (2026-08-07, ob-mrd.8)
@@ -3387,6 +3389,7 @@ microarchitectural.
 Data: `results/raw/jetson-j1_*_ctxsweep_e2e_raw.csv`, manifests in
 `results/manifests/jetson-j1_*_ctxsweep.json`.
 
+Per-device figures: [`A57 (Jetson)`](../results/figures/ctx_length_scaling_a57.md), [`A76 (RK3588-t3)`](../results/figures/ctx_length_scaling_a76.md).
 Cross-device figure: [`results/figures/ctx_length_scaling_cross.md`](../results/figures/ctx_length_scaling_cross.md)
 
 ### What this means for the submission
@@ -3447,6 +3450,8 @@ throughput throughout each burst.
 thermal throttling. The burst benchmark numbers in §15–17 are steady-state
 sustainable numbers, not peak-only artifacts. This matters for the Physical AI
 submission criterion: honest sustained throughput, not a one-shot burst.
+
+**Data:** [`results/raw/rk3588-t3_sustained_thermal.txt`](../../results/raw/rk3588-t3_sustained_thermal.txt) · [`rk3588-t4_sustained_thermal.txt`](../../results/raw/rk3588-t4_sustained_thermal.txt) (independent cross-check).
 
 ---
 
@@ -3728,6 +3733,7 @@ advantage remains.
 
 Auto-generated reports (reproducible via `python3 bench/ctx_scaling_analysis.py`):
 - t4 device report: [`results/figures/ctx_length_scaling_a76t4.md`](../results/figures/ctx_length_scaling_a76t4.md)
+- t4 KV int8 scaling: [`results/figures/kv_int8_scaling_t4.md`](../results/figures/kv_int8_scaling_t4.md)
 - t3 vs t4 cross-validation: [`results/figures/ctx_length_scaling_t3vst4.md`](../results/figures/ctx_length_scaling_t3vst4.md) — avg |Δ%|=3.6%, max 7.8%
 
 ---
