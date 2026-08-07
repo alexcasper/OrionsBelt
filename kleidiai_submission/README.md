@@ -268,36 +268,42 @@ This exercises SVE2 (128-bit), SVE1 (128/256-bit), NEON-only (A57 floor),
 and NEON+dotprod (A76) paths — confirming the dispatch is correct at every
 ISA level.
 
-### A57 (Armv8.0, NEON path) — measured on Jetson Nano
+### A57 (Armv8.0, NEON path) — measured on Jetson Nano (device j1)
 
-All numbers are p50 of 30 repeats (3 warmups discarded). The A57 is the
-lowest-end core in the test fleet (Armv8.0, 4-wide NEON, no dotprod/SVE),
-making it the worst-case portability floor.
+Governor: performance, 4× Cortex-A57 @ 1.48 GHz. p50 of 30 repeats (3 warmups
+discarded). The A57 is the lowest-end core in the test fleet (Armv8.0, 4-wide
+NEON, no dotprod/SVE), making it the worst-case portability floor. Provenance:
+[`results/raw/kleidiai/jetson-j1_kleidiai_gdn_kernels.csv`](../results/raw/kleidiai/jetson-j1_kleidiai_gdn_kernels.csv),
+manifest:
+[`results/manifests/jetson-j1_kleidiai_gdn_kernels.json`](../results/manifests/jetson-j1_kleidiai_gdn_kernels.json)
+(commit `2d0a4cc`, dirty=false).
 
 | Kernel      | Shape (seq×ch)   | p50 (µs) | GiB/s |
 |-------------|------------------|----------|-------|
-| cumdecay    | 64×160           |     11.8 |   6.5 |
+| cumdecay    | 64×160           |     13.1 |   5.8 |
 | cumdecay    | 1×160            |      0.3 |   4.6 |
-| cumdecay    | 64×2560          |    433.6 |   2.8 |
-| cumdecay    | 1×2560           |      2.1 |   9.2 |
-| gated_scan  | 64×160           |     18.2 |   6.3 |
+| cumdecay    | 64×2560          |    420.4 |   2.9 |
+| cumdecay    | 1×2560           |      2.1 |   8.9 |
+| gated_scan  | 64×160           |     18.3 |   6.3 |
 | gated_scan  | 1×160            |      0.3 |   9.5 |
-| gated_scan  | 64×2560          |    757.0 |   2.4 |
-| gated_scan  | 1×2560           |      3.8 |  12.5 |
-| dwconv1d    | 64×160           |     17.8 |   4.6 |
+| gated_scan  | 64×2560          |    873.0 |   2.1 |
+| gated_scan  | 1×2560           |      3.6 |  13.3 |
+| dwconv1d    | 64×160           |     17.6 |   4.7 |
 | dwconv1d    | 1×160            |      0.7 |  10.6 |
-| dwconv1d    | 64×2560          |    475.5 |   2.8 |
-| dwconv1d    | 1×2560           |     10.2 |  11.3 |
-| gemv        | K=128 N=128      |     13.3 |   4.7 |
-| gemv        | K=128 N=2048     |    184.5 |   5.3 |
-| gemv        | K=128 N=2560     |    234.1 |   5.3 |
+| dwconv1d    | 64×2560          |    567.4 |   2.3 |
+| dwconv1d    | 1×2560           |      9.7 |  11.8 |
+| gemv        | K=128 N=128      |     13.4 |   4.6 |
+| gemv        | K=128 N=2048     |    209.2 |   4.7 |
+| gemv        | K=128 N=2560     |    301.8 |   4.1 |
 
-> **Note on variance:** The A57 exhibits high run-to-run variance (up to 1.5×
-> on the same kernel at the same commit, per beads ob-bf7). The numbers above
-> are from representative single runs; cross-device comparisons must use
-> matched commits with multiple replicates. The GEMV NEON path uses
-> double-width unrolling (8 channels/iter) and `vfmaq_n_f32` scalar FMA,
-> matching the three recurrent kernels' pattern.
+> **Note on variance:** The A57 exhibits high between-session variance (up to
+> 2× on memory-bound shapes between sessions, though <10% within back-to-back
+> replicates — see bead ob-bf7 and the A57 KleidiAI bench variance insight in
+> beads). The numbers above are from a committed manifest-backed run verified
+> with 3 back-to-back replicates. Cross-device comparisons must use matched
+> commits with multiple replicates. The GEMV NEON path uses double-width
+> unrolling (8 channels/iter) and `vfmaq_n_f32` scalar FMA, matching the three
+> recurrent kernels' pattern.
 
 At seq=64 (prefill chunk), all three recurrent kernels are bandwidth-bound
 (1.6–6.6 GiB/s vs the A57's 25.6 GiB/s spec). At seq=1 (decode), the working
