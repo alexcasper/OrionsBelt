@@ -236,6 +236,8 @@ confirms the decision for both platforms: the safe assumption is that edge NPU t
 relied upon to host a runtime-length recurrence, even if one vendor's compiler accepts the `Scan`
 construct.
 
+## 3. The CPU kernel gap: toolchain, SVE2 width, and KleidiAI inventory (2026-08-02)
+
 Investigating what compiler targets Cortex-A720, and whether Arm's own micro-kernel library
 already contains anything we need for the CPU-hosted GDN scan (`ob-8qt.1`).
 
