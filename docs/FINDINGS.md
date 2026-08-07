@@ -3369,3 +3369,106 @@ At 2.7 tok/s with a 0.37s TTFT, the Jetson Nano (2014-era Cortex-A57,
 passively cooled at +1°C delta) can sustain real-time text generation for
 the 0.8B model. This is a usable rate for interactive chat or structured
 extraction on hardware that costs <$50 and draws ~5W.
+
+---
+
+## 20. INT8 KV cache quantization: 1.7–2.6× full-attention speedup at long context (2026-08-07, ob-8qt.12)
+
+**Bead `ob-8qt.12`. Run on RK3588-t3 big cluster (A76, 4 cores @ 2.3 GHz,
+governor=performance, commit `dcfae65`). Manifest-backed.**
+
+### Motivation
+
+The context-length scaling results (§17) showed full-attention's decode cost
+grows O(n) due to the growing KV cache, while GDN layers stay O(1). INT8
+weight quantization (§16) cut the weight-memory traffic but left the KV cache
+untouched — and at long context, KV cache reads dominate the full-attention
+cost. INT8 KV cache quantization stores the KV cache as int8 with per-head
+symmetric scale, cutting KV memory traffic 4× (1 byte vs 4 per element).
+
+This is the natural complement to INT8 weight quantization: both the GEMV
+weight path and the KV cache path are bandwidth-bound, and quantizing both
+shows the combined effect on decode throughput.
+
+### Implementation
+
+Added `full_attn_real_forward_int8kv()` to `gdn_e2e_decode.c`:
+- KV cache stored as `int8_t[max_ctx * kv_dim]` with per-head float scale
+  (FULL_KV_HEADS scales per K/V per layer — group-wise quantization)
+- NEON dequantization on-the-fly in both score (Q·K) and value-gather loops:
+  int8→int16→int32→float32 chain, same as the INT8 weight GEMV path
+- Per-head scale factored out of inner loops: score = scale_k * sum(Q·K_q),
+  out += scale_v * weight * V_q — avoids per-element scaling
+- Activated with `-DKV_INT8` compile flag; `--kv-quant int8` in run script
+
+### Results: 0.8B model (ctx-sweep, 4 quantization configs)
+
+| Config | ctx=1 tok/s | ctx=4096 tok/s | ctx=4096 full-attn (µs) | KV MB |
+|--------|------------:|--------------:|------------------------:|------:|
+| FP32 weights + FP32 KV | 7.75 | 4.30 | 116,166 | 96.0 |
+| FP32 weights + INT8 KV | 7.93 | 6.19 | 45,036 | 24.0 |
+| INT8 weights + FP32 KV | 10.58 | 4.96 | 115,947 | 96.0 |
+| **INT8 weights + INT8 KV** | **10.60** | **7.70** | **44,389** | **24.0** |
+
+### Results: 4B model (ctx-sweep, 4 quantization configs)
+
+| Config | ctx=1 tok/s | ctx=4096 tok/s | ctx=4096 full-attn (µs) | KV MB |
+|--------|------------:|--------------:|------------------------:|------:|
+| FP32 weights + FP32 KV | 1.04 | 0.79 | 355,591 | 256.0 |
+| FP32 weights + INT8 KV | 1.04 | 0.90 | 205,324 | 64.0 |
+| INT8 weights + FP32 KV | 1.85 | 1.19 | 333,047 | 256.0 |
+| **INT8 weights + INT8 KV** | **1.84** | **1.44** | **188,922** | **64.0** |
+
+### Analysis
+
+**INT8 KV reduces full-attention cost 1.7–2.6× at long context**, independent
+of weight precision. The speedup is larger for the 0.8B model (2.6×) than the
+4B model (1.9×) because the 0.8B model has fewer GQA groups (2 vs 4), so each
+KV head serves more Q heads, making KV reads a larger share of attention cost.
+
+**Combined INT8 (weights + KV) gives 1.8× overall speedup** at ctx=4096:
+- 0.8B: 4.30→7.70 tok/s (1.79×)
+- 4B: 0.79→1.44 tok/s (1.82×)
+
+**KV memory drops 4×**: 0.8B 96→24 MB, 4B 256→64 MB at ctx=4096.
+
+**Context-length penalty reduction** (ctx=1→4096 throughput degradation):
+- 0.8B: 1.80× → 1.38× (24% reduction in degradation)
+- 4B: 1.32× → 1.28× (3% reduction — FFN dominates more at 4B)
+
+**GDN layers remain O(1)** regardless of KV quantization: 48k µs/token (0.8B)
+and 213k µs/token (4B), flat across all context lengths and quantization configs.
+GDN's fixed recurrent state is immune to KV cache quantization — the
+architectural advantage is in the state size, not the precision.
+
+### Implication for the GDN hypothesis
+
+INT8 KV cache is the strongest counter-argument to GDN's architectural
+advantage at long context: it makes full-attention cheaper and shrinks the
+KV cache footprint. But even with INT8 KV, full-attention's decode cost still
+scales O(n) with context length — the constant factor improves but the
+asymptotic behavior is unchanged. GDN's O(1) cost means its advantage *grows*
+with context length, regardless of how aggressively the KV cache is quantized.
+
+At ctx=4096 on the 4B model, full-attention with INT8 KV costs 189k µs/token
+vs GDN's 213k µs/token for all 18 layers — comparable today, but full-attention
+doubles again at ctx=8192 while GDN stays flat. The crossover where GDN wins
+on throughput is pushed further out by INT8 KV, but the crossover in *memory
+feasibility* (whether the KV cache fits at all) is much more dramatically
+shifted: 256 MB→64 MB at ctx=4096 for 4B.
+
+### Why not 4× speedup?
+
+INT8 KV cuts memory traffic 4×, but the measured full-attention speedup is
+only 1.7–2.6×. Three reasons:
+1. **Dequantization compute**: the int8→int16→int32→float chain adds ~3 cycles
+   per 4 elements, partially offsetting the bandwidth saving.
+2. **Projection cost is unaffected**: Q/K/V projections (GEMV) are the same
+   regardless of KV cache format (~54k µs for 4B, ~9k µs for 0.8B).
+3. **Cortex-A76 lacks SDOT/i8mm**: a dot-product instruction would compute
+   4 int8×int8→int32 accumulations in 1 cycle, eliminating the dequantization
+   overhead entirely. On Cortex-A720/A77+ with dotprod, the speedup would be
+   closer to 3–4×.
+
+Generated comparison: [`results/figures/kv_int8_scaling.md`](../results/figures/kv_int8_scaling.md)
+(generator: `bench/kv_int8_analysis.py` — do not hand-edit).

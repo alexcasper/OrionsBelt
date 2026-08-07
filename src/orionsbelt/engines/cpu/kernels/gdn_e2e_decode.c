@@ -335,6 +335,12 @@ typedef struct {
     /* Growing KV cache for ctx-sweep mode (allocated on demand) */
     float *kv_k_grow;
     float *kv_v_grow;
+    /* INT8 KV cache: 4× less memory traffic per attention element.
+     * Per-head symmetric scale (FULL_KV_HEADS entries per K and V). */
+    int8_t *kv_k_grow_q;   /* [max_ctx * kv_dim] int8 */
+    int8_t *kv_v_grow_q;   /* [max_ctx * kv_dim] int8 */
+    float  *kv_k_scale;    /* [FULL_KV_HEADS] per-head scale */
+    float  *kv_v_scale;    /* [FULL_KV_HEADS] per-head scale */
     size_t kv_pos;        /* current position (tokens in cache) */
 } LayerState;
 
@@ -539,6 +545,157 @@ static void full_attn_real_forward(const Weights *w, LayerState *st,
     free(q); free(k); free(v); free(attn_out); free(scores);
 }
 
+/* ---- INT8 KV cache: real attention with quantized KV (ctx-sweep mode) ----
+ *
+ * Same GQA attention as full_attn_real_forward, but stores the growing KV
+ * cache as int8 with per-head symmetric scale. This cuts KV memory traffic
+ * 4× (1 byte per element vs 4), directly improving full-attention's O(n)
+ * decode cost at long context.
+ *
+ * Optimization: per-head scale is factored out of the inner loops.
+ *   score = scale_k[kh] * sum_d(q[d] * (float)kq[d])   ← scale applied once
+ *   out  += scale_v[kh] * weight * (float)vq[d]         ← scale folded into weight
+ *
+ * This avoids per-element scaling in the hot loop.
+ */
+static void full_attn_real_forward_int8kv(const Weights *w, LayerState *st,
+                                          const float *hidden_in, float *hidden_out) {
+    size_t q_dim = FULL_HEADS * FULL_HEAD_DIM;
+    size_t kv_dim = FULL_KV_HEADS * FULL_HEAD_DIM;
+    size_t pos = st->kv_pos;
+    size_t ctx = pos + 1;
+
+    float *q = alloc_aligned(q_dim);
+    float *k = alloc_aligned(kv_dim);
+    float *v = alloc_aligned(kv_dim);
+    float *attn_out = alloc_aligned(q_dim);
+    float *scores = alloc_aligned(ctx);
+
+    MM(hidden_in, w->f_q_proj, w->f_q_proj_q, q, 1, HIDDEN, q_dim);
+    MM(hidden_in, w->f_k_proj, w->f_k_proj_q, k, 1, HIDDEN, kv_dim);
+    MM(hidden_in, w->f_v_proj, w->f_v_proj_q, v, 1, HIDDEN, kv_dim);
+
+    /* Quantize new K/V token to int8, append to cache */
+    for (size_t kh = 0; kh < FULL_KV_HEADS; ++kh) {
+        for (size_t d = 0; d < FULL_HEAD_DIM; ++d) {
+            float kv = k[kh * FULL_HEAD_DIM + d];
+            st->kv_k_grow_q[pos * kv_dim + kh * FULL_HEAD_DIM + d] =
+                (int8_t)lroundf(kv / st->kv_k_scale[kh]);
+            float vv = v[kh * FULL_HEAD_DIM + d];
+            st->kv_v_grow_q[pos * kv_dim + kh * FULL_HEAD_DIM + d] =
+                (int8_t)lroundf(vv / st->kv_v_scale[kh]);
+        }
+    }
+
+    /* GQA attention with INT8 KV cache */
+    const size_t groups = FULL_HEADS / FULL_KV_HEADS;
+    const float scale = 1.0f / sqrtf((float)FULL_HEAD_DIM);
+
+    for (size_t h = 0; h < FULL_HEADS; ++h) {
+        size_t kh = h / groups;
+        const float *qh = q + h * FULL_HEAD_DIM;
+        const float sk = st->kv_k_scale[kh];  /* per-head K scale */
+
+        /* Score = scale_k[kh] * sum_d(Q[d] * (float)Kq[t,d]) * attention_scale
+         * Factor sk out of the inner sum, multiply once per token. */
+        float max_s = -INFINITY;
+        for (size_t t = 0; t < ctx; ++t) {
+            const int8_t *kt = st->kv_k_grow_q + t * kv_dim + kh * FULL_HEAD_DIM;
+            float s = 0.0f;
+            size_t d = 0;
+#ifdef __ARM_NEON
+            /* Dequantize K to float on-the-fly, dot with Q via FMA.
+             * No dotprod on A76 — same int8→int16→int32→float chain
+             * as the INT8 GEMV weight path. */
+            float32x4_t acc4 = vdupq_n_f32(0.0f);
+            for (; d + 8 <= FULL_HEAD_DIM; d += 8) {
+                int8x8_t   i8  = vld1_s8((const int8_t*)(kt + d));
+                int16x8_t  i16 = vmovl_s8(i8);
+                int32x4_t  i32lo = vmovl_s16(vget_low_s16(i16));
+                int32x4_t  i32hi = vmovl_s16(vget_high_s16(i16));
+                float32x4_t flo = vcvtq_f32_s32(i32lo);
+                float32x4_t fhi = vcvtq_f32_s32(i32hi);
+                float32x4_t qlo = vld1q_f32(qh + d);
+                float32x4_t qhi = vld1q_f32(qh + d + 4);
+                acc4 = vfmaq_f32(acc4, qlo, flo);
+                acc4 = vfmaq_f32(acc4, qhi, fhi);
+            }
+            for (; d + 4 <= FULL_HEAD_DIM; d += 4) {
+                int8x8_t  i8  = vld1_s8((const int8_t*)(kt + d));
+                int16x8_t i16 = vmovl_s8(i8);
+                int32x4_t i32 = vmovl_s16(vget_low_s16(i16));
+                float32x4_t fq = vcvtq_f32_s32(i32);
+                float32x4_t q4 = vld1q_f32(qh + d);
+                acc4 = vfmaq_f32(acc4, q4, fq);
+            }
+            s += vaddvq_f32(acc4);
+            for (; d < FULL_HEAD_DIM; ++d)
+                s += qh[d] * (float)kt[d];
+#else
+            for (size_t dd = 0; dd < FULL_HEAD_DIM; ++dd)
+                s += qh[dd] * (float)kt[dd];
+#endif
+            s *= sk * scale;  /* fold in per-head scale + attention scale */
+            scores[t] = s;
+            if (s > max_s) max_s = s;
+        }
+
+        /* Softmax */
+        float sum_exp = 0.0f;
+        for (size_t t = 0; t < ctx; ++t) {
+            scores[t] = expf(scores[t] - max_s);
+            sum_exp += scores[t];
+        }
+
+        /* Weighted sum of V — fold sv into effective weight */
+        float sv = st->kv_v_scale[kh];
+        float *out_h = attn_out + h * FULL_HEAD_DIM;
+        memset(out_h, 0, FULL_HEAD_DIM * sizeof(float));
+        for (size_t t = 0; t < ctx; ++t) {
+            const int8_t *vt = st->kv_v_grow_q + t * kv_dim + kh * FULL_HEAD_DIM;
+            float ew = scores[t] / sum_exp * sv;  /* effective weight with V scale */
+            size_t d = 0;
+#ifdef __ARM_NEON
+            float32x4_t ewv = vdupq_n_f32(ew);
+            for (; d + 8 <= FULL_HEAD_DIM; d += 8) {
+                int8x8_t   i8  = vld1_s8((const int8_t*)(vt + d));
+                int16x8_t  i16 = vmovl_s8(i8);
+                int32x4_t  i32lo = vmovl_s16(vget_low_s16(i16));
+                int32x4_t  i32hi = vmovl_s16(vget_high_s16(i16));
+                float32x4_t flo = vcvtq_f32_s32(i32lo);
+                float32x4_t fhi = vcvtq_f32_s32(i32hi);
+                float32x4_t olo = vld1q_f32(out_h + d);
+                float32x4_t ohi = vld1q_f32(out_h + d + 4);
+                olo = vfmaq_f32(olo, ewv, flo);
+                ohi = vfmaq_f32(ohi, ewv, fhi);
+                vst1q_f32(out_h + d, olo);
+                vst1q_f32(out_h + d + 4, ohi);
+            }
+            for (; d + 4 <= FULL_HEAD_DIM; d += 4) {
+                int8x8_t  i8  = vld1_s8((const int8_t*)(vt + d));
+                int16x8_t i16 = vmovl_s8(i8);
+                int32x4_t i32 = vmovl_s16(vget_low_s16(i16));
+                float32x4_t fq = vcvtq_f32_s32(i32);
+                float32x4_t oh = vld1q_f32(out_h + d);
+                oh = vfmaq_f32(oh, ewv, fq);
+                vst1q_f32(out_h + d, oh);
+            }
+#endif
+            for (; d < FULL_HEAD_DIM; ++d)
+                out_h[d] += ew * (float)vt[d];
+        }
+    }
+
+    /* Output projection + residual */
+    MM(attn_out, w->f_o_proj, w->f_o_proj_q, hidden_out, 1, q_dim, HIDDEN);
+    for (size_t i = 0; i < HIDDEN; ++i)
+        hidden_out[i] += hidden_in[i];
+
+    st->kv_pos = pos + 1;
+
+    free(q); free(k); free(v); free(attn_out); free(scores);
+}
+
 static void ffn_forward(const Weights *w, const float *hidden_in, float *hidden_out, size_t seq) {
     float *gate = alloc_aligned(seq * INTER);
     float *up = alloc_aligned(seq * INTER);
@@ -707,14 +864,29 @@ int main(int argc, char **argv) {
             printf("  layers=%d (GDN=%d, full=%d)%s, hidden=%d\n", NUM_LAYERS,
                    n_gdn_actual, n_full_actual,
                    pure_gdn ? " [PURE GDN]" : "", HIDDEN);
+#ifdef KV_INT8
+            printf("  KV cache: INT8 (per-head symmetric scale)\n");
+#else
+            printf("  KV cache: FP32\n");
+#endif
             printf("  ctx sweep: %d points, max=%zu\n\n", n_ctx, max_ctx);
         }
 
         /* Allocate growing KV caches for each full-attention layer */
         for (int l = 0; l < NUM_LAYERS; ++l) {
             if (!is_gdn[l]) {
+#ifdef KV_INT8
+                /* INT8 KV cache: 1 byte per element + per-head float scale */
+                posix_memalign((void**)&states[l].kv_k_grow_q, 64, max_ctx * kv_dim);
+                posix_memalign((void**)&states[l].kv_v_grow_q, 64, max_ctx * kv_dim);
+                memset(states[l].kv_k_grow_q, 0, max_ctx * kv_dim);
+                memset(states[l].kv_v_grow_q, 0, max_ctx * kv_dim);
+                states[l].kv_k_scale = alloc_aligned(FULL_KV_HEADS);
+                states[l].kv_v_scale = alloc_aligned(FULL_KV_HEADS);
+#else
                 states[l].kv_k_grow = alloc_aligned(max_ctx * kv_dim);
                 states[l].kv_v_grow = alloc_aligned(max_ctx * kv_dim);
+#endif
             }
             states[l].kv_pos = 0;
         }
@@ -723,8 +895,40 @@ int main(int argc, char **argv) {
         unsigned fill_seed = 99999;
         for (int l = 0; l < NUM_LAYERS; ++l) {
             if (!is_gdn[l]) {
+#ifdef KV_INT8
+                /* Pre-fill: generate random FP32, quantize to INT8, discard FP32 */
+                float *tmp_k = alloc_aligned(max_ctx * kv_dim);
+                float *tmp_v = alloc_aligned(max_ctx * kv_dim);
+                fill_rand(tmp_k, max_ctx * kv_dim, &fill_seed);
+                fill_rand(tmp_v, max_ctx * kv_dim, &fill_seed);
+
+                /* Per-head symmetric quantization */
+                for (size_t kh = 0; kh < FULL_KV_HEADS; ++kh) {
+                    float max_k = 0, max_v = 0;
+                    for (size_t t = 0; t < max_ctx; ++t)
+                        for (size_t d = 0; d < FULL_HEAD_DIM; ++d) {
+                            float kv = fabsf(tmp_k[t * kv_dim + kh * FULL_HEAD_DIM + d]);
+                            if (kv > max_k) max_k = kv;
+                            float vv = fabsf(tmp_v[t * kv_dim + kh * FULL_HEAD_DIM + d]);
+                            if (vv > max_v) max_v = vv;
+                        }
+                    states[l].kv_k_scale[kh] = (max_k > 0) ? max_k / 127.0f : 1.0f;
+                    states[l].kv_v_scale[kh] = (max_v > 0) ? max_v / 127.0f : 1.0f;
+                    float inv_k = 1.0f / states[l].kv_k_scale[kh];
+                    float inv_v = 1.0f / states[l].kv_v_scale[kh];
+                    for (size_t t = 0; t < max_ctx; ++t)
+                        for (size_t d = 0; d < FULL_HEAD_DIM; ++d) {
+                            states[l].kv_k_grow_q[t * kv_dim + kh * FULL_HEAD_DIM + d] =
+                                (int8_t)lroundf(tmp_k[t * kv_dim + kh * FULL_HEAD_DIM + d] * inv_k);
+                            states[l].kv_v_grow_q[t * kv_dim + kh * FULL_HEAD_DIM + d] =
+                                (int8_t)lroundf(tmp_v[t * kv_dim + kh * FULL_HEAD_DIM + d] * inv_v);
+                        }
+                }
+                free(tmp_k); free(tmp_v);
+#else
                 fill_rand(states[l].kv_k_grow, max_ctx * kv_dim, &fill_seed);
                 fill_rand(states[l].kv_v_grow, max_ctx * kv_dim, &fill_seed);
+#endif
             }
         }
 
@@ -764,7 +968,11 @@ int main(int argc, char **argv) {
                         gdn_total += now_us() - t0;
                     } else {
                         double t0 = now_us();
+#ifdef KV_INT8
+                        full_attn_real_forward_int8kv(&w, &states[l], hidden, hidden_next);
+#else
                         full_attn_real_forward(&w, &states[l], hidden, hidden_next);
+#endif
                         full_total += now_us() - t0;
                         /* Reset position so next rep measures the same ctx */
                         states[l].kv_pos = C - 1;
@@ -780,11 +988,16 @@ int main(int argc, char **argv) {
             ffn_total /= reps;
             double total_us = gdn_total + full_total + ffn_total;
             double tps = 1e6 / total_us;
-            /* KV cache memory: actual full-attn layers * C * kv_dim * 4 bytes * 2 (K+V) */
+            /* KV cache memory: actual full-attn layers * C * kv_dim * 2 (K+V)
+             * FP32: 4 bytes/element, INT8: 1 byte/element + tiny scale overhead */
             int n_full_actual = 0;
             for (int l2 = 0; l2 < NUM_LAYERS; ++l2)
                 if (!is_gdn[l2]) n_full_actual++;
+#ifdef KV_INT8
+            double kv_mb = (double)n_full_actual * C * kv_dim * 1.0 * 2 / (1024 * 1024);
+#else
             double kv_mb = (double)n_full_actual * C * kv_dim * sizeof(float) * 2 / (1024 * 1024);
+#endif
 
             if (csv) {
                 printf(MODEL_NAME ",%zu,%.0f,%.0f,%.0f,%.0f,%.2f,%.1f\n",
@@ -799,8 +1012,15 @@ int main(int argc, char **argv) {
         /* Cleanup growing KV caches */
         for (int l = 0; l < NUM_LAYERS; ++l) {
             if (!is_gdn[l]) {
+#ifdef KV_INT8
+                free(states[l].kv_k_grow_q);  /* was alloc'd via alloc_aligned (float*) cast */
+                free(states[l].kv_v_grow_q);
+                free(states[l].kv_k_scale);
+                free(states[l].kv_v_scale);
+#else
                 free(states[l].kv_k_grow);
                 free(states[l].kv_v_grow);
+#endif
             }
         }
 
