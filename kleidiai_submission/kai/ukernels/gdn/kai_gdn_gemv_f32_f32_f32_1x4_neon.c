@@ -16,11 +16,11 @@
 //
 // The NEON path uses double-width unrolling (8 channels/iter, two independent
 // 4-wide register groups) to hide FMA latency, matching the pattern in the
-// three recurrent GDN kernels.  vfmaq_n_f32 broadcasts the scalar A[kk] in the
-// FMA itself, avoiding a separate vdupq instruction.  The K-outer loop order
-// keeps each b[kk] row access contiguous for cache efficiency.
-// An SVE path (vector-length-agnostic, predicated tails) is included for cores
-// with SVE; a scalar fallback ensures correctness on any architecture.
+// three recurrent GDN kernels.  Both NEON (vfmaq_n_f32) and SVE
+// (svmla_n_f32_x) paths broadcast the scalar A[kk] within the FMA instruction,
+// avoiding a separate broadcast.  The K-outer loop order keeps each b[kk] row
+// access contiguous for cache efficiency.
+// A scalar fallback ensures correctness on any architecture.
 
 #include <stddef.h>
 #include <string.h> /* memset */
@@ -44,9 +44,8 @@ void kai_run_gdn_gemv_f32_f32_f32_1x4_neon(const float *a,
             svbool_t pg = svwhilelt_b32((unsigned)j0, (unsigned)n);
             svfloat32_t acc = svdup_f32(0.0f);
             for (size_t kk = 0; kk < k; ++kk) {
-                svfloat32_t a_scalar = svdup_f32(a[kk]);
                 svfloat32_t b_vec = svld1_f32(pg, b + kk * n + j0);
-                acc = svmla_f32_x(pg, acc, b_vec, a_scalar);
+                acc = svmla_n_f32_x(pg, acc, b_vec, a[kk]);
             }
             svst1_f32(pg, c + j0, acc);
         }
