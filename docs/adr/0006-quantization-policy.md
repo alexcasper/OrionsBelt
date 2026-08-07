@@ -80,12 +80,12 @@ has **hardware fp16 (`asimdhp`) but no hardware bf16** (that needs Armv8.6-A), s
 it exercises the software bf16 conversion path on a fast core, which is the case
 most of the installed Armv8.2 base is in. Single-threaded, governor `performance`,
 thermals flat (bead `ob-8qt.4`, raw data in
-`results/raw/rk3588-t4_{big,little}_singlethread.csv`).
+`results/raw/rk3588-t4-clean.csv`).
 
 | cumdecay output format | Jetson A57 | RK3588 A76 | RK3588 A55 |
 |---|---:|---:|---:|
-| fp16 | 1.45× | **1.58×** | 1.53× |
-| bf16 | 1.42× | **1.10×** | 1.47× |
+| fp16 | 1.45× | **1.55×** | 1.53× |
+| bf16 | 1.42× | **1.08×** | 1.40× |
 
 **Prefer FP16 over BF16 for narrowed state and output on A76-class cores.** On the
 A76, software bf16 conversion drops the gain to 1.10× at 4B and goes *negative* at
