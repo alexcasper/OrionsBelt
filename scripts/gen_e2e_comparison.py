@@ -14,9 +14,8 @@ Usage:
     python3 scripts/gen_e2e_comparison.py
     python3 scripts/gen_e2e_comparison.py --output results/figures/e2e_fleet_comparison.md
 """
+
 import csv
-import json
-import os
 import sys
 from collections import defaultdict
 from pathlib import Path
@@ -39,8 +38,9 @@ def load_rows():
 
 def extract_metrics(rows):
     """Extract tok/s and TTFT per device/model/quant, keyed by (device, model, quant)."""
-    data = defaultdict(lambda: {"tok_per_sec": [], "ttft": [], "sha": set(),
-                                 "manifests": set(), "runs": 0})
+    data = defaultdict(
+        lambda: {"tok_per_sec": [], "ttft": [], "sha": set(), "manifests": set(), "runs": 0}
+    )
     for r in rows:
         device = r.get("device", "?")
         model = r.get("model_checkpoint", "?")
@@ -160,12 +160,26 @@ def generate_table(data):
             fp32_key = (norm_device, model)
             if fp32_key in fp32_map:
                 f_entry = fp32_map[fp32_key]
-                fp32_tok = sum(f_entry["tok_per_sec"]) / len(f_entry["tok_per_sec"]) if f_entry["tok_per_sec"] else 0
-                int8_tok = sum(i_entry["tok_per_sec"]) / len(i_entry["tok_per_sec"]) if i_entry["tok_per_sec"] else 0
+                fp32_tok = (
+                    sum(f_entry["tok_per_sec"]) / len(f_entry["tok_per_sec"])
+                    if f_entry["tok_per_sec"]
+                    else 0
+                )
+                int8_tok = (
+                    sum(i_entry["tok_per_sec"]) / len(i_entry["tok_per_sec"])
+                    if i_entry["tok_per_sec"]
+                    else 0
+                )
                 speedup = int8_tok / fp32_tok if fp32_tok > 0 else 0
-                lines.append(f"| {device} | {model} | {fp32_tok:.2f} | {int8_tok:.2f} | **{speedup:.2f}×** |")
+                lines.append(
+                    f"| {device} | {model} | {fp32_tok:.2f} | {int8_tok:.2f} | **{speedup:.2f}×** |"
+                )
             else:
-                int8_tok = sum(i_entry["tok_per_sec"]) / len(i_entry["tok_per_sec"]) if i_entry["tok_per_sec"] else 0
+                int8_tok = (
+                    sum(i_entry["tok_per_sec"]) / len(i_entry["tok_per_sec"])
+                    if i_entry["tok_per_sec"]
+                    else 0
+                )
                 lines.append(f"| {device} | {model} | — | {int8_tok:.2f} | — |")
 
         lines.append("")
@@ -181,9 +195,14 @@ def generate_table(data):
 
 def main():
     import argparse
+
     parser = argparse.ArgumentParser(description="Generate e2e fleet comparison table")
-    parser.add_argument("--output", "-o", default=str(DEFAULT_OUT),
-                        help="Output markdown file (default: results/figures/e2e_fleet_comparison.md)")
+    parser.add_argument(
+        "--output",
+        "-o",
+        default=str(DEFAULT_OUT),
+        help="Output markdown file (default: results/figures/e2e_fleet_comparison.md)",
+    )
     args = parser.parse_args()
 
     rows = load_rows()
@@ -198,7 +217,7 @@ def main():
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(markdown)
     print(f"Written: {out_path}")
-    print(f"  Devices: {len(set(r.get('device','?') for r in rows))}")
+    print(f"  Devices: {len(set(r.get('device', '?') for r in rows))}")
     print(f"  Data rows: {len(rows)}")
 
     # Warn about commit mismatches
