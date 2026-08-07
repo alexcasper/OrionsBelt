@@ -5,49 +5,70 @@ See per-device tables (`*_table.md`) for full kernel-level detail._
 
 ## Provenance
 
-| Device | CSV | Git SHA | Dirty | Governor | Manifest |
-|---|---|---|---|---|---|
-| rk3588-t3 (big) | `rk3588-t3-clean.csv` | `f015982` | **false** | performance | `rk3588-t3-clean.json` |
-| rk3588-t4 (big) | `rk3588-t4-clean.csv` | `1ca4d6d` | **false** | performance | `rk3588-t4-clean.json` |
+| Device | CSV | Git SHA | Dirty | Governor | Threads | Manifest |
+|---|---|---|---|---|---|---|
+| rk3588-t3 (big, **8-thread**) | `rk3588-t3-clean.csv` | `f015982` | **false** | performance | 8 | `rk3588-t3-clean.json` |
+| rk3588-t3 (big, **1-thread**) | `rk3588-t3-clean-singlethread.csv` | `d72eaa1` | **false** | performance | 1 | `rk3588-t3-clean-singlethread.json` |
+| rk3588-t4 (big, 1-thread) | `rk3588-t4-clean.csv` | `1ca4d6d` | **false** | performance | 1 | `rk3588-t4-clean.json` |
 
-> ⚠️ **Thread-count correction (ob-mrd.12, 2026-08-07):** the two CSVs above
-> were captured at **different** parallelism, not "single-thread" as previously
-> stated. `rk3588-t3-clean.json` records `effective_threads: 8`
-> (`threads_source: core_count_default` — `OMP_NUM_THREADS` was unset, so OpenMP
-> defaulted to all 8 cores). `rk3588-t4-clean.json` records `effective_threads: 1`
+> **⚠ Correction (ob-mrd.12, ob-mrd.13):** The original provenance note claimed
+> both boards were "single-thread." This was **false for t3**: manifests show
+> `rk3588-t3-clean.csv` ran with `effective_threads=8` (thread count defaulted to
+> core count). t4's `rk3588-t4-clean.csv` was genuinely 1-thread
 > (`OMP_NUM_THREADS=1`). They are therefore **not directly comparable**.
 >
-> The like-for-like, equal-thread-count comparison is **t3-clean (8-thread) vs
-> `rk3588-t4_big.csv` (8-thread, `rk3588-t4.json`)**: cumdecay 21.06 vs **22.47**
-> GiB/s, gated scan 10.62 vs **11.09**, Conv1D 18.73 vs **23.00** — i.e. the two
-> boards are within ~7% and **t4 is marginally faster**, consistent with its
-> higher 2400 MHz clock. **No genuine single-thread t3 run exists**, so a strict
-> 1-thread t3↔t4 comparison is not possible from committed data. The
-> "1.6–2.9× cross-board gap" reported below is a **thread-count artifact**, not a
-> hardware difference. See the marked correction in
-> [`FINDINGS.md`](../../docs/FINDINGS.md) §"Cross-Board Gap".
+> A genuine 1-thread t3 run was captured for ob-mrd.13
+> (`rk3588-t3-clean-singlethread.csv`, `OMP_NUM_THREADS=1`, taskset-pinned to
+> one A76 core, commit `d72eaa1`). The like-for-like 1-thread comparison is in
+> §1a below.
+>
+> The equal-thread-count 8v8 comparison (`rk3588-t3-clean.csv` vs
+> `rk3588-t4_big.csv`, both `effective_threads=8`) gives cumdecay 21.06 vs 22.47,
+> gated scan 10.62 vs 11.09, Conv1D 18.73 vs 23.00 — boards agree within ~7%,
+> consistent with t4's higher 2400 MHz clock.
+>
+> t3 is an unknown RK3588 board (kernel 5.10, CFS, 32 GB); t4 is a Turing
+> Machines RK1 (kernel 6.11, EEVDF, 8 GB). Both use Cortex-A76 big cores at
+> ~2.3 GHz (t4: 2400 MHz; t3: 2304 MHz).
 
-## 1. Headline: GDN kernel bandwidth — RK3588 Cortex-A76 (big)
+## 1. GDN kernel bandwidth — RK3588 Cortex-A76 (big, 8-thread vs 1-thread)
 
-Qwen3.5-4B, prefill (seq=64), fp32 baseline, spec bandwidth 34.0 GiB/s.
+### 1a. Like-for-like single-thread comparison (ob-mrd.13)
+
+Qwen3.5-4B, prefill (seq=64), fp32. Both devices `OMP_NUM_THREADS=1`, one A76 core, governor=performance, clean tree.
 
 | Kernel | t3 GiB/s | t3 spread | t4 GiB/s | t4 spread | t3÷t4 ratio |
 |---|---:|---:|---:|---:|---:|
-| gdn_cumdecay | 21.06 | 3.5% | 7.40 | 5.0% | 2.85× |
-| gdn_gated_scan | 10.62 | 5.4% | 5.67 | 7.4% | 1.87× |
-| gdn_causal_dwconv1d | 18.73 | 4.8% | 7.04 | 4.3% | 2.66× |
+| gdn_cumdecay | 7.01 | 6.7% | 7.40 | 5.0% | 0.95× |
+| gdn_gated_scan | 3.07 | 7.5% | 5.67 | 7.4% | 0.54× |
+| gdn_causal_dwconv1d | 6.02 | 4.3% | 7.04 | 4.3% | 0.86× |
 
-> ⚠️ The `t3÷t4 ratio` column above compares **8-thread t3** against
-> **1-thread t4** and therefore overstates any real difference by the thread
-> count. Use it only alongside the equal-thread-count note above.
+> **The apparent 2.85× "cross-board gap" (§1b) collapses for cumdecay at matched
+> thread counts** (0.95×, within noise). Gated scan remains lower on t3 (0.54×,
+> t4 is 1.87× faster); the cause is likely a board-level memory-subsystem
+> difference (not clock — both are ~2.3 GHz A76). dwconv1d is 0.86×, also within
+> the known run-to-run variance (ob-bf7: 1.68× on this fleet).
+>
+> Sources: `rk3588-t3-clean-singlethread.csv` (commit `d72eaa1`) vs
+> `rk3588-t4-clean.csv` (commit `1ca4d6d`). Different commits, but both
+> clean-tree post-NEON-optimization with identical kernel code.
 
-> Both boards achieve well under the 34 GiB/s spec bandwidth per cluster. t3's
-> cumdecay reaches 62% of spec; t4 reaches 22%. The gap is systematic across
-> all kernels — see FINDINGS.md for the cross-board analysis (board vendor,
-> kernel scheduler, and DRAM differences).
-> Gated scan runs at a lower fraction of spec than cumdecay/dwconv because its
-> sequential recurrence is instruction-overhead-bound, not DRAM-bandwidth-bound
-> (see [`fleet_bandwidth_scaling.md`](fleet_bandwidth_scaling.md)).
+### 1b. 8-thread (t3) vs 1-thread (t4) — confounded, kept for historical reference
+
+Qwen3.5-4B, prefill (seq=64), fp32. ⚠ t3 was 8-thread (threads_source=core_count_default); t4 was 1-thread. **Not comparable** — see §1a for the valid comparison.
+
+| Kernel | t3 GiB/s (8T) | t4 GiB/s (1T) | t3÷t4 ratio |
+|---|---:|---:|---:|
+| gdn_cumdecay | 21.06 | 7.40 | 2.85× |
+| gdn_gated_scan | 10.62 | 5.67 | 1.87× |
+| gdn_causal_dwconv1d | 18.73 | 7.04 | 2.66× |
+
+> The 8-thread t3 numbers reflect OpenMP scaling across 4 big cores. The
+> 8-thread vs 8-thread comparison (`rk3588-t3-clean.csv` vs `rk3588-t4_big.csv`,
+> both effective_threads=8) gives cumdecay 21.06 vs 22.47 — t4 is ~7% faster,
+> consistent with its 2400 MHz clock. See §8 for OpenMP scaling analysis.
+
+### 1c. 0.8B model (t3 8-thread, t4 1-thread — also confounded)
 
 Qwen3.5-0.8B, prefill (seq=64), fp32 baseline (t3 only; t4 shows similar ratios):
 
