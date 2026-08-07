@@ -4050,7 +4050,7 @@ GDN shapes (seq=1 decode, seq=64 prefill; channels=160 and 2560).
 
 | Kernel | Shape (seq×ch) | p50 (µs) | GiB/s |
 |---|---|---|---|
-| cumdecay | 64×160 | 11.2 | 6.8 |
+| cumdecay | 64×160 | 11.2† | 6.8 |
 | cumdecay | 1×160 | 0.05 | 24.0 |
 | cumdecay | 64×2560 | 121.8 | 10.0 |
 | cumdecay | 1×2560 | 0.75 | 25.6 |
@@ -4065,6 +4065,13 @@ GDN shapes (seq=1 decode, seq=64 prefill; channels=160 and 2560).
 | gemv | K=128 N=128 | 3.6 | 17.4 |
 | gemv | K=128 N=2048 | 58.3 | 16.9 |
 | gemv | K=128 N=2560 | 73.3 | 16.8 |
+
+> **† cumdecay 64×160:** This value (11.2 µs / 6.8 GiB/s) was measured on a
+> **little A55 core**, not the A76. The t3 CSV was generated without `taskset`,
+> and the scheduler placed this short-running kernel (~3 µs on A76) on a little
+> core. The correct A76 value is ~3.3 µs / ~23 GiB/s (verified on t4 with
+> `taskset -c 4-7`). See the corrected analysis below this section. All other
+> rows are confirmed A76 big-core measurements.
 
 ### Cross-core comparison: A76 (NEON) vs A57 (NEON)
 
@@ -4108,43 +4115,51 @@ recurrent primitives.
 > Manifest: `results/manifests/rk3588-t3_kleidiai_gdn_kernels.json`.
 > Raw CSV: `results/raw/kleidiai/rk3588-t3_kleidiai_gdn_kernels.csv`.
 
-### Cross-device anomaly: cumdecay 64×160 (t3 vs t4)
+### Corrected: cumdecay 64×160 "cross-device divergence" was a core-affinity artifact
 
-The same KleidiAI benchmark was run on a second RK3588 unit (t4, commit
-`1604356`). **14 of 15 shapes agree within 5–17%** between the two devices.
-The sole outlier is **cumdecay 64×160**: t3 measures 11.2 µs (6.8 GiB/s) vs
-t4 at 3.3 µs (22.8 GiB/s) — a **3.35× divergence**.
+> **Correction (2026-08-07, ob-jvx).** The original version of this subsection
+> hypothesised a load-to-use scheduling hazard amplified by board-revision
+> differences. That analysis was **wrong**. The real cause is a CPU
+> core-affinity methodology gap. See below.
 
-| Shape | t3 p50 (µs) | t4 p50 (µs) | t3/t4 |
-|---|---|---|---|
-| cumdecay 64×160 | 11.2 | 3.3 | 3.35× ⚠️ |
-| cumdecay 64×2560 | 121.8 | 120.9 | 1.01× |
-| gated_scan 64×160 | 5.3 | 5.5 | 0.98× |
-| dwconv1d 64×160 | 5.2 | 5.1 | 1.01× |
+The t4 KleidiAI CSV was generated with `taskset -c 4-7` (big A76 cores
+pinned). The t3 CSV was generated **without** taskset. On the RK3588's
+big.LITTLE layout (4× A55 + 4× A76), the Linux scheduler placed the first
+benchmarked shape — cumdecay 64×160, which runs for only ~3 µs on an A76 —
+on a **little A55 core**, then migrated to a big core for all subsequent
+shapes.
 
-The manifests confirm the devices are **different board revisions**: t3
-big-core max clock is 2304 MHz (cpu_capacity 414, kernel 5.10.160-rockchip,
-glibc 2.35), t4 is 2400 MHz (cpu_capacity 397, kernel 6.11.0-1006-rockchip,
-glibc 2.40) — a 4.2% clock difference that explains most of the 5–17%
-variance on bandwidth-bound shapes but not the 3.35× cumdecay outlier.
+Verification on t4 (commit `5d8430c`):
 
-**Root cause analysis.** The kernel code is byte-identical at both commits
-(`git diff` is empty). t4's value is stable to <0.3% across 5 re-runs. The
-NEON inner loop (see `kai_gdn_cumdecay_f32_sve.c`, double-width unroll path)
-issues `ldr q` → `fmul` with only 3 instructions of separation, but the A76
-L1 load latency is 4 cycles — creating a 1-cycle stall per timestep. This
-stall compounds across the 64-step sequential dependency chain (each
-`vmulq_f32` depends on the previous iteration's `run` register). On the t3
-board revision (lower-clocked, different kernel, possibly different silicon
-stepping), this scheduling hazard appears amplified — possibly because t3's
-older kernel (5.10) has different scheduler behavior or the gcc codegen at
-the t3 build differs. At the larger cumdecay 64×2560 shape (640 KiB working
-set, L2/DRAM-resident and bandwidth-bound), the scheduling stall is masked
-and the two devices agree to 1%.
+| Affinity | cumdecay 64×160 | GiB/s |
+|---|---|---|
+| t4 big cores (`taskset -c 4-7`) | **3.33 µs** | 22.9 |
+| t4 little cores (`taskset -c 0-3`) | **10.70 µs** | 7.1 |
+| t3 CSV (no taskset) | 11.18 µs | 6.8 |
+| t4 no taskset (varies) | 3.6–10.7 µs | 7.1–21.0 |
 
-**Implication for the submission.** The cumdecay 64×160 cell in the §24
-table should be treated as t3-specific; the t4 value (3.3 µs, 22.8 GiB/s)
-is likely closer to the true A76 capability at this shape. The discrepancy
-does not affect the A76 vs A57 comparison (which uses t3 data consistently)
-or the portability thesis (the kernel produces correct results on all
-tested cores).
+The t3 value (11.18 µs) matches t4's **little-core** measurement almost
+exactly. Without taskset, cumdecay 64×160 is nondeterministic — 5 re-runs
+produced values from 3.6 µs (big) to 10.7 µs (little). All other 14 t3
+shapes match t4's big-core values, confirming that only the first shape
+was mis-scheduled.
+
+**Root cause:** The Linux energy-aware scheduler initially places short-lived
+tasks on little cores for energy efficiency. Cumdecay 64×160 completes in
+~3 µs on an A76 — fast enough that the scheduler does not migrate it before
+the measurement window ends. By the second shape (cumdecay 1×160), the
+process has accumulated enough CPU time to trigger migration to a big core,
+where it remains for the rest of the benchmark.
+
+**Implication for the submission.** The cumdecay 64×160 cell in the §24 A76
+table (11.2 µs / 6.8 GiB/s) is an **A55 measurement, not A76**. The true A76
+value at this shape is ~3.3 µs / ~23 GiB/s. The §24 A76 vs A57 comparison
+ratios are not materially affected (both used the same methodology, so the
+ratio is preserved), but the absolute cumdecay 64×160 number understates
+A76 capability by ~3.4×. The t3 CSV should be re-run with `taskset -c 4-7`
+for correct big-core provenance.
+
+> **Lesson:** On Arm big.LITTLE systems, **always pin benchmark processes
+> with taskset**, even for micro-benchmarks. Short-running kernels (< 10 µs)
+> are especially vulnerable to scheduler placement on little cores, which
+> can inflate apparent latency by 3–4×.
