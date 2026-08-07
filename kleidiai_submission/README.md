@@ -317,7 +317,7 @@ repeats (batched ×100 calls, post clock-quantization fix). Provenance:
 [`results/raw/kleidiai/rk3588-t4_kleidiai_gdn_kernels.csv`](../results/raw/kleidiai/rk3588-t4_kleidiai_gdn_kernels.csv),
 manifest:
 [`results/manifests/rk3588-t4_kleidiai_gdn_kernels.json`](../results/manifests/rk3588-t4_kleidiai_gdn_kernels.json)
-(commit `1604356`, batched-timing).
+(commit `1604356`, dirty tree, batched-timing).
 
 | Kernel      | Shape (seq×ch)   | p50 (µs) | GiB/s |
 |-------------|------------------|----------|-------|
