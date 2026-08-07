@@ -85,6 +85,48 @@ extern void gdn_causal_dwconv1d_f32(const float *in, const float *w, float *out,
 #define FULL_KV_HEADS 4
 #endif
 
+/* ---- INT8 weight-only quantization ----
+ *
+ * Stores weights as int8 + per-output-column float scale. Dequantizes
+ * on-the-fly in the GEMV inner loop. Cuts weight memory traffic 4× vs FP32,
+ * directly improving tok/s since decode is bandwidth-bound.
+ *
+ * Compiled in with -DINT8_WEIGHTS. The FP32 path is unchanged for comparison.
+ */
+typedef struct {
+    int8_t *q;   /* quantized weights [K×N] row-major int8 */
+    float  *s;   /* per-column (output) scale [N] */
+} QW;
+
+/* Quantize a [K×N] float matrix to int8 + per-column scale (symmetric).
+ * B_in is read-only; q and s are allocated and filled. */
+static void quantize_weight(const float *B_in, int8_t **q_out, float **s_out,
+                            size_t K, size_t N) {
+    int8_t *q = malloc(K * N);
+    float  *s = malloc(N * sizeof(float));
+    if (!q || !s) { fprintf(stderr, "OOM in quantize\n"); exit(1); }
+
+    for (size_t n = 0; n < N; ++n) {
+        /* Find max abs in column n */
+        float max_abs = 0.0f;
+        for (size_t k = 0; k < K; ++k) {
+            float v = fabsf(B_in[k * N + n]);
+            if (v > max_abs) max_abs = v;
+        }
+        s[n] = (max_abs > 0.0f) ? max_abs / 127.0f : 1.0f;
+        float inv = 1.0f / s[n];
+        for (size_t k = 0; k < K; ++k) {
+            float scaled = B_in[k * N + n] * inv;
+            int vi = (int)lroundf(scaled);
+            if (vi > 127) vi = 127;
+            if (vi < -128) vi = -128;
+            q[k * N + n] = (int8_t)vi;
+        }
+    }
+    *q_out = q;
+    *s_out = s;
+}
+
 /* ---- Helpers ---- */
 static float *alloc_aligned(size_t n) {
     void *p = NULL;
@@ -149,6 +191,78 @@ static void gemv_neon(const float *a, const float *B, float *c, size_t K, size_t
     }
 }
 
+/* INT8 GEMV: dequantize-on-the-fly with NEON.
+ * a is [K] float, Bq is [K×N] int8, Bs is [N] float scale, c is [N] float.
+ *
+ * Row-sweep with per-column scale factored out:
+ *   c[n] = Bs[n] * sum_k(a[k] * (float)Bq[k*N+n])
+ *
+ * This loads 1 byte per weight element (vs 4 for FP32), cutting memory
+ * traffic ~4×. NEON dequantization (int8→int16→int32→float32) adds ~3
+ * cycles per 4 elements but is hidden behind memory latency. */
+static void gemv_int8_neon(const float *a, const int8_t *Bq, const float *Bs,
+                           float *c, size_t K, size_t N) {
+    const size_t TILE = 1024;
+
+#pragma omp parallel for schedule(static)
+    for (size_t jt = 0; jt < N; jt += TILE) {
+        size_t tn = (jt + TILE <= N) ? TILE : (N - jt);
+        float *ct = c + jt;
+
+        memset(ct, 0, tn * sizeof(float));
+
+        for (size_t k = 0; k < K; ++k) {
+            float ak = a[k];
+            const int8_t *Brow = Bq + k * N + jt;
+            size_t j = 0;
+#ifdef __ARM_NEON
+            float32x4_t akv = vdupq_n_f32(ak);
+            for (; j + 8 <= tn; j += 8) {
+                /* Load 8 int8 → widen to 8 int16 → split to 2× int32x4 → 2× float32x4 */
+                int8x8_t   i8  = vld1_s8(Brow + j);
+                int16x8_t  i16 = vmovl_s8(i8);
+                int32x4_t  i32lo = vmovl_s16(vget_low_s16(i16));
+                int32x4_t  i32hi = vmovl_s16(vget_high_s16(i16));
+                float32x4_t flo = vcvtq_f32_s32(i32lo);
+                float32x4_t fhi = vcvtq_f32_s32(i32hi);
+
+                float32x4_t clo = vld1q_f32(ct + j);
+                float32x4_t chi = vld1q_f32(ct + j + 4);
+                clo = vfmaq_f32(clo, akv, flo);
+                chi = vfmaq_f32(chi, akv, fhi);
+                vst1q_f32(ct + j, clo);
+                vst1q_f32(ct + j + 4, chi);
+            }
+            for (; j + 4 <= tn; j += 4) {
+                int8x8_t   i8  = vld1_s8(Brow + j);
+                int16x8_t  i16 = vmovl_s8(i8);
+                int32x4_t  i32 = vmovl_s16(vget_low_s16(i16));
+                float32x4_t bq = vcvtq_f32_s32(i32);
+
+                float32x4_t ck = vld1q_f32(ct + j);
+                ck = vfmaq_f32(ck, akv, bq);
+                vst1q_f32(ct + j, ck);
+            }
+#endif
+            for (; j < tn; ++j)
+                ct[j] += ak * (float)Brow[j];
+        }
+
+        /* Apply per-column scale (NEON-vectorized) */
+        size_t j = 0;
+#ifdef __ARM_NEON
+        for (; j + 4 <= tn; j += 4) {
+            float32x4_t cv = vld1q_f32(ct + j);
+            float32x4_t sv = vld1q_f32(Bs + jt + j);
+            cv = vmulq_f32(cv, sv);
+            vst1q_f32(ct + j, cv);
+        }
+#endif
+        for (; j < tn; ++j)
+            ct[j] *= Bs[jt + j];
+    }
+}
+
 static void matmul(const float *A, const float *B, float *C,
                    size_t M, size_t K, size_t N) {
 #ifdef __ARM_NEON
@@ -166,6 +280,31 @@ static void matmul(const float *A, const float *B, float *C,
         }
     }
 }
+
+/* INT8 matmul wrapper for M=1 decode path (falls back to scalar for M>1) */
+static void matmul_int8(const float *A, const int8_t *Bq, const float *Bs,
+                        float *C, size_t M, size_t K, size_t N) {
+    if (M == 1) {
+        gemv_int8_neon(A, Bq, Bs, C, K, N);
+        return;
+    }
+    /* Prefill path: dequantize on the fly (rare in decode benchmark) */
+    float *Bf = malloc(K * N * sizeof(float));
+    for (size_t k = 0; k < K; ++k)
+        for (size_t n = 0; n < N; ++n)
+            Bf[k * N + n] = (float)Bq[k * N + n] * Bs[n];
+    matmul(A, Bf, C, M, K, N);
+    free(Bf);
+}
+
+/* Dispatch macro: uses INT8 GEMV when compiled with -DINT8_WEIGHTS,
+ * otherwise falls through to the FP32 path. Bf is the float weight,
+ * Bq is the QW (int8+scale), only one is used per compilation. */
+#ifdef INT8_WEIGHTS
+#define MM(A, Bf, Bq, C, M, K, N) matmul_int8(A, (Bq).q, (Bq).s, C, M, K, N)
+#else
+#define MM(A, Bf, Bq, C, M, K, N) matmul(A, Bf, C, M, K, N)
+#endif
 
 static double now_us(void) {
     struct timespec ts;
@@ -215,6 +354,10 @@ typedef struct {
     float *down_proj;  /* INTER x HIDDEN */
     /* Embedding / LM head */
     float *embed;      /* VOCAB x HIDDEN (tied) */
+    /* INT8 quantized versions (populated when INT8_WEIGHTS is defined) */
+    QW g_q_proj_q, g_k_proj_q, g_v_proj_q, g_o_proj_q;
+    QW f_q_proj_q, f_k_proj_q, f_v_proj_q, f_o_proj_q;
+    QW gate_proj_q, up_proj_q, down_proj_q;
 } Weights;
 
 static void gdn_layer_forward(const Weights *w, LayerState *st, const float *hidden_in,
@@ -233,9 +376,9 @@ static void gdn_layer_forward(const Weights *w, LayerState *st, const float *hid
 
     /* Q/K/V projections */
     t0 = now_us();
-    matmul(hidden_in, w->g_q_proj, q, seq, HIDDEN, KEY_DIM);
-    matmul(hidden_in, w->g_k_proj, k, seq, HIDDEN, KEY_DIM);
-    matmul(hidden_in, w->g_v_proj, v, seq, HIDDEN, VALUE_DIM);
+    MM(hidden_in, w->g_q_proj, w->g_q_proj_q, q, seq, HIDDEN, KEY_DIM);
+    MM(hidden_in, w->g_k_proj, w->g_k_proj_q, k, seq, HIDDEN, KEY_DIM);
+    MM(hidden_in, w->g_v_proj, w->g_v_proj_q, v, seq, HIDDEN, VALUE_DIM);
     g_t_gdn_proj += now_us() - t0;
 
     /* Project Q to conv_dim for depthwise conv */
@@ -272,7 +415,7 @@ static void gdn_layer_forward(const Weights *w, LayerState *st, const float *hid
 
     /* Output projection */
     t0 = now_us();
-    matmul(scanned, w->g_o_proj, attn_out, seq, VALUE_DIM, HIDDEN);
+    MM(scanned, w->g_o_proj, w->g_o_proj_q, attn_out, seq, VALUE_DIM, HIDDEN);
     g_t_gdn_oproj += now_us() - t0;
 
     /* Residual */
@@ -293,9 +436,9 @@ static void full_attn_layer_forward(const Weights *w, LayerState *st,
     float *v = alloc_aligned(seq * kv_dim);
     float *attn_out = alloc_aligned(seq * HIDDEN);
 
-    matmul(hidden_in, w->f_q_proj, q, seq, HIDDEN, q_dim);
-    matmul(hidden_in, w->f_k_proj, k, seq, HIDDEN, kv_dim);
-    matmul(hidden_in, w->f_v_proj, v, seq, HIDDEN, kv_dim);
+    MM(hidden_in, w->f_q_proj, w->f_q_proj_q, q, seq, HIDDEN, q_dim);
+    MM(hidden_in, w->f_k_proj, w->f_k_proj_q, k, seq, HIDDEN, kv_dim);
+    MM(hidden_in, w->f_v_proj, w->f_v_proj_q, v, seq, HIDDEN, kv_dim);
 
     /* Simulated attention (identity for benchmark — KV cache growth is the point,
      * measured separately by the memory instrumentation harness) */
@@ -306,7 +449,7 @@ static void full_attn_layer_forward(const Weights *w, LayerState *st,
     }
 
     /* Output projection */
-    matmul(q, w->f_o_proj, attn_out, seq, q_dim, HIDDEN);
+    MM(q, w->f_o_proj, w->f_o_proj_q, attn_out, seq, q_dim, HIDDEN);
 
     for (size_t i = 0; i < seq * HIDDEN; ++i)
         hidden_out[i] = hidden_in[i] + attn_out[i];
@@ -320,8 +463,8 @@ static void ffn_forward(const Weights *w, const float *hidden_in, float *hidden_
     float *act = alloc_aligned(seq * INTER);
     float *down = alloc_aligned(seq * HIDDEN);
 
-    matmul(hidden_in, w->gate_proj, gate, seq, HIDDEN, INTER);
-    matmul(hidden_in, w->up_proj, up, seq, HIDDEN, INTER);
+    MM(hidden_in, w->gate_proj, w->gate_proj_q, gate, seq, HIDDEN, INTER);
+    MM(hidden_in, w->up_proj, w->up_proj_q, up, seq, HIDDEN, INTER);
 
     /* SiLU(gate) * up */
     for (size_t i = 0; i < seq * INTER; ++i) {
@@ -329,7 +472,7 @@ static void ffn_forward(const Weights *w, const float *hidden_in, float *hidden_
         act[i] = g / (1.0f + expf(-g)) * up[i];
     }
 
-    matmul(act, w->down_proj, down, seq, INTER, HIDDEN);
+    MM(act, w->down_proj, w->down_proj_q, down, seq, INTER, HIDDEN);
 
     for (size_t i = 0; i < seq * HIDDEN; ++i)
         hidden_out[i] = hidden_in[i] + down[i];
@@ -385,6 +528,23 @@ int main(int argc, char **argv) {
     fill_rand(w.gate_proj, HIDDEN * INTER, &seed);
     fill_rand(w.up_proj,   HIDDEN * INTER, &seed);
     fill_rand(w.down_proj, INTER * HIDDEN, &seed);
+
+    /* INT8 quantize all GEMV weight matrices (when enabled) */
+#ifdef INT8_WEIGHTS
+    quantize_weight(w.g_q_proj,  &w.g_q_proj_q.q,  &w.g_q_proj_q.s,  HIDDEN, KEY_DIM);
+    quantize_weight(w.g_k_proj,  &w.g_k_proj_q.q,  &w.g_k_proj_q.s,  HIDDEN, KEY_DIM);
+    quantize_weight(w.g_v_proj,  &w.g_v_proj_q.q,  &w.g_v_proj_q.s,  HIDDEN, VALUE_DIM);
+    quantize_weight(w.g_o_proj,  &w.g_o_proj_q.q,  &w.g_o_proj_q.s,  VALUE_DIM, HIDDEN);
+    quantize_weight(w.f_q_proj,  &w.f_q_proj_q.q,  &w.f_q_proj_q.s,  HIDDEN, FULL_HEADS * FULL_HEAD_DIM);
+    quantize_weight(w.f_k_proj,  &w.f_k_proj_q.q,  &w.f_k_proj_q.s,  HIDDEN, FULL_KV_HEADS * FULL_HEAD_DIM);
+    quantize_weight(w.f_v_proj,  &w.f_v_proj_q.q,  &w.f_v_proj_q.s,  HIDDEN, FULL_KV_HEADS * FULL_HEAD_DIM);
+    quantize_weight(w.f_o_proj,  &w.f_o_proj_q.q,  &w.f_o_proj_q.s,  FULL_HEADS * FULL_HEAD_DIM, HIDDEN);
+    quantize_weight(w.gate_proj, &w.gate_proj_q.q, &w.gate_proj_q.s, HIDDEN, INTER);
+    quantize_weight(w.up_proj,   &w.up_proj_q.q,   &w.up_proj_q.s,   HIDDEN, INTER);
+    quantize_weight(w.down_proj, &w.down_proj_q.q, &w.down_proj_q.s, INTER, HIDDEN);
+    if (!csv)
+        printf("  Weight quantization: INT8 (weight-only, per-column symmetric scale)\n\n");
+#endif
 
     /* Per-layer state */
     LayerState states[NUM_LAYERS];
@@ -528,6 +688,19 @@ int main(int argc, char **argv) {
     free(w.g_conv_w); free(w.g_beta);
     free(w.f_q_proj); free(w.f_k_proj); free(w.f_v_proj); free(w.f_o_proj);
     free(w.gate_proj); free(w.up_proj); free(w.down_proj);
+#ifdef INT8_WEIGHTS
+    free(w.g_q_proj_q.q);  free(w.g_q_proj_q.s);
+    free(w.g_k_proj_q.q);  free(w.g_k_proj_q.s);
+    free(w.g_v_proj_q.q);  free(w.g_v_proj_q.s);
+    free(w.g_o_proj_q.q);  free(w.g_o_proj_q.s);
+    free(w.f_q_proj_q.q);  free(w.f_q_proj_q.s);
+    free(w.f_k_proj_q.q);  free(w.f_k_proj_q.s);
+    free(w.f_v_proj_q.q);  free(w.f_v_proj_q.s);
+    free(w.f_o_proj_q.q);  free(w.f_o_proj_q.s);
+    free(w.gate_proj_q.q); free(w.gate_proj_q.s);
+    free(w.up_proj_q.q);   free(w.up_proj_q.s);
+    free(w.down_proj_q.q); free(w.down_proj_q.s);
+#endif
     for (int l = 0; l < NUM_LAYERS; ++l) {
         free(states[l].gdn_state); free(states[l].conv_hist);
         free(states[l].kv_cache_k); free(states[l].kv_cache_v);

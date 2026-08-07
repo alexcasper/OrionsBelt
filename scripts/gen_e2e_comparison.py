@@ -1,314 +1,215 @@
 #!/usr/bin/env python3
-"""Generate the fleet-wide e2e decode comparison table from committed CSVs.
+"""Generate the e2e fleet comparison table from committed schema CSVs.
 
-Reads all results/raw/*_e2e_raw.csv and results/raw/*_e2e_schema.csv,
-aggregates by (device, model), and emits results/figures/e2e_fleet_comparison.md.
+Reads every results/raw/*_e2e_schema.csv, extracts decode tok/s and TTFT,
+groups by model + quantization, and emits a markdown table to
+results/figures/e2e_fleet_comparison.md.
 
-Stdlib only — compatible with Python 3.6+ (Jetson Nano).
+Flags commit mismatches per RESULTS DISCIPLINE: devices measured at
+different commits are not comparable.
 
-Bead ob-mrd.8 / ob-ami.  Do NOT hand-edit the output; update this script.
+Bead ob-52r. Run after all fleet devices have re-run at the matched commit.
+
+Usage:
+    python3 scripts/gen_e2e_comparison.py
+    python3 scripts/gen_e2e_comparison.py --output results/figures/e2e_fleet_comparison.md
 """
 import csv
+import json
 import os
-import statistics
 import sys
 from collections import defaultdict
-from datetime import datetime
+from pathlib import Path
 
-RAW = os.path.join(os.path.dirname(__file__), "..", "results", "raw")
-MAN = os.path.join(os.path.dirname(__file__), "..", "results", "manifests")
-OUT = os.path.join(os.path.dirname(__file__), "..", "results", "figures",
-                   "e2e_fleet_comparison.md")
-
-# CPU class lookup for readability
-CPU_CLASS = {
-    "jetson-j1": "Cortex-A57 @1.48 GHz ×4",
-    "jetson-j1_08b": "Cortex-A57 @1.48 GHz ×4",
-    "rk3588-t3": "Cortex-A76 @2.4 GHz ×4 (big)",
-    "rk3588-t3_08b": "Cortex-A76 @2.4 GHz ×4 (big)",
-    "rk3588-t4": "Cortex-A76 @2.4 GHz ×4 (big)",
-}
-
-# Commit notes — explain WHY different commits
-COMMIT_NOTES = {
-    "a8b5195": "STALE: pre-GEMV binary (20x too slow — see §14 correction)",
-    "b85fab1": "GEMV row-sweep + 0.8B variant",
-    "2e752af": "GEMV row-sweep optimized",
-    "7962968": "GEMV + 0.8B variant",
-    "def3f29": "PRE-GEMV-opt (column-sweep GEMV)",
-    "2896dd0": "GEMV row-sweep + 0.8B variant",
-}
+REPO_ROOT = Path(__file__).resolve().parent.parent
+RAW_DIR = REPO_ROOT / "results" / "raw"
+DEFAULT_OUT = REPO_ROOT / "results" / "figures" / "e2e_fleet_comparison.md"
 
 
-def median_or_none(xs):
-    return statistics.median(xs) if xs else None
-
-
-def min_or_none(xs):
-    return min(xs) if xs else None
-
-
-def max_or_none(xs):
-    return max(xs) if xs else None
-
-
-def load_raw():
-    """Load all *_e2e_raw.csv files. Returns list of dicts."""
+def load_rows():
+    """Load all e2e schema CSVs and return a list of dicts."""
     rows = []
-    for fname in sorted(os.listdir(RAW)):
-        if not fname.endswith("_e2e_raw.csv"):
-            continue
-        path = os.path.join(RAW, fname)
-        with open(path) as f:
-            for r in csv.DictReader(f):
-                # Derive device from filename: <device>_e2e_raw.csv
-                device = fname.replace("_e2e_raw.csv", "")
-                r["_device"] = device
-                r["_file"] = fname
-                # Cast numerics
-                for k in ("tokens", "ttft_ms", "tok_per_sec_mean",
-                          "p50_us", "p95_us", "p99_us", "mean_us",
-                          "gdn_proj_pct", "gdn_conv_pct", "gdn_decay_pct",
-                          "gdn_scan_pct", "gdn_oproj_pct", "full_pct",
-                          "ffn_pct"):
-                    if r.get(k):
-                        try:
-                            r[k] = float(r[k])
-                        except ValueError:
-                            pass
-                rows.append(r)
+    for f in sorted(RAW_DIR.glob("*_e2e_schema.csv")):
+        with open(f) as fh:
+            reader = csv.DictReader(fh)
+            for row in reader:
+                rows.append(row)
     return rows
 
 
-def load_schema():
-    """Load all *_e2e_schema.csv files for git_sha provenance."""
-    rows = []
-    for fname in sorted(os.listdir(RAW)):
-        if not fname.endswith("_e2e_schema.csv"):
+def extract_metrics(rows):
+    """Extract tok/s and TTFT per device/model/quant, keyed by (device, model, quant)."""
+    data = defaultdict(lambda: {"tok_per_sec": [], "ttft": [], "sha": set(),
+                                 "manifests": set(), "runs": 0})
+    for r in rows:
+        device = r.get("device", "?")
+        model = r.get("model_checkpoint", "?")
+        # Shorten model name
+        if "4B" in model:
+            model_short = "4B"
+        elif "0.8B" in model:
+            model_short = "0.8B"
+        else:
+            model_short = model.split("/")[-1] if "/" in model else model
+        quant = r.get("quantization", "fp32")
+        sha = r.get("git_sha", "?")[:8]
+
+        key = (device, model_short, quant)
+        entry = data[key]
+        entry["sha"].add(sha)
+        entry["manifests"].add(r.get("manifest_ref", ""))
+        entry["runs"] = max(entry["runs"], int(r.get("repeat_count", "1")))
+
+        metric = r.get("metric_name", "")
+        val = r.get("value", "")
+        try:
+            val = float(val)
+        except (ValueError, TypeError):
             continue
-        path = os.path.join(RAW, fname)
-        with open(path) as f:
-            for r in csv.DictReader(f):
-                rows.append(r)
-    return rows
+
+        if metric == "decode_tokens_per_sec":
+            entry["tok_per_sec"].append(val)
+        elif metric == "ttft_seconds":
+            # Convert to ms for readability
+            entry["ttft"].append(val * 1000)
+
+    return data
 
 
-def get_provenance(schema_rows, device):
-    """Return (git_sha, manifest_ref) for a device from schema data."""
-    for r in schema_rows:
-        if r.get("device") == device:
-            return r.get("git_sha", "?"), r.get("manifest_ref", "?")
-    return "?", "?"
+def fmt_mean_std(vals):
+    if not vals:
+        return "—"
+    mean = sum(vals) / len(vals)
+    if len(vals) > 1:
+        std = (sum((v - mean) ** 2 for v in vals) / len(vals)) ** 0.5
+        if std / mean > 0.01:  # Show std only if >1%
+            return f"{mean:.2f} ± {std:.2f}"
+    return f"{mean:.2f}"
+
+
+def generate_table(data):
+    """Generate markdown table from extracted metrics."""
+    lines = []
+
+    # Group by (model, quant)
+    groups = defaultdict(list)
+    for (device, model, quant), entry in sorted(data.items()):
+        groups[(model, quant)].append((device, entry))
+
+    lines.append("# E2E Decode Fleet Comparison")
+    lines.append("")
+    lines.append("Generated by `scripts/gen_e2e_comparison.py`. Do not hand-edit.")
+    lines.append("")
+
+    # Commit mismatch check
+    all_shas = set()
+    for entry in data.values():
+        all_shas.update(entry["sha"])
+    if len(all_shas) > 1:
+        lines.append("> ⚠️ **Commit mismatch detected.** Devices measured at different commits")
+        lines.append("> are not comparable (RESULTS DISCIPLINE, bead ob-bf7).")
+        lines.append(f"> Commits in play: {', '.join(sorted(all_shas))}")
+        lines.append("")
+
+    for (model, quant), entries in sorted(groups.items()):
+        title = f"Qwen3.5-{model} — {quant.upper()}"
+        lines.append(f"## {title}")
+        lines.append("")
+
+        # Table header
+        lines.append("| Device | Commit | Tok/s | TTFT (ms) | Runs | Notes |")
+        lines.append("|--------|--------|------:|----------:|-----:|-------|")
+
+        for device, entry in entries:
+            sha_str = ", ".join(sorted(entry["sha"]))
+            tok = fmt_mean_std(entry["tok_per_sec"])
+            ttft = fmt_mean_std(entry["ttft"])
+            runs = entry["runs"]
+            notes = []
+            if len(entry["sha"]) > 1:
+                notes.append("⚠ multi-commit")
+            if any("dirty" in m for m in entry["manifests"]):
+                notes.append("⚠ dirty")
+            notes_str = "; ".join(notes) if notes else ""
+            lines.append(f"| {device} | `{sha_str}` | {tok} | {ttft} | {runs} | {notes_str} |")
+
+        lines.append("")
+
+    # Cross-quantization comparison (if both fp32 and int8 exist for same device/model)
+    # Normalize device names: strip _int8 suffix, match big-cluster FP32 (no suffix) to big INT8
+    fp32_map = {}  # (normalized_device, model) -> entry
+    for (device, model, quant), entry in data.items():
+        if quant == "fp32":
+            # FP32 without cluster suffix = big cluster (default)
+            norm = device
+            fp32_map[(norm, model)] = entry
+            # Also try with _big appended for matching
+            if "_big" not in device and "_little" not in device:
+                fp32_map[(device + "_big", model)] = entry
+
+    int8_entries = {k: v for k, v in data.items() if k[2] == "int8"}
+    if int8_entries:
+        lines.append("## INT8 vs FP32 Speedup")
+        lines.append("")
+        lines.append("| Device | Model | FP32 tok/s | INT8 tok/s | Speedup |")
+        lines.append("|--------|-------|-----------:|-----------:|--------:|")
+
+        for (device, model, _), i_entry in sorted(int8_entries.items()):
+            # Normalize: strip _int8 from device name for matching
+            norm_device = device.replace("_int8", "")
+            fp32_key = (norm_device, model)
+            if fp32_key in fp32_map:
+                f_entry = fp32_map[fp32_key]
+                fp32_tok = sum(f_entry["tok_per_sec"]) / len(f_entry["tok_per_sec"]) if f_entry["tok_per_sec"] else 0
+                int8_tok = sum(i_entry["tok_per_sec"]) / len(i_entry["tok_per_sec"]) if i_entry["tok_per_sec"] else 0
+                speedup = int8_tok / fp32_tok if fp32_tok > 0 else 0
+                lines.append(f"| {device} | {model} | {fp32_tok:.2f} | {int8_tok:.2f} | **{speedup:.2f}×** |")
+            else:
+                int8_tok = sum(i_entry["tok_per_sec"]) / len(i_entry["tok_per_sec"]) if i_entry["tok_per_sec"] else 0
+                lines.append(f"| {device} | {model} | — | {int8_tok:.2f} | — |")
+
+        lines.append("")
+
+    lines.append("## Data Sources")
+    lines.append("")
+    for f in sorted(RAW_DIR.glob("*_e2e_schema.csv")):
+        lines.append(f"- `{f.relative_to(REPO_ROOT)}`")
+    lines.append("")
+
+    return "\n".join(lines)
 
 
 def main():
-    raw_rows = load_raw()
-    schema_rows = load_schema()
+    import argparse
+    parser = argparse.ArgumentParser(description="Generate e2e fleet comparison table")
+    parser.add_argument("--output", "-o", default=str(DEFAULT_OUT),
+                        help="Output markdown file (default: results/figures/e2e_fleet_comparison.md)")
+    args = parser.parse_args()
 
-    # Group by (device, model)
-    groups = defaultdict(list)
-    for r in raw_rows:
-        model = r.get("model", "?")
-        groups[(r["_device"], model)].append(r)
+    rows = load_rows()
+    if not rows:
+        print("ERROR: no *_e2e_schema.csv files found in results/raw/", file=sys.stderr)
+        sys.exit(1)
 
-    # Sort: 0.8B first, then 4B; within model sort by tok/s desc
-    def sort_key(item):
-        (device, model) = item[0]
-        model_order = 0 if "0.8B" in model else 1
-        toks = [r["tok_per_sec_mean"] for r in item[1] if "tok_per_sec_mean" in r]
-        avg_tok = sum(toks) / len(toks) if toks else 0
-        return (model_order, -avg_tok)
+    data = extract_metrics(rows)
+    markdown = generate_table(data)
 
-    sorted_groups = sorted(groups.items(), key=sort_key)
+    out_path = Path(args.output)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(markdown)
+    print(f"Written: {out_path}")
+    print(f"  Devices: {len(set(r.get('device','?') for r in rows))}")
+    print(f"  Data rows: {len(rows)}")
 
-    lines = []
-    lines.append("# E2E Decode Fleet Comparison")
-    lines.append("")
-    lines.append("<!-- GENERATED by scripts/gen_e2e_comparison.py — do not hand-edit. -->")
-    lines.append("<!-- Bead ob-mrd.8 / ob-ami. Update the script, not this file. -->")
-    lines.append("<!-- All numbers traceable to manifest-backed CSVs in results/raw/. -->")
-    lines.append("")
-    lines.append("> End-to-end Qwen3.5 CPU-only decode benchmark (fp32, random weights).")
-    lines.append("> C implementation of the full GDN hybrid forward pass using optimized")
-    lines.append("> NEON GEMV kernels. Every number links to a manifest-backed CSV.")
-    lines.append("")
-
-    # ---- Provenance table ----
-    lines.append("## Provenance")
-    lines.append("")
-    lines.append("| Device | CPU class | Model | Commit | GEMV | Manifest |")
-    lines.append("|--------|-----------|-------|--------|------|----------|")
-
-    seen_devices = set()
-    for (device, model), rows in sorted_groups:
-        sha, manifest = get_provenance(schema_rows, device)
-        cpu = CPU_CLASS.get(device, "?")
-        gemv = COMMIT_NOTES.get(sha, "?")
-        key = (device, model)
-        if key not in seen_devices:
-            lines.append(f"| {device} | {cpu} | {model} | `{sha}` | {gemv} | [{os.path.basename(manifest)}](../../{manifest}) |")
-            seen_devices.add(key)
-
-    lines.append("")
-    lines.append("> **⚠ Cross-commit comparison:** some devices ran at different commits.")
-    lines.append("> The GEMV row-sweep optimization (commit `2e752af` on t3) delivered ~12×")
-    lines.append("> speedup over the column-sweep baseline. See the bottleneck analysis below.")
-    lines.append("")
-
-    # ---- Results table ----
-    lines.append("## Results")
-    lines.append("")
-    lines.append("| Device | Model | Runs | TTFT (s) | TTFT range | tok/s | tok/s range | Spread |")
-    lines.append("|--------|-------|------|----------|------------|-------|-------------|--------|")
-
-    for (device, model), rows in sorted_groups:
-        n = len(rows)
-        ttfts = [r["ttft_ms"] / 1000.0 for r in rows if "ttft_ms" in r]
-        toks = [r["tok_per_sec_mean"] for r in rows if "tok_per_sec_mean" in r]
-
-        ttft_med = median_or_none(ttfts)
-        ttft_min = min_or_none(ttfts)
-        ttft_max = max_or_none(ttfts)
-        tok_med = median_or_none(toks)
-        tok_min = min_or_none(toks)
-        tok_max = max_or_none(toks)
-
-        if ttft_med and ttft_max and ttft_min:
-            ttft_spread = ttft_max / ttft_min if ttft_min > 0 else 0
-        else:
-            ttft_spread = 0
-
-        cpu_short = CPU_CLASS.get(device, device).split("@")[0].strip()
-
-        def fmt_range(lo, hi, prec):
-            if lo is None:
-                return "—"
-            if abs(hi - lo) / max(lo, 1e-9) < 0.001:
-                return f"{lo:.{prec}f}"
-            return f"{lo:.{prec}f}–{hi:.{prec}f}"
-
-        ttft_s = f"{ttft_med:.3f}" if ttft_med else "—"
-        tok_s = f"{tok_med:.2f}" if tok_med else "—"
-
-        lines.append(
-            f"| {device} ({cpu_short}) | {model} | {n} | "
-            f"{ttft_s} | {fmt_range(ttft_min, ttft_max, 3)} | "
-            f"{tok_s} | {fmt_range(tok_min, tok_max, 2)} | "
-            f"{ttft_spread:.2f}× |"
-        )
-
-    lines.append("")
-
-    # ---- Bottleneck breakdown ----
-    lines.append("## Bottleneck breakdown")
-    lines.append("")
-    lines.append("Phase timing as share of total (from per-phase instrumentation in the C binary).")
-    lines.append("")
-    lines.append("| Device | Model | FFN | GDN q/k/v proj | GDN out proj | Full attn | GDN conv | GDN decay | GDN scan |")
-    lines.append("|--------|-------|-----|----------------|--------------|-----------|----------|-----------|----------|")
-
-    for (device, model), rows in sorted_groups:
-        # Use first row that has breakdown data
-        r = None
-        for row in rows:
-            if "ffn_pct" in row and isinstance(row.get("ffn_pct"), float):
-                r = row
-                break
-        if r is None:
-            lines.append(f"| {device} | {model} | — | — | — | — | — | — | — |")
-            continue
-
-        def pct(key):
-            v = r.get(key)
-            return f"{v:.1f}%" if isinstance(v, float) else "—"
-
-        lines.append(
-            f"| {device} | {model} | "
-            f"{pct('ffn_pct')} | {pct('gdn_proj_pct')} | {pct('gdn_oproj_pct')} | "
-            f"{pct('full_pct')} | {pct('gdn_conv_pct')} | {pct('gdn_decay_pct')} | "
-            f"{pct('gdn_scan_pct')} |"
-        )
-
-    lines.append("")
-    lines.append("**Key findings:**")
-    lines.append("- **FFN dominates** (54–72% across all device/model combos) — the model is")
-    lines.append("  matmul-bound, not recurrence-bound. GDN's novel kernels (Conv1D, decay, scan)")
-    lines.append("  are <1% of total time.")
-    lines.append("- **GEMV optimization matters more than core class:** RK3588-A76 with the")
-    lines.append("  row-sweep GEMV (`2e752af`) achieves 1.04 tok/s on 4B, vs 0.09 tok/s at the")
-    lines.append("  pre-optimization commit `def3f29` — an 11.6× gain from software alone.")
-    lines.append("- **0.8B is practical on low-end edge:** the A57 achieves 2.7 tok/s on 0.8B,")
-    lines.append("  making it deployable for real-time assistance on passively-cooled hardware.")
-    lines.append("")
-
-    # ---- Cross-device scaling ----
-    lines.append("## Cross-device scaling (matched GEMV code)")
-    lines.append("")
-
-    # Collect A57 and A76 numbers for each model
-    def get_avg_tok(device_pat, model_pat):
-        """Average tok/s across all matching device/model groups."""
-        vals = []
-        for (dev, mdl), rows in groups.items():
-            if device_pat in dev and model_pat in mdl:
-                vals.extend(r["tok_per_sec_mean"] for r in rows
-                            if "tok_per_sec_mean" in r)
-        return sum(vals) / len(vals) if vals else None
-
-    a57_08b = get_avg_tok("jetson", "0.8B")
-    a76_08b = get_avg_tok("rk3588", "0.8B")
-    a57_4b  = get_avg_tok("jetson", "4B")
-    # For A76 4B, exclude t4 (pre-GEMV baseline) — use t3 only
-    a76_4b  = None
-    for (dev, mdl), rows in groups.items():
-        if "rk3588-t3 " in dev + " " and "4B" in mdl and "0.8B" not in mdl:
-            toks = [r["tok_per_sec_mean"] for r in rows if "tok_per_sec_mean" in r]
-            a76_4b = sum(toks) / len(toks) if toks else None
-
-    if a57_08b and a76_08b:
-        r08 = a76_08b / a57_08b if a57_08b else 0
-        r4  = a76_4b / a57_4b if (a76_4b and a57_4b) else 0
-        lines.append("| Metric | Cortex-A57 (Jetson) | Cortex-A76 (RK3588) | A76/A57 |")
-        lines.append("|--------|---------------------|---------------------|---------|")
-        lines.append(f"| 0.8B tok/s | {a57_08b:.2f} | {a76_08b:.2f} | {r08:.1f}× |")
-        if a57_4b and a76_4b:
-            lines.append(f"| 4B tok/s | {a57_4b:.2f} | {a76_4b:.2f} | {r4:.1f}× |")
-        lines.append(f"| 0.8B TTFT (s) | ~0.37 | ~0.125 | {0.37/0.125:.1f}× |")
-        if a57_4b and a76_4b:
-            lines.append(f"| 4B TTFT (s) | ~2.3 | ~0.96 | {2.3/0.96:.1f}× |")
-        lines.append("")
-        lines.append("The A76 is 2.4–3.0× faster than the A57, consistent with the ~1.6× clock")
-        lines.append("advantage (2.4 vs 1.48 GHz) plus the A76's wider pipeline (2× FMA/cycle")
-        lines.append("vs A57's 1×). The 4B ratio is smaller because the larger working set pushes")
-        lines.append("both cores closer to DRAM bandwidth limits.")
-        lines.append("")
-        lines.append("> t4 (pre-GEMV baseline) excluded from this comparison. A76 4B = t3 only.")
-        lines.append("")
-
-    # ---- Methodology ----
-    lines.append("## Methodology")
-    lines.append("")
-    lines.append("- Binary: `bench_gdn_e2e_decode[_08b]_<isa>` — full Qwen3.5 forward pass in C")
-    lines.append("  with NEON GEMV (row-sweep, OpenMP parallel tiles) for the projection matmuls.")
-    lines.append("- Protocol: governor=performance, 3+ independent runs, pre/post thermal")
-    lines.append("  snapshots. All manifests confirm `dirty=false`.")
-    lines.append("- Weights: random fp32 (benchmark only — no model loading).")
-    lines.append("- Replicates: see the Spread column. On this fleet, single-run variance can")
-    lines.append("  reach 1.68× (bead ob-bf7). All entries here show <1.15× spread.")
-    lines.append("")
-
-    # Write output
-    os.makedirs(os.path.dirname(OUT), exist_ok=True)
-    with open(OUT, "w") as f:
-        f.write("\n".join(lines) + "\n")
-
-    print(f"Wrote {OUT}")
-    print(f"  {len(groups)} device/model combinations")
-    for (device, model), rows in sorted_groups:
-        sha, _ = get_provenance(schema_rows, device)
-        toks = [r["tok_per_sec_mean"] for r in rows if "tok_per_sec_mean" in r]
-        avg = sum(toks) / len(toks) if toks else 0
-        print(f"  {device:<20} {model:<16} sha={sha:<10} {len(rows)} runs  {avg:.2f} tok/s")
+    # Warn about commit mismatches
+    all_shas = set()
+    for entry in data.values():
+        all_shas.update(entry["sha"])
+    if len(all_shas) > 1:
+        print(f"\n⚠ WARNING: {len(all_shas)} different commits in the data:")
+        for sha in sorted(all_shas):
+            print(f"  {sha}")
+        print("Devices at different commits are NOT comparable.")
 
 
 if __name__ == "__main__":
