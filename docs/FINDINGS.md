@@ -3001,9 +3001,18 @@ FP32 baselines: commits `2e752af` (4B) / `7962968` (0.8B) from §15.
 All A57 INT8 runs at commit `660ce17` with manifests (`dirty=false`).
 Replicate spread within 1.7% (3.01 ± 0.01 tok/s for 0.8B, 0.59 ± 0.01 for 4B).
 
+> **Matched-commit re-run (8e7403c, 2026-08-07):** The A57 was re-benchmarked
+> at the fleet-wide matched commit as part of ob-52r. Updated numbers (3 runs
+> each, `dirty=false` manifests, thermal logged): **0.8B FP32 2.06 tok/s,
+> 0.8B INT8 2.45 tok/s (1.19×), 4B INT8 0.51 tok/s (1.19×).** The lower
+> absolute throughput (vs 2.70/3.01/0.59 above) reflects a higher device
+> thermal state during the re-run (55 °C vs ~45 °C); INT8 speedup is
+> consistent. The cumulative optimization table above uses these matched-commit
+> numbers. See `results/figures/e2e_fleet_comparison.md`.
+
 FP32 baselines: commits `2896dd0` (0.8B) / `b85fab1` (4B) from §17.
 
-**A57 vs A76 INT8 speedup.** The A57 sees smaller INT8 gains (1.11–1.36×)
+**A57 vs A76 INT8 speedup.** The A57 sees smaller INT8 gains (1.19× at matched commit `8e7403c`; 1.11–1.36× in the original `660ce17` run)
 than the A76 (1.32–1.77×) because the A57 is an ARMv8.0-A core without
 `dotprod` or `i8mm`: the NEON int8→int16→int32→fp32 dequant pipeline costs
 ~3 extra instructions per 8 elements, and the A57's narrower 2-wide pipeline
@@ -3045,10 +3054,10 @@ require a weight transpose or a different access pattern. Left as future work.
 |-------------|-------------:|-------------:|----------------:|----------------:|
 | Naive column-sweep GEMV (FP32) | 0.07 | ~0.02 | 1.0× | 1.0× |
 | Row-sweep + OpenMP (FP32, §15) | 1.04 | 0.43 | 14.9× | ~21× |
-| + INT8 weight-only (this section) | 1.84 | 0.59 | **26.3×** | **~30×** |
+| + INT8 weight-only (this section) | 1.84 | 0.51 | **26.3×** | **~25×** |
 
 From the naive baseline to the fully optimized INT8 path, the 4B model sees a
-**26–30× cumulative speedup** across both core classes — purely from memory
+**~26× cumulative speedup** across both core classes — purely from memory
 access pattern and weight precision, with no algorithmic changes to the model.
 
 ### Implication for submission
