@@ -2536,6 +2536,8 @@ functional is itself notable: **the GPU GDN kernels require no proprietary
 drivers**, which is relevant for reproducibility and the open-source
 contribution criterion.
 
+**Data:** [`results/raw/rk3588-t4_gpu_mali-g610.csv`](../../results/raw/rk3588-t4_gpu_mali-g610.csv) · manifest [`rk3588-t4_gpu_mali-g610.json`](../../results/manifests/rk3588-t4_gpu_mali-g610.json) (dirty tree, SHA `e6aea70`).
+
 ---
 
 ## 14. End-to-end Qwen3.5-4B C decode loop: A57 joins the fleet (2026-08-07, ob-mrd.8)
