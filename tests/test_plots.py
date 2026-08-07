@@ -878,6 +878,7 @@ class TestTryImportMatplotlib:
 
     def test_returns_module_when_available(self):
         """When matplotlib is installed, returns the pyplot module."""
+        pytest.importorskip("matplotlib")
         plt = _try_import_matplotlib()
         assert plt is not None
 
@@ -958,6 +959,7 @@ class TestPlotCrossDeviceEdgeCases:
 
     def test_spec_bandwidth_line_drawn(self, tmp_path):
         """_plot_cross_device draws spec line for recognised device (line 757)."""
+        pytest.importorskip("matplotlib")
         plt = _try_import_matplotlib()
         # "rk3588" prefix is in DEVICE_SPEC_BANDWIDTH → spec lookup hits
         by_device = {"rk3588-t4": [self._scan_row(gib=3.3)]}
