@@ -2494,6 +2494,46 @@ result credible when it arrives.
 
 ---
 
+## 14. End-to-end Qwen3.5-4B C decode loop: A57 joins the fleet (2026-08-07, ob-mrd.8)
+
+### What this adds
+
+Section 12 measured the 0.8B model via PyTorch on RK3588. The C decode loop
+(`gdn_e2e_decode.c`) is a separate measurement: it runs the full Qwen3.5-4B
+forward pass (32 layers, 24 GDN + 8 full-attention + 32 FFN blocks) using the
+optimized NEON/SVE kernels directly, with random weights (benchmark only).
+This is the number the CPU-first mapping hypothesis needs.
+
+### Results
+
+| Device | Core | Commit | Tok/s (decode) | TTFT | Governor |
+|--------|------|--------|---------------:|-----:|----------|
+| RK3588 (t3) | Cortex-A76 ×4 | a086a50 | 0.08 | 13.3 s | performance |
+| Jetson Nano (j1) | Cortex-A57 ×4 | dd1fdf4 | 0.02 | 48.6 s | performance |
+
+**Caveat: different commits.** The kernel source (`gdn_sve.c`,
+`gdn_delta_matmul.c`, `gdn_e2e_decode.c`) is identical at both commits — the
+intervening changes are to scripts and documentation — so the comparison is
+valid in practice. However, per the project's results-discipline rule, this
+should be re-confirmed at a matched commit before appearing in the submission.
+
+**Only 1 run per device.** A single measurement per device is not enough to
+establish replicates (bead ob-bf7 found 1.68× spread on this fleet). These
+numbers should be treated as order-of-magnitude, not precise.
+
+### What the numbers say (and don't)
+
+The A57 is ~4× slower than the A76 (0.02 vs 0.08 tok/s), consistent with the
+core-level bandwidth ratio from the fleet kernel study (§5a). This is not
+surprising — the A57 is Armv8.0-A with NEON only, while the A76 has dotprod
+and higher clock. The result confirms the decode loop runs correctly on the
+weakest fleet device and extends the fleet e2e data set.
+
+Files: `results/raw/jetson-j1_e2e_raw.csv`, `results/raw/jetson-j1_e2e_schema.csv`
+Manifest: `results/manifests/jetson-j1_e2e.json`
+
+---
+
 ## GDN-2 vs GDN-1 Gated Scan: Operator-Level Comparison on RK3588-t4
 
 **Date:** 2026-08-07
