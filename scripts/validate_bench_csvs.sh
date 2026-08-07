@@ -46,9 +46,16 @@ for csv in "$RAW"/jetson-j*.csv "$RAW"/pi5-*.csv "$RAW"/rk3588-t*_big.csv "$RAW"
     # rk3588-t3_little.csv share rk3588-t3.json), so try the exact name first,
     # then strip _big/_little/_singlethread suffixes to find the shared manifest.
     manifest_found=""
-    # Build candidate manifest names: exact, then progressively stripped
+    # Build candidate manifest names: exact, then progressively stripped.
+    # Strip cluster/run suffixes (_big/_little/_singlethread) and e2e pipeline
+    # suffixes (_raw/_schema) to find the shared manifest.
     stripped="$base"
     for suffix in _big _little _singlethread; do
+        case "$stripped" in
+            *"$suffix") stripped="${stripped%$suffix}" ;;
+        esac
+    done
+    for suffix in _raw _schema; do
         case "$stripped" in
             *"$suffix") stripped="${stripped%$suffix}" ;;
         esac
