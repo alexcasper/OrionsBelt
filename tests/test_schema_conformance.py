@@ -82,6 +82,7 @@ def test_csv_header_from_existing_results():
     ctx_sweep_marker = "gdn_layer_us"  # gdn_e2e_decode.c --ctx-sweep mode (ob-mrd.10)
     delta_matmul_marker = "M"  # bench_gdn --delta-matmul mode (ob-8qt.1)
     ctx_sweep_marker = "gdn_layer_us"  # context-length sweep (gdn_e2e_decode.c --ctx-sweep)
+    kleidiai_marker = "shape"  # KleidiAI micro-kernel bench (bench_kai_gdn.c)
     result_row_columns = set(RESULT_ROW_COLUMNS)
 
     checked = 0
@@ -98,6 +99,7 @@ def test_csv_header_from_existing_results():
             or layer_profile_marker in cols
             or delta_matmul_marker in cols
             or e2e_ctxsweep_marker in cols
+            or kleidiai_marker in cols
         ):
             continue  # different shape by design, not a conformance failure
         if e2e_decode_marker in cols:

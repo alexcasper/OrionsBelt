@@ -273,7 +273,7 @@ ISA level.
 Governor: performance, 4× Cortex-A57 @ 1.48 GHz. p50 of 30 repeats (3 warmups
 discarded). The A57 is the lowest-end core in the test fleet (Armv8.0, 4-wide
 NEON, no dotprod/SVE), making it the worst-case portability floor. Provenance:
-[`results/raw/jetson-j1_kleidiai_gdn_kernels.csv`](../results/raw/jetson-j1_kleidiai_gdn_kernels.csv),
+[`results/raw/kleidiai/jetson-j1_kleidiai_gdn_kernels.csv`](../results/raw/kleidiai/jetson-j1_kleidiai_gdn_kernels.csv),
 manifest:
 [`results/manifests/jetson-j1_kleidiai_gdn_kernels.json`](../results/manifests/jetson-j1_kleidiai_gdn_kernels.json)
 (commit `2d0a4cc`, dirty=false).
