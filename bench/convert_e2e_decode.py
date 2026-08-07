@@ -26,8 +26,6 @@ Usage:
 Stdlib only — runs on edge devices. Bead ob-mrd.8.
 """
 
-from __future__ import annotations
-
 import argparse
 import csv
 import os

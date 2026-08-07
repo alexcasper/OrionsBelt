@@ -85,6 +85,33 @@ build_matmul rk3588_a76  "-mcpu=cortex-a76"
 build_matmul rk3588_a55  "-mcpu=cortex-a55"
 build_matmul orion_a720  "-mcpu=cortex-a720"
 
+# --- End-to-end decode benchmark (ob-8qt.9) ---
+# Multi-threaded (OpenMP). Full Qwen3.5-4B forward pass at real shapes.
+build_e2e() {
+    local name="$1" flags="$2"
+    if $CC -O3 -fopenmp $flags -static \
+        -Wno-aggressive-loop-optimizations \
+        "$K/gdn_sve.c" "$K/gdn_delta_matmul.c" "$K/gdn_e2e_decode.c" \
+        -I"$K" -o "$OUT/bench_gdn_e2e_decode_$name" -lm 2>/dev/null; then
+        printf "  %-14s %-40s %s bytes\n" "e2e_$name" "$flags" \
+            "$(stat -c%s "$OUT/bench_gdn_e2e_decode_$name")"
+    else
+        printf "  %-14s %-40s SKIPPED\n" "e2e_$name" "$flags"
+    fi
+}
+
+echo ""
+echo "E2E decode benchmarks:"
+build_e2e armv8a      "-march=armv8-a"
+build_e2e armv8.2dot  "-march=armv8.2-a+dotprod"
+build_e2e armv8.6i8mm "-march=armv8.2-a+i8mm"
+build_e2e armv9sve2   "-march=armv9-a+sve2+i8mm+bf16"
+build_e2e jetson_a57  "-mcpu=cortex-a57"
+build_e2e pi5_a76     "-mcpu=cortex-a76"
+build_e2e rk3588_a76  "-mcpu=cortex-a76"
+build_e2e rk3588_a55  "-mcpu=cortex-a55"
+build_e2e orion_a720  "-mcpu=cortex-a720"
+
 cat <<'NOTE'
 
 Pick the most specific binary your device supports, then:
@@ -95,6 +122,10 @@ Pick the most specific binary your device supports, then:
 Delta-rule matmul benchmark (ob-8qt.1):
 
     ./bench_delta_matmul_<variant> --repeats 30 --csv > results/raw/<device>_delta_matmul.csv
+
+E2E decode benchmark (ob-8qt.9):
+
+    ./scripts/run_e2e_decode.sh --device <device>   # builds, runs, converts, manifests
 
 For the known fleet, use the core-tuned build:
 
