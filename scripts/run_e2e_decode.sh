@@ -16,6 +16,7 @@
 #   ./scripts/run_e2e_decode.sh --pin "0-3" --cluster little # RK3588 little cluster
 #   ./scripts/run_e2e_decode.sh --device rk3588-t3       # override output name
 #   ./scripts/run_e2e_decode.sh --runs 3                 # 3 independent runs for repeat stats
+#   ./scripts/run_e2e_decode.sh --rebuild                # force rebuild even if binary exists
 #
 # Output:
 #   results/raw/<device>_e2e_raw.csv         — raw binary output (simple CSV)
@@ -36,6 +37,7 @@ PIN_CPUS=""
 CLUSTER="all"
 RUNS=1
 FORCE=0
+REBUILD=0
 MODEL="4b"
 BINARY=""
 K=src/orionsbelt/engines/cpu/kernels
@@ -51,6 +53,7 @@ while [[ $# -gt 0 ]]; do
         --binary)  BINARY="$2"; shift 2 ;;
         --model)   MODEL="$2"; shift 2 ;;   # 4b (default) or 08b
         --force)   FORCE=1; shift ;;
+        --rebuild) REBUILD=1; shift ;;
         *) echo "Unknown option: $1" >&2; exit 1 ;;
     esac
 done
@@ -116,24 +119,45 @@ echo "  Cluster: $CLUSTER"
 echo ""
 
 # --- 3. build if needed ----------------------------------------------------
+# Detect ISA and use appropriate flags (mirrors detect_isa.sh logic).
+# Must handle ARMv8.0-A cores (e.g. Cortex-A57) that lack dotprod —
+# the old default of -march=armv8.2-a+dotprod would SIGILL on them.
+FEATURES=$(grep -m1 '^Features' /proc/cpuinfo 2>/dev/null || echo "")
+has_feat() { echo "$FEATURES" | grep -qw "$1" 2>/dev/null; }
+if has_feat sve2; then
+    ISA_FLAGS="-march=armv9-a+sve2+i8mm+bf16"
+elif has_feat sve; then
+    ISA_FLAGS="-march=armv8.2-a+sve+bf16"
+elif has_feat asimddp; then
+    ISA_FLAGS="-march=armv8.2-a+dotprod"
+elif has_feat asimd; then
+    ISA_FLAGS="-march=armv8-a"
+else
+    ISA_FLAGS="-march=armv8-a"
+fi
+
+NEED_BUILD=0
 if [ ! -x "$BINARY" ]; then
     echo "  Binary not found, building..."
-    # Detect ISA and use appropriate flags (mirrors detect_isa.sh logic).
-    # Must handle ARMv8.0-A cores (e.g. Cortex-A57) that lack dotprod —
-    # the old default of -march=armv8.2-a+dotprod would SIGILL on them.
-    FEATURES=$(grep -m1 '^Features' /proc/cpuinfo 2>/dev/null || echo "")
-    has_feat() { echo "$FEATURES" | grep -qw "$1" 2>/dev/null; }
-    if has_feat sve2; then
-        ISA_FLAGS="-march=armv9-a+sve2+i8mm+bf16"
-    elif has_feat sve; then
-        ISA_FLAGS="-march=armv8.2-a+sve+bf16"
-    elif has_feat asimddp; then
-        ISA_FLAGS="-march=armv8.2-a+dotprod"
-    elif has_feat asimd; then
-        ISA_FLAGS="-march=armv8-a"
-    else
-        ISA_FLAGS="-march=armv8-a"
-    fi
+    NEED_BUILD=1
+elif [ "$REBUILD" -eq 1 ]; then
+    echo "  --rebuild requested, rebuilding..."
+    NEED_BUILD=1
+else
+    # Staleness check: rebuild if any source file is newer than the binary.
+    # This prevents the class of bug where run_e2e_decode.sh reuses a stale
+    # binary from before a code optimization was merged (see FINDINGS §14
+    # correction — a stale binary produced 19x-too-slow numbers).
+    for src in "$K/gdn_sve.c" "$K/gdn_delta_matmul.c" "$K/gdn_e2e_decode.c"; do
+        if [ "$src" -nt "$BINARY" ]; then
+            echo "  Source $src is newer than binary — rebuilding..."
+            NEED_BUILD=1
+            break
+        fi
+    done
+fi
+
+if [ "$NEED_BUILD" -eq 1 ]; then
     cc -O3 -fopenmp $ISA_FLAGS $MODEL_DEFINE -static \
         -Wno-aggressive-loop-optimizations \
         "$K/gdn_sve.c" "$K/gdn_delta_matmul.c" "$K/gdn_e2e_decode.c" \
