@@ -262,6 +262,9 @@ class TestFindDeviceSpec:
     def test_rk3588(self):
         assert find_device_spec("rk3588-t4_big.csv") == 34.0
 
+    def test_orion(self):
+        assert find_device_spec("orion-o6_big.csv") == 100.0
+
     def test_unknown_returns_none(self):
         assert find_device_spec("o6-something.csv") is None
 

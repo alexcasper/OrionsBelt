@@ -47,11 +47,13 @@ PY_OK=$(( PY_MAJOR * 100 + PY_MINOR >= 307 ))
 echo "[1/8] Python test suite"
 if [ "$PY_OK" -ne 1 ]; then
     skip "Python 3.7+ required (have ${PY_MAJOR}.${PY_MINOR}); run on CI or an x86 host"
-elif python3 -m pytest tests/ --tb=no 2>&1 | grep -q "passed"; then
-    RESULT=$(python3 -m pytest tests/ --tb=no 2>&1 | grep "passed" | tail -1)
-    ok "Tests: $RESULT"
 else
-    fail "Tests did not pass"
+    RESULT=$(python3 -m pytest tests/ --tb=no 2>&1 | grep "passed" | tail -1)
+    if [ -n "$RESULT" ]; then
+        ok "Tests: $RESULT"
+    else
+        fail "Tests did not pass"
+    fi
 fi
 
 # -------------------------------------------------------------------

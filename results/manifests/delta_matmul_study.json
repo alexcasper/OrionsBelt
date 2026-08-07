@@ -1,0 +1,28 @@
+{
+  "schema": "bench.manifest/v1",
+  "generated_at": "2026-08-07T15:58:10.120670+00:00",
+  "retroactive": true,
+  "note": "Generated retroactively from CSV-embedded provenance (git_sha, timestamp, governor, thermal). Device fields reconstructed from board identity.",
+  "csv_file": "results/raw/affinity/delta_matmul_study.csv",
+  "git": {
+    "sha": "f6f5854",
+    "dirty": false
+  },
+  "device": {
+    "hostname": "rk3588-t4",
+    "model": "Turing Machines RK1 (RK3588)",
+    "soc": "Rockchip RK3588",
+    "cpu": "4x Cortex-A76 @ 2.4 GHz + 4x Cortex-A55 @ 1.8 GHz",
+    "memory": "8 GB LPDDR4X"
+  },
+  "runtime": {
+    "governor": "performance",
+    "thermal_before_mC": 39769,
+    "thermal_after_mC": 41615
+  },
+  "benchmark": {
+    "study": "delta_matmul_affinity_study (ob-8qt.1)",
+    "repeats": 30,
+    "binary": "dist/bench_gdn_armv8.2dot"
+  }
+}
