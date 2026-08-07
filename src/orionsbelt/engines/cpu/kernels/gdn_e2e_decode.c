@@ -429,6 +429,59 @@ static void gemv_int8_sdot(const float *a, const int8_t *Bq_packed,
 
 #endif /* INT8_WEIGHTS */
 
+/* Cache-blocked, NEON-vectorized matmul for M>1 (prefill path, ob-8qt.15).
+ *
+ * Parallelizes over output rows (M dimension) via OpenMP so all cores
+ * participate. Each row is an independent GEMV with the same row-sweep
+ * access pattern as gemv_neon: K-outer, N-inner with L1 tiling. B is
+ * read sequentially (row-major) → ~100% cache-line utilization.
+ *
+ * This replaces the naive triple-nested scalar loop (j-inner, k-innermost)
+ * that strides B by N between consecutive K elements — wasting up to 600×
+ * the memory bandwidth. See FINDINGS §15.
+ *
+ * B reuse note: each OpenMP thread reads all K×N of B for its row subset.
+ * For M=64 and 4 threads, B is read 4× instead of 1×. However, B is
+ * typically 90+ MB (4B FFN weights) and never fits in cache anyway, so
+ * the extra passes are sequential DRAM reads — far cheaper than the
+ * random-access pattern of the naive loop. */
+static void matmul_neon_m(const float *A, const float *B, float *C,
+                          size_t M, size_t K, size_t N) {
+    const size_t TILE = 1024;  /* 4 KB output tile, stays in L1 */
+
+#ifdef _OPENMP
+#pragma omp parallel for schedule(static)
+#endif
+    for (size_t i = 0; i < M; ++i) {
+        const float *a = A + i * K;
+        float *c = C + i * N;
+
+        for (size_t jt = 0; jt < N; jt += TILE) {
+            size_t tn = (N - jt >= TILE) ? TILE : (N - jt);
+            float *ct = c + jt;
+
+            memset(ct, 0, tn * sizeof(float));
+
+            for (size_t k = 0; k < K; ++k) {
+                float ak = a[k];
+                const float *Brow = B + k * N + jt;
+                size_t j = 0;
+#ifdef __ARM_NEON
+                float32x4_t akv = vdupq_n_f32(ak);
+                for (; j + 4 <= tn; j += 4) {
+                    float32x4_t bk = vld1q_f32(Brow + j);
+                    float32x4_t ck = vld1q_f32(ct + j);
+                    ck = vfmaq_f32(ck, akv, bk);
+                    vst1q_f32(ct + j, ck);
+                }
+#endif
+                for (; j < tn; ++j)
+                    ct[j] += ak * Brow[j];
+            }
+        }
+    }
+}
+
 static void matmul(const float *A, const float *B, float *C,
                    size_t M, size_t K, size_t N) {
 #ifdef __ARM_NEON
@@ -436,6 +489,8 @@ static void matmul(const float *A, const float *B, float *C,
         gemv_neon(A, B, C, K, N);
         return;
     }
+    matmul_neon_m(A, B, C, M, K, N);
+    return;
 #endif
     for (size_t i = 0; i < M; ++i) {
         for (size_t j = 0; j < N; ++j) {
@@ -447,7 +502,86 @@ static void matmul(const float *A, const float *B, float *C,
     }
 }
 
-/* INT8 matmul wrapper for M=1 decode path (falls back to scalar for M>1)
+/* INT8 cache-blocked matmul for M>1 (prefill path, ob-8qt.15).
+ *
+ * Same row-sweep + NEON + OpenMP pattern as matmul_neon_m, but dequantizes
+ * int8 weights on-the-fly in the inner loop (int8→int16→int32→float32)
+ * and applies per-column scale at the end — identical to gemv_int8_neon
+ * but generalized for M>1. Avoids the old path's full-matrix dequantization
+ * (K×N malloc + fill + scalar matmul) which doubled memory traffic.
+ * Only needed under -DINT8_WEIGHTS. */
+#ifdef INT8_WEIGHTS
+static void matmul_int8_neon_m(const float *A, const int8_t *Bq, const float *Bs,
+                               float *C, size_t M, size_t K, size_t N) {
+    const size_t TILE = 1024;
+
+#ifdef _OPENMP
+#pragma omp parallel for schedule(static)
+#endif
+    for (size_t i = 0; i < M; ++i) {
+        const float *a = A + i * K;
+        float *c = C + i * N;
+
+        for (size_t jt = 0; jt < N; jt += TILE) {
+            size_t tn = (N - jt >= TILE) ? TILE : (N - jt);
+            float *ct = c + jt;
+
+            memset(ct, 0, tn * sizeof(float));
+
+            for (size_t k = 0; k < K; ++k) {
+                float ak = a[k];
+                const int8_t *Brow = Bq + k * N + jt;
+                size_t j = 0;
+#ifdef __ARM_NEON
+                float32x4_t akv = vdupq_n_f32(ak);
+                for (; j + 8 <= tn; j += 8) {
+                    int8x8_t   i8  = vld1_s8(Brow + j);
+                    int16x8_t  i16 = vmovl_s8(i8);
+                    int32x4_t  i32lo = vmovl_s16(vget_low_s16(i16));
+                    int32x4_t  i32hi = vmovl_s16(vget_high_s16(i16));
+                    float32x4_t flo = vcvtq_f32_s32(i32lo);
+                    float32x4_t fhi = vcvtq_f32_s32(i32hi);
+
+                    float32x4_t clo = vld1q_f32(ct + j);
+                    float32x4_t chi = vld1q_f32(ct + j + 4);
+                    clo = vfmaq_f32(clo, akv, flo);
+                    chi = vfmaq_f32(chi, akv, fhi);
+                    vst1q_f32(ct + j, clo);
+                    vst1q_f32(ct + j + 4, chi);
+                }
+                for (; j + 4 <= tn; j += 4) {
+                    int8x8_t   i8  = vld1_s8(Brow + j);
+                    int16x8_t  i16 = vmovl_s8(i8);
+                    int32x4_t  i32 = vmovl_s16(vget_low_s16(i16));
+                    float32x4_t bq = vcvtq_f32_s32(i32);
+
+                    float32x4_t ck = vld1q_f32(ct + j);
+                    ck = vfmaq_f32(ck, akv, bq);
+                    vst1q_f32(ct + j, ck);
+                }
+#endif
+                for (; j < tn; ++j)
+                    ct[j] += ak * (float)Brow[j];
+            }
+
+            /* Apply per-column scale (NEON-vectorized) */
+            size_t j = 0;
+#ifdef __ARM_NEON
+            for (; j + 4 <= tn; j += 4) {
+                float32x4_t cv = vld1q_f32(ct + j);
+                float32x4_t sv = vld1q_f32(Bs + jt + j);
+                cv = vmulq_f32(cv, sv);
+                vst1q_f32(ct + j, cv);
+            }
+#endif
+            for (; j < tn; ++j)
+                ct[j] *= Bs[jt + j];
+        }
+    }
+}
+#endif /* INT8_WEIGHTS */
+
+/* INT8 matmul wrapper: optimized GEMV for M=1, cache-blocked for M>1.
  * Only needed under -DINT8_WEIGHTS. */
 #ifdef INT8_WEIGHTS
 static void matmul_int8(const float *A, const QW *qw,
@@ -463,13 +597,7 @@ static void matmul_int8(const float *A, const QW *qw,
         gemv_int8_neon(A, qw->q, qw->s, C, K, N);
         return;
     }
-    /* Prefill path: dequantize on the fly (rare in decode benchmark) */
-    float *Bf = malloc(K * N * sizeof(float));
-    for (size_t k = 0; k < K; ++k)
-        for (size_t n = 0; n < N; ++n)
-            Bf[k * N + n] = (float)qw->q[k * N + n] * qw->s[n];
-    matmul(A, Bf, C, M, K, N);
-    free(Bf);
+    matmul_int8_neon_m(A, qw->q, qw->s, C, M, K, N);
 }
 #endif /* INT8_WEIGHTS */
 
@@ -948,6 +1076,8 @@ int main(int argc, char **argv) {
     int csv = 0;
     int ctx_sweep = 0;
     int pure_gdn = 0;
+    int prefill_len = 0;
+    int prefill_repeats = 5;
     const char *ctx_lens_str = NULL;
     for (int i = 1; i < argc; ++i) {
         if (strcmp(argv[i], "--tokens") == 0 && i + 1 < argc)
@@ -961,18 +1091,27 @@ int main(int argc, char **argv) {
         }
         else if (strcmp(argv[i], "--pure-gdn") == 0)
             pure_gdn = 1;
+        else if (strcmp(argv[i], "--prefill") == 0 && i + 1 < argc) {
+            prefill_len = atoi(argv[++i]);
+            if (i + 1 < argc && argv[i + 1][0] != '-')
+                prefill_repeats = atoi(argv[++i]);
+        }
         else if (strcmp(argv[i], "--help") == 0) {
-            printf("Usage: %s [--tokens N] [--csv] [--ctx-sweep L1,L2,...] [--pure-gdn]\n", argv[0]);
+            printf("Usage: %s [--tokens N] [--csv] [--ctx-sweep L1,L2,...] [--pure-gdn]\n"
+                   "          [--prefill N [repeats]]\n", argv[0]);
             printf("  --ctx-sweep  Measure decode cost at growing context lengths\n");
             printf("               Comma-separated list, e.g. 1,64,256,1024,4096\n");
             printf("  --pure-gdn   All layers GDN (no full-attention) — shows ideal O(1) scaling\n");
+            printf("  --prefill N  Prefill benchmark: process N tokens at once (M>1 matmul path)\n");
+            printf("               Optional repeats arg (default 5); reports TTFT + prefill tok/s\n");
             return 0;
         }
     }
 
     /* Validate token count — 0 or negative causes division by zero in
-     * mean/percentile stats and array underflow in the sort loop. */
-    if (num_tokens < 1) {
+     * mean/percentile stats and array underflow in the sort loop.
+     * Skip for prefill mode (doesn't use the decode loop). */
+    if (prefill_len == 0 && num_tokens < 1) {
         fprintf(stderr, "Error: --tokens must be >= 1 (got %d)\n", num_tokens);
         return 1;
     }
@@ -1061,6 +1200,98 @@ int main(int argc, char **argv) {
     if (pure_gdn) {
         for (int l = 0; l < NUM_LAYERS; ++l)
             is_gdn[l] = 1;
+    }
+
+    /* ---- Prefill benchmark mode (ob-8qt.15) ----
+     *
+     * Processes prefill_len tokens at once (seq>1), exercising the M>1 matmul
+     * path through all layers. This measures prefill cost = TTFT (time to
+     * first token). The matmul M>1 path was previously a naive scalar triple
+     * loop; this mode enables before/after comparison of the cache-blocked
+     * NEON optimization.
+     *
+     * Repeats the prefill `prefill_repeats` times (default 5) and reports
+     * the p50 wall-clock time to suppress noise. */
+    if (prefill_len > 0) {
+        if (prefill_len < 1) {
+            fprintf(stderr, "Error: --prefill must be >= 1 (got %d)\n", prefill_len);
+            return 1;
+        }
+        if (prefill_repeats < 1) prefill_repeats = 1;
+
+        size_t pf = (size_t)prefill_len;
+        float *pf_in  = alloc_aligned(pf * HIDDEN);
+        float *pf_out = alloc_aligned(pf * HIDDEN);
+
+        if (!csv) {
+            printf(MODEL_NAME " prefill benchmark\n");
+            printf("  layers=%d (GDN=%d, full=%d), hidden=%d\n", NUM_LAYERS, NUM_GDN, NUM_FULL, HIDDEN);
+            printf("  prefill_len=%zu, repeats=%d\n\n", pf, prefill_repeats);
+        }
+
+        /* Warmup (1 pass) */
+        fill_rand(pf_in, pf * HIDDEN, &seed);
+        for (int l = 0; l < NUM_LAYERS; ++l) {
+            if (is_gdn[l])
+                gdn_layer_forward(&w, &states[l], pf_in, pf_out, pf);
+            else
+                full_attn_layer_forward(&w, &states[l], pf_in, pf_out, pf);
+            ffn_forward(&w, pf_out, pf_in, pf);
+        }
+
+        /* Reset GDN state after warmup */
+        for (int l = 0; l < NUM_LAYERS; ++l) {
+            memset(states[l].gdn_state, 0, VALUE_DIM * sizeof(float));
+            memset(states[l].conv_hist, 0, (CONV_K - 1) * CONV_DIM * sizeof(float));
+        }
+
+        /* Measured runs */
+        double *times = malloc(prefill_repeats * sizeof(double));
+        for (int r = 0; r < prefill_repeats; ++r) {
+            fill_rand(pf_in, pf * HIDDEN, &seed);
+            /* Reset GDN state for each repeat */
+            for (int l = 0; l < NUM_LAYERS; ++l) {
+                memset(states[l].gdn_state, 0, VALUE_DIM * sizeof(float));
+                memset(states[l].conv_hist, 0, (CONV_K - 1) * CONV_DIM * sizeof(float));
+            }
+
+            double t0 = now_us();
+            for (int l = 0; l < NUM_LAYERS; ++l) {
+                if (is_gdn[l])
+                    gdn_layer_forward(&w, &states[l], pf_in, pf_out, pf);
+                else
+                    full_attn_layer_forward(&w, &states[l], pf_in, pf_out, pf);
+                ffn_forward(&w, pf_out, pf_in, pf);
+            }
+            times[r] = now_us() - t0;
+        }
+
+        /* Sort for p50 */
+        for (int a = 0; a < prefill_repeats - 1; ++a)
+            for (int b = a + 1; b < prefill_repeats; ++b)
+                if (times[b] < times[a]) {
+                    double tmp = times[a]; times[a] = times[b]; times[b] = tmp;
+                }
+        double p50_us = times[prefill_repeats / 2];
+        double ttft_s = p50_us / 1e6;
+        double prefill_tps = (double)prefill_len / ttft_s;
+
+        if (csv) {
+            printf("model,prefill_len,ttft_s,prefill_tps,p50_us\n");
+            printf(MODEL_NAME ",%d,%.6f,%.2f,%.0f\n",
+                   prefill_len, ttft_s, prefill_tps, p50_us);
+        } else {
+            printf("Results (p50 of %d repeats):\n", prefill_repeats);
+            printf("  Prefill length:  %d tokens\n", prefill_len);
+            printf("  TTFT:            %.4f s (%.0f ms)\n", ttft_s, ttft_s * 1e3);
+            printf("  Prefill tps:     %.2f tok/s\n", prefill_tps);
+        }
+
+        free(pf_in); free(pf_out); free(times);
+        free_weights(&w);
+        free_layer_states(states);
+        free(hidden); free(hidden_next);
+        return 0;
     }
 
     /* ---- Context-length sweep mode ----
