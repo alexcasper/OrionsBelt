@@ -242,7 +242,10 @@ def generate_report(device, output_dir):
     lines.append("")
 
     output = "\n".join(lines) + "\n"
-    out_path = os.path.join(output_dir, "kv_int8_scaling.md")
+    # Derive a short device tag for the filename (e.g. "rk3588-t3_big" → "t3")
+    parts = device.replace("_", "-").split("-")
+    dev_tag = parts[1] if len(parts) > 1 else device
+    out_path = os.path.join(output_dir, f"kv_int8_scaling_{dev_tag}.md")
     with open(out_path, "w") as f:
         f.write(output)
     print(f"Report written to {out_path}")
