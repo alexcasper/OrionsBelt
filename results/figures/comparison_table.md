@@ -194,7 +194,7 @@ t4 = 8 tokens (re-run, see per-row manifest for details).
 >
 > **Before optimization** (commit `a756662`): t3=0.07, t4=0.09 tok/s — the gap
 > to the ~12 tok/s analytical ceiling (§6) was from a pathological column-sweep
-> GEMV that achieved <1 GB/s of 25 GB/s bandwidth, not from the GDN kernels.
+> GEMV that achieved <1 GiB/s of ~25 GiB/s bandwidth, not from the GDN kernels.
 > **Bottleneck breakdown** (4B, after optimization): FFN 72%, GDN proj 14%,
 > full-attn 6%, GDN conv/decay/scan <0.1%. The GDN recurrent kernels are
 > negligible — the next high-impact optimization is INT8 weight quantization
