@@ -77,6 +77,7 @@ def test_csv_header_from_existing_results():
     sustained_marker = "sustained_kernel"
     power_marker = "power_in_mw"
     layer_profile_marker = "layer_idx"  # bench/profile_layers.py (ob-c9k)
+    matmul_marker = "M"  # delta-rule matmul benchmark (gdn_delta_matmul.c)
     result_row_columns = set(RESULT_ROW_COLUMNS)
 
     checked = 0
@@ -85,7 +86,7 @@ def test_csv_header_from_existing_results():
             continue
         with open(os.path.join(base, fname)) as f:
             cols = set(csv.DictReader(f).fieldnames or [])
-        if sustained_marker in cols or power_marker in cols or layer_profile_marker in cols:
+        if sustained_marker in cols or power_marker in cols or layer_profile_marker in cols or matmul_marker in cols:
             continue  # different shape by design, not a conformance failure
         if result_row_columns <= cols:
             continue  # model-level ResultRow schema (bench/schema.py), not a microbenchmark CSV
