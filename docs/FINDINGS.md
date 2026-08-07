@@ -3494,3 +3494,60 @@ only 1.7–2.6×. Three reasons:
 
 Generated comparison: [`results/figures/kv_int8_scaling.md`](../results/figures/kv_int8_scaling.md)
 (generator: `bench/kv_int8_analysis.py` — do not hand-edit).
+
+---
+
+## 21. KV int8 context-sweep cross-check on independent RK3588 hardware (rk3588-t4) (2026-08-07, ob-8qt.13)
+
+### Purpose
+
+§20's KV int8 quantization results were measured on rk3588-t3 (first RK3588
+unit). This section validates those findings on **rk3588-t4 (second RK3588
+unit)** — independent hardware at the same commit, same governor, same
+cluster pinning. Cross-device validation is the load-bearing evidence that
+the findings generalise, not an artefact of one board.
+
+### Setup
+
+- Device: rk3588-t4, Cortex-A76 big cluster (cpu4-7), 2.4 GHz max
+- Governor: performance (all 8 cores)
+- Binary: `gdn_e2e_decode.c --ctx-sweep 1,64,256,1024,4096` with ISA flags
+  `-march=armv8.2-a+dotprod`
+- Thermal: pre 40°C → post 42°C (Δ+2°C, no throttling)
+- Commit: `995ad04` (dirty=false at CSV capture), manifest committed
+
+### Results: 4B model at ctx=4096 (the long-context comparison point)
+
+| Config | t4 tok/s | t3 tok/s | t4/t3 ratio |
+|--------|--------:|--------:|------------:|
+| FP32 weights + FP32 KV | 0.84 | 0.79 | 1.06 |
+| FP32 weights + INT8 KV | 0.95 | 0.96 | 0.99 |
+| INT8 weights + FP32 KV | 1.20 | 1.20 | 1.00 |
+| **INT8 weights + INT8 KV** | **1.43** | **1.44** | **0.99** |
+
+### Cross-device speedup confirmation
+
+| Metric | t4 | t3 |
+|--------|---:|---:|
+| KV-int8-only speedup (ctx=4096) | 1.13× | 1.22× |
+| Weight-int8-only speedup (ctx=4096) | 1.43× | 1.52× |
+| Combined int8 speedup (ctx=4096) | 1.70× | 1.82× |
+| Weight-int8 speedup (ctx=1, decode) | 1.65× | 1.77× |
+
+### Analysis
+
+**The KV int8 quantization finding is confirmed on independent hardware.**
+All four quantization configurations match within 1–6% between t3 and t4 at
+every context length. At ctx=1 (decode, no KV traffic), the match is
+particularly tight: t4 1.83 tok/s vs t3 1.84 tok/s (<1% divergence).
+
+**t4 shows a slightly smaller KV-int8-only speedup** (1.13× vs 1.22×). This is
+within the documented t3-t4 board heterogeneity — t4's FP32 baseline is
+slightly faster (0.84 vs 0.79 tok/s), narrowing the relative speedup gap. The
+absolute INT8+INT8 throughput is nearly identical (1.43 vs 1.44).
+
+**At long context the GDN O(1) vs full-attention O(n) thesis holds**: even
+with INT8 KV, full-attention's decode cost at ctx=4096 is 189k µs on t4
+(vs GDN's 120k µs for all 24 GDN layers). The crossover where full-attention
+overtakes GDN on throughput is pushed further by INT8 KV, but the asymptotic
+advantage remains.
