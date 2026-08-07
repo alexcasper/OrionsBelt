@@ -139,11 +139,11 @@ All figures above are verified against primary sources (Radxa product page and d
 
 **Device-fleet microbenchmarks are complete across five Arm devices.** Three GDN CPU kernels (gated cumulative decay, gated delta-rule scan, causal depthwise Conv1D) have been measured at verified Qwen3.5-4B and 0.8B shapes on the full fleet: Jetson Nano (Cortex-A57, NEON), Raspberry Pi 5 (Cortex-A76), and RK3588 (Cortex-A76 big + Cortex-A55 little clusters). The optimization stack (OpenMP parallelization + NEON unrolling + fp16 state) delivers 2.6–5.1× on A76 silicon and 2.6–3.1× on A57. The key cross-device finding — that these kernels are **instruction-overhead-bound, not DRAM-bandwidth-bound** at seq=64 working-set sizes — is documented in the [fleet bandwidth-scaling analysis](./results/figures/fleet_bandwidth_scaling.md).
 
-**Operator analysis findings** ([`docs/FINDINGS.md`](./docs/FINDINGS.md), 10 sections):
+**Operator analysis findings** ([`docs/FINDINGS.md`](./docs/FINDINGS.md), 26 sections):
 - CIX NOE and Rockchip RKNN toolchains both reject GDN's runtime-length recurrence — the limitation generalises beyond one vendor (§1, §7)
 - KleidiAI packed GEMM wins 1.7–3.6× on matmul but packing cost dominates at decode; dual-path strategy recommended (§8)
 - big.LITTLE affinity: pinning to A76 big cores is 2–3× faster than default scheduler placement (§9)
-- GDN-2 vs GDN-1: gates are free at decode, cost 2× at prefill, 3.1× penalty on little cores (§10)
+- GDN-2 vs GDN-1: decoupled gating costs 2.5–4.1× at prefill (bandwidth-bound), only 1.2–1.8× at decode (cache-resident); A55 penalized worse than A76 due to in-order pipeline (§10)
 
 | Item | Status |
 |---|---|
@@ -152,31 +152,33 @@ All figures above are verified against primary sources (Radxa product page and d
 | Repository skeleton, Apache-2.0 license | Done |
 | Results schema (`docs/RESULTS_SCHEMA.md`) | Done |
 | Benchmark harness (`bench/`) + device microbenchmark (`bench_gdn.c`) | Producing data |
-| CI: lint + unit tests (1447 tests, 99% coverage) | Done — `.github/workflows/ci.yaml` |
+| CI: lint + unit tests (1500 tests, 99% coverage) | Done — `.github/workflows/ci.yaml` |
 | Device-fleet microbenchmarks (5 devices) | Done — [fleet analysis](./results/figures/fleet_bandwidth_scaling.md) |
 | Ablation matrix (6 configs, synthetic) | Done — [comparison table](./results/figures/ablation_comparison.md) |
 | Memory decomposition (analytical) | Done — [figures](./results/figures/) |
-| Architecture decision records (`docs/adr/`) | 8 ADRs recorded |
+| Architecture decision records (`docs/adr/`) | 10 ADRs recorded |
 | CPU GDN kernels (NEON/SVE/scalar) | Verified, benchmarked across fleet |
 | Mixed-precision state kernels (bf16/fp16) | Implemented, benchmarked on Jetson |
 | NPU operator-coverage audit (CIX NOE + RKNN) | Done — [FINDINGS.md](./docs/FINDINGS.md) §1, §7 |
 | KleidiAI matmul evaluation | Done — [FINDINGS.md](./docs/FINDINGS.md) §8 |
 | big.LITTLE affinity policy | Done — [FINDINGS.md](./docs/FINDINGS.md) §9 |
-| GDN-2 vs GDN-1 microbenchmark | Done — [FINDINGS.md](./docs/FINDINGS.md) §10 |
+| GDN-2 vs GDN-1 microbenchmark | Done — [FINDINGS.md](./docs/FINDINGS.md) §10, clean-tree re-run |
+| E2E model decode (tokens/sec, TTFT) | Baseline measured — 0.09 tok/s (fp32, RK3588 A76). [Comparison table §7](./results/figures/comparison_table.md) |
+| Sustained-load thermal characterization | Done — no throttling on RK3588 (-1.5% over 60s) |
 | Track decision: Edge AI | Done — [ADR 0007](./docs/adr/0007-commit-to-edge-ai-track.md) |
 | Model survey / selection (`docs/MODEL_SURVEY.md`) | In progress |
 | Orion O6 board bring-up | **Pending** — board not yet in hand |
 | CIX Early Bird SDK / NPU toolchain access | **Pending** — not yet approved |
 | Per-layer engine mapping (NPU/GPU/CPU) | Hypothesis only — pending measurements |
-| Full inference results (tokens/sec, TTFT, memory) | **Not started — needs hardware** |
+| Optimized full inference (tokens/sec, TTFT, memory) | **Not started — needs hardware** |
 
-> **Results so far:** 36 CSVs from the device fleet, 22 provenance manifests, 33 generated figures/tables.
+> **Results so far:** 64 CSVs from the device fleet, 67 generated figures/tables, 26 FINDINGS sections.
 >
 > ```
 > results/
->   raw/         <- 36 per-run CSVs across 5 devices
->   manifests/   <- 22 provenance manifests (git SHA, governor, thermals)
->   figures/     <- fleet analysis, ablation comparison, kernel/memory plots
+>   raw/         <- 64 per-run CSVs across 5 devices
+>   manifests/   <- provenance manifests (git SHA, governor, thermals)
+>   figures/     <- fleet analysis, comparison table, kernel/memory plots
 > ```
 >
 > See [`results/README.md`](./results/README.md) for the layout, [`docs/FINDINGS.md`](./docs/FINDINGS.md) for findings, and [`results/figures/fleet_bandwidth_scaling.md`](./results/figures/fleet_bandwidth_scaling.md) for the headline cross-device analysis.
