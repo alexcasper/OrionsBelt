@@ -15,8 +15,6 @@ Usage:
     python3 scripts/gen_e2e_comparison.py --output results/figures/e2e_fleet_comparison.md
 """
 import csv
-import json
-import os
 import sys
 from collections import defaultdict
 from pathlib import Path
