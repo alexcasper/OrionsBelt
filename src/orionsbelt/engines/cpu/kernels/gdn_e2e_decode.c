@@ -137,8 +137,14 @@ static void quantize_weight(const float *B_in, int8_t **q_out, float **s_out,
 
 /* Repack quantized weights into K-interleaved layout for SDOT GEMV.
  * Called after quantize_weight when __ARM_FEATURE_DOTPROD is active.
- * Stores the repacked pointer back into the QW struct. */
+ * Stores the repacked pointer back into the QW struct.
+ *
+ * repack_int8_k_interleaved is defined further down (with gemv_int8_sdot);
+ * forward-declare it here so this compiles instead of getting an implicit
+ * int-returning declaration that conflicts with its real int8_t* signature. */
 #if defined(__ARM_FEATURE_DOTPROD)
+static int8_t *repack_int8_k_interleaved(const int8_t *Bq, size_t K, size_t N);
+
 static void repack_qw_for_sdot(QW *qw, size_t K, size_t N) {
     qw->q_sdot = repack_int8_k_interleaved(qw->q, K, N);
     qw->K = K;
@@ -975,6 +981,13 @@ int main(int argc, char **argv) {
 
     /* Allocate weights (random, benchmark only) */
     Weights w;
+    /* Zero first: under -DINT8_WEIGHTS with dotprod, QW.q_sdot/K/N (ob-8qt.14
+     * SDOT scaffolding) are never populated by quantize_weight() below and
+     * repack_qw_for_sdot() is not yet wired up anywhere, so without this,
+     * matmul_int8()'s `if (qw->q_sdot)` check reads indeterminate stack
+     * memory as a weight pointer. Zeroing keeps the SDOT path inert (falls
+     * through to the verified gemv_int8_neon path) until it's finished. */
+    memset(&w, 0, sizeof(w));
     w.embed = NULL;  /* not allocated (VOCAB×HIDDEN = 2.5 GB) — NULL prevents dangling */
     w.g_q_proj  = alloc_aligned(HIDDEN * KEY_DIM);
     w.g_k_proj  = alloc_aligned(HIDDEN * KEY_DIM);
