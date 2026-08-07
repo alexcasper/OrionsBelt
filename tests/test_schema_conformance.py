@@ -78,6 +78,7 @@ def test_csv_header_from_existing_results():
     power_marker = "power_in_mw"
     layer_profile_marker = "layer_idx"  # bench/profile_layers.py (ob-c9k)
     e2e_decode_marker = "tok_per_sec_mean"  # gdn_e2e_decode.c raw output (ob-mrd.8)
+    e2e_ctxsweep_marker = "kv_cache_mb"  # ctx-sweep e2e raw (model,ctx_len,gdn_layer_us,...)
     delta_matmul_marker = "M"  # bench_gdn --delta-matmul mode (ob-8qt.1)
     result_row_columns = set(RESULT_ROW_COLUMNS)
 
@@ -92,6 +93,7 @@ def test_csv_header_from_existing_results():
             or power_marker in cols
             or layer_profile_marker in cols
             or delta_matmul_marker in cols
+            or e2e_ctxsweep_marker in cols
         ):
             continue  # different shape by design, not a conformance failure
         if e2e_decode_marker in cols:
