@@ -60,7 +60,7 @@ Qwen3.5-4B, prefill (seq=64), fp32 baseline, 8-thread (big cluster). Two indepen
 > t3 manifest git_sha `f015982`, dirty=false; t4 manifest git_sha `1ca4d6d`,
 > dirty=false; 30 repeats each. The boards agree within 4–19% (t4 marginally
 > faster), confirming the result is hardware-reproducible. Cumulative decay
-> reaches 62% of the 34 GiB/s spec bandwidth; gated scan runs at a lower
+> reaches 66% of the 31.7 GiB/s spec bandwidth; gated scan runs at a lower
 > fraction because its sequential recurrence is
 > **instruction-overhead-bound, not DRAM-bandwidth-bound**.
 > (An earlier version of this table compared t3 8-thread against t4 1-thread
@@ -95,7 +95,7 @@ This is not a bug in one toolchain — it is an **architectural constraint** of 
 
 ### Fleet cross-device validation
 
-5 devices, 3 core classes (A76, A55, A57), spec bandwidth ranging 17–34 GiB/s:
+5 devices, 3 core classes (A76, A55, A57), spec bandwidth ranging 15.8–31.7 GiB/s:
 
 - **Pi 5 (A76, 17 GB/s) vs Jetson (A57, 25.6 GB/s):** Pi 5 is faster despite less bandwidth — confirming the kernels are instruction-bound, not bandwidth-bound
 - **big.LITTLE:** A76 big cores are 2–3× faster than A55 little cores; simultaneous big+little scheduling shows diminishing returns past 4 big cores

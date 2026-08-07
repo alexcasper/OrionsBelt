@@ -43,16 +43,17 @@ from pathlib import Path
 # Data types
 # ---------------------------------------------------------------------------
 
-# Canonical device spec bandwidth (GiB/s) — from DEVICE_RUNBOOK.md "What we are
-# actually testing".  Used for the achieved-vs-spec bandwidth plot.
+# Canonical device spec bandwidth (GiB/s).  Vendor datasheets quote GB/s
+# (decimal); the bench binary measures GiB/s (÷2^30).  We convert so the
+# achieved-vs-spec ratio is unit-consistent.  See ADR 0005 for GB/s originals.
 DEVICE_SPEC_BANDWIDTH: dict[str, float] = {
     # device identifier (lowercase prefix match) → spec GiB/s
-    "pi5": 17.0,
-    "pi": 17.0,
-    "rk3588": 34.0,
-    "jetson": 25.6,
-    "jetson-j1": 25.6,
-    "o6": 93.1,  # 100 GB/s ÷ 1.0737 = 93.1 GiB/s
+    "pi5": 15.8,  # 17.0 GB/s ÷ 1.0737
+    "pi": 15.8,
+    "rk3588": 31.7,  # 34.0 GB/s ÷ 1.0737
+    "jetson": 23.8,  # 25.6 GB/s ÷ 1.0737
+    "jetson-j1": 23.8,
+    "o6": 93.1,  # 100 GB/s ÷ 1.0737
 }
 
 # Human-readable kernel names for plot labels.

@@ -253,7 +253,7 @@ class TestMicrobenchTables:
         os.unlink(path)
 
         md = microbench_bandwidth_table(rows, "jetson-j1")
-        assert "25.6 GiB/s" in md
+        assert "23.8 GiB/s" in md
         assert "% of Spec" in md
 
     def test_bandwidth_table_unknown_device(self):
@@ -325,16 +325,16 @@ class TestSchemaTables:
 class TestDeviceSpecBandwidth:
     def test_jetson_lookup(self):
 
-        assert _lookup_spec_bandwidth("jetson-j1") == 25.6
-        assert _lookup_spec_bandwidth("jetson") == 25.6
+        assert _lookup_spec_bandwidth("jetson-j1") == 23.8
+        assert _lookup_spec_bandwidth("jetson") == 23.8
 
     def test_pi5_lookup(self):
 
-        assert _lookup_spec_bandwidth("pi5") == 17.0
+        assert _lookup_spec_bandwidth("pi5") == 15.8
 
     def test_rk3588_lookup(self):
 
-        assert _lookup_spec_bandwidth("rk3588") == 34.0
+        assert _lookup_spec_bandwidth("rk3588") == 31.7
 
     def test_o6_lookup(self):
 
@@ -372,7 +372,7 @@ class TestGenerateAll:
             with open(table_files[0]) as f:
                 content = f.read()
             assert "Gated Cumulative Decay" in content
-            assert "25.6 GiB/s" in content  # spec bandwidth
+            assert "23.8 GiB/s" in content  # spec bandwidth
 
     def test_schema_and_microbench_text_mode(self):
         """Pipeline handles both formats in one run."""
