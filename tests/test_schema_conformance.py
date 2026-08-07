@@ -78,6 +78,7 @@ def test_csv_header_from_existing_results():
     power_marker = "power_in_mw"
     layer_profile_marker = "layer_idx"  # bench/profile_layers.py (ob-c9k)
     e2e_decode_marker = "tok_per_sec_mean"  # gdn_e2e_decode.c raw output (ob-mrd.8)
+    ctx_sweep_marker = "gdn_layer_us"  # gdn_e2e_decode.c --ctx-sweep mode (ob-mrd.10)
     delta_matmul_marker = "M"  # bench_gdn --delta-matmul mode (ob-8qt.1)
     result_row_columns = set(RESULT_ROW_COLUMNS)
 
@@ -96,6 +97,8 @@ def test_csv_header_from_existing_results():
             continue  # different shape by design, not a conformance failure
         if e2e_decode_marker in cols:
             continue  # e2e decode raw CSV (simple format, converted by bench/convert_e2e_decode.py)
+        if ctx_sweep_marker in cols:
+            continue  # ctx-length sweep CSV (gdn_e2e_decode.c --ctx-sweep mode, ob-mrd.10)
         if result_row_columns <= cols:
             continue  # model-level ResultRow schema (bench/schema.py), not a microbenchmark CSV
         missing = expected - cols
