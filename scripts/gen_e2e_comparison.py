@@ -210,7 +210,7 @@ def _check_commit_lineage(base_commit, commits):
         # Check ancestry
         is_ancestor = subprocess.run(
             ["git", "merge-base", "--is-ancestor", full_base, resolved],
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=REPO_ROOT  # noqa: UP022
+            capture_output=True, cwd=REPO_ROOT
         ).returncode == 0
 
         if not is_ancestor:
