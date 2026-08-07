@@ -172,7 +172,7 @@ static void gemv_neon(const float *a, const float *B, float *c, size_t K, size_t
 #pragma omp parallel for schedule(static)
 #endif
     for (size_t jt = 0; jt < N; jt += TILE) {
-        size_t tn = (jt + TILE <= N) ? TILE : (N - jt);
+        size_t tn = (N - jt >= TILE) ? TILE : (N - jt);
         float *ct = c + jt;
 
         /* Zero the output tile */
@@ -217,7 +217,7 @@ static void gemv_int8_neon(const float *a, const int8_t *Bq, const float *Bs,
 #pragma omp parallel for schedule(static)
 #endif
     for (size_t jt = 0; jt < N; jt += TILE) {
-        size_t tn = (jt + TILE <= N) ? TILE : (N - jt);
+        size_t tn = (N - jt >= TILE) ? TILE : (N - jt);
         float *ct = c + jt;
 
         memset(ct, 0, tn * sizeof(float));
