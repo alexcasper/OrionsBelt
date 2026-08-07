@@ -207,7 +207,7 @@ the library), not a performance bottleneck.
 kleidiai_submission/
 ├── README.md                                         (this file)
 ├── Makefile                                          (build: test, bench, clean)
-├── test_kai_gdn.c                                    (test harness, 10 suites)
+├── test_kai_gdn.c                                    (test harness, 14 suites)
 ├── bench_kai_gdn.c                                   (micro-benchmark, CSV output)
 └── kai/ukernels/gdn/
     ├── kai_gdn_cumdecay_f32_sve.h
@@ -223,8 +223,8 @@ kleidiai_submission/
 ## Verification
 
 The test harness compares each kernel against a naive C reference implementation
-and prints `ALL TESTS PASSED` on success (10 test suites: 6 correctness +
-4 edge-case tail-handling):
+and prints `ALL TESTS PASSED` on success (14 test suites: 6 correctness +
+4 edge-case tail-handling + 4 degenerate-input):
 
 ```bash
 cd kleidiai_submission && make test
@@ -254,6 +254,19 @@ achieved bandwidth at realistic GDN shapes:
 ```bash
 cd kleidiai_submission && make bench
 ```
+
+### Cross-ISA verification (no Arm hardware required)
+
+`scripts/verify_kleidiai_kernels.sh` cross-compiles the four kernels for
+aarch64 and verifies correctness under QEMU across all three dispatch tiers:
+
+```bash
+bash scripts/verify_kleidiai_kernels.sh
+```
+
+This exercises SVE2 (128-bit), SVE1 (128/256-bit), NEON-only (A57 floor),
+and NEON+dotprod (A76) paths — confirming the dispatch is correct at every
+ISA level.  CI runs this on every push (`.github/workflows/ci.yaml`).
 
 ### A57 (Armv8.0, NEON path) — measured on Jetson Nano
 
