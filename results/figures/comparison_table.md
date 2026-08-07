@@ -140,27 +140,28 @@ Qwen3.5-4B at 100 GB/s (O6 LPDDR5 spec; RK3588 shared pool is 34 GiB/s per clust
 
 ## 7. End-to-end model decode: tokens/sec (measured)
 
-Qwen3.5-4B, fp32, A76 big cluster (cpu4-7), governor=performance, 8 decode tokens.
+Qwen3.5-4B + 0.8B, fp32, A76 big cluster (cpu4-7), governor=performance, 128 decode tokens.
 
-| Device | tok/s | TTFT (s) | Git SHA | Manifest |
-|---|---:|---:|---|---|
-| rk3588-t3 | 0.08 | 13.32 | `a086a50` | `rk3588-t3_e2e.json` |
-| rk3588-t4 | 0.09 | 11.76 | `def3f29` | `rk3588-t4_e2e.json` |
+**After GEMV row-sweep optimization (commit `2e752af`, §FINDINGS-15):**
 
-> This is the model-level headline number: a full Qwen3.5-4B forward pass through
-> all 32 layers (24 GDN + 8 full-attention) with the optimized GDN kernels. The
-> two boards agree within 12%, which is expected given the cross-board gap (§1).
-> t4 is slightly faster at e2e despite slower kernel-level throughput — likely
-> because the e2e binary exercises different code paths (full matmul/FFN blocks
-> where t4's higher clock helps). At fp32 on RK3588, 0.09 tok/s = ~11 s/token is
-> too slow for interactive use but establishes the CPU-only baseline against
-> which INT4 quantization and heterogeneous dispatch must improve. See FINDINGS.md
-> §"End-to-end Qwen3.5-0.8B tokens/sec" for the 0.8B variant (0.47 tok/s).
+| Device | Model | tok/s | TTFT (ms) | Git SHA | Manifest |
+|---|---|---:|---:|---|---|
+| rk3588-t3 | 4B   | 1.04 | — | `7962968` | `rk3588-t3_e2e.json` |
+| rk3588-t4 | 4B   | 1.11 | 898 | `b3c8203` | `rk3588-t4_gemv_optimized.json` |
+| rk3588-t3 | 0.8B | 7.98 | — | `41a847d` | `rk3588-t3_e2e.json` |
+| rk3588-t4 | 0.8B | 8.36 | 121 | `b3c8203` | `rk3588-t4_gemv_optimized.json` |
+
+> **10–15× speedup** from fixing the GEMV memory access pattern (column-sweep →
+> row-sweep + OpenMP tiles). The two boards agree within 7%, consistent with the
+> known cross-board gap (§1). See FINDINGS.md §15 for the full analysis.
 >
-> **Context:** the analytical ceiling (§6) predicts ≈12 tok/s at fp16 on a
-> 100 GB/s bus — we are 130× below that ceiling because the current decode loop
-> is unoptimized reference code. This gap is the optimization opportunity the
-> project targets.
+> **Before optimization** (commit `a756662`): t3=0.07, t4=0.09 tok/s — the gap
+> to the ~12 tok/s analytical ceiling (§6) was from a pathological column-sweep
+> GEMV that achieved <1 GB/s of 25 GB/s bandwidth, not from the GDN kernels.
+> **Bottleneck breakdown** (4B, after optimization): FFN 72%, GDN proj 14%,
+> full-attn 6%, GDN conv/decay/scan <0.1%. The GDN recurrent kernels are
+> negligible — the next high-impact optimization is INT8 weight quantization
+> (halves FFN memory traffic, the dominant phase).
 
 ## 8. OpenMP multi-threading scaling (t4)
 
