@@ -78,24 +78,24 @@ Qwen3.5-4B, decode (seq=1), A76 big. Both devices clean, post-optimization.
 
 ## 4. Per-layer latency: GDN vs full-attention
 
-From t4 per-layer profiling (Qwen3.5-0.8B, Python `transformers`, commit `fb578e1`, dirty=true).
-This is model-level timing through the actual Qwen3.5 forward pass — the closest available
-measurement to end-to-end inference. See [`rk3588-t4_layer_profile.csv`](../raw/rk3588-t4_layer_profile.csv).
+From t4 per-layer profiling (Qwen3.5-0.8B, Python `transformers`, commit `80dc1fc5`, dirty=false).
+Clean re-run on a clean tree — this is model-level timing through the actual Qwen3.5 forward
+pass. See [`rk3588-t4_layer_profile.csv`](../raw/rk3588-t4_layer_profile.csv).
 
 | Phase | Context | Layer type | Mean p50 (µs) | Layers | Total (µs) |
 |---|---|---|---:|---:|---:|
-| Decode | 32 | linear_attention (GDN) | 47,492 | 18 | 854,856 |
-| Decode | 32 | full_attention | 42,286 | 6 | 253,716 |
-| Decode | 64 | linear_attention (GDN) | 48,667 | 18 | 876,006 |
-| Decode | 64 | full_attention | 48,737 | 6 | 292,422 |
-| Decode | 128 | linear_attention (GDN) | 51,806 | 18 | 932,508 |
-| Decode | 128 | full_attention | 56,971 | 6 | 341,826 |
-| Prefill | 32 | linear_attention (GDN) | 129,160 | 18 | 2,324,880 |
-| Prefill | 32 | full_attention | 78,081 | 6 | 468,486 |
-| Prefill | 64 | linear_attention (GDN) | 171,120 | 18 | 3,080,160 |
-| Prefill | 64 | full_attention | 112,658 | 6 | 675,948 |
-| Prefill | 128 | linear_attention (GDN) | 238,802 | 18 | 4,298,436 |
-| Prefill | 128 | full_attention | 158,013 | 6 | 948,078 |
+| Decode | 32 | linear_attention (GDN) | 50,485 | 18 | 908,732 |
+| Decode | 32 | full_attention | 46,037 | 6 | 276,224 |
+| Decode | 64 | linear_attention (GDN) | 48,876 | 18 | 879,775 |
+| Decode | 64 | full_attention | 49,558 | 6 | 297,349 |
+| Decode | 128 | linear_attention (GDN) | 52,493 | 18 | 944,877 |
+| Decode | 128 | full_attention | 53,914 | 6 | 323,483 |
+| Prefill | 32 | linear_attention (GDN) | 126,586 | 18 | 2,278,540 |
+| Prefill | 32 | full_attention | 76,521 | 6 | 459,124 |
+| Prefill | 64 | linear_attention (GDN) | 166,478 | 18 | 2,996,599 |
+| Prefill | 64 | full_attention | 106,189 | 6 | 637,134 |
+| Prefill | 128 | linear_attention (GDN) | 239,104 | 18 | 4,303,867 |
+| Prefill | 128 | full_attention | 145,741 | 6 | 874,444 |
 
 > **At decode**, GDN and full-attention layers have similar per-layer cost (~49 ms) and neither
 > grows significantly with context — GDN because its state is fixed-size, full-attention because
