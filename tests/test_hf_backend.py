@@ -339,10 +339,13 @@ class TestLoadWithMock:
 
         mock_model = MagicMock()
 
-        # Ensure transformers is NOT in sys.modules so `from transformers import BitsAndBytesConfig` fails
+        # Make 'from transformers import BitsAndBytesConfig' raise ImportError.
+        # Setting sys.modules["transformers"] = None causes Python to raise
+        # ImportError even when the package IS installed on the system.
         import sys
 
-        original_transformers = sys.modules.pop("transformers", None)
+        original_transformers = sys.modules.get("transformers")
+        sys.modules["transformers"] = None
 
         try:
             with patch("bench.hf_backend.torch") as mock_torch:
