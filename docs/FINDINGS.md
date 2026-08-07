@@ -2631,3 +2631,74 @@ numbers without a "sustained" caveat for this device class.
 Note: the O6 (Cortex-A720) may behave differently — it has higher peak
 power density. The thermal characterization should be repeated on O6 when
 hardware is available.
+
+---
+
+## Fleet Data Quality: Single-Core Clean Sweep Variance (ob-bf7)
+
+**Date:** 2026-08-07
+**Device:** rk3588-t4 (RK3588, A76)
+**Bead:** ob-bf7
+**Data:** `results/raw/rk3588-t4_clean_stability_check.csv`
+
+### Problem
+
+The fleet bandwidth-scaling comparison uses single-core "clean" sweeps for
+cross-device comparison. However, rk3588-t3's clean sweep shows a **29.9%
+spread** on `gdn_gated_scan` (4B prefill), making the numbers unreliable.
+The t3 number (2.91 GiB/s) appears 1.8× slower than t4 (5.27 GiB/s) on
+identical silicon at the same git SHA — this is environmental noise, not
+a real device difference.
+
+### Evidence: t4 Stability Check (3 consecutive runs)
+
+| Run | p50 (µs) | GiB/s | Spread |
+|-----|----------|-------|--------|
+| 1 (committed) | 561.2 | 5.27 | 6.3% |
+| 2 | 548.7 | 5.40 | 8.9% |
+| 3 | 516.6 | 5.73 | 6.2% |
+| **Mean** | **542** | **5.47** | — |
+| **CoV** | **4.0%** | — | — |
+
+t4 is stable: ~4% coefficient of variation across runs.
+
+### Cross-Device Comparison: Single-Core vs Multi-Core
+
+| Metric | t3 | t4 | Ratio |
+|--------|----|----|-------|
+| **Single-core clean** (gated_scan 4B) | 2.91 GiB/s (30% spread) | 5.27 GiB/s (6% spread) | **1.81×** |
+| **Multi-core big** (gated_scan 4B) | 10.33 GiB/s (8% spread) | 11.09 GiB/s (5% spread) | **1.07×** |
+
+The multi-core numbers agree within 7%, consistent with same-silicon
+expectations. The single-core discrepancy is entirely due to t3's
+anomalous clean sweep (likely wrong governor or background load).
+
+### Root Cause Analysis
+
+t3's clean sweep shows 10-30% spread across **all** kernels, not just one:
+
+| Kernel | t3 spread | t4 spread |
+|--------|-----------|-----------|
+| gated_scan | 29.9% | 6.3% |
+| gated_scan_f16 | 18.8% | 4.2% |
+| gated_scan_bf16 | 20.5% | 4.4% |
+| cumdecay | 17.6% | 9.2% |
+| causal_dwconv1d | 10.6% | 5.6% |
+
+This systemic noise pattern indicates an environmental issue (governor not
+set to performance, background processes, or thermal interference from
+prior workloads), not a kernel or measurement methodology problem.
+
+### Recommendations
+
+1. **Use multi-cluster (4-core OpenMP) numbers for fleet comparison.** They
+   are more stable (5-8% spread vs 6-30%) and less sensitive to
+   environmental interference. The single-core protocol amplifies
+   scheduling jitter on Linux edge devices.
+
+2. **t3 should re-run its clean sweep** with verified governor=performance
+   and no background load. The current numbers are not trustworthy.
+
+3. **Always capture governor state in the manifest.** Both t3 and t4 clean
+   manifests lack governor/thermal data — this makes it impossible to
+   diagnose bad runs after the fact.
