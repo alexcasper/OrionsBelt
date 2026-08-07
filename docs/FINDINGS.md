@@ -3630,6 +3630,10 @@ with INT8 KV, full-attention's decode cost at ctx=4096 is 189k µs on t4
 overtakes GDN on throughput is pushed further by INT8 KV, but the asymptotic
 advantage remains.
 
+Auto-generated reports (reproducible via `python3 bench/ctx_scaling_analysis.py`):
+- t4 device report: [`results/figures/ctx_length_scaling_a76t4.md`](../results/figures/ctx_length_scaling_a76t4.md)
+- t3 vs t4 cross-validation: [`results/figures/ctx_length_scaling_t3vst4.md`](../results/figures/ctx_length_scaling_t3vst4.md) — avg |Δ%|=3.6%, max 7.8%
+
 ---
 
 ## 22. Matched-commit fleet e2e comparison: final submission-quality cross-device table (2026-08-07, ob-52r)
