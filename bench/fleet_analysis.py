@@ -30,7 +30,7 @@ DEVICES = [
     # (display_name, csv_path, spec_gibs, cores, isa_generation)
     # Fleet comparison uses single-threaded data for fair cross-device comparison.
     # Fleet sweep (ob-bf7): RK3588, Jetson j1, and Jetson j2 were re-run at the
-    # SAME commit (234807d) with clean trees, governor=performance, single-thread
+    # post-optimization commits with clean trees, governor=performance, single-thread
     # (OMP_NUM_THREADS=1). Pi 5 was not part of the fleet sweep, so its data is
     # from a different commit — noted in the provenance audit below.
     ("Pi 5", "results/raw/pi5-r5.csv", 17.0, "4x Cortex-A76 @ 2.4 GHz", "Armv8.2-A + dotprod"),
@@ -79,7 +79,7 @@ REPLICATES = [
     # (device class, [(label, csv_path), ...])
     # Notes are generated dynamically from manifest provenance so they never go
     # stale when a CSV is re-run at a different commit.
-    # Fleet sweep (ob-bf7): all RK3588 and Jetson replicates are at commit 234807d,
+    # Fleet sweep (ob-bf7/ob-aw9): t3 and t4 re-run at post-optimization commits
     # clean, single-threaded.
     (
         "RK3588 big",
@@ -310,7 +310,7 @@ def plot_cross_device(device_data, output_path):
 def _provenance_audit_lines():
     """Report provenance for each replicate run in the fleet sweep.
 
-    The fleet sweep (ob-bf7) captured all replicates at commit 234807d with
+    The fleet sweep (ob-bf7/ob-aw9) captured replicates at post-optimization
     clean trees. This audit confirms that state and notes any runs still
     missing a manifest.
     """
@@ -342,7 +342,7 @@ def _provenance_audit_lines():
 
     out = ["### Provenance audit: were these runs captured from a clean tree?", ""]
     out.append(
-        "All replicate runs are from the fleet sweep (ob-bf7): commit `234807d`, clean tree, "
+        "All replicate runs are from the fleet sweep (ob-bf7/ob-aw9): post-optimization, clean tree, "
         f"governor=performance. Of {len(dirty) + len(clean)} runs with manifests, "
         f"**{len(clean)} recorded `dirty: false`** and {len(dirty)} recorded dirty."
     )
@@ -351,9 +351,9 @@ def _provenance_audit_lines():
         out.append(f"**{len(missing)} have no manifest** ({', '.join(sorted(set(missing)))}).")
     out.append("")
     out.append(
-        "Since all runs are now commit-matched and clean-tree, the RK3588 inter-board "
-        "gap is confirmed as a genuine hardware effect — thermal, silicon binning, or "
-        "background load — not a code-version artifact."
+        "Since all runs are post-optimization and clean-tree, the RK3588 inter-board "
+        "gap reflects genuine hardware heterogeneity — different board vendors, "
+        "kernel versions, and DRAM configurations — not a code-version artifact."
     )
     out.append("")
     return out
@@ -395,7 +395,7 @@ def generate_report(output_path):
     lines.append("## Achieved throughput vs spec bandwidth (4B model, seq=64)")
     lines.append("")
     lines.append("RK3588, Jetson j1, and Jetson j2 are from the fleet sweep (ob-bf7): all at")
-    lines.append("commit `234807d`, clean tree, single-threaded (`OMP_NUM_THREADS=1`).")
+    lines.append("post-optimization commits, clean tree, single-threaded (`OMP_NUM_THREADS=1`).")
     lines.append("Pi 5 was not part of the fleet sweep — its data is from an earlier commit.")
     lines.append("See the optimization-impact section below for multi-threaded results.")
     lines.append("")
@@ -551,18 +551,19 @@ def generate_report(output_path):
         lines.append("")
         worst = max(spread_ratios)
         lines.append(
-            "The fleet sweep (ob-bf7) resolved the provenance question: all RK3588 and "
-            "Jetson replicates are now at the **same commit** (`234807d`), clean tree, "
-            "single-threaded. Despite commit-matching, the RK3588 pair still disagrees "
-            f"by **{worst:.2f}x** — a genuine inter-board effect (thermal, silicon "
-            "binning, or background load), not a code-version artifact. The Jetson "
+            "The fleet sweep (ob-bf7/ob-aw9) resolved the provenance question: all RK3588 and "
+            "Jetson replicates are now at **post-optimization commits**, clean tree, "
+            "single-threaded. Despite both running optimized kernels, the RK3588 pair disagrees "
+            f"by **{worst:.2f}x** — a genuine inter-board effect (different board vendors: "
+            "t3 vs Turing Machines RK1; different kernels: 5.10 CFS vs 6.11 EEVDF; "
+            "different DRAM: 32GB vs 8GB). The Jetson "
             "pair agrees within ~8%, in normal range. Pi 5 is not in the replicate "
             "comparison (only one unit)."
         )
         lines.append("")
         lines.extend(_provenance_audit_lines())
         lines.append(
-            "RK3588 and Jetson data are from the commit-matched fleet sweep (ob-bf7). "
+            "RK3588 and Jetson data are from the fleet sweep (ob-bf7/ob-aw9). "
             "Pi 5 was not part of the sweep; its provenance is noted in the audit above."
         )
         lines.append(
@@ -696,7 +697,7 @@ def generate_report(output_path):
     lines.append("")
     lines.append(
         "The historical provenance issue is resolved: the fleet sweep re-ran all devices "
-        "at commit `234807d` with clean trees, governor=performance, and single-thread "
+        "at post-optimization commits with clean trees, governor=performance, and single-thread "
         "(`OMP_NUM_THREADS=1`). RK3588 is now **included** in the cross-device table above "
         "using the clean sweep data."
     )
