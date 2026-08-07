@@ -17,6 +17,7 @@ if _ROOT not in sys.path:
 from scripts.validate_results import (  # noqa: E402
     ABSURD_THROUGHPUT,
     E2E_SWEEP_COLS,
+    GPU_MICRO_COLS,
     LAYER_PROFILE_COLS,
     STANDARD_COLS,
     SUSTAINED_COLS,
@@ -30,6 +31,7 @@ from scripts.validate_results import (  # noqa: E402
     main,
     validate_csv,
     validate_e2e_sweep_row,
+    validate_gpu_micro_row,
     validate_layer_profile_row,
     validate_manifest,
     validate_standard_row,
@@ -188,6 +190,15 @@ class TestDetectCsvType:
         cols = ["run_id", "metric_name", "metric_component", "repeat_index"]
         assert detect_csv_type(cols) == "e2e_sweep"
 
+    def test_gpu_micro_detected(self):
+        """GPU microbenchmark CSV should be detected."""
+        assert detect_csv_type(GPU_MICRO_COLS) == "gpu_micro"
+
+    def test_gpu_micro_minimal_cols(self):
+        """Detection only needs the key columns."""
+        cols = ["bw_mibs", "p50_ms", "dim1"]
+        assert detect_csv_type(cols) == "gpu_micro"
+
 
 # ---------------------------------------------------------------------------
 # expected_columns
@@ -214,6 +225,10 @@ class TestExpectedColumns:
     def test_e2e_sweep_columns(self):
         assert "metric_name" in expected_columns("e2e_sweep")
         assert "context_length" in expected_columns("e2e_sweep")
+
+    def test_gpu_micro_columns(self):
+        assert "bw_mibs" in expected_columns("gpu_micro")
+        assert "p50_ms" in expected_columns("gpu_micro")
 
 
 # ---------------------------------------------------------------------------
@@ -411,6 +426,80 @@ class TestValidateE2eSweepRow:
             2,
         )
         assert any("high throughput" in i.message for i in issues)
+
+
+# ---------------------------------------------------------------------------
+# validate_gpu_micro_row
+# ---------------------------------------------------------------------------
+
+
+def _gpu_row(**overrides):
+    """A valid GPU microbenchmark row."""
+    base = {
+        "kernel": "gdn_gated_scan",
+        "dim1": "64",
+        "dim2": "2048",
+        "dim3": "",
+        "p50_ms": "0.948",
+        "p95_ms": "1.0477",
+        "bw_mibs": "1598.8",
+    }
+    base.update(overrides)
+    return base
+
+
+class TestValidateGpuMicroRow:
+    def test_valid_row_no_issues(self):
+        issues = []
+        validate_gpu_micro_row(_gpu_row(), "test.csv", issues, 2)
+        assert issues == []
+
+    def test_valid_row_no_dim3_no_p95(self):
+        """Kernels like gdn_cumdecay only have p50, not p95 or dim3."""
+        issues = []
+        validate_gpu_micro_row(
+            _gpu_row(kernel="gdn_cumdecay", dim3="", p95_ms="", bw_mibs="1182.2"),
+            "test.csv",
+            issues,
+            2,
+        )
+        assert issues == []
+
+    def test_valid_row_with_dim3(self):
+        """gdn_delta_rule_decode has dim3."""
+        issues = []
+        validate_gpu_micro_row(
+            _gpu_row(kernel="gdn_delta_rule_decode", dim1="16", dim2="128", dim3="128"),
+            "test.csv",
+            issues,
+            2,
+        )
+        assert issues == []
+
+    def test_unknown_kernel(self):
+        issues = []
+        validate_gpu_micro_row(_gpu_row(kernel="mystery_kernel"), "test.csv", issues, 2)
+        assert any("unknown kernel" in i.message for i in issues)
+
+    def test_non_positive_bw(self):
+        issues = []
+        validate_gpu_micro_row(_gpu_row(bw_mibs="0.0"), "test.csv", issues, 2)
+        assert any("bw_mibs" in i.message and i.severity == "ERROR" for i in issues)
+
+    def test_p95_less_than_p50(self):
+        issues = []
+        validate_gpu_micro_row(_gpu_row(p50_ms="2.0", p95_ms="1.0"), "test.csv", issues, 2)
+        assert any("p95" in i.message and i.severity == "WARNING" for i in issues)
+
+    def test_non_positive_dims(self):
+        issues = []
+        validate_gpu_micro_row(_gpu_row(dim1="0"), "test.csv", issues, 2)
+        assert any("dim1" in i.message and i.severity == "ERROR" for i in issues)
+
+    def test_malformed_p50(self):
+        issues = []
+        validate_gpu_micro_row(_gpu_row(p50_ms="abc"), "test.csv", issues, 2)
+        assert any("cannot parse p50_ms" in i.message for i in issues)
 
 
 # ---------------------------------------------------------------------------

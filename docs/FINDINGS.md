@@ -1090,6 +1090,8 @@ characterization will come from passively-cooled devices (e.g. Pi 5) where susta
 load may trigger frequency reduction. The `--sustained` flag is portable — every
 device in the fleet can produce its own decay curve.
 
+**Data:** [`results/raw/jetson-j1_sustained.csv`](../results/raw/jetson-j1_sustained.csv) · manifest `jetson-j1_sustained.json` (dirty tree, SHA `a99495f`).
+
 ## Native NEON kernel correctness verification (ob-mrd.3)
 
 The existing `verify_cpu_kernels.sh` cross-compiles for SVE and verifies under QEMU.
@@ -1207,6 +1209,8 @@ that saving is irrelevant if it increases per-token energy under load.
 **Practical implication for submission:** all reported numbers use the
 `performance` governor. The `ondemand` comparison is documented to show the
 trade-off, not to suggest it as a recommended setting.
+
+**Data:** [`results/raw/jetson-j1_power_sustained.csv`](../results/raw/jetson-j1_power_sustained.csv) · [`cumdecay`](../results/raw/jetson-j1_power_sustained_cumdecay.csv) · [`dwconv1d`](../results/raw/jetson-j1_power_sustained_dwconv1d.csv) · manifest `jetson-j1_power.json` (timestamp 2026-08-03, governor=performance).
 
 ## Model-Level Benchmark: Qwen3.5-0.8B on RK3588 (ob-mrd.2)
 
@@ -2536,7 +2540,7 @@ functional is itself notable: **the GPU GDN kernels require no proprietary
 drivers**, which is relevant for reproducibility and the open-source
 contribution criterion.
 
-**Data:** [`results/raw/rk3588-t4_gpu_mali-g610.csv`](../../results/raw/rk3588-t4_gpu_mali-g610.csv) · manifest [`rk3588-t4_gpu_mali-g610.json`](../../results/manifests/rk3588-t4_gpu_mali-g610.json) (dirty tree, SHA `e6aea70`).
+**Data:** [`results/raw/rk3588-t4_gpu_mali-g610.csv`](../results/raw/rk3588-t4_gpu_mali-g610.csv) · manifest [`rk3588-t4_gpu_mali-g610.json`](../results/manifests/rk3588-t4_gpu_mali-g610.json) (dirty tree, SHA `e6aea70`).
 
 ---
 
@@ -2845,6 +2849,8 @@ numbers without a "sustained" caveat for this device class.
 Note: the O6 (Cortex-A720) may behave differently — it has higher peak
 power density. The thermal characterization should be repeated on O6 when
 hardware is available.
+
+**Data:** [`results/raw/rk3588-t4_sustained_thermal.txt`](../results/raw/rk3588-t4_sustained_thermal.txt) · manifest `rk3588-t4.json` (dirty tree, SHA `20b50c7`).
 
 ---
 
@@ -3451,7 +3457,7 @@ thermal throttling. The burst benchmark numbers in §15–17 are steady-state
 sustainable numbers, not peak-only artifacts. This matters for the Physical AI
 submission criterion: honest sustained throughput, not a one-shot burst.
 
-**Data:** [`results/raw/rk3588-t3_sustained_thermal.txt`](../../results/raw/rk3588-t3_sustained_thermal.txt) · [`rk3588-t4_sustained_thermal.txt`](../../results/raw/rk3588-t4_sustained_thermal.txt) (independent cross-check).
+**Data:** [`results/raw/rk3588-t3_sustained_thermal.txt`](../results/raw/rk3588-t3_sustained_thermal.txt) · [`rk3588-t4_sustained_thermal.txt`](../results/raw/rk3588-t4_sustained_thermal.txt) (independent cross-check).
 
 ---
 
