@@ -120,6 +120,22 @@ class TestGDNPolicies:
         a = next(p for p in GDN_POLICIES if p.tensor_group == "in_proj_a.weight")
         assert a.scheme == QuantScheme.WEIGHT_ONLY_INT8
 
+    def test_in_proj_qkv_is_int4(self):
+        p = policy_for("layers.0.linear_attn.in_proj_qkv.weight")
+        assert p.scheme == QuantScheme.WEIGHT_ONLY_INT4
+
+    def test_in_proj_z_is_int4(self):
+        p = policy_for("in_proj_z.weight")
+        assert p.scheme == QuantScheme.WEIGHT_ONLY_INT4
+
+    def test_conv1d_is_int8(self):
+        p = policy_for("conv1d.weight")
+        assert p.scheme == QuantScheme.WEIGHT_ONLY_INT8
+
+    def test_out_proj_is_int4(self):
+        p = policy_for("out_proj.weight")
+        assert p.scheme == QuantScheme.WEIGHT_ONLY_INT4
+
     def test_reasons_non_empty(self):
         """Every policy must explain why its precision was chosen."""
         for p in GDN_POLICIES:
