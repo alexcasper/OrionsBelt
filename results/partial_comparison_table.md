@@ -19,7 +19,7 @@ ABLATION (model-level, tidy long, cpu/cpu hybrid, 4K)
 ==========================================================================================
 KERNEL FLEET BASELINE (4B/0.8B, seq=64, single-core canonical, fp32) — GiB/s @ p50
 Device            run_id_sha            dirty   CumDecay  Scan    DWConv1D  GDN2
-  Jetson j1 (canon) 2c9ac9f              dirty   3.70   2.74   3.25   2.08 
+  Jetson j1 (canon) 148db31              CLEAN   3.70   2.74   3.25   2.08 
   Jetson j2 (canon) 6ea1771              dirty   1.15   0.73   1.04     —  
   Pi5 r5           28729f3              dirty   3.74   1.20   3.23     —  
   Pi5 j1           f127a11              dirty   2.93   1.84   2.37     —  

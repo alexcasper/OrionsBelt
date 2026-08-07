@@ -1449,20 +1449,14 @@ Data: `results/raw/rk3588-t4_big.csv` (kernel timings),
 Nano A57 (4× Cortex-A57 @ 1.479 GHz, Armv8.0 NEON, active fan cooling, Tegra
 210). The INA3221 power monitor is present on both boards at the same IIO path.
 
-### The j1 CSV is stale
+### The j1 CSV was stale — re-run at 148db31 (2026-08-07)
 
-j1's main benchmark CSV (`jetson-j1.csv`) was captured at commit `2c9ac9f` —
-**before** NEON double-width unrolling, bf16 vectorization, and OpenMP
-parallelization were added. j2's data is at commit `194e37c` (post-optimization).
-The fleet comparison table (§5b) already uses j2's single-threaded data for a
-fair cross-device comparison, but j1's stale CSV should be re-run when j1 is
-available with the current binary.
-
-**Impact on fleet table:** the j1 row (1.16/0.72/1.04 GiB/s) understates what
-the A57 achieves with optimized kernels. j2's single-threaded data (1.32/1.13/1.20
-GiB/s) is the accurate representation. The fleet conclusions (Pi 5 A76 beats
-Jetson A57 despite less bandwidth) are unaffected — the relative ordering holds
-regardless.
+j1's main benchmark CSV (`jetson-j1.csv`) was originally captured at commit
+`2c9ac9f` — **before** NEON double-width unrolling, bf16 vectorization, and
+OpenMP parallelization were added. It was re-run at commit `148db31` (dirty=false,
+4-thread, landed in `4ef46f8`) with the current optimized binary, resolving the
+staleness. The fleet comparison table (§5b) uses the clean single-threaded sweep
+(`jetson-j1-clean.csv` at `234807d`) for fair cross-device comparison.
 
 ### Energy efficiency: optimized kernels vs old kernels (single-threaded)
 
