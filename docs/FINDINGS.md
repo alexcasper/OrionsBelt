@@ -2613,6 +2613,27 @@ triple loop also wastes bandwidth).
 ```
 
 Files: `results/raw/rk3588-t3_e2e_raw.csv`, `results/raw/rk3588-t3_08b_e2e_raw.csv`
+
+### Cross-check — rk3588-t4 (2nd RK3588 unit)
+
+The GEMV optimization was independently validated on rk3588-t4 (separate
+board, same silicon). Results confirm t3 within 7%:
+
+| Model | t3 tok/s | t4 tok/s | Delta | t4 TTFT (ms) | t4 s/tok |
+|-------|---------:|---------:|------:|-------------:|---------:|
+| Qwen3.5-4B   | 1.04 | 1.11 | +7% | 898 | 0.90 |
+| Qwen3.5-0.8B | 7.98 | 8.36 | +5% | 121 | 0.12 |
+
+Phase proportions match t3 (FFN 72%, GDN proj 14%, scan/decay/conv <0.1%).
+t4 is consistently ~5-7% faster than t3 on both model sizes — consistent
+with the known cross-board gap (t4 has a newer kernel 6.11 vs t3's 5.10).
+
+Files: `results/raw/rk3588-t4_4b_gemv_optimized.csv`, `results/raw/rk3588-t4_08b_gemv_optimized.csv`
+Manifest: `results/manifests/rk3588-t4_gemv_optimized.json` (sha `b3c8203`, dirty=false)
+Governor: performance. Cluster: big (A76 cores 4-7), 128 tokens × 1 run.
+
+---
+
 ## GDN-2 vs GDN-1 Gated Scan: Operator-Level Comparison on RK3588-t4
 
 **Date:** 2026-08-07
