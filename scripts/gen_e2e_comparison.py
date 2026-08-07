@@ -238,7 +238,7 @@ def _check_commit_lineage(base_commit, commits):
         if kernel_changes:
             results[sha] = {
                 "status": "diverged",
-                "detail": f"kernel changes: {', '.join(kernel_changes[:3])}"
+                "detail": f"kernel changes: {', '.join(kernel_changes[:3])}",
             }
         else:
             results[sha] = {
