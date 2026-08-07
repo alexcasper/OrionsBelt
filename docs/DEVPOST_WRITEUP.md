@@ -168,6 +168,62 @@ remain <1% of decode time; the bottleneck is weight-loading matmuls (FFN
 [FINDINGS.md §15–16](./FINDINGS.md) and the
 [e2e fleet comparison](./results/figures/e2e_fleet_comparison.md).
 
+**Context-length scaling: GDN is O(1), full-attention is O(n) — measured on silicon.**
+
+We implemented real grouped-query attention (GQA) with a growing KV cache in
+the full-attention layers, then swept context length from 1 to 4096 tokens
+to measure the scaling behavior of each layer type independently
+(FINDINGS.md §17, commit `c4cc9be`, RK3588-t3 A76):
+
+| Context | 0.8B hybrid tok/s | 0.8B pure-GDN tok/s | 4B hybrid tok/s | 4B pure-GDN tok/s |
+|--------:|------------------:|--------------------:|----------------:|------------------:|
+|       1 |             10.70 |               10.48 |            1.84 |              1.85 |
+|    1024 |              8.42 |               10.46 |            1.62 |              1.84 |
+|    4096 |              4.99 |               10.45 |            1.19 |              1.84 |
+
+**Pure-GDN throughput is flat to within 0.3%** from ctx=1 to ctx=4096 — the
+recurrent state matrix does not grow. Meanwhile the hybrid model degrades
+1.55× (4B) to 2.14× (0.8B) at 4K context, entirely from the 6 full-attention
+layers whose KV cache reads grow linearly. At 4K context, full-attention
+consumes 58% of decode time on the 0.8B model — up from 9.5% at ctx=1.
+
+Full-attention latency scales linearly: 9→116 ms (12.9×) on 0.8B, 37→333 ms
+(9.0×) on 4B. GDN latency is flat at 35 ms (0.8B) / 115 ms (4B) regardless
+of context length.
+
+**Cross-device validation:** the identical scaling shape holds on the Jetson
+Nano (Cortex-A57, 2014-era). Pure-GDN stays flat (0.4% variance); hybrid
+degrades 1.77× at 4K context. The O(1) vs O(n) distinction is architectural,
+not microarchitectural. (FINDINGS.md §17.)
+
+**INT8 KV cache quantization: the counter-argument, measured.**
+
+The strongest counter to GDN's advantage is to quantize the full-attention KV
+cache to INT8, cutting its memory traffic 4×. We implemented this with NEON
+dequantize-on-the-fly and measured all four configurations (FINDINGS.md §20,
+commit `dcfae65`):
+
+| Config (0.8B) | ctx=1 tok/s | ctx=4096 tok/s | KV cache (ctx=4096) |
+|---------------|------------:|--------------:|--------------------:|
+| FP32 weights + FP32 KV | 7.75 | 4.30 | 96.0 MB |
+| FP32 weights + INT8 KV | 7.93 | 6.19 | 24.0 MB |
+| INT8 weights + FP32 KV | 10.58 | 4.96 | 96.0 MB |
+| **INT8 weights + INT8 KV** | **10.60** | **7.70** | **24.0 MB** |
+
+INT8 KV cache delivers 1.7–2.6× full-attention speedup at long context and
+cuts KV memory 4×. Combined INT8 (weights + KV) gives 1.8× overall speedup
+at ctx=4096 (4.30→7.70 tok/s on 0.8B, 0.79→1.44 tok/s on 4B). But
+full-attention's cost **still scales O(n)** regardless of KV precision — the
+constant factor improves, the asymptotic behavior does not. GDN's O(1)
+advantage *grows* with context length.
+
+**Sustained thermal stability: burst = steady-state.**
+
+Two back-to-back 500-token sustained bursts (94s total) on the 0.8B INT8 model
+showed **0.3% throughput decay** and p99/p50 latency spread of 0.4%
+(FINDINGS.md §18). The burst benchmark numbers are steady-state sustainable,
+not peak-only artifacts — critical for an honest Physical AI submission.
+
 **Three-component memory decomposition, confirmed on real model weights:**
 
 | Component | Size | Scaling | Why it matters |
@@ -329,6 +385,16 @@ ORIONS_FORCE_FP32=1 python3 bench/harness.py \
   first published confirmation that runtime recurrence is structurally
   incompatible with both compilers
 - End-to-end model throughput: Qwen3.5-0.8B on RK3588, prefill + decode + TTFT
+- Context-length scaling measurement proving GDN O(1) vs full-attention O(n):
+  pure-GDN throughput flat to 0.3% across ctx=1–4096, cross-validated on A57
+  and A76 (FINDINGS.md §17)
+- INT8 KV cache quantization: 1.7–2.6× full-attention speedup at long context,
+  4× KV memory reduction, combined INT8 (weights + KV) delivers 1.8× overall
+  speedup at ctx=4096 (FINDINGS.md §20)
+- Sustained-load thermal stability: 0.3% throughput decay over 94s on RK3588,
+  confirming burst numbers are steady-state sustainable (FINDINGS.md §18)
+- Cross-device decode comparison: A76 is 2.4–3.0× faster than A57, consistent
+  with clock and pipeline width (FINDINGS.md §19)
 - Three-component memory decomposition confirmed on real model weights
   (analytical = measured)
 - big.LITTLE affinity policy: 2–3× from pinning, validated across 6 configs
