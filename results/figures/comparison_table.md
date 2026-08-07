@@ -106,7 +106,7 @@ Qwen3.5-4B, decode (seq=1), A76 big. Both devices clean, post-optimization.
 | gdn_gated_scan | 1.458 | 52.33 | 20.0% | 2.333 | 32.70 | 0.0% |
 | gdn_causal_dwconv1d | 2.625 | 52.31 | 11.1% | 9.043 | 15.19 | 3.2% |
 
-> Decode GiB/s exceeds the 34 GiB/s DRAM spec on t3 because at seq=1 the working
+> Decode GiB/s exceeds the 31.7 GiB/s DRAM spec on t3 because at seq=1 the working
 > set fits in L1/L2 cache. t4 achieves lower cache-resident throughput, consistent
 > with the cross-board gap. The **per-token latency** (µs/token) is the load-bearing
 > decode metric — these are the actual costs a decode loop pays per GDN layer per token.
@@ -160,7 +160,7 @@ Full table including 0.8B: [`memory_comparison.md`](memory_comparison.md)._
 
 ## 6. Decode bandwidth ceilings (analytical)
 
-Qwen3.5-4B at 100 GB/s (O6 LPDDR5 spec; RK3588 shared pool is 34 GiB/s per cluster).
+Qwen3.5-4B at 100 GB/s (O6 LPDDR5 spec; RK3588 shared pool is 31.7 GiB/s per cluster).
 
 | Quantization | Weight traffic/token | State traffic/token | Total | Ceiling tok/s |
 |---|---:|---:|---:|---:|
