@@ -3525,7 +3525,16 @@ the findings generalise, not an artefact of one board.
 | INT8 weights + FP32 KV | 1.20 | 1.20 | 1.00 |
 | **INT8 weights + INT8 KV** | **1.43** | **1.44** | **0.99** |
 
-### Cross-device speedup confirmation
+### Results: 0.8B model at ctx=4096
+
+| Config | t4 tok/s | t3 tok/s | t4/t3 ratio |
+|--------|--------:|--------:|------------:|
+| FP32 weights + FP32 KV | 4.49 | 4.30 | 1.04 |
+| FP32 weights + INT8 KV | 6.23 | 6.19 | 1.01 |
+| INT8 weights + FP32 KV | 4.96 | 4.96 | 1.00 |
+| **INT8 weights + INT8 KV** | **7.45** | **7.70** | **0.97** |
+
+### Cross-device speedup confirmation (4B model)
 
 | Metric | t4 | t3 |
 |--------|---:|---:|
@@ -3533,6 +3542,15 @@ the findings generalise, not an artefact of one board.
 | Weight-int8-only speedup (ctx=4096) | 1.43× | 1.52× |
 | Combined int8 speedup (ctx=4096) | 1.70× | 1.82× |
 | Weight-int8 speedup (ctx=1, decode) | 1.65× | 1.77× |
+
+### Cross-device speedup confirmation (0.8B model)
+
+| Metric | t4 | t3 |
+|--------|---:|---:|
+| KV-int8-only speedup (ctx=4096) | 1.39× | 1.44× |
+| Weight-int8-only speedup (ctx=4096) | 1.11× | 1.15× |
+| Combined int8 speedup (ctx=4096) | 1.66× | 1.79× |
+| Weight-int8 speedup (ctx=1, decode) | 1.21× | 1.37× |
 
 ### Analysis
 
