@@ -52,14 +52,14 @@ def fix_table_file(filepath):
     changes = 0
 
     # Fix the spec bandwidth line
-    old_line = "**Device spec bandwidth:** {:.1f} GiB/s".format(old_spec)
-    new_line = "**Device spec bandwidth:** {:.1f} GiB/s".format(new_spec)
+    old_line = f"**Device spec bandwidth:** {old_spec:.1f} GiB/s"
+    new_line = f"**Device spec bandwidth:** {new_spec:.1f} GiB/s"
     if old_line in content:
         content = content.replace(old_line, new_line)
         changes += 1
 
     # Also catch the case where it's written without decimal (e.g., "34.0" vs "34")
-    old_line_nd = "**Device spec bandwidth:** {} GiB/s".format(int(old_spec))
+    old_line_nd = f"**Device spec bandwidth:** {int(old_spec)} GiB/s"
     if old_line_nd in content:
         content = content.replace(old_line_nd, new_line)
         changes += 1
@@ -92,7 +92,7 @@ def fix_table_file(filepath):
                     try:
                         achieved = float(parts[2].strip())
                         new_pct = achieved / new_spec * 100.0
-                        parts[3] = " {:.1f}% ".format(new_pct)
+                        parts[3] = f" {new_pct:.1f}% "
                         line = "|".join(parts)
                         changes += 1
                     except ValueError:
@@ -105,7 +105,7 @@ def fix_table_file(filepath):
     if content != original:
         with open(filepath, "w") as f:
             f.write(content)
-        return True, "{} changes".format(changes)
+        return True, f"{changes} changes"
     return False, "no changes needed (already correct or pattern not found)"
 
 
@@ -122,9 +122,9 @@ def main():
             fixed += 1
         else:
             skipped += 1
-        print("  {} {}: {}".format(status, os.path.basename(tf), msg))
+        print(f"  {status} {os.path.basename(tf)}: {msg}")
 
-    print("\n{} files fixed, {} skipped.".format(fixed, skipped))
+    print(f"\n{fixed} files fixed, {skipped} skipped.")
 
 
 if __name__ == "__main__":
