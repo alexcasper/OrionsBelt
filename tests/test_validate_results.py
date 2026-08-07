@@ -697,12 +697,6 @@ class TestMainEndToEnd:
         result = self._run_main(tmp_path / "nonexistent", tmp_path / "manifests")
         assert result == 2
 
-
-    def test_missing_csv_dir_exit_two(self, tmp_path):
-        """A non-existent CSV directory exits 2."""
-        result = self._run_main(tmp_path / "nonexistent", tmp_path / "manifests")
-        assert result == 2
-
     def test_recursive_subdirectory_discovery(self, tmp_path):
         """CSVs in subdirectories are discovered and validated."""
         csv_dir = tmp_path / "raw"
@@ -714,9 +708,7 @@ class TestMainEndToEnd:
         # Write a kleidiai matmul CSV in a subdirectory
         header = ",".join(KLEIDIAI_MATMUL_COLS)
         row = "decode_1x128x128,kleidiai,1,128,128,1.855,33.41,17.66"
-        (kleidiai_dir / "rk3588-t3_kleidiai_matmul.csv").write_text(
-            f"{header}\n{row}\n"
-        )
+        (kleidiai_dir / "rk3588-t3_kleidiai_matmul.csv").write_text(f"{header}\n{row}\n")
 
         import scripts.validate_results as vr
 
@@ -807,17 +799,6 @@ class TestValidateCsv:
         assert csv_type == "layer_profile"
         assert row_count == 1
 
-
-    def test_profile_csv_validated(self, tmp_path):
-        header = "phase,ctx_len,layer_idx,layer_type,p50_us,p95_us,mean_us,n_samples"
-        row = "prefill,64,0,linear_attention,100.0,120.0,110.0,3"
-        path = tmp_path / "profile.csv"
-        path.write_text(f"{header}\n{row}\n")
-        issues = []
-        csv_type, row_count, _ = validate_csv(str(path), "profile.csv", issues)
-        assert csv_type == "layer_profile"
-        assert row_count == 1
-
     def test_comment_prefixed_standard_csv(self, tmp_path):
         """A CSV with a '# metadata' comment line before the header."""
         comment = "# config=big_only_a76 binary=bench_gdn_a76 affinity=4-7\n"
@@ -878,6 +859,7 @@ class TestValidateCsv:
         csv_type, row_count, _ = validate_csv(str(path), "multi.csv", issues)
         assert csv_type == "standard"
         assert row_count == 2
+
     def test_valid_json(self, tmp_path):
         path = tmp_path / "manifest.json"
         path.write_text('{"git": {"sha": "abc123"}}')
