@@ -1,6 +1,6 @@
 # ADR 0001: Record the testable hypothesis for GDN-2 decoupled erase/write gating on edge silicon
 
-- **Status:** Proposed
+- **Status:** Accepted (hypothesis tested via benchmark-only path per [ADR 0008](./0008-gdn2-benchmark-only-comparison.md); research note at `docs/research/ob-7b5-gdn2-edge-cost-research-note.md`)
 - **Date:** 2026-08-02
 - **Bead:** `ob-8m7`
 - **Deciders:** GDN-2 research track (E8)

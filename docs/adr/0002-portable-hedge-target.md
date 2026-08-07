@@ -1,6 +1,6 @@
 # ADR 0002: Select the portable aarch64 hedge target
 
-- **Status:** Proposed
+- **Status:** Superseded by [ADR 0005](./0005-device-fleet-and-bandwidth-study.md) (device fleet selected) and [ADR 0007](./0007-commit-to-edge-ai-track.md) (Edge AI track committed)
 - **Date:** 2026-08-02
 - **Bead:** `ob-zh4`
 - **Deciders:** Claude (agent), pending maintainer confirmation (see "What I need from the maintainer" below)
