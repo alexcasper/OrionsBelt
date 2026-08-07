@@ -4017,7 +4017,7 @@ Four micro-kernels with dual-ISA design (`#ifdef __ARM_FEATURE_SVE` /
 Compiled with `gcc -O3 -march=armv8.2-a` (Makefile auto-detects ISA floor:
 SVE2 → SVE → dotprod → NEON). The A76 falls through to the NEON path.
 
-**Correctness: 10/10 test suites pass** (`make test` → ALL TESTS PASSED).
+**Correctness: 14/14 test suites pass** (`make test` → ALL TESTS PASSED).
 Each suite compares the kernel output against a naive C reference at realistic
 GDN shapes (seq=1 decode, seq=64 prefill; channels=160 and 2560).
 
