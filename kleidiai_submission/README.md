@@ -66,7 +66,7 @@ that have no SME.
 decay[t][c] = ∏_{i=0}^{t} a[i][c]    (inclusive prefix product)
 ```
 
-An exclusive prefix product along the sequence axis. Computed as a direct
+An inclusive prefix product along the sequence axis. Computed as a direct
 running product (not `exp(cumsum(log a))`) — at typical chunk lengths of 64 the
 direct product is both cheaper and numerically stable in fp32, avoiding two
 transcendentals per element.
