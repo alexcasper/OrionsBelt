@@ -3141,6 +3141,33 @@ constant at ~1.2 MB total (24 × 4096 × 4 bytes). In a pure-GDN model (no
 full-attention layers), decode cost and memory would both remain flat at any
 context length.
 
+### Pure-GDN comparison: what if all layers were GDN?
+
+To isolate the cost of the full-attention layers, we ran the same sweep with
+`--pure-gdn` (all NUM_LAYERS layers are GDN type, zero full-attention layers).
+This is a hypothetical architecture — Qwen3.5 uses a 3:1 hybrid — but it shows
+the ceiling: what a pure-linear-attention model would achieve.
+
+#### INT8, big cluster (A76, cpu4-7)
+
+| ctx | 0.8B hybrid tok/s | 0.8B pure-GDN tok/s | 4B hybrid tok/s | 4B pure-GDN tok/s |
+|----:|------------------:|--------------------:|----------------:|------------------:|
+| 1 | 10.70 | 10.48 | 1.84 | 1.85 |
+| 64 | 10.59 | 10.48 | 1.84 | 1.85 |
+| 256 | 10.07 | 10.47 | 1.79 | 1.85 |
+| 1024 | 8.42 | 10.46 | 1.62 | 1.84 |
+| 2048 | 6.82 | 10.46 | 1.45 | 1.84 |
+| 4096 | 4.99 | 10.45 | 1.19 | 1.84 |
+
+Pure-GDN throughput is **flat to within 0.3%** across all context lengths.
+The hybrid model degrades by 1.55× (4B) to 2.1× (0.8B) at ctx=4096 — entirely
+from the full-attention layers. KV cache memory is zero for pure-GDN.
+
+At ctx=1 the pure-GDN model is slightly slower than hybrid for the 0.8B model
+(10.48 vs 10.70 tok/s) because it has 6 additional GDN layers (replacing 6
+cheaper full-attention Q/K/V projections). But by ctx=1024 the crossover has
+occurred, and at ctx=4096 pure-GDN is 2.1× faster.
+
 ### What this means for the submission
 
 This is the core GDN value proposition, measured on real silicon: **linear
@@ -3148,7 +3175,8 @@ attention trades a constant per-token cost for the ability to process
 arbitrarily long contexts without throughput degradation or memory growth.**
 The 3:1 GDN:full-attention hybrid already captures most of the benefit — 75%
 of layers have O(1) cost. A pure-GDN architecture would eliminate the O(n)
-component entirely.
+component entirely, maintaining flat throughput at any context length (measured:
+0.3% variance from ctx=1 to ctx=4096).
 
 ### Data
 
@@ -3158,6 +3186,10 @@ component entirely.
 - `results/raw/rk3588-t3_08b_big_int8_ctxsweep_e2e_raw.csv` — 0.8B INT8 big
 - `results/raw/rk3588-t3_08b_little_ctxsweep_e2e_raw.csv` — 0.8B FP32 little
 - `results/raw/rk3588-t3_08b_little_int8_ctxsweep_e2e_raw.csv` — 0.8B INT8 little
+- `results/raw/rk3588-t3_big_int8_puregdn_ctxsweep_e2e_raw.csv` — 4B INT8 pure-GDN big
+- `results/raw/rk3588-t3_08b_big_int8_puregdn_ctxsweep_e2e_raw.csv` — 0.8B INT8 pure-GDN big
+- `results/raw/rk3588-t3_big_puregdn_ctxsweep_e2e_raw.csv` — 4B FP32 pure-GDN big
+- `results/raw/rk3588-t3_08b_big_puregdn_ctxsweep_e2e_raw.csv` — 0.8B FP32 pure-GDN big
 
 All at commit `c4cc9be`, governor=performance. Manifests in `results/manifests/`.
 
