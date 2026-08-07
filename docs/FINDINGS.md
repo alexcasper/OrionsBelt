@@ -2869,6 +2869,23 @@ prior workloads), not a kernel or measurement methodology problem.
 
 ## Cross-Board Gap: t4 (Turing Machines RK1) vs t3 — Fresh Data at Current HEAD
 
+> **⚠ CORRECTION (ob-mrd.12, ob-mrd.13):** The headline table below compares t3
+> **8-thread** data (`rk3588-t3-clean.csv`, `effective_threads=8`) against t4
+> **1-thread** data (`rk3588-t4-clean.csv`, `OMP_NUM_THREADS=1`). The "gap" of
+> 1.25–4.87× is a **thread-count artifact**, not a hardware difference.
+>
+> A genuine 1-thread t3 run was captured (ob-mrd.13, `OMP_NUM_THREADS=1`,
+> taskset-pinned to one A76 core, commit `d72eaa1`). The like-for-like 1-thread
+> comparison shows **cumdecay is essentially identical** (t3 7.01 vs t4 7.40
+> GiB/s, 0.95×). Only gated_scan retains a gap (t3 3.07 vs t4 5.67, t4 is 1.87×
+> faster), likely due to a board-level memory-subsystem difference.
+>
+> The 8-thread vs 8-thread comparison (`rk3588-t3-clean.csv` vs
+> `rk3588-t4_big.csv`, both `effective_threads=8`) shows the boards agree within
+> ~7% (cumdecay 21.06 vs 22.47), consistent with t4's higher 2400 MHz clock.
+>
+> See `comparison_table.md` §1a for the corrected like-for-like analysis.
+
 **Date:** 2026-08-07  
 **Beads:** ob-aw9, ob-bf7  
 **Commits:** t4 at 8b64d1a, t3 fresh at f015982
@@ -2890,7 +2907,7 @@ kernels. Both boards are RK3588 (4×A55 + 4×A76) but **different board vendors*
 | GCC | unknown | 14.2.0 |
 | OS | Ubuntu 22.04 | Ubuntu 24.04 |
 
-### Headline Numbers (A76 big cluster, single-thread, governor=performance)
+### Headline Numbers (⚠ t3=8-thread, t4=1-thread — confounded, see correction above)
 
 | Kernel | Model | Seq | t4 GiB/s | t3 GiB/s | Ratio |
 |--------|-------|-----|----------|----------|-------|
@@ -2928,13 +2945,16 @@ kernels. Both boards are RK3588 (4×A55 + 4×A76) but **different board vendors*
 
 ### Implications for Fleet Comparison
 
-- **The t3/t4 performance gap is REAL and hardware/environmental**, not a
-  stale-data artifact (both are now fresh at current HEAD with optimized kernels).
-- Fleet comparisons between RK3588 boards must treat t3 and t4 as **different
-  implementations**, not replicates.
-- The original ob-bf7 spread concern is RESOLVED for stale data (both boards
-  now have clean post-optimization CSVs with <8% spread), but a new
-  cross-board heterogeneity finding replaces it.
+- **⚠ The t3/t4 performance gap was NOT real — it was a thread-count artifact.**
+  The original analysis below assumed both boards were single-thread; in fact t3
+  ran 8-thread (effective_threads=8). At matched thread counts the boards agree
+  within ~7% (8-thread) or within noise for cumdecay (1-thread). See ob-mrd.12,
+  ob-mrd.13, and comparison_table.md §1a for the corrected analysis.
+- The original ob-bf7 spread concern remains RESOLVED for stale data (both
+  boards now have clean post-optimization CSVs with <8% spread).
+- The residual gated_scan gap at 1-thread (t3 0.54× of t4) may indicate a
+  genuine board-level memory-subsystem difference, but is within the 1.68×
+  fleet run-to-run variance (ob-bf7).
 
 ### ⚠️ CORRECTION (ob-mrd.12, 2026-08-07) — the "single-thread" claim is false; the gap is a thread-count artifact
 
