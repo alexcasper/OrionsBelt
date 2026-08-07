@@ -15,7 +15,9 @@
 // The "1x4" in the name encodes M=1 (single output row) and 4-wide NEON
 // accumulation.  The "neon" suffix indicates fp32 NEON FMA vectorisation —
 // no int8 dot-product (SDOT) instructions are used, because the delta-rule
-// operands are fp32.
+// operands are fp32.  The NEON path uses double-width unrolling (8 channels
+// per iteration, two independent 4-wide register groups) matching the other
+// three GDN kernels.
 
 #ifndef KAI_GDN_GEMV_F32_F32_F32_1X4_NEON_H
 #define KAI_GDN_GEMV_F32_F32_F32_1X4_NEON_H

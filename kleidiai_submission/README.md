@@ -275,12 +275,19 @@ making it the worst-case portability floor.
 | dwconv1d    | 1×160            |      0.7 |  10.6 |
 | dwconv1d    | 64×2560          |    475.5 |   2.8 |
 | dwconv1d    | 1×2560           |     10.2 |  11.3 |
-| gemv        | K=128 N=128      |     12.1 |   5.1 |
-| gemv        | K=128 N=2048     |    192.1 |   5.1 |
-| gemv        | K=128 N=2560     |    253.6 |   4.9 |
+| gemv        | K=128 N=128      |     13.3 |   4.7 |
+| gemv        | K=128 N=2048     |    184.5 |   5.3 |
+| gemv        | K=128 N=2560     |    234.1 |   5.3 |
+
+> **Note on variance:** The A57 exhibits high run-to-run variance (up to 1.5×
+> on the same kernel at the same commit, per beads ob-bf7). The numbers above
+> are from representative single runs; cross-device comparisons must use
+> matched commits with multiple replicates. The GEMV NEON path uses
+> double-width unrolling (8 channels/iter) and `vfmaq_n_f32` scalar FMA,
+> matching the three recurrent kernels' pattern.
 
 At seq=64 (prefill chunk), all three recurrent kernels are bandwidth-bound
-(2.4–6.5 GiB/s vs the A57's 25.6 GiB/s spec). At seq=1 (decode), the working
+(1.6–6.6 GiB/s vs the A57's 25.6 GiB/s spec). At seq=1 (decode), the working
 set fits in L1 and the kernels are launch-overhead-dominated, not
 bandwidth-limited. The GEMV at all sizes is bandwidth-bound at ~5 GiB/s.
 

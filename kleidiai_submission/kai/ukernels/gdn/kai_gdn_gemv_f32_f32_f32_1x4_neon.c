@@ -14,10 +14,13 @@
 //   exceeds the matmul itself.  Hand-NEON without packing wins 2.6-3.0x at M=1.
 //   Measured break-even M is 3-6 on Cortex-A76 (RK3588).
 //
-// The kernel accumulates in a 4-wide fp32 NEON register across the K
-// reduction dimension using FMA.  An SVE path (vector-length-agnostic,
-// predicated tails) is included for cores with SVE; a scalar fallback ensures
-// correctness on any architecture.
+// The NEON path uses double-width unrolling (8 channels/iter, two independent
+// 4-wide register groups) to hide FMA latency, matching the pattern in the
+// three recurrent GDN kernels.  vfmaq_n_f32 broadcasts the scalar A[kk] in the
+// FMA itself, avoiding a separate vdupq instruction.  The K-outer loop order
+// keeps each b[kk] row access contiguous for cache efficiency.
+// An SVE path (vector-length-agnostic, predicated tails) is included for cores
+// with SVE; a scalar fallback ensures correctness on any architecture.
 
 #include <stddef.h>
 #include <string.h> /* memset */
@@ -49,17 +52,25 @@ void kai_run_gdn_gemv_f32_f32_f32_1x4_neon(const float *a,
         }
     }
 #elif defined(__ARM_NEON)
-    /* Zero the output, then accumulate A[k]*B[k][:] across the reduction
-     * dimension with 4-wide NEON FMA.  No packing — at M=1 the repack cost
-     * dominates, so a direct accumulation is faster (2.6-3.0x measured). */
+    /* K-outer loop order: cache-friendly — each b[kk] row is streamed
+     * contiguously.  Double-width unroll (8 channels/iter, two independent
+     * 4-wide register groups) hides FMA latency.  vfmaq_n_f32 broadcasts the
+     * scalar A[kk] without a separate vdupq instruction. */
     memset(c, 0, n * sizeof(float));
     for (size_t kk = 0; kk < k; ++kk) {
-        float32x4_t a_vec = vdupq_n_f32(a[kk]);
         size_t j = 0;
+        for (; j + 8 <= n; j += 8) {
+            float32x4_t c0 = vld1q_f32(c + j);
+            float32x4_t c1 = vld1q_f32(c + j + 4);
+            c0 = vfmaq_n_f32(c0, vld1q_f32(b + kk * n + j), a[kk]);
+            c1 = vfmaq_n_f32(c1, vld1q_f32(b + kk * n + j + 4), a[kk]);
+            vst1q_f32(c + j, c0);
+            vst1q_f32(c + j + 4, c1);
+        }
         for (; j + 4 <= n; j += 4) {
-            float32x4_t c_vec = vld1q_f32(c + j);
-            float32x4_t b_vec = vld1q_f32(b + kk * n + j);
-            vst1q_f32(c + j, vfmaq_f32(c_vec, a_vec, b_vec));
+            float32x4_t cv = vld1q_f32(c + j);
+            cv = vfmaq_n_f32(cv, vld1q_f32(b + kk * n + j), a[kk]);
+            vst1q_f32(c + j, cv);
         }
         for (; j < n; ++j) {
             c[j] += a[kk] * b[kk * n + j];
