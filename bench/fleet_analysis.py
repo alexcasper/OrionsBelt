@@ -31,7 +31,8 @@ DEVICES = [
     # Fleet comparison uses single-threaded data for fair cross-device comparison.
     # Fleet sweep (ob-bf7): RK3588, Jetson j1, and Jetson j2 were re-run at the
     # post-optimization commits with clean trees, governor=performance, single-thread
-    # (OMP_NUM_THREADS=1). Pi 5 was not part of the fleet sweep, so its data is
+    # (OMP_NUM_THREADS=1) for t4. ⚠ t3-clean was actually 8-thread — see ob-mrd.12/14.
+    # Pi 5 was not part of the fleet sweep, so its data is
     # from a different commit — noted in the provenance audit below.
     ("Pi 5", "results/raw/pi5-r5.csv", 17.0, "4x Cortex-A76 @ 2.4 GHz", "Armv8.2-A + dotprod"),
     (
@@ -79,8 +80,9 @@ REPLICATES = [
     # (device class, [(label, csv_path), ...])
     # Notes are generated dynamically from manifest provenance so they never go
     # stale when a CSV is re-run at a different commit.
-    # Fleet sweep (ob-bf7/ob-aw9): t3 and t4 re-run at post-optimization commits
-    # clean, single-threaded.
+    # Fleet sweep (ob-bf7/ob-aw9): t3 and t4 re-run at post-optimization commits,
+    # clean. ⚠ Thread counts differ: t3-clean=8 (OMP_NUM_THREADS unset → core_count_default),
+    # t4-clean=1 (OMP_NUM_THREADS=1). See ob-mrd.12 / ob-mrd.14 correction.
     (
         "RK3588 big",
         [
@@ -152,6 +154,20 @@ def get_manifest_sha(csv_path):
         return short, git.get("dirty"), full
     except (OSError, ValueError):
         return None, None, None
+
+
+def get_manifest_threads(csv_path):
+    """Return (effective_threads, threads_source) from manifest, or (None, None)."""
+    mpath = _manifest_path_for_csv(csv_path)
+    if mpath is None:
+        return None, None
+    try:
+        with open(mpath) as fh:
+            meta = json.load(fh)
+        par = meta.get("parallelism", {})
+        return par.get("effective_threads"), par.get("threads_source")
+    except (OSError, ValueError):
+        return None, None
 
 
 O6_SPEC_GIBS = 93.1  # 100 GB/s ÷ 1.0737
@@ -352,8 +368,9 @@ def _provenance_audit_lines():
     out.append("")
     out.append(
         "Since all runs are post-optimization and clean-tree, the RK3588 inter-board "
-        "gap reflects genuine hardware heterogeneity — different board vendors, "
-        "kernel versions, and DRAM configurations — not a code-version artifact."
+        "gap **would** reflect hardware heterogeneity — **but see the thread-count "
+        "confound warning above (ob-mrd.12/14)**: t3-clean ran 8-thread while t4-clean "
+        "ran 1-thread, so the raw gap overstates any real difference."
     )
     out.append("")
     return out
@@ -394,8 +411,10 @@ def generate_report(output_path):
     # ---- 4B comparison ----
     lines.append("## Achieved throughput vs spec bandwidth (4B model, seq=64)")
     lines.append("")
-    lines.append("RK3588, Jetson j1, and Jetson j2 are from the fleet sweep (ob-bf7): all at")
-    lines.append("post-optimization commits, clean tree, single-threaded (`OMP_NUM_THREADS=1`).")
+    lines.append("RK3588 (t4-clean), Jetson j1, and Jetson j2 are from the fleet sweep (ob-bf7):")
+    lines.append("post-optimization commits, clean tree. The RK3588 entry uses t4-clean")
+    lines.append("(1-thread, `OMP_NUM_THREADS=1`). ⚠ t3-clean was 8-thread — see the replicate")
+    lines.append("spread section below and the ob-mrd.12/14 correction.")
     lines.append("Pi 5 was not part of the fleet sweep — its data is from an earlier commit.")
     lines.append("See the optimization-impact section below for multi-threaded results.")
     lines.append("")
@@ -550,16 +569,37 @@ def generate_report(output_path):
             lines.append(f"| {cls} | {shown} | **{ratio:.2f}x** | {note} |")
         lines.append("")
         worst = max(spread_ratios)
-        lines.append(
-            "The fleet sweep (ob-bf7/ob-aw9) resolved the provenance question: all RK3588 and "
-            "Jetson replicates are now at **post-optimization commits**, clean tree, "
-            "single-threaded. Despite both running optimized kernels, the RK3588 pair disagrees "
-            f"by **{worst:.2f}x** — a genuine inter-board effect (different board vendors: "
-            "t3 vs Turing Machines RK1; different kernels: 5.10 CFS vs 6.11 EEVDF; "
-            "different DRAM: 32GB vs 8GB). The Jetson "
-            "pair agrees within ~8%, in normal range. Pi 5 is not in the replicate "
-            "comparison (only one unit)."
-        )
+        # Check thread counts for RK3588 big-cluster replicates to avoid the
+        # false "single-threaded" claim (ob-mrd.12/14: t3-clean was 8-thread).
+        rk_t3_t, rk_t4_t = None, None
+        for _cls, runs in REPLICATES:
+            if _cls == "RK3588 big":
+                for lbl, path in runs:
+                    et, _ = get_manifest_threads(path)
+                    if lbl == "t3":
+                        rk_t3_t = et
+                    elif lbl == "t4":
+                        rk_t4_t = et
+        thread_mismatch = rk_t3_t is not None and rk_t4_t is not None and rk_t3_t != rk_t4_t
+        if thread_mismatch:
+            lines.append(
+                "⚠ **Thread-count confound (ob-mrd.12/14):** the RK3588 replicates were "
+                f"**not** all single-threaded. t3-clean ran at **{rk_t3_t} threads** "
+                f"while t4-clean ran at **{rk_t4_t} thread**. The "
+                f"{worst:.2f}x spread is dominated by this thread-count difference, not "
+                "by a hardware effect. The like-for-like comparison (both at 8 threads) "
+                "shows the boards agree within ~7%. See FINDINGS.md §ob-mrd.12 correction."
+            )
+        else:
+            lines.append(
+                "The fleet sweep (ob-bf7/ob-aw9) resolved the provenance question: all RK3588 and "
+                "Jetson replicates are now at **post-optimization commits**, clean tree. "
+                f"The RK3588 pair disagrees by **{worst:.2f}x** — a genuine inter-board effect "
+                "(different board vendors: t3 vs Turing Machines RK1; different kernels: "
+                "5.10 CFS vs 6.11 EEVDF; different DRAM: 32GB vs 8GB). The Jetson "
+                "pair agrees within ~8%, in normal range. Pi 5 is not in the replicate "
+                "comparison (only one unit)."
+            )
         lines.append("")
         lines.extend(_provenance_audit_lines())
         lines.append(
@@ -640,8 +680,9 @@ def generate_report(output_path):
             )
             lines.append("")
         lines.append(
-            "The fleet sweep (ob-bf7) confirmed the RK3588 inter-board gap is a genuine "
-            "hardware effect. This prediction does not depend on resolving that gap."
+            "⚠ The fleet sweep (ob-bf7) inter-board gap is confounded by a thread-count "
+            "mismatch (t3=8, t4=1; ob-mrd.12/14). This prediction uses t4 single-thread "
+            "data and does not depend on resolving that gap."
         )
         lines.append("")
         lines.append("To check this prediction: if the O6 board arrives, run")
@@ -697,9 +738,11 @@ def generate_report(output_path):
     lines.append("")
     lines.append(
         "The historical provenance issue is resolved: the fleet sweep re-ran all devices "
-        "at post-optimization commits with clean trees, governor=performance, and single-thread "
-        "(`OMP_NUM_THREADS=1`). RK3588 is now **included** in the cross-device table above "
-        "using the clean sweep data."
+        "at post-optimization commits with clean trees, governor=performance. RK3588 is "
+        "now **included** in the cross-device table above using the clean sweep data. "
+        "⚠ However, t3-clean ran **8-thread** (OMP_NUM_THREADS unset) while t4-clean ran "
+        "**1-thread** (OMP_NUM_THREADS=1) — see ob-mrd.12/14. The cross-device table uses "
+        "t4-clean (1-thread); the replicate comparison is flagged accordingly."
     )
     lines.append("")
     lines.append(

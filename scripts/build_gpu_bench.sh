@@ -6,8 +6,10 @@
 #   gdn_gpu_validate — comprehensive validation suite (87 tests across configs)
 #
 # Prerequisites:
-#   - OpenCL ICD loader (ocl-icd-libopencl1, ocl-icd-opencl-dev)
-#   - Mali GPU userspace driver (libmali-g610-x11 on RK3588, or equivalent)
+#   - OpenCL headers + ICD loader: apt-get install opencl-headers ocl-icd-opencl-dev
+#   - Mesa OpenCL runtime (RusticL): apt-get install mesa-opencl-icd
+#   - User must be in the 'render' group: sudo usermod -aG render $USER
+#   - On RK3588 Mali-G610, set RUSTICL_ENABLE=panfrost before running
 #   - Kernel source at gpu/gdn_gpu_kernels.cl (loaded at runtime, not compiled in)
 #
 # Usage:
@@ -43,5 +45,8 @@ echo "  → $OUT_DIR/gdn_gpu_validate"
 
 echo ""
 echo "Build complete. Run from the repo root so the kernel source path resolves:"
+echo "  # On RK3588 Mali-G610 (RusticL/Panfrost):"
+echo "  RUSTICL_ENABLE=panfrost ./gpu/gdn_gpu_bench --repeats 50"
+echo "  RUSTICL_ENABLE=panfrost ./gpu/gdn_gpu_validate"
+echo "  # On other OpenCL platforms:"
 echo "  ./gpu/gdn_gpu_bench --repeats 50"
-echo "  ./gpu/gdn_gpu_validate"

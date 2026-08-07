@@ -88,6 +88,8 @@ def test_csv_header_from_existing_results():
     for fname in sorted(os.listdir(base)):
         if not fname.endswith(".csv"):
             continue
+        if "_gpu_" in fname:
+            continue  # GPU benchmark CSV (gdn_gpu_bench.c) — different format, no header row
         with open(os.path.join(base, fname)) as f:
             cols = set(csv.DictReader(f).fieldnames or [])
         if (

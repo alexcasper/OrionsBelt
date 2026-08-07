@@ -862,6 +862,18 @@ narrow only for prefill chunk boundaries.
 
 ### Measurement quality: fleet sweep resolves inter-board spread (ob-bf7)
 
+> **⚠ CORRECTION (ob-mrd.12/14, 2026-08-07):** The claim below that
+> `OMP_NUM_THREADS=1` was used for all runs is **false for t3**. The
+> `rk3588-t3-clean.json` manifest records `effective_threads: 8`
+> (`threads_source: core_count_default` — `OMP_NUM_THREADS` was unset).
+> `rk3588-t4-clean.json` records `effective_threads: 1`. The "1.98×
+> genuine hardware effect" conclusion is **not supported**; the gap is
+> primarily an 8-thread-vs-1-thread confound. The like-for-like comparison
+> (both 8-thread) shows the boards agree within ~7%. See the full
+> correction at [§ob-mrd.12](#correction-ob-mrd12-2026-08-07--the-single-thread-claim-is-false-the-gap-is-a-thread-count-artifact)
+> below. The `fleet_bandwidth_scaling.md` report has been regenerated with
+> matching warnings.
+
 The fleet sweep (j2, commit `6a4d8ab`) re-ran all four devices at commit
 `234807d` with clean trees, governor=performance, and `OMP_NUM_THREADS=1`.
 This resolves the provenance question that dominated earlier analysis:
@@ -872,12 +884,17 @@ This resolves the provenance question that dominated earlier analysis:
 | RK3588 little | t3 **0.55** vs t4 **0.72** | **1.31×** | same commit, clean, single-threaded |
 | Jetson | j1 **1.18** vs j2 **1.09** | **1.08×** | same commit, clean, single-threaded |
 
+> ⚠ **The following conclusion is superseded by the correction above.** The
+> "genuine hardware effect" claim is not supported because t3 ran 8-thread
+> while t4 ran 1-thread. See ob-mrd.12/14.
+
 **The RK3588 inter-board gap is a genuine hardware effect.** Even fully
 commit-matched and clean-tree, the two RK3588 boards disagree by 1.98× on the
 big cluster. t3 also shows higher run-to-run spread (29.9% vs t4's 12.0% on
 scan). The Jetson pair agrees within ~8%, in normal range. The root cause
-(thermal, silicon binning, or background load) is not determined here — but it
-is NOT a code-version artifact.
+(thermal, silicon binning, or background load) is not determined here — but
+it is NOT a code-version artifact. **See correction above: the gap is primarily
+a thread-count confound (ob-mrd.12/14).**
 
 **Optimization impact.** The multi-threaded optimized run (4-core OpenMP + NEON
 unrolling + bf16) on t4 reads 11.56 GiB/s scan vs 5.75 single-threaded — a
@@ -1449,20 +1466,14 @@ Data: `results/raw/rk3588-t4_big.csv` (kernel timings),
 Nano A57 (4× Cortex-A57 @ 1.479 GHz, Armv8.0 NEON, active fan cooling, Tegra
 210). The INA3221 power monitor is present on both boards at the same IIO path.
 
-### The j1 CSV is stale
+### The j1 CSV was stale — re-run at 148db31 (2026-08-07)
 
-j1's main benchmark CSV (`jetson-j1.csv`) was captured at commit `2c9ac9f` —
-**before** NEON double-width unrolling, bf16 vectorization, and OpenMP
-parallelization were added. j2's data is at commit `194e37c` (post-optimization).
-The fleet comparison table (§5b) already uses j2's single-threaded data for a
-fair cross-device comparison, but j1's stale CSV should be re-run when j1 is
-available with the current binary.
-
-**Impact on fleet table:** the j1 row (1.16/0.72/1.04 GiB/s) understates what
-the A57 achieves with optimized kernels. j2's single-threaded data (1.32/1.13/1.20
-GiB/s) is the accurate representation. The fleet conclusions (Pi 5 A76 beats
-Jetson A57 despite less bandwidth) are unaffected — the relative ordering holds
-regardless.
+j1's main benchmark CSV (`jetson-j1.csv`) was originally captured at commit
+`2c9ac9f` — **before** NEON double-width unrolling, bf16 vectorization, and
+OpenMP parallelization were added. It was re-run at commit `148db31` (dirty=false,
+4-thread, landed in `4ef46f8`) with the current optimized binary, resolving the
+staleness. The fleet comparison table (§5b) uses the clean single-threaded sweep
+(`jetson-j1-clean.csv` at `234807d`) for fair cross-device comparison.
 
 ### Energy efficiency: optimized kernels vs old kernels (single-threaded)
 
@@ -2491,6 +2502,39 @@ GPU. We wrote one from scratch, validated it bit-exact, and characterised
 its performance honestly — including the honest finding that on this
 particular GPU generation, the CPU wins. That honesty is what makes the O6
 result credible when it arrives.
+
+### Cross-validation on t4: open-source RustiCL/Panfrost stack (bead ob-q44.1)
+
+**Device:** t4 (RK3588, independent unit) · **Driver:** Mesa RustiCL 24.2.8 + panthor kernel
+**OpenCL:** 3.0 via `RUSTICL_ENABLE=panfrost` (no proprietary blob)
+
+The t3 results above used ARM's proprietary `libmali-g610-x11` blob (g13p0).
+On t4, the open-source Mesa RustiCL/Panfrost stack drives the same Mali-G610
+hardware via the `panthor` kernel module (not the older `panfrost` KMS driver).
+**All 87 validation tests pass bit-exact** on the open-source stack, confirming
+that the kernel correctness is driver-independent.
+
+The RustiCL stack does not support `CL_QUEUE_PROFILING_ENABLE` (returns
+`CL_INVALID_COMMAND_QUEUE`, err -35), so wall-clock timing via
+`clock_gettime(CLOCK_MONOTONIC)` is used instead of device profiling events.
+A profiling fallback was added to `gdn_gpu_bench.c` so the same binary works
+on both driver stacks.
+
+| Kernel | t4 GPU (RustiCL wall-clock) | t3 GPU (libmali profiling) |
+|--------|---------------------------|---------------------------|
+| `gdn_gated_scan` | 817 µs | 165 µs |
+| `gdn_cumdecay` | 819 µs | 44 µs |
+| `gdn_causal_dwconv1d` | 846 µs | 48 µs |
+| `gdn_delta_rule_decode` | 2363 µs | 290 µs |
+
+The ~5× latency gap is attributable to the RustiCL software compiler (LLVM
+SPIR-V → NIR) versus ARM's proprietary shader compiler, not a hardware
+difference (identical G610 silicon). This confirms the t3 conclusion that the
+G610 loses to the CPU for these kernels, and strengthens the "CPU-first"
+mapping (ADR 0005 / ob-o4g working hypothesis). The open-source stack being
+functional is itself notable: **the GPU GDN kernels require no proprietary
+drivers**, which is relevant for reproducibility and the open-source
+contribution criterion.
 
 ---
 

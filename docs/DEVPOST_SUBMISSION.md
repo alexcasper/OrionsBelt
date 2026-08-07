@@ -34,9 +34,10 @@ At 262K context on the 4B checkpoint, that difference is **23.95 GiB of RAM** �
 - **Cross-vendor NPU operator-coverage audit** — both CIX NOE and Rockchip RKNN reject GDN's variable-length recurrence (the "Loop" op). This generalizes: no current edge NPU compiler handles it
 - **GDN-2 vs GDN-1 comparison** — the decoupled gating in GDN-2 costs 1.2–1.5× at decode on big cores (2.2–2.4× on little), 2.2–2.7× at prefill
 - **Analytical memory model** decomposing weights, KV cache, and recurrent state at every context length
+- **End-to-end model decode** — C decode loop with row-sweep NEON GEMV + INT8 weight-only quantization: **10.6 tok/s (0.8B, A76)**, **2.45 tok/s (0.8B, A57)**, 1.84 tok/s (4B, A76), 0.51 tok/s (4B, A57). ~26× cumulative speedup over the Python/transformers baseline
 
 **What we did NOT achieve (stated honestly):**
-- End-to-end model-level tokens/sec — baseline measured at 0.09 tok/s (fp32, RK3588 A76, Qwen3.5-4B unoptimized reference decode loop); optimized inference deferred pending heterogeneous dispatch
+- Heterogeneous NPU/GPU/CPU dispatch — requires the Orion O6's GPU+NPU for a meaningful test; designed but not implemented
 - NPU acceleration — both vendors' compilers reject the recurrence (see above)
 - The target Orion O6 board did not arrive in time; all results are from the portable aarch64 fleet (Pi 5, RK3588, Jetson Nano)
 
@@ -109,7 +110,7 @@ GDN-2's decoupled erase/write gating costs **1.2–1.5× at decode** on big core
 
 ### Prerequisites
 
-- Any 64-bit Arm board (aarch64). Tested on: Raspberry Pi 5, RK3588, Jetson Nano, AWS Graviton
+- Any 64-bit Arm board (aarch64). Tested on: Raspberry Pi 5, RK3588, Jetson Nano
 - GCC ≥ 9 or Clang ≥ 10 (native compiler on the device)
 - Python 3.10+ for manifest/plot generation (optional)
 
@@ -142,7 +143,7 @@ No GPU, NPU, or proprietary SDK required. Full setup guide: [`docs/SETUP_PORTABL
 ### Reproducibility
 
 - Every measurement has a **provenance manifest** (git SHA, governor state, CPU topology, thermals)
-- 733 unit tests covering kernel correctness and schema conformance
+- 1636 unit tests covering kernel correctness and schema conformance
 - All figures are **regenerable** from committed CSVs (`bench/plots.py`, `scripts/generate_memory_plots.py`)
 - t3 benchmark data: commit `553a96e`, dirty=false, governor=performance, 30 repeats per kernel
 
@@ -167,7 +168,7 @@ Specifically:
 
 - **Repository:** https://github.com/alexcasper/OrionsBelt
 - **License:** Apache-2.0
-- **Findings (10 sections, 2175 lines):** [`docs/FINDINGS.md`](../docs/FINDINGS.md)
+- **Findings (35 sections, 3752 lines):** [`docs/FINDINGS.md`](../docs/FINDINGS.md)
 - **Comparison table:** [`results/figures/comparison_table.md`](../results/figures/comparison_table.md)
 - **Fleet bandwidth analysis:** [`results/figures/fleet_bandwidth_scaling.md`](../results/figures/fleet_bandwidth_scaling.md)
 - **Memory scaling figures:** [`results/figures/memory_comparison.md`](../results/figures/memory_comparison.md)
