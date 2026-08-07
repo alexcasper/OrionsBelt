@@ -1,3 +1,0 @@
-run_id,timestamp,git_sha,manifest_ref,device,engine_gdn,engine_full_attention,model_checkpoint,quantization,context_length,phase,metric_name,metric_component,value,unit,repeat_index,repeat_count,layer_class,notes
-rk3588-t4_e2e_def3f29,2026-08-07T00:52:30Z,def3f29,results/manifests/rk3588-t4_e2e.json,rk3588-t4,cpu,cpu,Qwen/Qwen3.5-4B,fp32,8,prefill,ttft_seconds,,11.764040,seconds,0,1,all,tokens=8;cluster=big
-rk3588-t4_e2e_def3f29,2026-08-07T00:52:30Z,def3f29,results/manifests/rk3588-t4_e2e.json,rk3588-t4,cpu,cpu,Qwen/Qwen3.5-4B,fp32,8,decode,decode_tokens_per_sec,,0.090000,tokens_per_sec,0,1,all,tokens=8;cluster=big
