@@ -53,7 +53,7 @@ def test_csv_header_from_existing_results():
     containing "_", intending to exclude sustained and power CSVs — but
     jetson-j2-sustained-optimized.csv is hyphen-separated, so it slipped through
     and failed for the right reason in the wrong place. results/raw/ legitimately
-    holds six different shapes, so detect the shape and assert accordingly.
+    holds seven different shapes, so detect the shape and assert accordingly.
     """
     import csv
 
@@ -73,10 +73,11 @@ def test_csv_header_from_existing_results():
         "gib_per_s_p50",
         "gflop_per_s_p50",
     }
-    # Markers that identify the other five CSV shapes; see scripts/validate_results.py.
+    # Markers that identify the other six CSV shapes; see scripts/validate_results.py.
     sustained_marker = "sustained_kernel"
     power_marker = "power_in_mw"
     layer_profile_marker = "layer_idx"  # bench/profile_layers.py (ob-c9k)
+    e2e_decode_marker = "tok_per_sec_mean"  # gdn_e2e_decode.c raw output (ob-mrd.8)
     delta_matmul_marker = "M"  # bench_gdn --delta-matmul mode (ob-8qt.1)
     result_row_columns = set(RESULT_ROW_COLUMNS)
 
@@ -93,6 +94,8 @@ def test_csv_header_from_existing_results():
             or delta_matmul_marker in cols
         ):
             continue  # different shape by design, not a conformance failure
+        if e2e_decode_marker in cols:
+            continue  # e2e decode raw CSV (simple format, converted by bench/convert_e2e_decode.py)
         if result_row_columns <= cols:
             continue  # model-level ResultRow schema (bench/schema.py), not a microbenchmark CSV
         missing = expected - cols
