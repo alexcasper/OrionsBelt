@@ -19,6 +19,8 @@
  * that was compiled in so results are never attributed to the wrong one.
  */
 
+#define _POSIX_C_SOURCE 200112L  /* clock_gettime, CLOCK_MONOTONIC */
+
 #include <math.h>
 #include <stdint.h>
 #include <stdio.h>

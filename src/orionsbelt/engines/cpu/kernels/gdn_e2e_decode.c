@@ -28,6 +28,8 @@
  *   ./gdn_e2e_decode --tokens 128           # human-readable
  *   ./gdn_e2e_decode --tokens 128 --csv     # CSV for fleet sweep
  */
+#define _POSIX_C_SOURCE 200112L  /* clock_gettime, posix_memalign, rand_r */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
