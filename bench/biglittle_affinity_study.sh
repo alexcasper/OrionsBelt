@@ -14,8 +14,16 @@
 
 set -euo pipefail
 
+# Clean up temp files on exit/interrupt
+_trap_cleanup() {
+    rm -f "$TMP_BIG" "$TMP_LITTLE" 2>/dev/null || true
+}
+trap _trap_cleanup EXIT
+
 REPEATS=30
 CSV_MODE=false
+TMP_BIG=""
+TMP_LITTLE=""
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -131,4 +139,8 @@ fi
 # Thermal after
 therm_after=$(cat /sys/class/thermal/thermal_zone0/temp 2>/dev/null || echo "N/A")
 echo "# thermal_after: $therm_after" >&2
-echo "# thermal_delta: $(( ${therm_after:-0} - ${therm_before:-0} ))" >&2
+if [[ "$therm_before" =~ ^[0-9]+$ ]] && [[ "$therm_after" =~ ^[0-9]+$ ]]; then
+    echo "# thermal_delta: $(( therm_after - therm_before ))" >&2
+else
+    echo "# thermal_delta: N/A" >&2
+fi
