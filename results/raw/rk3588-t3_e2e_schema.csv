@@ -1,3 +1,5 @@
 run_id,timestamp,git_sha,manifest_ref,device,engine_gdn,engine_full_attention,model_checkpoint,quantization,context_length,phase,metric_name,metric_component,value,unit,repeat_index,repeat_count,layer_class,notes
-rk3588-t3_e2e_a086a50,2026-08-06T20:03:45Z,a086a50,results/manifests/rk3588-t3_e2e.json,rk3588-t3,cpu,cpu,Qwen/Qwen3.5-4B,fp32,8,prefill,ttft_seconds,,13.315830,seconds,0,1,all,tokens=8;cluster=big
-rk3588-t3_e2e_a086a50,2026-08-06T20:03:45Z,a086a50,results/manifests/rk3588-t3_e2e.json,rk3588-t3,cpu,cpu,Qwen/Qwen3.5-4B,fp32,8,decode,decode_tokens_per_sec,,0.080000,tokens_per_sec,0,1,all,tokens=8;cluster=big
+rk3588-t3_e2e_2e752af,2026-08-07T02:02:51Z,2e752af,results/manifests/rk3588-t3_e2e.json,rk3588-t3,cpu,cpu,Qwen/Qwen3.5-4B,fp32,20,prefill,ttft_seconds,,0.962040,seconds,0,2,all,tokens=20;cluster=big
+rk3588-t3_e2e_2e752af,2026-08-07T02:02:51Z,2e752af,results/manifests/rk3588-t3_e2e.json,rk3588-t3,cpu,cpu,Qwen/Qwen3.5-4B,fp32,20,decode,decode_tokens_per_sec,,1.040000,tokens_per_sec,0,2,all,tokens=20;cluster=big
+rk3588-t3_e2e_2e752af,2026-08-07T02:02:51Z,2e752af,results/manifests/rk3588-t3_e2e.json,rk3588-t3,cpu,cpu,Qwen/Qwen3.5-4B,fp32,20,prefill,ttft_seconds,,0.966370,seconds,1,2,all,tokens=20;cluster=big
+rk3588-t3_e2e_2e752af,2026-08-07T02:02:51Z,2e752af,results/manifests/rk3588-t3_e2e.json,rk3588-t3,cpu,cpu,Qwen/Qwen3.5-4B,fp32,20,decode,decode_tokens_per_sec,,1.030000,tokens_per_sec,1,2,all,tokens=20;cluster=big

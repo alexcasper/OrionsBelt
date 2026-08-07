@@ -1,16 +1,19 @@
-/* End-to-end CPU decode loop for Qwen3.5-4B (bead ob-8qt.9).
+/* End-to-end CPU decode loop for Qwen3.5 (bead ob-8qt.9).
  *
  * Wires the optimized GDN kernels (gdn_sve.c, gdn_delta_matmul.c) into a
- * full forward pass: 24 GDN linear-attention layers + 8 full-attention layers
- * + 32 FFN blocks, measuring per-token wall-clock time and reporting
- * tokens/sec and first-token latency (TTFT).
+ * full forward pass over every GDN + full-attention layer + FFN block,
+ * measuring per-token wall-clock time and reporting tokens/sec, first-token
+ * latency (TTFT), and a coarse per-phase bottleneck breakdown.
  *
- * Shapes from src/orionsbelt/model/gdn_layer_info.py (4B config):
- *   hidden_size=2560  num_layers=32  (24 GDN + 8 full, pattern 8x(3 GDN,1 full))
- *   key_dim=2048  value_dim=4096  conv_dim=8192
- *   intermediate_size=9216  vocab_size=248320
- *   conv_kernel=4  num_key_heads=16  num_value_heads=32  head_dim=128
- *   full_attn: heads=16 head_dim=256 kv_heads=4
+ * Two verified checkpoints (src/orionsbelt/model/gdn_layer_info.py), selected
+ * at compile time (default 4B):
+ *   4B:   hidden=2560  layers=32 (24 GDN + 8 full, 8x(3 GDN,1 full))
+ *         key_dim=2048  value_dim=4096  conv_dim=8192  intermediate=9216
+ *         full_attn: heads=16 head_dim=256 kv_heads=4
+ *   0.8B: hidden=1024  layers=24 (18 GDN + 6 full, 6x(3 GDN,1 full))
+ *         key_dim=2048  value_dim=2048  conv_dim=6144  intermediate=3584
+ *         full_attn: heads=8  head_dim=256 kv_heads=2
+ * Both: vocab=248320  conv_kernel=4  num_key_heads=16  head_dim=128
  *
  * Weights are random (benchmark only — correctness is validated by the
  * per-kernel test suites). The point is to measure the kernel + memory
@@ -19,6 +22,7 @@
  * Build (native on any aarch64):
  *   cc -O3 -fopenmp -march=<isa> -static \
  *     gdn_sve.c gdn_delta_matmul.c gdn_e2e_decode.c -I. -o gdn_e2e_decode -lm
+ *   # add -DMODEL_08B for the 0.8B variant (build a separate binary)
  *
  * Run:
  *   ./gdn_e2e_decode --tokens 128           # human-readable
@@ -40,7 +44,29 @@ extern void gdn_gated_scan_f32(const float *g, const float *x, float *s, float *
 extern void gdn_causal_dwconv1d_f32(const float *in, const float *w, float *out,
                                     float *hist, size_t seq, size_t channels);
 
-/* ---- Qwen3.5-4B layer geometry ---- */
+/* ---- Qwen3.5 layer geometry ----
+ * Default is 4B. Build with -DMODEL_08B for the 0.8B variant (both verified
+ * against src/orionsbelt/model/gdn_layer_info.py). */
+#ifdef MODEL_08B
+#define MODEL_NAME   "Qwen3.5-0.8B"
+#define HIDDEN       1024
+#define NUM_LAYERS   24
+#define NUM_GDN      18
+#define NUM_FULL     6
+#define KEY_DIM      2048
+#define VALUE_DIM    2048
+#define CONV_DIM     6144
+#define INTER        3584
+#define VOCAB        248320
+#define CONV_K       4
+#define NUM_K_HEADS  16
+#define NUM_V_HEADS  16
+#define HEAD_DIM     128
+#define FULL_HEADS   8
+#define FULL_HEAD_DIM 256
+#define FULL_KV_HEADS 2
+#else
+#define MODEL_NAME   "Qwen3.5-4B"
 #define HIDDEN       2560
 #define NUM_LAYERS   32
 #define NUM_GDN      24
@@ -57,6 +83,7 @@ extern void gdn_causal_dwconv1d_f32(const float *in, const float *w, float *out,
 #define FULL_HEADS   16
 #define FULL_HEAD_DIM 256
 #define FULL_KV_HEADS 4
+#endif
 
 /* ---- Helpers ---- */
 static float *alloc_aligned(size_t n) {
@@ -82,24 +109,43 @@ static void fill_rand(float *buf, size_t n, unsigned *seed) {
 #endif
 
 static void gemv_neon(const float *a, const float *B, float *c, size_t K, size_t N) {
-    /* a is [K], B is [K x N] row-major, c is [N].
-     * Walk N in NEON-width strides, reduce over K. */
-    size_t j = 0;
-    for (; j + 4 <= N; j += 4) {
-        float32x4_t acc = vdupq_n_f32(0.0f);
+    /* a is [K], B is [K×N] row-major, c is [N].
+     *
+     * Row-sweep GEMV: K-outer, N-inner. Each row of B is accessed
+     * sequentially → ~100% cache-line utilization (vs 0.17% in the old
+     * column-sweep version that strides by N between consecutive K).
+     * Parallelized over N-tiles via OpenMP so all big cores participate.
+     *
+     * For N=9216 (4B FFN), the old version wasted 576× the memory bandwidth
+     * because it touched one float per 36 KB cache-line stride; this version
+     * touches every float in each contiguous row segment. */
+    const size_t TILE = 1024;  /* 4 KB output tile, stays in L1 */
+
+#pragma omp parallel for schedule(static)
+    for (size_t jt = 0; jt < N; jt += TILE) {
+        size_t tn = (jt + TILE <= N) ? TILE : (N - jt);
+        float *ct = c + jt;
+
+        /* Zero the output tile */
+        memset(ct, 0, tn * sizeof(float));
+
+        /* Sweep K — B row segments accessed sequentially */
         for (size_t k = 0; k < K; ++k) {
-            float32x4_t bk = vld1q_f32(B + k * N + j);
-            float32x4_t ak = vdupq_n_f32(a[k]);
-            acc = vfmaq_f32(acc, ak, bk);
+            float ak = a[k];
+            const float *Brow = B + k * N + jt;
+            size_t j = 0;
+#ifdef __ARM_NEON
+            float32x4_t akv = vdupq_n_f32(ak);
+            for (; j + 4 <= tn; j += 4) {
+                float32x4_t bk = vld1q_f32(Brow + j);
+                float32x4_t ck = vld1q_f32(ct + j);
+                ck = vfmaq_f32(ck, akv, bk);
+                vst1q_f32(ct + j, ck);
+            }
+#endif
+            for (; j < tn; ++j)
+                ct[j] += ak * Brow[j];
         }
-        vst1q_f32(c + j, acc);
-    }
-    /* Tail: remaining columns when N % 4 != 0 */
-    for (; j < N; ++j) {
-        float acc = 0.0f;
-        for (size_t k = 0; k < K; ++k)
-            acc += a[k] * B[k * N + j];
-        c[j] = acc;
     }
 }
 
@@ -126,6 +172,17 @@ static double now_us(void) {
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return (double)ts.tv_sec * 1e6 + ts.tv_nsec / 1e3;
 }
+
+/* ---- Bottleneck breakdown: coarse phase timing, reset before the measured
+ * loop and accumulated across every layer + token. Single-threaded caller
+ * only (main's decode loop), so plain globals are fine. */
+static double g_t_gdn_proj = 0;   /* GDN q/k/v projections */
+static double g_t_gdn_conv = 0;   /* causal depthwise conv1d */
+static double g_t_gdn_decay = 0;  /* cumulative decay */
+static double g_t_gdn_scan = 0;   /* gated delta-rule scan */
+static double g_t_gdn_oproj = 0;  /* GDN output projection */
+static double g_t_full = 0;       /* full-attention layers (whole) */
+static double g_t_ffn = 0;        /* FFN blocks (whole) */
 
 /* ---- Per-layer persistent state ---- */
 typedef struct {
@@ -172,13 +229,18 @@ static void gdn_layer_forward(const Weights *w, LayerState *st, const float *hid
     float *scanned = alloc_aligned(seq * VALUE_DIM);
     float *attn_out = alloc_aligned(seq * HIDDEN);
 
+    double t0;
+
     /* Q/K/V projections */
+    t0 = now_us();
     matmul(hidden_in, w->g_q_proj, q, seq, HIDDEN, KEY_DIM);
     matmul(hidden_in, w->g_k_proj, k, seq, HIDDEN, KEY_DIM);
     matmul(hidden_in, w->g_v_proj, v, seq, HIDDEN, VALUE_DIM);
+    g_t_gdn_proj += now_us() - t0;
 
     /* Project Q to conv_dim for depthwise conv */
     /* (Simplified: conv operates on CONV_DIM channels, we use first CONV_DIM of Q padded) */
+    t0 = now_us();
     for (size_t t = 0; t < seq; ++t) {
         size_t copy = KEY_DIM < CONV_DIM ? KEY_DIM : CONV_DIM;
         memcpy(conv_in + t * CONV_DIM, q + t * KEY_DIM, copy * sizeof(float));
@@ -190,6 +252,7 @@ static void gdn_layer_forward(const Weights *w, LayerState *st, const float *hid
     /* Copy conv output back to Q (first KEY_DIM channels) */
     for (size_t t = 0; t < seq; ++t)
         memcpy(q + t * KEY_DIM, conv_out + t * CONV_DIM, KEY_DIM * sizeof(float));
+    g_t_gdn_conv += now_us() - t0;
 
     /* Beta = SiLU(conv_out[:KEY_DIM]) * g_beta — simplified to just beta projection */
     for (size_t t = 0; t < seq; ++t)
@@ -197,14 +260,20 @@ static void gdn_layer_forward(const Weights *w, LayerState *st, const float *hid
             beta[t * KEY_DIM + c] = w->g_beta[c];
 
     /* Cumulative decay: decay[t] = prod_{i<=t} beta[i] */
+    t0 = now_us();
     gdn_cumdecay_f32(beta, decay, seq, KEY_DIM);
+    g_t_gdn_decay += now_us() - t0;
 
     /* Delta-rule update: S = S + (v - S*k^T) * decay * k
      * Simplified to gated_scan with decay as gate */
+    t0 = now_us();
     gdn_gated_scan_f32(decay, v, scanned, st->gdn_state, seq, VALUE_DIM);
+    g_t_gdn_scan += now_us() - t0;
 
     /* Output projection */
+    t0 = now_us();
     matmul(scanned, w->g_o_proj, attn_out, seq, VALUE_DIM, HIDDEN);
+    g_t_gdn_oproj += now_us() - t0;
 
     /* Residual */
     for (size_t i = 0; i < seq * HIDDEN; ++i)
@@ -331,14 +400,14 @@ int main(int argc, char **argv) {
     float *hidden = alloc_aligned(HIDDEN);
     float *hidden_next = alloc_aligned(HIDDEN);
 
-    /* Determine layer types: 8 blocks of (3 GDN, 1 full) */
+    /* Determine layer types: NUM_LAYERS/4 blocks of (3 GDN, 1 full) */
     int is_gdn[NUM_LAYERS];
-    for (int b = 0; b < 8; ++b)
+    for (int b = 0; b < NUM_LAYERS / 4; ++b)
         for (int s = 0; s < 4; ++s)
             is_gdn[b * 4 + s] = (s < 3) ? 1 : 0;
 
     if (!csv) {
-        printf("Qwen3.5-4B CPU decode benchmark\n");
+        printf(MODEL_NAME " CPU decode benchmark\n");
         printf("  layers=%d (GDN=%d, full=%d), hidden=%d\n", NUM_LAYERS, NUM_GDN, NUM_FULL, HIDDEN);
         printf("  tokens=%d\n\n", num_tokens);
     }
@@ -361,6 +430,10 @@ int main(int argc, char **argv) {
         memset(states[l].gdn_state, 0, VALUE_DIM * sizeof(float));
         memset(states[l].conv_hist, 0, (CONV_K - 1) * CONV_DIM * sizeof(float));
     }
+    /* Warmup also touched the phase timers — zero them so the breakdown only
+     * reflects the measured tokens below. */
+    g_t_gdn_proj = g_t_gdn_conv = g_t_gdn_decay = g_t_gdn_scan = g_t_gdn_oproj = 0;
+    g_t_full = g_t_ffn = 0;
 
     /* Measured decode loop */
     double *tok_times = malloc(num_tokens * sizeof(double));
@@ -371,11 +444,16 @@ int main(int argc, char **argv) {
         double tok_start = now_us();
 
         for (int l = 0; l < NUM_LAYERS; ++l) {
-            if (is_gdn[l])
+            if (is_gdn[l]) {
                 gdn_layer_forward(&w, &states[l], hidden, hidden_next, 1);
-            else
+            } else {
+                double t0 = now_us();
                 full_attn_layer_forward(&w, &states[l], hidden, hidden_next, 1);
+                g_t_full += now_us() - t0;
+            }
+            double t0 = now_us();
             ffn_forward(&w, hidden_next, hidden, 1);
+            g_t_ffn += now_us() - t0;
             float *tmp = hidden; hidden = hidden_next; hidden_next = tmp;
         }
 
@@ -400,10 +478,23 @@ int main(int argc, char **argv) {
     double tok_per_sec = 1e6 / mean_us;
     double ttft_ms = ttft_us / 1e3;
 
+    /* Bottleneck breakdown: phase totals as a fraction of summed measured time.
+     * Note this sums to slightly more than the wall-clock decode time on some
+     * boards because of scheduling noise between now_us() calls — treat as
+     * relative proportions, not an exact partition. */
+    double phase_sum = g_t_gdn_proj + g_t_gdn_conv + g_t_gdn_decay + g_t_gdn_scan
+                      + g_t_gdn_oproj + g_t_full + g_t_ffn;
+
     if (csv) {
-        printf("model,tokens,ttft_ms,tok_per_sec_mean,p50_us,p95_us,p99_us,mean_us\n");
-        printf("Qwen3.5-4B,%d,%.2f,%.2f,%.0f,%.0f,%.0f,%.0f\n",
-               num_tokens, ttft_ms, tok_per_sec, p50, p95, p99, mean_us);
+        printf("model,tokens,ttft_ms,tok_per_sec_mean,p50_us,p95_us,p99_us,mean_us,"
+               "gdn_proj_pct,gdn_conv_pct,gdn_decay_pct,gdn_scan_pct,gdn_oproj_pct,full_pct,ffn_pct\n");
+        printf(MODEL_NAME ",%d,%.2f,%.2f,%.0f,%.0f,%.0f,%.0f,"
+               "%.1f,%.1f,%.1f,%.1f,%.1f,%.1f,%.1f\n",
+               num_tokens, ttft_ms, tok_per_sec, p50, p95, p99, mean_us,
+               100.0 * g_t_gdn_proj / phase_sum, 100.0 * g_t_gdn_conv / phase_sum,
+               100.0 * g_t_gdn_decay / phase_sum, 100.0 * g_t_gdn_scan / phase_sum,
+               100.0 * g_t_gdn_oproj / phase_sum, 100.0 * g_t_full / phase_sum,
+               100.0 * g_t_ffn / phase_sum);
     } else {
         printf("Results (%d tokens):\n", num_tokens);
         printf("  TTFT (first token):  %.2f ms\n", ttft_ms);
@@ -414,6 +505,21 @@ int main(int argc, char **argv) {
         printf("    p99:  %.0f us  (%.2f ms)\n", p99, p99 / 1e3);
         printf("    mean: %.0f us  (%.2f ms)\n", mean_us, mean_us / 1e3);
         printf("  Total wall time:     %.2f s\n", total_us / 1e6);
+        printf("  Bottleneck breakdown (share of summed measured phase time):\n");
+        printf("    GDN q/k/v proj:  %5.1f%%  (%.0f us/tok)\n",
+               100.0 * g_t_gdn_proj / phase_sum, g_t_gdn_proj / num_tokens);
+        printf("    GDN conv1d:      %5.1f%%  (%.0f us/tok)\n",
+               100.0 * g_t_gdn_conv / phase_sum, g_t_gdn_conv / num_tokens);
+        printf("    GDN cumdecay:    %5.1f%%  (%.0f us/tok)\n",
+               100.0 * g_t_gdn_decay / phase_sum, g_t_gdn_decay / num_tokens);
+        printf("    GDN gated_scan:  %5.1f%%  (%.0f us/tok)\n",
+               100.0 * g_t_gdn_scan / phase_sum, g_t_gdn_scan / num_tokens);
+        printf("    GDN out proj:    %5.1f%%  (%.0f us/tok)\n",
+               100.0 * g_t_gdn_oproj / phase_sum, g_t_gdn_oproj / num_tokens);
+        printf("    Full-attention:  %5.1f%%  (%.0f us/tok)\n",
+               100.0 * g_t_full / phase_sum, g_t_full / num_tokens);
+        printf("    FFN:             %5.1f%%  (%.0f us/tok)\n",
+               100.0 * g_t_ffn / phase_sum, g_t_ffn / num_tokens);
     }
 
     /* Cleanup */

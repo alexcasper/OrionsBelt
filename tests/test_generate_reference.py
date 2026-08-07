@@ -228,7 +228,9 @@ class TestContextLengths:
 class TestMain:
     def test_no_torch_returns_error(self, monkeypatch, capsys):
         """Without torch, main() returns 1 and prints an error."""
-        # torch is not installed on this device, so _TORCH_AVAILABLE is False
+        import scripts.generate_reference as gen
+
+        monkeypatch.setattr(gen, "_TORCH_AVAILABLE", False)
         rc = main([])
         assert rc == 1
         captured = capsys.readouterr()
@@ -236,11 +238,17 @@ class TestMain:
 
     def test_missing_model_path(self, monkeypatch, capsys):
         """When torch is not available, exits before checking model path."""
+        import scripts.generate_reference as gen
+
+        monkeypatch.setattr(gen, "_TORCH_AVAILABLE", False)
         rc = main(["--model-path", "/nonexistent/path"])
         assert rc == 1
 
-    def test_smoke_flag_still_fails_without_torch(self, capsys):
+    def test_smoke_flag_still_fails_without_torch(self, monkeypatch, capsys):
         """Smoke flag doesn't help without torch."""
+        import scripts.generate_reference as gen
+
+        monkeypatch.setattr(gen, "_TORCH_AVAILABLE", False)
         rc = main(["--smoke"])
         assert rc == 1
 

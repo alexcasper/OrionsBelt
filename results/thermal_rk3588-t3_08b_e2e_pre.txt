@@ -1,0 +1,12 @@
+# Pre-run thermal snapshot — e2e decode
+# Device: rk3588-t3_08b  Cluster: big
+# Git SHA: 7962968
+# Timestamp: 2026-08-07T02:03:11Z
+
+thermal_zone0 soc-thermal 44384
+thermal_zone1 bigcore0-thermal 44384
+thermal_zone2 bigcore1-thermal 44384
+thermal_zone3 littlecore-thermal 45307
+thermal_zone4 center-thermal 44384
+thermal_zone5 gpu-thermal 43461
+thermal_zone6 npu-thermal 44384
