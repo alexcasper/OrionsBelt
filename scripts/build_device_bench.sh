@@ -135,6 +135,51 @@ build_e2e_08b rk3588_a76  "-mcpu=cortex-a76"
 build_e2e_08b rk3588_a55  "-mcpu=cortex-a55"
 build_e2e_08b orion_a720  "-mcpu=cortex-a720"
 
+# INT8 weight-only quantization variant (-DINT8_WEIGHTS, ob-8qt.11)
+# Same kernels, weights stored as int8 + per-column float scale.
+build_e2e_int8() {
+    local name="$1" flags="$2"
+    if $CC -O3 -fopenmp $flags -static -DINT8_WEIGHTS \
+        -Wno-aggressive-loop-optimizations \
+        "$K/gdn_sve.c" "$K/gdn_delta_matmul.c" "$K/gdn_e2e_decode.c" \
+        -I"$K" -o "$OUT/bench_gdn_e2e_decode_${name}_int8" -lm 2>/dev/null; then
+        printf "  %-14s %-40s %s bytes\n" "e2e_${name}_int8" "$flags" \
+            "$(stat -c%s "$OUT/bench_gdn_e2e_decode_${name}_int8")"
+    else
+        printf "  %-14s %-40s SKIPPED\n" "e2e_${name}_int8" "$flags"
+    fi
+}
+
+# INT8 0.8B variant
+build_e2e_08b_int8() {
+    local name="$1" flags="$2"
+    if $CC -O3 -fopenmp $flags -static -DMODEL_08B -DINT8_WEIGHTS \
+        -Wno-aggressive-loop-optimizations \
+        "$K/gdn_sve.c" "$K/gdn_delta_matmul.c" "$K/gdn_e2e_decode.c" \
+        -I"$K" -o "$OUT/bench_gdn_e2e_decode_08b_${name}_int8" -lm 2>/dev/null; then
+        printf "  %-14s %-40s %s bytes\n" "e2e_08b_${name}_int8" "$flags" \
+            "$(stat -c%s "$OUT/bench_gdn_e2e_decode_08b_${name}_int8")"
+    else
+        printf "  %-14s %-40s SKIPPED\n" "e2e_08b_${name}_int8" "$flags"
+    fi
+}
+
+echo ""
+echo "E2E decode benchmarks (INT8 weight-only quantization, ob-8qt.11):"
+build_e2e_int8 armv8a      "-march=armv8-a"
+build_e2e_int8 jetson_a57  "-mcpu=cortex-a57"
+build_e2e_int8 pi5_a76     "-mcpu=cortex-a76"
+build_e2e_int8 rk3588_a76  "-mcpu=cortex-a76"
+build_e2e_int8 rk3588_a55  "-mcpu=cortex-a55"
+
+echo ""
+echo "E2E decode benchmarks (0.8B + INT8):"
+build_e2e_08b_int8 armv8a      "-march=armv8-a"
+build_e2e_08b_int8 jetson_a57  "-mcpu=cortex-a57"
+build_e2e_08b_int8 pi5_a76     "-mcpu=cortex-a76"
+build_e2e_08b_int8 rk3588_a76  "-mcpu=cortex-a76"
+build_e2e_08b_int8 rk3588_a55  "-mcpu=cortex-a55"
+
 cat <<'NOTE'
 
 Pick the most specific binary your device supports, then:
