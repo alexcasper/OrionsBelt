@@ -993,12 +993,12 @@ Prefill (Qwen3.5-4B, seq=64, single-threaded p50 µs):
 
 | Kernel | Jetson A57 | RK3588 A76 | RK3588 A55 |
 |---|---:|---:|---:|
-| cumdecay fp32 | 1800 | 271.0 | 1422.0 |
-| cumdecay f16-output | 1006 (1.45×) | **171.5 (1.58×)** | 932.2 (1.53×) |
-| cumdecay bf16-output | 1259 (1.42×) | **247.1 (1.10×)** | 970.1 (1.47×) |
-| gated_scan fp32 | 3925 | 559.5 | 3875.3 |
-| gated_scan f16-state | 3948 (1.00×) | 558.6 (1.00×) | 3642.6 (1.06×) |
-| gated_scan bf16-state | 3987 (1.00×) | 548.7 (1.02×) | 3665.6 (1.06×) |
+| cumdecay fp32 | 1800 | 264.0 | 1349.9 |
+| cumdecay f16-output | 1006 (1.45×) | **170.1 (1.55×)** | 882.6 (1.53×) |
+| cumdecay bf16-output | 1259 (1.42×) | **243.6 (1.08×)** | 963.2 (1.40×) |
+| gated_scan fp32 | 3925 | 522.4 | 3604.1 |
+| gated_scan f16-state | 3948 (1.00×) | 520.4 (1.00×) | 3588.9 (1.00×) |
+| gated_scan bf16-state | 3987 (1.00×) | 519.5 (1.01×) | 3578.7 (1.01×) |
 
 **Findings confirmed and refined cross-device:**
 
@@ -1007,7 +1007,7 @@ Prefill (Qwen3.5-4B, seq=64, single-threaded p50 µs):
 2. **fp16 output narrowing is a consistent, portable win** (1.45–1.59×): the A76's hardware fp16
    (`FCVTN`/`FCVTL`) makes the conversion single-cycle.
 3. **NEW — software bf16 conversion negates the bandwidth win on the fastest core.** On the A76,
-   cumdecay-bf16 drops to 1.10× (4B) and is *slower than fp32* at 0.8B (129.5 vs 124.0 µs): the
+   cumdecay-bf16 drops to 1.08× (4B) and is *slower than fp32* at 0.8B (129.5 vs 124.0 µs): the
    integer-NEON round-to-nearest-even conversion cost rivals the bytes saved. On the slower A55
    and A57, the bandwidth saving dominates so bf16 still wins (1.42–1.47×).
 
@@ -1016,8 +1016,8 @@ RK3588 big cluster) — **prefer fp16 over bf16** for narrowed state/output. bf1
 hardware support (Armv8.6-A+, e.g. Graviton / the O6's A720) or where the core is slow enough to
 amortize software conversion. The optimal narrow format is **core-class-dependent, not universal.**
 
-Raw CSVs: `results/raw/rk3588-t4_{big,little}_singlethread.csv`; manifest
-`results/manifests/rk3588-t4_mixedprec.json` (git SHA `aad6189`, governor=performance).
+Raw CSV: `results/raw/rk3588-t4-clean.csv` (A76 big cluster);
+manifest `results/manifests/rk3588-t4-clean.json` (git SHA `1ca4d6d`, clean tree, governor=performance).
 
 ### Decode-phase narrow-format penalty (ob-mrd.6)
 
@@ -1311,17 +1311,17 @@ pre/post hooks to measure wall-clock time per layer, broken down by type
 
 | Ctx | Full-Attn Total | GDN Total | Full/layer | GDN/layer | GDN % time | GDN/Full ratio |
 |----:|----------------:|----------:|-----------:|----------:|-----------:|---------------:|
-|  32 |         468,484 | 2,324,884 |     78,081 |   129,160 |      83.2% |          1.65× |
-|  64 |         675,950 | 3,080,169 |    112,658 |   171,120 |      82.0% |          1.52× |
-| 128 |         948,075 | 4,298,430 |    158,013 |   238,802 |      81.9% |          1.51× |
+|  32 |         459,124 | 2,278,540 |     76,521 |   126,586 |      83.2% |          1.65× |
+|  64 |         637,134 | 2,996,599 |    106,189 |   166,478 |      82.5% |          1.57× |
+| 128 |         874,444 | 4,303,867 |    145,741 |   239,104 |      83.1% |          1.64× |
 
 **Decode phase (p50 µs per layer, aggregated):**
 
 | Ctx | Full-Attn Total | GDN Total | Full/layer | GDN/layer | GDN % time | GDN/Full ratio |
 |----:|----------------:|----------:|-----------:|----------:|-----------:|---------------:|
-|  32 |         253,715 |   854,858 |     42,286 |    47,492 |      77.1% |          1.12× |
-|  64 |         292,420 |   876,000 |     48,737 |    48,667 |      75.0% |          1.00× |
-| 128 |         341,825 |   932,504 |     56,971 |    51,806 |      73.2% |          0.91× |
+|  32 |         276,224 |   908,732 |     46,037 |    50,485 |      76.7% |          1.10× |
+|  64 |         297,349 |   879,775 |     49,558 |    48,876 |      74.7% |          0.99× |
+| 128 |         323,483 |   944,877 |     53,914 |    52,493 |      74.5% |          0.97× |
 
 **Key findings:**
 
@@ -1330,14 +1330,14 @@ pre/post hooks to measure wall-clock time per layer, broken down by type
    full-attention layer during prefill, making them the primary optimization
    target for TTFT.
 
-2. **The crossover happens in decode**: at ctx=128, GDN per-layer cost
-   (51,806 µs) drops *below* full-attention (56,971 µs) — a 0.91× ratio.
+2. **The crossover happens in decode**: at ctx=64, GDN per-layer cost
+   (48,876 µs) drops *below* full-attention (49,558 µs) — a 0.99× ratio.
    This is because GDN recurrent state is O(1) (fixed-size, independent of
    context length), while full-attention KV cache grows linearly with ctx.
 
-3. **GDN decode cost is nearly flat**: 47,492 → 51,806 µs (9% increase)
+3. **GDN decode cost is nearly flat**: 50,485 → 52,493 µs (4% increase)
    across ctx 32→128, confirming the O(1) recurrent state hypothesis.
-   Full-attention decode grows 35% across the same range.
+   Full-attention decode grows 17% across the same range.
 
 4. **Implication for heterogeneous mapping**: During prefill, GDN layers
    are the bottleneck and should be prioritized for acceleration (NPU,
@@ -1381,12 +1381,12 @@ just as the recurrence does, so the ratio is constant.
 The standalone C kernels confirm the FLOP analysis empirically. At seq=64,
 channels=2048 (0.8B dimensions), the three sequential GDN kernels total ~205 µs
 (gated_scan: 125 µs, cumdecay: 33 µs, conv1d: 47 µs). The full GDN layer as
-profiled in PyTorch takes ~129,000 µs at ctx=32 — so the sequential kernels are
+profiled in PyTorch takes ~127,000 µs at ctx=32 — so the sequential kernels are
 under 0.2% of wall-clock layer time (with PyTorch dispatch overhead inflating
 the remainder).
 
 At decode (seq=1), all three sequential kernels complete in ~5.2 µs total on
-A76 — negligible against the ~47,000 µs per-layer decode cost, which is
+A76 — negligible against the ~50,500 µs per-layer decode cost, which is
 dominated by weight-loading for the projection matmuls.
 
 #### Memory traffic analysis (decode)
@@ -2620,7 +2620,7 @@ Files: `results/raw/rk3588-t3_e2e_raw.csv`, `results/raw/rk3588-t3_08b_e2e_raw.c
 **Governor:** performance
 **Beads:** ob-82b (microbenchmark), ob-7b5 (research note)
 **Data:** `results/raw/rk3588-t4_gdn2_vs_gdn1_big_single.csv`, `_little_single.csv` (single-thread, `OMP_NUM_THREADS=1`, manifest: `rk3588-t4-gdn2-single.json`)
-**Note:** Earlier CSVs (`_big.csv`, `_little.csv` dirty-tree; `_big_clean.csv`, `_little_clean.csv` multi-thread) are superseded. The multi-thread data had identical GDN-2/GDN-1 ratios (1.55× vs 1.57× single-thread) but inflated absolute GiB/s by ~2×.
+**Note:** Earlier multi-thread CSVs (removed) had identical GDN-2/GDN-1 ratios (1.55× vs 1.57× single-thread) but inflated absolute GiB/s by ~2×. The canonical single-thread data above supersedes them.
 
 ### Background
 

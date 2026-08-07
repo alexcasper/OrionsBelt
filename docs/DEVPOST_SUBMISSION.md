@@ -99,7 +99,7 @@ This is not a bug in one toolchain — it is an **architectural constraint** of 
 
 ### GDN-2 stretch comparison
 
-GDN-2's decoupled erase/write gating costs **1.2–1.5× at decode** on big cores (**2.2–2.4× on A55 little cores** where the in-order pipeline cannot hide extra arithmetic) and **2.2–2.7× at prefill** due to extra bandwidth streams.
+GDN-2's decoupled erase/write gating costs **1.2–1.5× at decode** on big cores (**2.2–2.4× on A55 little cores** where the in-order pipeline cannot hide extra arithmetic) and **2.2–2.7× at prefill** due to extra bandwidth streams. Full analysis: [`docs/research/ob-7b5-gdn2-edge-cost-research-note.md`](../research/ob-7b5-gdn2-edge-cost-research-note.md).
 
 ---
 

@@ -8,12 +8,11 @@ Run `python3 -m bench.plots results/raw/ --text-only --output-dir results/figure
 - [`rk3588-t3_big_table.md`](rk3588-t3_big_table.md) — Cortex-A76 (big cluster)
 - [`rk3588-t3_little_table.md`](rk3588-t3_little_table.md) — Cortex-A55 (little cluster)
 
-## RK3588 (t4, cross-check, dirty=true)
+## RK3588 (t4, cross-check, clean tree 1ca4d6d)
 
-- [`rk3588-t4_big_table.md`](rk3588-t4_big_table.md) — A76 optimized
-- [`rk3588-t4_big_singlethread_table.md`](rk3588-t4_big_singlethread_table.md) — A76 baseline
-- [`rk3588-t4_little_table.md`](rk3588-t4_little_table.md) — A55 optimized
-- [`rk3588-t4_little_singlethread_table.md`](rk3588-t4_little_singlethread_table.md) — A55 baseline
+- [`rk3588-t4-clean_table.md`](rk3588-t4-clean_table.md) — A76 big cluster (clean, single-thread)
+- [`rk3588-t4-little-clean_table.md`](rk3588-t4-little-clean_table.md) — A55 little cluster (clean, single-thread)
+- [`rk3588-t4-big-omp4_table.md`](rk3588-t4-big-omp4_table.md) — A76 4-thread OpenMP scaling
 
 ## Jetson Nano (Cortex-A57)
 
