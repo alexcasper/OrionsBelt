@@ -1208,6 +1208,8 @@ that saving is irrelevant if it increases per-token energy under load.
 `performance` governor. The `ondemand` comparison is documented to show the
 trade-off, not to suggest it as a recommended setting.
 
+**Data:** [`results/raw/jetson-j1_power_sustained.csv`](../results/raw/jetson-j1_power_sustained.csv) · [`cumdecay`](../results/raw/jetson-j1_power_sustained_cumdecay.csv) · [`dwconv1d`](../results/raw/jetson-j1_power_sustained_dwconv1d.csv) · manifest `jetson-j1_power.json` (timestamp 2026-08-03, governor=performance).
+
 ## Model-Level Benchmark: Qwen3.5-0.8B on RK3588 (ob-mrd.2)
 
 ### Three-Component Memory Decomposition — Confirmed on Real Model
@@ -2845,6 +2847,8 @@ numbers without a "sustained" caveat for this device class.
 Note: the O6 (Cortex-A720) may behave differently — it has higher peak
 power density. The thermal characterization should be repeated on O6 when
 hardware is available.
+
+**Data:** [`results/raw/rk3588-t4_sustained_thermal.txt`](../results/raw/rk3588-t4_sustained_thermal.txt) · manifest `rk3588-t4.json` (dirty tree, SHA `20b50c7`).
 
 ---
 
