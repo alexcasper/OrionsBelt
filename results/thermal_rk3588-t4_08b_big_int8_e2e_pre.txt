@@ -1,0 +1,12 @@
+# Pre-run thermal snapshot — e2e decode
+# Device: rk3588-t4_08b_big_int8  Cluster: big
+# Git SHA: 591232e
+# Timestamp: 2026-08-07T02:52:06Z
+
+thermal_zone0 package-thermal 41615
+thermal_zone1 bigcore0-thermal 41615
+thermal_zone2 bigcore2-thermal 41615
+thermal_zone3 littlecore-thermal 41615
+thermal_zone4 center-thermal 40692
+thermal_zone5 gpu-thermal 40692
+thermal_zone6 npu-thermal 40692
