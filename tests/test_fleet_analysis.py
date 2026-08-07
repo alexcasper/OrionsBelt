@@ -739,6 +739,7 @@ class TestPlotCrossDevice:
 
         Exercises the else branch of the cores-label if-chain (line 246).
         """
+        pytest.importorskip("matplotlib")
         csv_path = str(tmp_path / "mystery.csv")
         write_device_csv(csv_path, gib_overrides={"gdn_gated_scan": 2.0})
         monkeypatch.setattr(
