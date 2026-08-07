@@ -27,15 +27,15 @@ DEVICE = "rk3588-t3_big"
 # ---------------------------------------------------------------------------
 CONFIGS = [
     # (label, weight_quant, kv_quant, suffix)
-    ("FP32 weights + FP32 KV",  "fp32", "fp32", "fp32w_fp32kv"),
-    ("FP32 weights + INT8 KV",  "fp32", "int8", "fp32w_int8kv"),
-    ("INT8 weights + FP32 KV",  "int8", "fp32", "int8w_fp32kv"),
-    ("INT8 weights + INT8 KV",  "int8", "int8", "int8w_int8kv"),
+    ("FP32 weights + FP32 KV", "fp32", "fp32", "fp32w_fp32kv"),
+    ("FP32 weights + INT8 KV", "fp32", "int8", "fp32w_int8kv"),
+    ("INT8 weights + FP32 KV", "int8", "fp32", "int8w_fp32kv"),
+    ("INT8 weights + INT8 KV", "int8", "int8", "int8w_int8kv"),
 ]
 
 MODELS = [
     ("0.8B", "08b"),
-    ("4B",   "4b"),
+    ("4B", "4b"),
 ]
 
 
@@ -78,10 +78,7 @@ def generate_report(device, output_dir):
         # Load all 4 configs
         all_data = {}
         for _label, _wq, _kv, suffix in CONFIGS:
-            path = os.path.join(
-                "results", "raw",
-                f"{device}_ctx_sweep_{model_tag}_{suffix}.csv"
-            )
+            path = os.path.join("results", "raw", f"{device}_ctx_sweep_{model_tag}_{suffix}.csv")
             rows = read_csv(path)
             if rows:
                 all_data[suffix] = rows
@@ -172,11 +169,13 @@ def generate_report(device, output_dir):
             lines.append("")
             lines.append("| Metric | FP32 baseline | INT8 weights + INT8 KV | Improvement |")
             lines.append("|--------|--------------|------------------------|-------------|")
-            lines.append(f"| tok/s | {b_tps:.2f} | {o_tps:.2f} | **{o_tps/b_tps:.2f}×** |")
-            lines.append(f"| full-attn (µs) | {b_fa:.0f} | {o_fa:.0f} | **{b_fa/o_fa:.2f}×** |")
-            lines.append(f"| KV cache (MB) | {b_kv:.1f} | {o_kv:.1f} | **{b_kv/o_kv:.1f}×** |")
+            lines.append(f"| tok/s | {b_tps:.2f} | {o_tps:.2f} | **{o_tps / b_tps:.2f}×** |")
+            lines.append(f"| full-attn (µs) | {b_fa:.0f} | {o_fa:.0f} | **{b_fa / o_fa:.2f}×** |")
+            lines.append(f"| KV cache (MB) | {b_kv:.1f} | {o_kv:.1f} | **{b_kv / o_kv:.1f}×** |")
             if kv_only_fa > 0:
-                lines.append(f"| INT8 KV only full-attn speedup | — | {kv_only_fa:.0f} µs | **{b_fa/kv_only_fa:.2f}×** |")
+                lines.append(
+                    f"| INT8 KV only full-attn speedup | — | {kv_only_fa:.0f} µs | **{b_fa / kv_only_fa:.2f}×** |"
+                )
             lines.append("")
 
             # Degradation analysis
@@ -193,12 +192,18 @@ def generate_report(device, output_dir):
                     degrad_int8 = bs_tps / bl_tps if bl_tps > 0 else 0
 
                     lines.append(f"**Throughput degradation ctx=1→{max_ctx}:**")
-                    lines.append(f"- FP32 baseline: {short_tps:.2f}→{long_tps:.2f} = "
-                                 f"**{degrad_fp32:.2f}×** degradation")
-                    lines.append(f"- INT8 weights + INT8 KV: {bs_tps:.2f}→{bl_tps:.2f} = "
-                                 f"**{degrad_int8:.2f}×** degradation")
-                    lines.append(f"- INT8 KV reduces the context-length penalty by "
-                                 f"**{(1-degrad_int8/degrad_fp32)*100:.0f}%**")
+                    lines.append(
+                        f"- FP32 baseline: {short_tps:.2f}→{long_tps:.2f} = "
+                        f"**{degrad_fp32:.2f}×** degradation"
+                    )
+                    lines.append(
+                        f"- INT8 weights + INT8 KV: {bs_tps:.2f}→{bl_tps:.2f} = "
+                        f"**{degrad_int8:.2f}×** degradation"
+                    )
+                    lines.append(
+                        f"- INT8 KV reduces the context-length penalty by "
+                        f"**{(1 - degrad_int8 / degrad_fp32) * 100:.0f}%**"
+                    )
                     lines.append("")
 
         # GDN stays flat regardless
@@ -206,8 +211,10 @@ def generate_report(device, output_dir):
         if gdn_data:
             gdn_min = min(float(r["gdn_layer_us"]) for r in gdn_data)
             gdn_max = max(float(r["gdn_layer_us"]) for r in gdn_data)
-            lines.append(f"**GDN layer cost** (O(1), unaffected by KV quantization): "
-                         f"{gdn_min:.0f}–{gdn_max:.0f} µs/token across all context lengths")
+            lines.append(
+                f"**GDN layer cost** (O(1), unaffected by KV quantization): "
+                f"{gdn_min:.0f}–{gdn_max:.0f} µs/token across all context lengths"
+            )
             lines.append("")
 
     lines.append("## Key Takeaways")
@@ -217,13 +224,19 @@ def generate_report(device, output_dir):
     lines.append("   length because the KV cache read dominates at long sequences.")
     lines.append("")
     lines.append("2. **KV cache memory drops 4×** (FP32→INT8), directly extending the GDN O(1) vs")
-    lines.append("   full-attention O(n) comparison. At ctx=4096, 4B's KV cache shrinks from 256 MB")
+    lines.append(
+        "   full-attention O(n) comparison. At ctx=4096, 4B's KV cache shrinks from 256 MB"
+    )
     lines.append("   to 64 MB.")
     lines.append("")
     lines.append("3. **Combined INT8 (weights + KV) gives 1.8× overall speedup** at ctx=4096 vs")
-    lines.append("   the FP32 baseline, and significantly reduces the context-length throughput penalty.")
+    lines.append(
+        "   the FP32 baseline, and significantly reduces the context-length throughput penalty."
+    )
     lines.append("")
-    lines.append("4. **GDN layers remain O(1)** regardless of KV quantization — the recurrent state")
+    lines.append(
+        "4. **GDN layers remain O(1)** regardless of KV quantization — the recurrent state"
+    )
     lines.append("   is a fixed-size buffer, not a growing cache, so GDN's architectural advantage")
     lines.append("   is immune to quantization of the full-attention layers.")
     lines.append("")
@@ -237,10 +250,12 @@ def generate_report(device, output_dir):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--device", default=DEVICE,
-                        help="Device prefix for CSV files (default: %(default)s)")
-    parser.add_argument("--output-dir", default="results/figures",
-                        help="Output directory (default: %(default)s)")
+    parser.add_argument(
+        "--device", default=DEVICE, help="Device prefix for CSV files (default: %(default)s)"
+    )
+    parser.add_argument(
+        "--output-dir", default="results/figures", help="Output directory (default: %(default)s)"
+    )
     args = parser.parse_args()
     generate_report(args.device, args.output_dir)
 
