@@ -172,11 +172,11 @@ All figures above are verified against primary sources (Radxa product page and d
 | INT8 KV cache quantization | Done — 1.7–2.6× full-attn speedup at long context, 4× KV memory reduction. [§20](./docs/FINDINGS.md) |
 | Sustained-load thermal characterization | Done — 0.3% throughput decay over 94s on RK3588 (§18) |
 | Track decision: Edge AI | Done — [ADR 0007](./docs/adr/0007-commit-to-edge-ai-track.md) |
-| Model survey / selection (`docs/MODEL_SURVEY.md`) | In progress |
+| Model survey / selection (`docs/MODEL_SURVEY.md`) | Done |
 | Orion O6 board bring-up | **Pending** — board not yet in hand |
 | CIX Early Bird SDK / NPU toolchain access | **Pending** — not yet approved |
 | Per-layer engine mapping (NPU/GPU/CPU) | Hypothesis only — pending measurements |
-| Full inference results (tokens/sec, TTFT, memory) | Partial — C decode loop on A57 + RK3588, ctx-length scaling proven (§17–20), [e2e comparison](./results/figures/e2e_fleet_comparison.md) |
+| Full inference results (tokens/sec, TTFT, memory) | Done — C decode loop (FP32+INT8), ctx-length scaling (§17–20), cross-device (A57+A76), sustained-load thermal stability (§18). [e2e comparison](./results/figures/e2e_fleet_comparison.md) |
 
 > **Results so far:** 119 CSVs from the device fleet, 84 provenance manifests, 76 generated figures/tables, 35 FINDINGS sections.
 >
