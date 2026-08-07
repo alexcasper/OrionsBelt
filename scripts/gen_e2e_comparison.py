@@ -242,32 +242,47 @@ def main():
     lines.append("")
 
     # ---- Cross-device scaling ----
-    lines.append("## Cross-device scaling (0.8B)")
+    lines.append("## Cross-device scaling (matched GEMV code)")
     lines.append("")
 
-    # Find A57 and A76 0.8B numbers
-    a57_08b = None
-    a76_08b = None
-    for (device, model), rows in groups.items():
-        if "0.8B" not in model:
-            continue
-        toks = [r["tok_per_sec_mean"] for r in rows if "tok_per_sec_mean" in r]
-        avg = sum(toks) / len(toks) if toks else 0
-        if "jetson" in device:
-            a57_08b = avg
-        elif "rk3588" in device:
-            a76_08b = avg
+    # Collect A57 and A76 numbers for each model
+    def get_avg_tok(device_pat, model_pat):
+        """Average tok/s across all matching device/model groups."""
+        vals = []
+        for (dev, mdl), rows in groups.items():
+            if device_pat in dev and model_pat in mdl:
+                vals.extend(r["tok_per_sec_mean"] for r in rows
+                            if "tok_per_sec_mean" in r)
+        return sum(vals) / len(vals) if vals else None
+
+    a57_08b = get_avg_tok("jetson", "0.8B")
+    a76_08b = get_avg_tok("rk3588", "0.8B")
+    a57_4b  = get_avg_tok("jetson", "4B")
+    # For A76 4B, exclude t4 (pre-GEMV baseline) — use t3 only
+    a76_4b  = None
+    for (dev, mdl), rows in groups.items():
+        if "rk3588-t3 " in dev + " " and "4B" in mdl and "0.8B" not in mdl:
+            toks = [r["tok_per_sec_mean"] for r in rows if "tok_per_sec_mean" in r]
+            a76_4b = sum(toks) / len(toks) if toks else None
 
     if a57_08b and a76_08b:
-        ratio = a76_08b / a57_08b
-        lines.append(f"| Metric | Cortex-A57 (Jetson) | Cortex-A76 (RK3588) | A76/A57 ratio |")
-        lines.append(f"|--------|---------------------|---------------------|---------------|")
-        lines.append(f"| 0.8B tok/s | {a57_08b:.2f} | {a76_08b:.2f} | {ratio:.1f}× |")
+        r08 = a76_08b / a57_08b if a57_08b else 0
+        r4  = a76_4b / a57_4b if (a76_4b and a57_4b) else 0
+        lines.append("| Metric | Cortex-A57 (Jetson) | Cortex-A76 (RK3588) | A76/A57 |")
+        lines.append("|--------|---------------------|---------------------|---------|")
+        lines.append(f"| 0.8B tok/s | {a57_08b:.2f} | {a76_08b:.2f} | {r08:.1f}× |")
+        if a57_4b and a76_4b:
+            lines.append(f"| 4B tok/s | {a57_4b:.2f} | {a76_4b:.2f} | {r4:.1f}× |")
         lines.append(f"| 0.8B TTFT (s) | ~0.37 | ~0.125 | {0.37/0.125:.1f}× |")
+        if a57_4b and a76_4b:
+            lines.append(f"| 4B TTFT (s) | ~2.3 | ~0.96 | {2.3/0.96:.1f}× |")
         lines.append("")
-        lines.append(f"The A76 is {ratio:.1f}× faster than the A57 on the 0.8B model. This is")
-        lines.append(f"consistent with the ~1.6× clock advantage (2.4 vs 1.48 GHz) plus the A76's")
-        lines.append(f"wider pipeline and better NEON throughput (2× FMA/cycle vs A57's 1×).")
+        lines.append("The A76 is 2.4–3.0× faster than the A57, consistent with the ~1.6× clock")
+        lines.append("advantage (2.4 vs 1.48 GHz) plus the A76's wider pipeline (2× FMA/cycle")
+        lines.append("vs A57's 1×). The 4B ratio is smaller because the larger working set pushes")
+        lines.append("both cores closer to DRAM bandwidth limits.")
+        lines.append("")
+        lines.append("> t4 (pre-GEMV baseline) excluded from this comparison. A76 4B = t3 only.")
         lines.append("")
 
     # ---- Methodology ----

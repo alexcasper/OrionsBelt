@@ -54,16 +54,21 @@ Phase timing as share of total (from per-phase instrumentation in the C binary).
 - **0.8B is practical on low-end edge:** the A57 achieves 2.7 tok/s on 0.8B,
   making it deployable for real-time assistance on passively-cooled hardware.
 
-## Cross-device scaling (0.8B)
+## Cross-device scaling (matched GEMV code)
 
-| Metric | Cortex-A57 (Jetson) | Cortex-A76 (RK3588) | A76/A57 ratio |
-|--------|---------------------|---------------------|---------------|
+| Metric | Cortex-A57 (Jetson) | Cortex-A76 (RK3588) | A76/A57 |
+|--------|---------------------|---------------------|---------|
 | 0.8B tok/s | 2.70 | 7.98 | 3.0× |
+| 4B tok/s | 0.43 | 1.04 | 2.4× |
 | 0.8B TTFT (s) | ~0.37 | ~0.125 | 3.0× |
+| 4B TTFT (s) | ~2.3 | ~0.96 | 2.4× |
 
-The A76 is 3.0× faster than the A57 on the 0.8B model. This is
-consistent with the ~1.6× clock advantage (2.4 vs 1.48 GHz) plus the A76's
-wider pipeline and better NEON throughput (2× FMA/cycle vs A57's 1×).
+The A76 is 2.4–3.0× faster than the A57, consistent with the ~1.6× clock
+advantage (2.4 vs 1.48 GHz) plus the A76's wider pipeline (2× FMA/cycle
+vs A57's 1×). The 4B ratio is smaller because the larger working set pushes
+both cores closer to DRAM bandwidth limits.
+
+> t4 (pre-GEMV baseline) excluded from this comparison. A76 4B = t3 only.
 
 ## Methodology
 
