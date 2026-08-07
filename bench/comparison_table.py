@@ -12,6 +12,12 @@ Usage::
 
     python3 -m bench.comparison_table results/raw/*.csv
     python3 -m bench.comparison_table --csv results/raw/run1.csv results/raw/run2.csv
+
+.. warning::
+
+    ``results/figures/comparison_table.md`` is a **hand-curated** file with
+    analytical commentary. This script's ``--output`` guard refuses to
+    overwrite it. Write auto-generated output to a different filename.
 """
 
 from __future__ import annotations
@@ -21,6 +27,10 @@ import sys
 from collections import defaultdict
 from collections.abc import Sequence
 from pathlib import Path
+
+# Sentinel: this filename in a figures/ directory is hand-curated (234 lines,
+# 8 analytical sections). The auto-generated table must never overwrite it.
+_CURATED_TABLE_FILENAME = "comparison_table.md"
 
 # Ensure repo root is importable
 _ROOT = str(Path(__file__).resolve().parent.parent)
@@ -176,7 +186,18 @@ def main(argv: list[str] | None = None) -> int:
     table = generate_comparison(csv_paths)
 
     if args.output:
-        Path(args.output).write_text(table + "\n", encoding="utf-8")
+        out = Path(args.output)
+        if out.name == _CURATED_TABLE_FILENAME and "figures" in out.parts:
+            print(
+                "ERROR: refusing to overwrite results/figures/comparison_table.md\n"
+                "       This file is hand-curated with 8 analytical sections and is\n"
+                "       referenced from docs/FINDINGS.md. The auto-generated table is a\n"
+                "       different artifact. Use a different filename, e.g.:\n"
+                "         --output results/figures/comparison_table_auto.md",
+                file=sys.stderr,
+            )
+            return 1
+        out.write_text(table + "\n", encoding="utf-8")
         print(f"  Table written to {args.output}")
     else:
         print(table)
