@@ -105,7 +105,7 @@ fi
 echo "[6/8] Key deliverable files"
 for f in \
     README.md \
-    PLAN.md \
+    docs/archive/PLAN.md \
     LICENSE \
     docs/FINDINGS.md \
     docs/CLAIM_VERIFICATION.md \
