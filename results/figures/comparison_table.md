@@ -137,3 +137,43 @@ Qwen3.5-4B at 100 GB/s (O6 LPDDR5 spec; RK3588 shared pool is 34 GiB/s per clust
 > overhead, no cache effects). Real throughput will be lower. The point is the scaling: INT4
 > quantization roughly doubles decode throughput versus fp16 because it halves the dominant
 > weight-traffic cost. The GDN recurrent state (51 MiB) is negligible at every precision.
+
+## 7. End-to-end model decode: tokens/sec (measured)
+
+Qwen3.5-4B, fp32, A76 big cluster (cpu4-7), governor=performance, 8 decode tokens.
+
+| Device | tok/s | TTFT (s) | Git SHA | Manifest |
+|---|---:|---:|---|---|
+| rk3588-t3 | 0.08 | 13.32 | `a086a50` | `rk3588-t3_e2e.json` |
+| rk3588-t4 | 0.09 | 11.76 | `def3f29` | `rk3588-t4_e2e.json` |
+
+> This is the model-level headline number: a full Qwen3.5-4B forward pass through
+> all 32 layers (24 GDN + 8 full-attention) with the optimized GDN kernels. The
+> two boards agree within 12%, which is expected given the cross-board gap (§1).
+> t4 is slightly faster at e2e despite slower kernel-level throughput — likely
+> because the e2e binary exercises different code paths (full matmul/FFN blocks
+> where t4's higher clock helps). At fp32 on RK3588, 0.09 tok/s = ~11 s/token is
+> too slow for interactive use but establishes the CPU-only baseline against
+> which INT4 quantization and heterogeneous dispatch must improve. See FINDINGS.md
+> §"End-to-end Qwen3.5-0.8B tokens/sec" for the 0.8B variant (0.47 tok/s).
+>
+> **Context:** the analytical ceiling (§6) predicts ≈12 tok/s at fp16 on a
+> 100 GB/s bus — we are 130× below that ceiling because the current decode loop
+> is unoptimized reference code. This gap is the optimization opportunity the
+> project targets.
+
+## 8. OpenMP multi-threading scaling (t4)
+
+Qwen3.5-4B, prefill (seq=64), fp32, A76 big cluster.
+
+| Config | gated_scan GiB/s | vs single-thread |
+|---|---:|---:|
+| Single-thread | 5.67 | 1.00× |
+| 4-thread OpenMP | 11.04 | **1.95×** |
+
+> Source: `rk3588-t4-clean.csv` (single) vs `rk3588-t4-big-omp4.csv` (OMP).
+> The 1.95× scaling (not the ideal 4×) reflects the sequential nature of the
+> delta-rule recurrence: channels are parallelizable, but the per-channel scan
+> is serial. Amdahl's law limits the speedup to the fraction of work that
+> parallelizes across channels. This is consistent with the instruction-overhead
+> bottleneck identified in FINDINGS.md.
