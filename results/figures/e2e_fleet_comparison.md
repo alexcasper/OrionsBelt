@@ -15,8 +15,8 @@
 | rk3588-t3_08b | Cortex-A76 @2.4 GHz ×4 (big) | Qwen3.5-0.8B | `7962968` | GEMV + 0.8B variant | [rk3588-t3_08b_e2e.json](../../results/manifests/rk3588-t3_08b_e2e.json) |
 | jetson-j1_08b | Cortex-A57 @1.48 GHz ×4 | Qwen3.5-0.8B | `2896dd0` | GEMV row-sweep + 0.8B variant | [jetson-j1_08b_e2e.json](../../results/manifests/jetson-j1_08b_e2e.json) |
 | rk3588-t3 | Cortex-A76 @2.4 GHz ×4 (big) | Qwen3.5-4B | `2e752af` | GEMV row-sweep optimized | [rk3588-t3_e2e.json](../../results/manifests/rk3588-t3_e2e.json) |
+| jetson-j1 | Cortex-A57 @1.48 GHz ×4 | Qwen3.5-4B | `b85fab1` | GEMV row-sweep + 0.8B variant | [jetson-j1_e2e.json](../../results/manifests/jetson-j1_e2e.json) |
 | rk3588-t4 | Cortex-A76 @2.4 GHz ×4 (big) | Qwen3.5-4B | `def3f29` | PRE-GEMV-opt (column-sweep GEMV) | [rk3588-t4_e2e.json](../../results/manifests/rk3588-t4_e2e.json) |
-| jetson-j1 | Cortex-A57 @1.48 GHz ×4 | Qwen3.5-4B | `a8b5195` | pre-GEMV-opt | [jetson-j1_e2e.json](../../results/manifests/jetson-j1_e2e.json) |
 
 > **⚠ Cross-commit comparison:** some devices ran at different commits.
 > The GEMV row-sweep optimization (commit `2e752af` on t3) delivered ~12×
@@ -29,8 +29,8 @@
 | rk3588-t3_08b (Cortex-A76) | Qwen3.5-0.8B | 2 | 0.125 | 0.125–0.125 | 7.98 | 7.97–7.99 | 1.00× |
 | jetson-j1_08b (Cortex-A57) | Qwen3.5-0.8B | 3 | 0.375 | 0.364–0.375 | 2.69 | 2.68–2.72 | 1.03× |
 | rk3588-t3 (Cortex-A76) | Qwen3.5-4B | 2 | 0.964 | 0.962–0.966 | 1.04 | 1.03–1.04 | 1.00× |
+| jetson-j1 (Cortex-A57) | Qwen3.5-4B | 3 | 2.321 | 2.317–2.328 | 0.43 | 0.43 | 1.00× |
 | rk3588-t4 (Cortex-A76) | Qwen3.5-4B | 1 | 11.764 | 11.764 | 0.09 | 0.09 | 1.00× |
-| jetson-j1 (Cortex-A57) | Qwen3.5-4B | 3 | 44.159 | 41.421–47.777 | 0.02 | 0.02 | 1.15× |
 
 ## Bottleneck breakdown
 
@@ -41,8 +41,8 @@ Phase timing as share of total (from per-phase instrumentation in the C binary).
 | rk3588-t3_08b | Qwen3.5-0.8B | 54.1% | 29.9% | 8.2% | 7.5% | 0.3% | 0.0% | 0.0% |
 | jetson-j1_08b | Qwen3.5-0.8B | 55.9% | 24.5% | 10.5% | 8.3% | 0.7% | 0.1% | 0.1% |
 | rk3588-t3 | Qwen3.5-4B | 72.4% | 13.8% | 8.1% | 5.6% | 0.1% | 0.0% | 0.0% |
+| jetson-j1 | Qwen3.5-4B | 69.9% | 15.0% | 7.9% | 7.1% | 0.1% | 0.0% | 0.0% |
 | rk3588-t4 | Qwen3.5-4B | — | — | — | — | — | — | — |
-| jetson-j1 | Qwen3.5-4B | — | — | — | — | — | — | — |
 
 **Key findings:**
 - **FFN dominates** (54–72% across all device/model combos) — the model is

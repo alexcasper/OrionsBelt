@@ -1,11 +1,11 @@
 # Pre-run thermal snapshot — e2e decode
 # Device: jetson-j1  Cluster: all
-# Git SHA: a8b5195
-# Timestamp: 2026-08-07T01:39:31Z
+# Git SHA: b85fab1
+# Timestamp: 2026-08-07T02:31:11Z
 
-thermal_zone0 AO-therm 53000
-thermal_zone1 CPU-therm 47500
-thermal_zone2 GPU-therm 47000
-thermal_zone3 PLL-therm 45000
+thermal_zone0 AO-therm 51500
+thermal_zone1 CPU-therm 46500
+thermal_zone2 GPU-therm 45500
+thermal_zone3 PLL-therm 43500
 thermal_zone4 PMIC-Die 50000
-thermal_zone5 thermal-fan-est 47250
+thermal_zone5 thermal-fan-est 45750

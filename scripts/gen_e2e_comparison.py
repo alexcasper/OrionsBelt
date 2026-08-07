@@ -31,7 +31,8 @@ CPU_CLASS = {
 
 # Commit notes — explain WHY different commits
 COMMIT_NOTES = {
-    "a8b5195": "pre-GEMV-opt",
+    "a8b5195": "STALE: pre-GEMV binary (20x too slow — see §14 correction)",
+    "b85fab1": "GEMV row-sweep + 0.8B variant",
     "2e752af": "GEMV row-sweep optimized",
     "7962968": "GEMV + 0.8B variant",
     "def3f29": "PRE-GEMV-opt (column-sweep GEMV)",
