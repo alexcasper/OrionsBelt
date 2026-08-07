@@ -208,10 +208,14 @@ def _check_commit_lineage(base_commit, commits):
             continue
 
         # Check ancestry
-        is_ancestor = subprocess.run(
-            ["git", "merge-base", "--is-ancestor", full_base, resolved],
-            capture_output=True, cwd=REPO_ROOT
-        ).returncode == 0
+        is_ancestor = (
+            subprocess.run(
+                ["git", "merge-base", "--is-ancestor", full_base, resolved],
+                capture_output=True,
+                cwd=REPO_ROOT,
+            ).returncode
+            == 0
+        )
 
         if not is_ancestor:
             results[sha] = {"status": "pre-matched", "detail": "pre-dates base commit"}
@@ -221,8 +225,14 @@ def _check_commit_lineage(base_commit, commits):
         changed = _run(["git", "diff", "--name-only", full_base, resolved]).strip().splitlines()
 
         # Files that affect the benchmark binary or kernel
-        kernel_patterns = ("bench/gdn_", "bench/bench_gdn", "src/", "include/",
-                           "scripts/build_device_bench", "scripts/run_e2e_decode")
+        kernel_patterns = (
+            "bench/gdn_",
+            "bench/bench_gdn",
+            "src/",
+            "include/",
+            "scripts/build_device_bench",
+            "scripts/run_e2e_decode",
+        )
         kernel_changes = [f for f in changed if any(p in f for p in kernel_patterns)]
 
         if kernel_changes:
