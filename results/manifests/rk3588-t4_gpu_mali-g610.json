@@ -1,8 +1,8 @@
 {
   "caller": {},
   "git": {
-    "dirty": true,
-    "sha": "e6aea702439a4fedd45db3cffd2a3310495406b7"
+    "dirty": false,
+    "sha": "f98a2ff2e0e72d62e1827961ac2134d97215f7d4"
   },
   "host": {
     "core_count": 8,
@@ -80,7 +80,7 @@
   },
   "manifest_version": 1,
   "memory": {
-    "mem_available_kb": 4684052,
+    "mem_available_kb": 4960264,
     "mem_total_kb": 8120248
   },
   "parallelism": {
@@ -90,7 +90,7 @@
     "omp_proc_bind": null,
     "threads_source": "core_count_default"
   },
-  "run_id": "t4_20260807T111442Z_e6aea70",
+  "run_id": "t4_20260807T114030Z_f98a2ff",
   "software": {
     "packages": {
       "numpy": "2.5.1",
@@ -103,42 +103,42 @@
   },
   "thermal_zones": [
     {
-      "temp_millicelsius": 42538,
+      "zone": "thermal_zone0",
       "type": "package-thermal",
-      "zone": "thermal_zone0"
+      "temp_millicelsius": 39769
     },
     {
-      "temp_millicelsius": 42538,
+      "zone": "thermal_zone1",
       "type": "bigcore0-thermal",
-      "zone": "thermal_zone1"
+      "temp_millicelsius": 38846
     },
     {
-      "temp_millicelsius": 42538,
+      "zone": "thermal_zone2",
       "type": "bigcore2-thermal",
-      "zone": "thermal_zone2"
+      "temp_millicelsius": 38846
     },
     {
-      "temp_millicelsius": 42538,
+      "zone": "thermal_zone3",
       "type": "littlecore-thermal",
-      "zone": "thermal_zone3"
+      "temp_millicelsius": 39769
     },
     {
-      "temp_millicelsius": 41615,
+      "zone": "thermal_zone4",
       "type": "center-thermal",
-      "zone": "thermal_zone4"
+      "temp_millicelsius": 38846
     },
     {
-      "temp_millicelsius": 40692,
+      "zone": "thermal_zone5",
       "type": "gpu-thermal",
-      "zone": "thermal_zone5"
+      "temp_millicelsius": 38846
     },
     {
-      "temp_millicelsius": 41615,
+      "zone": "thermal_zone6",
       "type": "npu-thermal",
-      "zone": "thermal_zone6"
+      "temp_millicelsius": 38846
     }
   ],
-  "timestamp_utc": "2026-08-07T11:14:42Z",
+  "timestamp_utc": "2026-08-07T11:40:30Z",
   "gpu": {
     "device_name": "Mali-G610 (Panfrost)",
     "device_vendor": "Arm",
@@ -164,7 +164,7 @@
   "run_config": {
     "benchmark": "gpu/gdn_gpu_bench",
     "kernel_source": "gpu/gdn_gpu_kernels.cl",
-    "repeats": 30,
+    "repeats": 50,
     "warmups_discarded": true,
     "governor": "performance"
   },
