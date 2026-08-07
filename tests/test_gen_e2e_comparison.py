@@ -19,6 +19,7 @@ if _SCRIPTS not in sys.path:
     sys.path.insert(0, _SCRIPTS)
 
 from gen_e2e_comparison import (  # noqa: E402
+    _check_manifest_dirty,
     _dedup_rows,
     _normalize_device,
     fmt_mean_std,
@@ -203,3 +204,82 @@ class TestFmtMeanStd:
         """<1% spread should not show ± std."""
         result = fmt_mean_std([100.0, 100.5])
         assert "±" not in result
+
+
+class TestCheckManifestDirty:
+    """Test manifest dirty-status cross-referencing."""
+
+    def test_all_clean(self, tmp_path, monkeypatch):
+        """All manifests dirty=false → (False, True)."""
+        import json
+
+        manifests = tmp_path / "manifests"
+        manifests.mkdir()
+        for name in ["dev_a_e2e.json", "dev_b_e2e.json"]:
+            (manifests / name).write_text(
+                json.dumps({"git": {"sha": "abc1234", "dirty": False}})
+            )
+        monkeypatch.setattr("gen_e2e_comparison.MANIFESTS_DIR", manifests)
+        refs = ["results/manifests/dev_a_e2e.json", "results/manifests/dev_b_e2e.json"]
+        any_dirty, all_checked = _check_manifest_dirty(refs)
+        assert any_dirty is False
+        assert all_checked is True
+
+    def test_some_dirty(self, tmp_path, monkeypatch):
+        """One manifest dirty=true → (True, True)."""
+        import json
+
+        manifests = tmp_path / "manifests"
+        manifests.mkdir()
+        (manifests / "dev_a_e2e.json").write_text(
+            json.dumps({"git": {"sha": "abc1234", "dirty": False}})
+        )
+        (manifests / "dev_b_e2e.json").write_text(
+            json.dumps({"git": {"sha": "def5678", "dirty": True}})
+        )
+        monkeypatch.setattr("gen_e2e_comparison.MANIFESTS_DIR", manifests)
+        refs = ["results/manifests/dev_a_e2e.json", "results/manifests/dev_b_e2e.json"]
+        any_dirty, all_checked = _check_manifest_dirty(refs)
+        assert any_dirty is True
+        assert all_checked is True
+
+    def test_missing_manifest(self, tmp_path, monkeypatch):
+        """Manifest file not found → all_checked=False."""
+        manifests = tmp_path / "manifests"
+        manifests.mkdir()
+        monkeypatch.setattr("gen_e2e_comparison.MANIFESTS_DIR", manifests)
+        refs = ["results/manifests/nonexistent_e2e.json"]
+        any_dirty, all_checked = _check_manifest_dirty(refs)
+        assert any_dirty is False
+        assert all_checked is False
+
+    def test_empty_refs(self, tmp_path, monkeypatch):
+        """No manifest refs → no dirty found, all_checked=True (vacuously)."""
+        monkeypatch.setattr("gen_e2e_comparison.MANIFESTS_DIR", tmp_path)
+        any_dirty, all_checked = _check_manifest_dirty(set())
+        assert any_dirty is False
+        assert all_checked is True
+
+    def test_malformed_json(self, tmp_path, monkeypatch):
+        """Malformed JSON manifest → all_checked=False."""
+        manifests = tmp_path / "manifests"
+        manifests.mkdir()
+        (manifests / "bad_e2e.json").write_text("{not valid json")
+        monkeypatch.setattr("gen_e2e_comparison.MANIFESTS_DIR", manifests)
+        refs = ["results/manifests/bad_e2e.json"]
+        any_dirty, all_checked = _check_manifest_dirty(refs)
+        assert any_dirty is False
+        assert all_checked is False
+
+    def test_missing_git_key(self, tmp_path, monkeypatch):
+        """Manifest without git key → treated as not dirty, but checked."""
+        import json
+
+        manifests = tmp_path / "manifests"
+        manifests.mkdir()
+        (manifests / "dev_e2e.json").write_text(json.dumps({"other": "data"}))
+        monkeypatch.setattr("gen_e2e_comparison.MANIFESTS_DIR", manifests)
+        refs = ["results/manifests/dev_e2e.json"]
+        any_dirty, all_checked = _check_manifest_dirty(refs)
+        assert any_dirty is False
+        assert all_checked is True
