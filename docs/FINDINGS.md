@@ -4074,15 +4074,21 @@ ratios at shapes large enough to amortize per-call overhead:
 
 | Kernel | A76 GiB/s | A57 GiB/s | A76/A57 |
 |---|---|---|---|
-| gated_scan 64×2560 | 10.2 | 2.1 | 4.9× |
-| dwconv1d 64×160 | 15.9 | 4.7 | 3.4× |
+| gated_scan 64×2560 | 10.2 | 2.4 | 4.2× |
+| dwconv1d 64×160 | 15.9 | 4.9 | 3.3× |
 | gemv K=128 N=128 | 17.4 | 4.6 | 3.8× |
 
-The A76 advantage (3.4–4.9×) exceeds the clock ratio (2.3/1.48 = 1.6×),
+The A76 advantage (3.3–4.2×) exceeds the clock ratio (2.3/1.48 = 1.6×),
 reflecting the A76's wider NEON pipeline and superior memory subsystem. Both
 cores run the same NEON code path, confirming the dual-ISA design works across
 the full Armv8.x range. At the smallest shapes (160 channels, seq=64), the
 advantage shrinks — launch overhead dominates sub-25 µs calls.
+
+> **Batched-timing note:** The A57 values above use batched timing (100
+> calls per measurement, matching the A76 methodology). An earlier version
+> of the A57 table used single-call timing; the A57's ~2.4 µs
+> `clock_gettime` overhead inflated fast shapes by up to 82% (e.g.
+> cumdecay 1×160: 4.6 → 8.3 GiB/s).
 
 ### Portability significance
 
