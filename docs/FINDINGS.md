@@ -1007,7 +1007,7 @@ Prefill (Qwen3.5-4B, seq=64, single-threaded p50 µs):
 2. **fp16 output narrowing is a consistent, portable win** (1.45–1.59×): the A76's hardware fp16
    (`FCVTN`/`FCVTL`) makes the conversion single-cycle.
 3. **NEW — software bf16 conversion negates the bandwidth win on the fastest core.** On the A76,
-   cumdecay-bf16 drops to 1.10× (4B) and is *slower than fp32* at 0.8B (129.5 vs 124.0 µs): the
+   cumdecay-bf16 drops to 1.08× (4B) and is *slower than fp32* at 0.8B (129.5 vs 124.0 µs): the
    integer-NEON round-to-nearest-even conversion cost rivals the bytes saved. On the slower A55
    and A57, the bandwidth saving dominates so bf16 still wins (1.42–1.47×).
 
