@@ -91,6 +91,9 @@ jobs:
       - name: Cross-compile and verify GDN kernels under QEMU
         run: bash scripts/verify_cpu_kernels.sh
 
+      - name: Cross-compile and verify KleidiAI GDN submission kernels under QEMU
+        run: bash scripts/verify_kleidiai_kernels.sh
+
   # ---------------------------------------------------------------------------
   # onnx-probes — regenerate the NPU operator probe graphs and assert they
   # still pass onnx.checker (full check) and execute cleanly under
