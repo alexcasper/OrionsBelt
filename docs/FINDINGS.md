@@ -2536,7 +2536,7 @@ functional is itself notable: **the GPU GDN kernels require no proprietary
 drivers**, which is relevant for reproducibility and the open-source
 contribution criterion.
 
-**Data:** [`results/raw/rk3588-t4_gpu_mali-g610.csv`](../../results/raw/rk3588-t4_gpu_mali-g610.csv) · manifest [`rk3588-t4_gpu_mali-g610.json`](../../results/manifests/rk3588-t4_gpu_mali-g610.json) (dirty tree, SHA `e6aea70`).
+**Data:** [`results/raw/rk3588-t4_gpu_mali-g610.csv`](../results/raw/rk3588-t4_gpu_mali-g610.csv) · manifest [`rk3588-t4_gpu_mali-g610.json`](../results/manifests/rk3588-t4_gpu_mali-g610.json) (dirty tree, SHA `e6aea70`).
 
 ---
 
@@ -3451,7 +3451,7 @@ thermal throttling. The burst benchmark numbers in §15–17 are steady-state
 sustainable numbers, not peak-only artifacts. This matters for the Physical AI
 submission criterion: honest sustained throughput, not a one-shot burst.
 
-**Data:** [`results/raw/rk3588-t3_sustained_thermal.txt`](../../results/raw/rk3588-t3_sustained_thermal.txt) · [`rk3588-t4_sustained_thermal.txt`](../../results/raw/rk3588-t4_sustained_thermal.txt) (independent cross-check).
+**Data:** [`results/raw/rk3588-t3_sustained_thermal.txt`](../results/raw/rk3588-t3_sustained_thermal.txt) · [`rk3588-t4_sustained_thermal.txt`](../results/raw/rk3588-t4_sustained_thermal.txt) (independent cross-check).
 
 ---
 
