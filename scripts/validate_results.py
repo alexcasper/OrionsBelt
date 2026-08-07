@@ -461,7 +461,9 @@ def validate_gpu_row(row, csv_name, issues, row_num):
         try:
             p95 = float(p95_raw)
             if p95 < p50:
-                issues.append(Issue("WARNING", csv_name, f"row {row_num}: p95 ({p95}) < p50 ({p50})"))
+                issues.append(
+                    Issue("WARNING", csv_name, f"row {row_num}: p95 ({p95}) < p50 ({p50})")
+                )
         except (ValueError, TypeError):
             pass
     bw_raw = row.get("bw_mibs")
@@ -469,7 +471,9 @@ def validate_gpu_row(row, csv_name, issues, row_num):
         try:
             bw = float(bw_raw)
             if bw <= 0:
-                issues.append(Issue("WARNING", csv_name, f"row {row_num}: non-positive bw_mibs={bw}"))
+                issues.append(
+                    Issue("WARNING", csv_name, f"row {row_num}: non-positive bw_mibs={bw}")
+                )
         except (ValueError, TypeError):
             pass
 
