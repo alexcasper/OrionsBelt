@@ -542,11 +542,14 @@ class TestMainCLI:
         """CSVs without required harness columns are silently skipped."""
         # A valid harness-schema CSV (3 rows so p50 is well-defined)
         good = tmp_path / "good.csv"
-        _write_csv(good, [
-            _row(value=100, repeat=0),
-            _row(value=110, repeat=1),
-            _row(value=120, repeat=2),
-        ])
+        _write_csv(
+            good,
+            [
+                _row(value=100, repeat=0),
+                _row(value=110, repeat=1),
+                _row(value=120, repeat=2),
+            ],
+        )
 
         # A raw kernel microbenchmark CSV (no context_length/phase/metric_name)
         bad = tmp_path / "bad.csv"
