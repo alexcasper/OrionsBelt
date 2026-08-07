@@ -141,7 +141,9 @@ All figures above are verified against primary sources (Radxa product page and d
 
 **End-to-end model decode** runs the full Qwen3.5 forward pass in C with optimized NEON GEMV kernels. With the full optimization stack (row-sweep GEMV + INT8 weight-only quantization), the 0.8B model achieves **3.0 tok/s on the Jetson Nano (Cortex-A57)** and **10.6 tok/s on RK3588 (Cortex-A76)** — practical for real-time edge deployment. The 4B model achieves 0.59 tok/s (A57 INT8) and 1.84 tok/s (A76 INT8). INT8 weight quantization adds 1.1–1.8× on top of the GEMV optimization, for a cumulative 26–30× over the naive baseline. Bottleneck analysis confirms the model is **matmul-bound** (FFN 54–72%), not recurrence-bound — GDN's novel kernels account for <1% of total time. See the [e2e fleet comparison](./results/figures/e2e_fleet_comparison.md) and [FINDINGS.md §16](./docs/FINDINGS.md).
 
-**Operator analysis findings** ([`docs/FINDINGS.md`](./docs/FINDINGS.md), 29 sections):
+**Context-length scaling proves GDN's core value proposition on silicon (§17).** Sweeping context length from 1 to 4096 tokens with real grouped-query attention: **pure-GDN throughput is flat to within 0.3%** while the hybrid model degrades 1.55× (4B) to 2.14× (0.8B) — entirely from the full-attention layers whose KV cache reads grow linearly. INT8 KV cache quantization (§20) cuts KV memory 4× and delivers 1.7–2.6× full-attention speedup at long context, but full-attention's cost still scales O(n). Sustained-load tests confirm 0.3% throughput decay over 94s — burst numbers are steady-state sustainable (§18). Cross-validated on both A57 and A76. See [FINDINGS.md §17–20](./docs/FINDINGS.md).
+
+**Operator analysis findings** ([`docs/FINDINGS.md`](./docs/FINDINGS.md), 20+ sections):
 - CIX NOE and Rockchip RKNN toolchains both reject GDN's runtime-length recurrence — the limitation generalises beyond one vendor (§1, §7)
 - KleidiAI packed GEMM wins 1.7–3.6× on matmul but packing cost dominates at decode; dual-path strategy recommended (§8)
 - big.LITTLE affinity: pinning to A76 big cores is 2–3× faster than default scheduler placement (§9)
@@ -166,13 +168,15 @@ All figures above are verified against primary sources (Radxa product page and d
 | big.LITTLE affinity policy | Done — [FINDINGS.md](./docs/FINDINGS.md) §9 |
 | GDN-2 vs GDN-1 microbenchmark | Done — [FINDINGS.md](./docs/FINDINGS.md) §10, clean-tree re-run |
 | E2E model decode (tokens/sec, TTFT) | FP32 + INT8 measured across fleet — 0.8B: 3.0 tok/s (A57 INT8), 10.6 tok/s (A76 INT8). [e2e comparison](./results/figures/e2e_fleet_comparison.md) |
-| Sustained-load thermal characterization | Done — no throttling on RK3588 (-1.5% over 60s) |
+| Context-length scaling (GDN O(1) vs full-attn O(n)) | Done — pure-GDN flat to 0.3% across ctx=1–4096, cross-validated A57+A76. [§17](./docs/FINDINGS.md) |
+| INT8 KV cache quantization | Done — 1.7–2.6× full-attn speedup at long context, 4× KV memory reduction. [§20](./docs/FINDINGS.md) |
+| Sustained-load thermal characterization | Done — 0.3% throughput decay over 94s on RK3588 (§18) |
 | Track decision: Edge AI | Done — [ADR 0007](./docs/adr/0007-commit-to-edge-ai-track.md) |
 | Model survey / selection (`docs/MODEL_SURVEY.md`) | In progress |
 | Orion O6 board bring-up | **Pending** — board not yet in hand |
 | CIX Early Bird SDK / NPU toolchain access | **Pending** — not yet approved |
 | Per-layer engine mapping (NPU/GPU/CPU) | Hypothesis only — pending measurements |
-| Full inference results (tokens/sec, TTFT, memory) | Partial — C decode loop on A57 + RK3588, cross-device e2e table ([FINDINGS.md](./docs/FINDINGS.md) §14–16, [e2e comparison](./results/figures/e2e_fleet_comparison.md)) |
+| Full inference results (tokens/sec, TTFT, memory) | Partial — C decode loop on A57 + RK3588, ctx-length scaling proven (§17–20), [e2e comparison](./results/figures/e2e_fleet_comparison.md) |
 
 > **Results so far:** 75 CSVs from the device fleet, 53 provenance manifests, 69 generated figures/tables, 29 FINDINGS sections.
 >
