@@ -595,15 +595,21 @@ static void full_attn_real_forward_int8kv(const Weights *w, LayerState *st,
     MM(hidden_in, w->f_k_proj, w->f_k_proj_q, k, 1, HIDDEN, kv_dim);
     MM(hidden_in, w->f_v_proj, w->f_v_proj_q, v, 1, HIDDEN, kv_dim);
 
-    /* Quantize new K/V token to int8, append to cache */
+    /* Quantize new K/V token to int8, append to cache.
+     * Clamp to [-128, 127] — the per-head scale was computed from pre-fill
+     * data, so a new token whose K/V exceeds the pre-fill max would overflow
+     * int8 without clamping (implementation-defined behavior → garbage). */
     for (size_t kh = 0; kh < FULL_KV_HEADS; ++kh) {
+        float inv_ks = 1.0f / st->kv_k_scale[kh];
+        float inv_vs = 1.0f / st->kv_v_scale[kh];
         for (size_t d = 0; d < FULL_HEAD_DIM; ++d) {
-            float kv = k[kh * FULL_HEAD_DIM + d];
-            st->kv_k_grow_q[pos * kv_dim + kh * FULL_HEAD_DIM + d] =
-                (int8_t)lroundf(kv / st->kv_k_scale[kh]);
-            float vv = v[kh * FULL_HEAD_DIM + d];
-            st->kv_v_grow_q[pos * kv_dim + kh * FULL_HEAD_DIM + d] =
-                (int8_t)lroundf(vv / st->kv_v_scale[kh]);
+            int kq = (int)lroundf(k[kh * FULL_HEAD_DIM + d] * inv_ks);
+            if (kq > 127) kq = 127;  if (kq < -128) kq = -128;
+            st->kv_k_grow_q[pos * kv_dim + kh * FULL_HEAD_DIM + d] = (int8_t)kq;
+
+            int vq = (int)lroundf(v[kh * FULL_HEAD_DIM + d] * inv_vs);
+            if (vq > 127) vq = 127;  if (vq < -128) vq = -128;
+            st->kv_v_grow_q[pos * kv_dim + kh * FULL_HEAD_DIM + d] = (int8_t)vq;
         }
     }
 
@@ -738,6 +744,35 @@ static void ffn_forward(const Weights *w, const float *hidden_in, float *hidden_
         hidden_out[i] = hidden_in[i] + down[i];
 
     free(gate); free(up); free(act); free(down);
+}
+
+/* ---- Cleanup helper: free all weight matrices (FP32 + optional INT8) ---- */
+static void free_weights(Weights *w) {
+    free(w->g_q_proj); free(w->g_k_proj); free(w->g_v_proj); free(w->g_o_proj);
+    free(w->g_conv_w); free(w->g_beta);
+    free(w->f_q_proj); free(w->f_k_proj); free(w->f_v_proj); free(w->f_o_proj);
+    free(w->gate_proj); free(w->up_proj); free(w->down_proj);
+#ifdef INT8_WEIGHTS
+    free(w->g_q_proj_q.q);  free(w->g_q_proj_q.s);
+    free(w->g_k_proj_q.q);  free(w->g_k_proj_q.s);
+    free(w->g_v_proj_q.q);  free(w->g_v_proj_q.s);
+    free(w->g_o_proj_q.q);  free(w->g_o_proj_q.s);
+    free(w->f_q_proj_q.q);  free(w->f_q_proj_q.s);
+    free(w->f_k_proj_q.q);  free(w->f_k_proj_q.s);
+    free(w->f_v_proj_q.q);  free(w->f_v_proj_q.s);
+    free(w->f_o_proj_q.q);  free(w->f_o_proj_q.s);
+    free(w->gate_proj_q.q); free(w->gate_proj_q.s);
+    free(w->up_proj_q.q);   free(w->up_proj_q.s);
+    free(w->down_proj_q.q); free(w->down_proj_q.s);
+#endif
+}
+
+/* ---- Cleanup helper: free per-layer base state (shared by both code paths) ---- */
+static void free_layer_states(LayerState *states) {
+    for (int l = 0; l < NUM_LAYERS; ++l) {
+        free(states[l].gdn_state); free(states[l].conv_hist);
+        free(states[l].kv_cache_k); free(states[l].kv_cache_v);
+    }
 }
 
 int main(int argc, char **argv) {
@@ -1061,27 +1096,8 @@ int main(int argc, char **argv) {
 
         /* Cleanup weights + states and exit */
         free(hidden); free(hidden_next);
-        free(w.g_q_proj); free(w.g_k_proj); free(w.g_v_proj); free(w.g_o_proj);
-        free(w.g_conv_w); free(w.g_beta);
-        free(w.f_q_proj); free(w.f_k_proj); free(w.f_v_proj); free(w.f_o_proj);
-        free(w.gate_proj); free(w.up_proj); free(w.down_proj);
-#ifdef INT8_WEIGHTS
-        free(w.g_q_proj_q.q);  free(w.g_q_proj_q.s);
-        free(w.g_k_proj_q.q);  free(w.g_k_proj_q.s);
-        free(w.g_v_proj_q.q);  free(w.g_v_proj_q.s);
-        free(w.g_o_proj_q.q);  free(w.g_o_proj_q.s);
-        free(w.f_q_proj_q.q);  free(w.f_q_proj_q.s);
-        free(w.f_k_proj_q.q);  free(w.f_k_proj_q.s);
-        free(w.f_v_proj_q.q);  free(w.f_v_proj_q.s);
-        free(w.f_o_proj_q.q);  free(w.f_o_proj_q.s);
-        free(w.gate_proj_q.q); free(w.gate_proj_q.s);
-        free(w.up_proj_q.q);   free(w.up_proj_q.s);
-        free(w.down_proj_q.q); free(w.down_proj_q.s);
-#endif
-        for (int l = 0; l < NUM_LAYERS; ++l) {
-            free(states[l].gdn_state); free(states[l].conv_hist);
-            free(states[l].kv_cache_k); free(states[l].kv_cache_v);
-        }
+        free_weights(&w);
+        free_layer_states(states);
         return 0;
     }
 
@@ -1206,26 +1222,7 @@ int main(int argc, char **argv) {
 
     /* Cleanup */
     free(tok_times); free(hidden); free(hidden_next);
-    free(w.g_q_proj); free(w.g_k_proj); free(w.g_v_proj); free(w.g_o_proj);
-    free(w.g_conv_w); free(w.g_beta);
-    free(w.f_q_proj); free(w.f_k_proj); free(w.f_v_proj); free(w.f_o_proj);
-    free(w.gate_proj); free(w.up_proj); free(w.down_proj);
-#ifdef INT8_WEIGHTS
-    free(w.g_q_proj_q.q);  free(w.g_q_proj_q.s);
-    free(w.g_k_proj_q.q);  free(w.g_k_proj_q.s);
-    free(w.g_v_proj_q.q);  free(w.g_v_proj_q.s);
-    free(w.g_o_proj_q.q);  free(w.g_o_proj_q.s);
-    free(w.f_q_proj_q.q);  free(w.f_q_proj_q.s);
-    free(w.f_k_proj_q.q);  free(w.f_k_proj_q.s);
-    free(w.f_v_proj_q.q);  free(w.f_v_proj_q.s);
-    free(w.f_o_proj_q.q);  free(w.f_o_proj_q.s);
-    free(w.gate_proj_q.q); free(w.gate_proj_q.s);
-    free(w.up_proj_q.q);   free(w.up_proj_q.s);
-    free(w.down_proj_q.q); free(w.down_proj_q.s);
-#endif
-    for (int l = 0; l < NUM_LAYERS; ++l) {
-        free(states[l].gdn_state); free(states[l].conv_hist);
-        free(states[l].kv_cache_k); free(states[l].kv_cache_v);
-    }
+    free_weights(&w);
+    free_layer_states(states);
     return 0;
 }
