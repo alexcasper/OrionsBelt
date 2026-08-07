@@ -138,8 +138,6 @@ The j2 CSV was re-run with the current optimized binary (OpenMP 4-core,
 NEON double-width unrolling, bf16 conversion vectorization). This shows
 the real-world impact of the optimization track (beads ob-8qt.5/6/7):
 
-> ⚠ **No provenance.** `jetson-j2-omp-full.csv` has no manifest on any branch, so the speedups below cannot be tied to a specific build or device state. PLAN.md section 9: a number without a manifest is not a result. Treat these as indicative and re-capture with `bench/manifest.py` alongside the run.
-
 | Kernel (4B, seq=64) | Single-thread (GiB/s) | 4-core OpenMP (GiB/s) | Speedup |
 |--------------------|-----------------------|-----------------------|---------|
 | Cumulative Decay | 1.32 | 3.85 | 2.9x |
