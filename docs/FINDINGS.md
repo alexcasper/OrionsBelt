@@ -1124,6 +1124,24 @@ Determinism verified (bit-identical across repeated runs).
 `causal_dwconv1d`; `cumdecay` was declared but never exercised. Added scalar
 references (float and double) and comparison reporting for `cumdecay`.
 
+**RK3588-T3 (Cortex-A76, Armv8.2-A, NEON+dotprod) — all 5 test suites pass (2026-08-07):**
+
+Verified via `scripts/verify_kernels_native.sh` on RK3588-T3, gcc 11.4.0,
+`-march=armv8.2-a+dotprod`. The A76 adds dotprod (`asimddp`) over the A57 baseline,
+exercising a different dispatch path. Key results:
+
+| Test suite | Result | Notes |
+|------------|--------|-------|
+| fp32 kernels (scan, decay, conv1d) | PASS | scan+decay bit-identical; conv1d 1 ULP (FMA) |
+| Mixed-precision (bf16/fp16) | PASS | All bounds met; determinism verified |
+| Delta-rule matmul | PASS | All 6 shapes bit-identical (max_abs=0) |
+| GDN-2 decoupled-gating scan | PASS | max_rel ≤9.1e-6; 8-chunk stability confirmed |
+| INT8 weight quantization + GEMV | PASS | mean_rel=0.42%, max_rel=2.0% |
+
+The dotprod-enabled matmul path is bit-identical to the scalar reference on the A76,
+matching the A57 NEON-only result — confirming the kernel is correct across both
+dispatch paths in the fleet.
+
 ---
 
 ## INA3221 power/energy characterization on Jetson-J1 (ob-agf.1)
