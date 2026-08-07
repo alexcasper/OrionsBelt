@@ -2916,3 +2916,43 @@ kernels. Both boards are RK3588 (4×A55 + 4×A76) but **different board vendors*
 - The original ob-bf7 spread concern is RESOLVED for stale data (both boards
   now have clean post-optimization CSVs with <8% spread), but a new
   cross-board heterogeneity finding replaces it.
+
+---
+
+## INT8 weight-only quantization: cross-check on rk3588-t4
+
+**Date:** 2026-08-07
+**Device:** rk3588-t4 (RK3588, A76 big cores, cpu4-7)
+**Bead:** ob-8qt.11 (t3's INT8 implementation, cherry-picked from `bdca994`)
+**Governor:** performance. **Thermals:** pre ~39 °C, delta +6-7 °C (no throttling).
+
+t3 implemented per-column symmetric INT8 quantization with NEON
+dequantize-on-the-fly, cutting weight memory traffic 4× (FP32→INT8+scale).
+As t4's role is independent cross-check validation, we cherry-picked t3's
+commit and re-ran the INT8 binary on separate hardware:
+
+| Model | t3 INT8 tok/s | t4 INT8 tok/s | t4/t3 | t4 TTFT (ms) | t4 s/tok |
+|-------|-------------:|-------------:|------:|-------------:|---------:|
+| Qwen3.5-4B   | 1.84 | 1.55 | 84 % | 645 | 0.65 |
+| Qwen3.5-0.8B | 10.55 | 7.64 | 72 % | 130 | 0.13 |
+
+Results stable across 3 independent runs (within 1 %). The 16 % gap on 4B is
+consistent with the known t3↔t4 cross-board performance heterogeneity
+documented above (t4 runs 5-33 % slower on microbenchmarks). The wider 28 %
+gap on 0.8B likely reflects the smaller working set being less
+memory-bandwidth-bound — the INT8 dequantize overhead becomes relatively
+costlier when DRAM traffic is not the sole bottleneck.
+
+t3 reported 1.79× (4B) and 1.32× (0.8B) INT8 speedup vs their FP32 GEMV
+baseline. On t4 the INT8 path delivers a comparable 4B improvement; the
+0.8B benefit is smaller, but the optimisation direction is validated across
+both boards.
+
+**Bottleneck breakdown** (4B INT8, t4): FFN 69 %, GDN proj 15.7 %, GDN oproj
+7.1 %, full 7.1 %, conv/decay/scan <1 %. Matches t3's profile.
+
+Files: `results/raw/rk3588-t4_big_int8_e2e_raw.csv`,
+`results/raw/rk3588-t4_08b_big_int8_e2e_raw.csv`
+Manifests: `rk3588-t4_big_int8_e2e.json` (sha `591232e`, dirty=false),
+`rk3588-t4_08b_big_int8_e2e.json` (sha `246d937`, dirty=false).
+128 tokens × 3 runs each.
