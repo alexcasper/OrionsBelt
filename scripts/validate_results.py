@@ -59,6 +59,18 @@ POWER_COLS = [
     "temp_milliC",
 ]
 
+# Delta-rule matmul microbenchmark CSV (from bench_gdn --delta-matmul mode)
+DELTA_MATMUL_COLS = [
+    "kernel",
+    "M",
+    "K",
+    "N",
+    "repeats",
+    "p50_us",
+    "p95_us",
+    "gib_per_s_p50",
+]
+
 # Per-layer latency profiling CSV (from profile_layers.py)
 LAYER_PROFILE_COLS = [
     "phase",
@@ -107,7 +119,7 @@ ABSURD_THROUGHPUT = 200.0  # GiB/s
 
 
 def detect_csv_type(header):
-    """Return 'standard', 'sustained', 'power', 'layer_profile', 'e2e_sweep', or None."""
+    """Return 'standard', 'sustained', 'power', 'layer_profile', 'delta_matmul', 'e2e_sweep', or None."""
     cols = set(header)
     if cols >= set(STANDARD_COLS):
         return "standard"
@@ -117,6 +129,8 @@ def detect_csv_type(header):
         return "power"
     if cols >= {"layer_idx", "layer_type", "p50_us", "mean_us"}:
         return "layer_profile"
+    if cols >= {"kernel", "M", "K", "N"}:
+        return "delta_matmul"
     if cols >= {"run_id", "metric_name", "metric_component", "repeat_index"}:
         return "e2e_sweep"
     return None
@@ -131,6 +145,8 @@ def expected_columns(csv_type):
         return POWER_COLS
     if csv_type == "layer_profile":
         return LAYER_PROFILE_COLS
+    if csv_type == "delta_matmul":
+        return DELTA_MATMUL_COLS
     if csv_type == "e2e_sweep":
         return E2E_SWEEP_COLS
     return []
@@ -333,6 +349,26 @@ def validate_layer_profile_row(row, csv_name, issues, row_num):
         issues.append(Issue("ERROR", csv_name, f"row {row_num}: negative layer_idx"))
 
 
+def validate_delta_matmul_row(row, csv_name, issues, row_num):
+    """Validate a single row of a delta-rule matmul CSV."""
+    try:
+        m = int(row["M"])
+        k = int(row["K"])
+        n = int(row["N"])
+        p50 = float(row["p50_us"])
+        p95 = float(row["p95_us"])
+    except (ValueError, KeyError) as e:
+        issues.append(Issue("ERROR", csv_name, f"row {row_num}: cannot parse: {e}"))
+        return
+
+    if m < 1 or k < 1 or n < 1:
+        issues.append(Issue("ERROR", csv_name, f"row {row_num}: non-positive matmul dim M={m},K={k},N={n}"))
+    if p50 <= 0:
+        issues.append(Issue("ERROR", csv_name, f"row {row_num}: non-positive p50_us"))
+    if p95 < p50:
+        issues.append(Issue("WARNING", csv_name, f"row {row_num}: p95 ({p95}) < p50 ({p50})"))
+
+
 def validate_e2e_sweep_row(row, csv_name, issues, row_num):
     """Validate a single row of an e2e context-sweep CSV (bench/schema.py format)."""
     try:
@@ -419,6 +455,8 @@ def validate_csv(path, csv_name, issues):
                     validate_sustained_row(row, csv_name, issues, i)
                 elif csv_type == "layer_profile":
                     validate_layer_profile_row(row, csv_name, issues, i)
+                elif csv_type == "delta_matmul":
+                    validate_delta_matmul_row(row, csv_name, issues, i)
                 elif csv_type == "e2e_sweep":
                     validate_e2e_sweep_row(row, csv_name, issues, i)
                     # e2e-sweep rows embed their own manifest path (bench.schema.ResultRow) —
