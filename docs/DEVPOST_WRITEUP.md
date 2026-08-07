@@ -158,8 +158,8 @@ Replacing the Python/transformers backend with a hand-tuned C decode loop
 | Implementation | 0.8B tok/s (A76) | 4B tok/s (A76) | 0.8B tok/s (A57) | 4B tok/s (A57) |
 |----------------|-----------------:|---------------:|-----------------:|---------------:|
 | Python/transformers (baseline) | ~0.68 | — | — | — |
-| C: row-sweep GEMV (FP32) | 7.98 | 1.04 | 2.70 | 0.43 |
-| C: + INT8 weight-only | **10.6** | **1.84** | **3.01** | **0.59** |
+| C: row-sweep GEMV (FP32) | 7.98 | 1.04 | 2.06 | 0.43 |
+| C: + INT8 weight-only | **10.6** | **1.84** | **2.45** | **0.51** |
 
 The optimization stack is pure memory-system engineering — no algorithmic
 changes to the model. GDN's novel recurrent kernels (conv, decay, scan)
@@ -393,8 +393,10 @@ ORIONS_FORCE_FP32=1 python3 bench/harness.py \
   speedup at ctx=4096 (FINDINGS.md §20)
 - Sustained-load thermal stability: 0.3% throughput decay over 94s on RK3588,
   confirming burst numbers are steady-state sustainable (FINDINGS.md §18)
-- Cross-device decode comparison: A76 is 2.4–3.0× faster than A57, consistent
-  with clock and pipeline width (FINDINGS.md §19)
+- Cross-device decode comparison: A76 is 2.4–4.3× faster than A57, consistent
+  with clock and pipeline width; INT8 weight quantization amplifies the gap
+  (dotprod-capable A76 gains 1.65–1.77× vs 1.19× on A57). Validated on two
+  independent RK3588 boards (FINDINGS.md §22)
 - Three-component memory decomposition confirmed on real model weights
   (analytical = measured)
 - big.LITTLE affinity policy: 2–3× from pinning, validated across 6 configs
