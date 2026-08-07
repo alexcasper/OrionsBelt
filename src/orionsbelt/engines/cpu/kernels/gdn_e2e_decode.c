@@ -332,6 +332,10 @@ typedef struct {
     /* Full-attention KV cache (simulated, 1 entry for single-token decode) */
     float *kv_cache_k;
     float *kv_cache_v;
+    /* Growing KV cache for ctx-sweep mode (allocated on demand) */
+    float *kv_k_grow;
+    float *kv_v_grow;
+    size_t kv_pos;        /* current position (tokens in cache) */
 } LayerState;
 
 /* ---- Weights (random, benchmark only) ---- */
@@ -457,6 +461,84 @@ static void full_attn_layer_forward(const Weights *w, LayerState *st,
     free(q); free(k); free(v); free(attn_out);
 }
 
+/* ---- Real multi-head attention with growing KV cache (ctx-sweep mode) ----
+ *
+ * Implements proper GQA attention: Q * K_cache^T -> softmax -> weighted V.
+ * Used by --ctx-sweep to show full-attention's O(n) scaling vs GDN's O(1).
+ * KV cache grows by one token per call; pre-filled with random data to
+ * simulate prior prefill tokens.
+ */
+static void full_attn_real_forward(const Weights *w, LayerState *st,
+                                   const float *hidden_in, float *hidden_out) {
+    size_t q_dim = FULL_HEADS * FULL_HEAD_DIM;
+    size_t kv_dim = FULL_KV_HEADS * FULL_HEAD_DIM;
+    size_t pos = st->kv_pos;
+    size_t ctx = pos + 1;  /* tokens to attend to (including this one) */
+
+    float *q = alloc_aligned(q_dim);
+    float *k = alloc_aligned(kv_dim);
+    float *v = alloc_aligned(kv_dim);
+    float *attn_out = alloc_aligned(q_dim);
+    float *scores = alloc_aligned(ctx);
+
+    /* Q/K/V projections (same as simulated mode) */
+    MM(hidden_in, w->f_q_proj, w->f_q_proj_q, q, 1, HIDDEN, q_dim);
+    MM(hidden_in, w->f_k_proj, w->f_k_proj_q, k, 1, HIDDEN, kv_dim);
+    MM(hidden_in, w->f_v_proj, w->f_v_proj_q, v, 1, HIDDEN, kv_dim);
+
+    /* Append new K/V to cache */
+    memcpy(st->kv_k_grow + pos * kv_dim, k, kv_dim * sizeof(float));
+    memcpy(st->kv_v_grow + pos * kv_dim, v, kv_dim * sizeof(float));
+
+    /* GQA attention: each Q head attends to its KV head group */
+    const size_t groups = FULL_HEADS / FULL_KV_HEADS;
+    const float scale = 1.0f / sqrtf((float)FULL_HEAD_DIM);
+
+    for (size_t h = 0; h < FULL_HEADS; ++h) {
+        size_t kh = h / groups;
+        const float *qh = q + h * FULL_HEAD_DIM;
+
+        /* Score = Q[h] . K_cache[t, kh] * scale */
+        float max_s = -INFINITY;
+        for (size_t t = 0; t < ctx; ++t) {
+            const float *kt = st->kv_k_grow + t * kv_dim + kh * FULL_HEAD_DIM;
+            float s = 0.0f;
+            for (size_t d = 0; d < FULL_HEAD_DIM; ++d)
+                s += qh[d] * kt[d];
+            s *= scale;
+            scores[t] = s;
+            if (s > max_s) max_s = s;
+        }
+
+        /* Softmax */
+        float sum_exp = 0.0f;
+        for (size_t t = 0; t < ctx; ++t) {
+            scores[t] = expf(scores[t] - max_s);
+            sum_exp += scores[t];
+        }
+
+        /* Weighted sum of V */
+        float *out_h = attn_out + h * FULL_HEAD_DIM;
+        memset(out_h, 0, FULL_HEAD_DIM * sizeof(float));
+        for (size_t t = 0; t < ctx; ++t) {
+            const float *vt = st->kv_v_grow + t * kv_dim + kh * FULL_HEAD_DIM;
+            float weight = scores[t] / sum_exp;
+            for (size_t d = 0; d < FULL_HEAD_DIM; ++d)
+                out_h[d] += weight * vt[d];
+        }
+    }
+
+    /* Output projection + residual */
+    MM(attn_out, w->f_o_proj, w->f_o_proj_q, hidden_out, 1, q_dim, HIDDEN);
+    for (size_t i = 0; i < HIDDEN; ++i)
+        hidden_out[i] += hidden_in[i];
+
+    /* Advance position */
+    st->kv_pos = pos + 1;
+
+    free(q); free(k); free(v); free(attn_out); free(scores);
+}
+
 static void ffn_forward(const Weights *w, const float *hidden_in, float *hidden_out, size_t seq) {
     float *gate = alloc_aligned(seq * INTER);
     float *up = alloc_aligned(seq * INTER);
@@ -483,13 +565,26 @@ static void ffn_forward(const Weights *w, const float *hidden_in, float *hidden_
 int main(int argc, char **argv) {
     int num_tokens = 8;
     int csv = 0;
+    int ctx_sweep = 0;
+    int pure_gdn = 0;
+    const char *ctx_lens_str = NULL;
     for (int i = 1; i < argc; ++i) {
         if (strcmp(argv[i], "--tokens") == 0 && i + 1 < argc)
             num_tokens = atoi(argv[++i]);
         else if (strcmp(argv[i], "--csv") == 0)
             csv = 1;
+        else if (strcmp(argv[i], "--ctx-sweep") == 0) {
+            ctx_sweep = 1;
+            if (i + 1 < argc && argv[i + 1][0] != '-')
+                ctx_lens_str = argv[++i];
+        }
+        else if (strcmp(argv[i], "--pure-gdn") == 0)
+            pure_gdn = 1;
         else if (strcmp(argv[i], "--help") == 0) {
-            printf("Usage: %s [--tokens N] [--csv]\n", argv[0]);
+            printf("Usage: %s [--tokens N] [--csv] [--ctx-sweep L1,L2,...] [--pure-gdn]\n", argv[0]);
+            printf("  --ctx-sweep  Measure decode cost at growing context lengths\n");
+            printf("               Comma-separated list, e.g. 1,64,256,1024,4096\n");
+            printf("  --pure-gdn   All layers GDN (no full-attention) — shows ideal O(1) scaling\n");
             return 0;
         }
     }
@@ -565,6 +660,175 @@ int main(int argc, char **argv) {
     for (int b = 0; b < NUM_LAYERS / 4; ++b)
         for (int s = 0; s < 4; ++s)
             is_gdn[b * 4 + s] = (s < 3) ? 1 : 0;
+
+    /* --pure-gdn: override all layers to GDN (hypothetical pure-linear-attention model) */
+    if (pure_gdn) {
+        for (int l = 0; l < NUM_LAYERS; ++l)
+            is_gdn[l] = 1;
+    }
+
+    /* ---- Context-length sweep mode ----
+     *
+     * For each context length C: pre-fill full-attention KV caches with C-1
+     * random tokens, then decode 1 token at position C-1, measuring per-layer-
+     * type cost. GDN layers have O(1) state so their cost is constant; full-
+     * attention cost scales O(C). This is the headline comparison that shows
+     * why GDN matters for long-context decode. */
+    if (ctx_sweep) {
+        /* Parse context lengths */
+        size_t ctx_lens[64];
+        int n_ctx = 0;
+        if (ctx_lens_str) {
+            char buf[512];
+            strncpy(buf, ctx_lens_str, sizeof(buf) - 1);
+            buf[sizeof(buf) - 1] = '\0';
+            char *tok = strtok(buf, ",");
+            while (tok && n_ctx < 64) {
+                ctx_lens[n_ctx++] = (size_t)atol(tok);
+                tok = strtok(NULL, ",");
+            }
+        } else {
+            /* Default sweep */
+            size_t defaults[] = {1, 64, 256, 1024, 4096};
+            for (int i = 0; i < 5; ++i) ctx_lens[n_ctx++] = defaults[i];
+        }
+
+        size_t max_ctx = 0;
+        for (int i = 0; i < n_ctx; ++i)
+            if (ctx_lens[i] > max_ctx) max_ctx = ctx_lens[i];
+
+        size_t kv_dim = FULL_KV_HEADS * FULL_HEAD_DIM;
+
+        if (!csv) {
+            printf(MODEL_NAME " context-length scaling benchmark\n");
+            int n_gdn_actual = 0, n_full_actual = 0;
+            for (int l = 0; l < NUM_LAYERS; ++l)
+                if (is_gdn[l]) n_gdn_actual++; else n_full_actual++;
+            printf("  layers=%d (GDN=%d, full=%d)%s, hidden=%d\n", NUM_LAYERS,
+                   n_gdn_actual, n_full_actual,
+                   pure_gdn ? " [PURE GDN]" : "", HIDDEN);
+            printf("  ctx sweep: %d points, max=%zu\n\n", n_ctx, max_ctx);
+        }
+
+        /* Allocate growing KV caches for each full-attention layer */
+        for (int l = 0; l < NUM_LAYERS; ++l) {
+            if (!is_gdn[l]) {
+                states[l].kv_k_grow = alloc_aligned(max_ctx * kv_dim);
+                states[l].kv_v_grow = alloc_aligned(max_ctx * kv_dim);
+            }
+            states[l].kv_pos = 0;
+        }
+
+        /* Pre-fill KV caches with random data */
+        unsigned fill_seed = 99999;
+        for (int l = 0; l < NUM_LAYERS; ++l) {
+            if (!is_gdn[l]) {
+                fill_rand(states[l].kv_k_grow, max_ctx * kv_dim, &fill_seed);
+                fill_rand(states[l].kv_v_grow, max_ctx * kv_dim, &fill_seed);
+            }
+        }
+
+        if (csv) {
+            printf("model,ctx_len,gdn_layer_us,full_attn_us,ffn_us,total_us,"
+                   "tok_per_sec,kv_cache_mb\n");
+        }
+
+        for (int ci = 0; ci < n_ctx; ++ci) {
+            size_t C = ctx_lens[ci];
+
+            /* Set each full-attention layer to position C-1 (pre-filled) */
+            for (int l = 0; l < NUM_LAYERS; ++l) {
+                if (!is_gdn[l])
+                    states[l].kv_pos = C - 1;
+            }
+
+            /* Reset GDN state for a clean measurement */
+            for (int l = 0; l < NUM_LAYERS; ++l) {
+                if (is_gdn[l]) {
+                    memset(states[l].gdn_state, 0, VALUE_DIM * sizeof(float));
+                    memset(states[l].conv_hist, 0, (CONV_K - 1) * CONV_DIM * sizeof(float));
+                }
+            }
+
+            /* Measure: decode 1 token at position C-1 */
+            fill_rand(hidden, HIDDEN, &seed);
+
+            double gdn_total = 0, full_total = 0, ffn_total = 0;
+            /* Average over a few tokens for stability */
+            int reps = (C > 1024) ? 3 : 5;
+            for (int r = 0; r < reps; ++r) {
+                for (int l = 0; l < NUM_LAYERS; ++l) {
+                    if (is_gdn[l]) {
+                        double t0 = now_us();
+                        gdn_layer_forward(&w, &states[l], hidden, hidden_next, 1);
+                        gdn_total += now_us() - t0;
+                    } else {
+                        double t0 = now_us();
+                        full_attn_real_forward(&w, &states[l], hidden, hidden_next);
+                        full_total += now_us() - t0;
+                        /* Reset position so next rep measures the same ctx */
+                        states[l].kv_pos = C - 1;
+                    }
+                    double t0 = now_us();
+                    ffn_forward(&w, hidden_next, hidden, 1);
+                    ffn_total += now_us() - t0;
+                    float *tmp = hidden; hidden = hidden_next; hidden_next = tmp;
+                }
+            }
+            gdn_total /= reps;
+            full_total /= reps;
+            ffn_total /= reps;
+            double total_us = gdn_total + full_total + ffn_total;
+            double tps = 1e6 / total_us;
+            /* KV cache memory: actual full-attn layers * C * kv_dim * 4 bytes * 2 (K+V) */
+            int n_full_actual = 0;
+            for (int l2 = 0; l2 < NUM_LAYERS; ++l2)
+                if (!is_gdn[l2]) n_full_actual++;
+            double kv_mb = (double)n_full_actual * C * kv_dim * sizeof(float) * 2 / (1024 * 1024);
+
+            if (csv) {
+                printf(MODEL_NAME ",%zu,%.0f,%.0f,%.0f,%.0f,%.2f,%.1f\n",
+                       C, gdn_total, full_total, ffn_total, total_us, tps, kv_mb);
+            } else {
+                printf("  ctx=%5zu  GDN=%7.0f us  full_attn=%7.0f us  FFN=%7.0f us"
+                       "  total=%7.0f us  %.2f tok/s  KV=%5.1f MB\n",
+                       C, gdn_total, full_total, ffn_total, total_us, tps, kv_mb);
+            }
+        }
+
+        /* Cleanup growing KV caches */
+        for (int l = 0; l < NUM_LAYERS; ++l) {
+            if (!is_gdn[l]) {
+                free(states[l].kv_k_grow);
+                free(states[l].kv_v_grow);
+            }
+        }
+
+        /* Cleanup weights + states and exit */
+        free(hidden); free(hidden_next);
+        free(w.g_q_proj); free(w.g_k_proj); free(w.g_v_proj); free(w.g_o_proj);
+        free(w.g_conv_w); free(w.g_beta);
+        free(w.f_q_proj); free(w.f_k_proj); free(w.f_v_proj); free(w.f_o_proj);
+        free(w.gate_proj); free(w.up_proj); free(w.down_proj);
+#ifdef INT8_WEIGHTS
+        free(w.g_q_proj_q.q);  free(w.g_q_proj_q.s);
+        free(w.g_k_proj_q.q);  free(w.g_k_proj_q.s);
+        free(w.g_v_proj_q.q);  free(w.g_v_proj_q.s);
+        free(w.g_o_proj_q.q);  free(w.g_o_proj_q.s);
+        free(w.f_q_proj_q.q);  free(w.f_q_proj_q.s);
+        free(w.f_k_proj_q.q);  free(w.f_k_proj_q.s);
+        free(w.f_v_proj_q.q);  free(w.f_v_proj_q.s);
+        free(w.f_o_proj_q.q);  free(w.f_o_proj_q.s);
+        free(w.gate_proj_q.q); free(w.gate_proj_q.s);
+        free(w.up_proj_q.q);   free(w.up_proj_q.s);
+        free(w.down_proj_q.q); free(w.down_proj_q.s);
+#endif
+        for (int l = 0; l < NUM_LAYERS; ++l) {
+            free(states[l].gdn_state); free(states[l].conv_hist);
+            free(states[l].kv_cache_k); free(states[l].kv_cache_v);
+        }
+        return 0;
+    }
 
     if (!csv) {
         printf(MODEL_NAME " CPU decode benchmark\n");

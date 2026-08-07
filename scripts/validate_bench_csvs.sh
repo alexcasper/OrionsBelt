@@ -96,7 +96,10 @@ except: print('')
     fi
 
     # Check kernel coverage (warn, don't fail — baseline-only CSVs are legitimate)
-    if [ "$rows" -lt 10 ]; then
+    # E2E decode and delta_matmul CSVs legitimately have few rows by design.
+    case "$base" in
+        *e2e*|*delta_matmul*) special_csv=1 ;; *) special_csv=0 ;; esac
+    if [ "$rows" -lt 10 ] && [ "$special_csv" -eq 0 ]; then
         echo "    ⚠ NOTE: only $rows rows — may be missing mixed-precision or decode variants"
     fi
     if [ "$has_bf16" -eq 0 ] && [ "$rows" -gt 6 ]; then

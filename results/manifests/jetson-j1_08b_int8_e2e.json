@@ -1,10 +1,10 @@
 {
   "manifest_version": 1,
-  "run_id": "jetson-j1_e2e_b85fab1",
-  "timestamp_utc": "2026-08-07T02:32:33Z",
+  "run_id": "jetson-j1_08b_int8_e2e_660ce17",
+  "timestamp_utc": "2026-08-07T02:54:20Z",
   "source": "scripts/capture_manifest.sh",
   "git": {
-    "sha": "b85fab11959e8f58a5b18d77d25937fe630290f1",
+    "sha": "660ce17bcfa2ad54efce5cb9ec63630ee6e527e7",
     "dirty": false
   },
   "host": {
@@ -24,10 +24,10 @@
     "effective_threads": 4,
     "threads_source": "core_count_default"
   },
-  "thermal_zones": [{"zone":"thermal_zone0","type":"AO-therm","temp_millicelsius":56000},{"zone":"thermal_zone1","type":"CPU-therm","temp_millicelsius":50500},{"zone":"thermal_zone2","type":"GPU-therm","temp_millicelsius":50000},{"zone":"thermal_zone3","type":"PLL-therm","temp_millicelsius":47500},{"zone":"thermal_zone4","type":"PMIC-Die","temp_millicelsius":50000},{"zone":"thermal_zone5","type":"thermal-fan-est","temp_millicelsius":51000}],
+  "thermal_zones": [{"zone":"thermal_zone0","type":"AO-therm","temp_millicelsius":53000},{"zone":"thermal_zone1","type":"CPU-therm","temp_millicelsius":48000},{"zone":"thermal_zone2","type":"GPU-therm","temp_millicelsius":47000},{"zone":"thermal_zone3","type":"PLL-therm","temp_millicelsius":44500},{"zone":"thermal_zone4","type":"PMIC-Die","temp_millicelsius":50000},{"zone":"thermal_zone5","type":"thermal-fan-est","temp_millicelsius":47500}],
   "memory": {
     "mem_total_kb": 4059020,
-    "mem_available_kb": 2018548
+    "mem_available_kb": 1991360
   },
   "software": {
     "python_version": "Python 3.6.9"
