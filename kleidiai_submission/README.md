@@ -314,19 +314,19 @@ SVE/SVE2 — the kernels run the NEON fallback path (`#elif __ARM_NEON`).
 |-------------|------------------|----------|-------|
 | cumdecay    | 64×160           |     11.4 |   6.7 |
 | cumdecay    | 1×160            |      0.3 |   4.1 |
-| cumdecay    | 64×2560          |    537.0 |   2.3 |
+| cumdecay    | 64×2560          |    537.3 |   2.3 |
 | cumdecay    | 1×2560           |      0.9 |  21.8 |
 | gated_scan  | 64×160           |      5.3 |  22.0 |
 | gated_scan  | 1×160            |      0.0 |    —* |
-| gated_scan  | 64×2560          |    179.7 |  10.3 |
+| gated_scan  | 64×2560          |    192.5 |   9.6 |
 | gated_scan  | 1×2560           |      1.2 |  40.9 |
 | dwconv1d    | 64×160           |      5.3 |  15.7 |
 | dwconv1d    | 1×160            |      0.3 |  24.6 |
-| dwconv1d    | 64×2560          |    141.8 |   9.3 |
+| dwconv1d    | 64×2560          |    143.8 |   9.2 |
 | dwconv1d    | 1×2560           |      2.9 |  39.3 |
 | gemv        | K=128 N=128      |      3.5 |  17.7 |
-| gemv        | K=128 N=2048     |     59.8 |  16.5 |
-| gemv        | K=128 N=2560     |     84.0 |  14.7 |
+| gemv        | K=128 N=2048     |     63.0 |  15.6 |
+| gemv        | K=128 N=2560     |     79.9 |  15.4 |
 
 *\*The seq=1×160 shape for gated_scan is too small to measure reliably (p50 <
 1 µs); the `inf` GiB/s is treated as a measurement-floor artifact, not a real
@@ -340,7 +340,8 @@ memory subsystem. At seq=1, the A76's advantage is even larger on
 bandwidth-fitting shapes (cumdecay 1×2560: 21.8 vs 9.2 GiB/s) because the A76's
 L1 is faster and the launch overhead is lower.
 
-> **Provenance:** Captured at commit `e26eb10` on device t3 (RK3588).
+> **Provenance:** Captured at commit `250dc96` on device t3 (RK3588),
+> clean tree (dirty=false). Governor: `performance`.
 > Manifest: `results/manifests/rk3588-t3_kleidiai_gdn_kernels.json`.
 > Raw CSV: `results/raw/kleidiai/rk3588-t3_kleidiai_gdn_kernels.csv`.
 
