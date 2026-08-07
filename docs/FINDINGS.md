@@ -1100,6 +1100,9 @@ RK3588 A76/A55 all dispatch through the NEON path. The new
 `scripts/verify_kernels_native.sh` builds and runs the C kernel tests natively on
 each device using its real ISA, validating the actual dispatch path.
 
+**Verified via:** `scripts/verify_kernels_native.sh` on Jetson-J1 (2026-08-07). No CSV —
+results are stdout from the native C test binary built with `-march=armv8-a`.
+
 **Jetson-J1 (Cortex-A57, Armv8.0-A, NEON) — all tests pass on real silicon:**
 
 | Kernel | vs scalar ref (float) | vs scalar ref (double) | Bit-identical |
@@ -1627,6 +1630,8 @@ variable is thread count.
    `jetson-j2-full-optimized.csv` (3.82 vs 3.85 GiB/s on cumdecay — within 1%),
    confirming the benchmark is reproducible across sessions on the same hardware.
 
+**Data:** [`jetson-j1.csv`](../results/raw/jetson-j1.csv) · [`jetson-j2-omp-full.csv`](../results/raw/jetson-j2-omp-full.csv) · [`jetson-j2-full-optimized.csv`](../results/raw/jetson-j2-full-optimized.csv) (manifests: `jetson-j1.json` SHA `148db31`, `jetson-j2_*.json` dirty-tree).
+
 ## 6. GDN-2 reference clone and decoupled-gating microbenchmark (2026-08-03)
 
 **Bead ob-y3f. NVLabs GatedDeltaNet-2 repo cloned and analysed; C kernel stub benchmarked on jetson-j2.**
@@ -1688,6 +1693,8 @@ Measured on jetson-j2 (4× A57, NEON 8-wide, OpenMP 4-thread, governor=performan
 | 4B (seq=64) | **gdn2_gated_scan** | **1632** | **3.01** | **1.64×** |
 | 0.8B (seq=64) | gdn_gated_scan | 258 | 5.73 | — |
 | 0.8B (seq=64) | **gdn2_gated_scan** | **431** | **5.71** | **1.67×** |
+
+**Data:** From `jetson-j2-omp-full.csv` (OpenMP 4-thread, SHA `152808b`, dirty tree) — GDN-2 scan kernel timings reported alongside GDN-1 baseline in the same run.
 
 ### Finding: GDN-2's overhead is entirely bandwidth, not compute
 
