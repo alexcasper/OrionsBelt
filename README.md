@@ -139,7 +139,9 @@ All figures above are verified against primary sources (Radxa product page and d
 
 **Device-fleet microbenchmarks are complete across five Arm devices.** Three GDN CPU kernels (gated cumulative decay, gated delta-rule scan, causal depthwise Conv1D) have been measured at verified Qwen3.5-4B and 0.8B shapes on the full fleet: Jetson Nano (Cortex-A57, NEON), Raspberry Pi 5 (Cortex-A76), and RK3588 (Cortex-A76 big + Cortex-A55 little clusters). The optimization stack (OpenMP parallelization + NEON unrolling + fp16 state) delivers 2.6–5.1× on A76 silicon and 2.6–3.1× on A57. The key cross-device finding — that these kernels are **instruction-overhead-bound, not DRAM-bandwidth-bound** at seq=64 working-set sizes — is documented in the [fleet bandwidth-scaling analysis](./results/figures/fleet_bandwidth_scaling.md).
 
-**Operator analysis findings** ([`docs/FINDINGS.md`](./docs/FINDINGS.md), 26 sections):
+**End-to-end model decode** runs the full Qwen3.5 forward pass in C with optimized NEON GEMV kernels. The 0.8B model achieves **2.7 tok/s on the Jetson Nano (Cortex-A57)** and **8.0 tok/s on RK3588 (Cortex-A76)** — practical for real-time edge deployment. The 4B model achieves 0.43 tok/s (A57) and 1.04 tok/s (A76). Bottleneck analysis confirms the model is **matmul-bound** (FFN 54–72%), not recurrence-bound — GDN's novel kernels account for <1% of total time. See the [e2e fleet comparison](./results/figures/e2e_fleet_comparison.md) and [FINDINGS.md §16](./docs/FINDINGS.md).
+
+**Operator analysis findings** ([`docs/FINDINGS.md`](./docs/FINDINGS.md), 29 sections):
 - CIX NOE and Rockchip RKNN toolchains both reject GDN's runtime-length recurrence — the limitation generalises beyond one vendor (§1, §7)
 - KleidiAI packed GEMM wins 1.7–3.6× on matmul but packing cost dominates at decode; dual-path strategy recommended (§8)
 - big.LITTLE affinity: pinning to A76 big cores is 2–3× faster than default scheduler placement (§9)
@@ -170,16 +172,15 @@ All figures above are verified against primary sources (Radxa product page and d
 | Orion O6 board bring-up | **Pending** — board not yet in hand |
 | CIX Early Bird SDK / NPU toolchain access | **Pending** — not yet approved |
 | Per-layer engine mapping (NPU/GPU/CPU) | Hypothesis only — pending measurements |
-| Optimized full inference (tokens/sec, TTFT, memory) | **Not started — needs hardware** |
+| Full inference results (tokens/sec, TTFT, memory) | Partial — C decode loop on A57 + RK3588, cross-device e2e table ([FINDINGS.md](./docs/FINDINGS.md) §14–16, [e2e comparison](./results/figures/e2e_fleet_comparison.md)) |
 
-> **Results so far:** 64 CSVs from the device fleet, 67 generated figures/tables, 26 FINDINGS sections.
+> **Results so far:** 73 CSVs from the device fleet, 48 provenance manifests, 68 generated figures/tables, 29 FINDINGS sections.
 >
 > ```
 > results/
->   raw/         <- 64 per-run CSVs across 5 devices
->   manifests/   <- provenance manifests (git SHA, governor, thermals)
->   figures/     <- fleet analysis, comparison table, kernel/memory plots
-> ```
+>   raw/         <- 73 per-run CSVs across 5 devices
+>   manifests/   <- 48 provenance manifests (git SHA, governor, thermals)
+>   figures/     <- fleet analysis, comparison table, kernel/memory plots> ```
 >
 > See [`results/README.md`](./results/README.md) for the layout, [`docs/FINDINGS.md`](./docs/FINDINGS.md) for findings, and [`results/figures/fleet_bandwidth_scaling.md`](./results/figures/fleet_bandwidth_scaling.md) for the headline cross-device analysis.
 

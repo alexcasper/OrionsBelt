@@ -2506,10 +2506,32 @@ This is the number the CPU-first mapping hypothesis needs.
 
 ### Results
 
-| Device | Core | Commit | Tok/s (decode) | TTFT | Governor |
-|--------|------|--------|---------------:|-----:|----------|
-| RK3588 (t3) | Cortex-A76 ×4 | a086a50 | 0.08 | 13.3 s | performance |
-| Jetson Nano (j1) | Cortex-A57 ×4 | dd1fdf4 | 0.02 | 48.6 s | performance |
+> **⚠ CORRECTION (2026-08-07):** The numbers below are from a **stale binary**
+> that predated the GEMV row-sweep optimization (§15). The `run_e2e_decode.sh`
+> script reuses existing binaries; the A57 binary was built before commit
+> `2e752af` merged the 15× GEMV speedup. Re-running at HEAD (`b85fab1`) with
+> a freshly built binary gives **0.43 tok/s and 2.3 s TTFT** — a 19× improvement.
+> The corrected numbers are in §16 and `results/figures/e2e_fleet_comparison.md`.
+> The data below is retained as the pre-optimization baseline.
+
+| Device | Core | Commit | Runs | Tok/s (decode) | TTFT range | Governor |
+|--------|------|--------|-----:|---------------:|-----------:|----------|
+| RK3588 (t3) | Cortex-A76 ×4 | a086a50 | 1 | 0.08 | 13.3 s | performance |
+| Jetson Nano (j1) | Cortex-A57 ×4 | a8b5195 | 3 | 0.022–0.024 | 41.4–47.8 s | performance |
+
+**A57 replicate detail (3 runs, commit `a8b5195`, clean tree):**
+
+| Run | TTFT (s) | Per-token mean (s) | Tok/s |
+|----:|---------:|-------------------:|------:|
+| 1 | 47.8 | 46.4 | 0.022 |
+| 2 | 44.2 | 44.0 | 0.023 |
+| 3 | 41.4 | 41.2 | 0.024 |
+
+TTFT spread: **1.15×** (47.8 / 41.4). Per-token mean spread: **1.13×**.
+Thermal delta over all 3 runs: +3 °C (47.5 → 50.5 °C CPU-therm) — no throttling.
+This is well within the stability range for a passively-cooled edge device,
+and far tighter than the 1.68× inter-board spread found in the kernel-level
+fleet sweep (bead ob-bf7).
 
 **Caveat: different commits.** The kernel source (`gdn_sve.c`,
 `gdn_delta_matmul.c`, `gdn_e2e_decode.c`) is identical at both commits — the
@@ -2517,14 +2539,17 @@ intervening changes are to scripts and documentation — so the comparison is
 valid in practice. However, per the project's results-discipline rule, this
 should be re-confirmed at a matched commit before appearing in the submission.
 
-**Only 1 run per device.** A single measurement per device is not enough to
-establish replicates (bead ob-bf7 found 1.68× spread on this fleet). These
-numbers should be treated as order-of-magnitude, not precise.
+**RK3588 (t3) is still single-run.** The A57 now has 3 replicates; the RK3588
+data point should be re-run with multiple measurements for a matched comparison.
 
 ### What the numbers say (and don't)
 
-The A57 is ~4× slower than the A76 (0.02 vs 0.08 tok/s), consistent with the
-core-level bandwidth ratio from the fleet kernel study (§5a). This is not
+> **Note:** these observations are based on the pre-optimization binary.
+> The corrected A57 4B performance (0.43 tok/s, 2.3s TTFT) narrows the A57/A76
+> gap to 2.4× — see §16 for the updated analysis.
+
+The A57 is ~4× slower than the A76 (0.022–0.024 vs 0.08 tok/s), consistent with
+the core-level bandwidth ratio from the fleet kernel study (§5a). This is not
 surprising — the A57 is Armv8.0-A with NEON only, while the A76 has dotprod
 and higher clock. The result confirms the decode loop runs correctly on the
 weakest fleet device and extends the fleet e2e data set.
@@ -3013,3 +3038,100 @@ that works on any Armv8-A NEON target. The implementation is 60 lines of C
 that the CPU decode bottleneck is addressable through memory-system
 optimization alone — the GDN recurrent-scan kernels remain <0.1% of decode
 time and are not the optimization target.
+
+---
+
+## 17. Cross-device e2e decode comparison: A57 vs A76, 4B vs 0.8B (2026-08-07, ob-mrd.8)
+
+### Motivation
+
+With the A57 now running the 0.8B model variant (added by t3 at commit
+`a756662`), we have the first cross-device, cross-model e2e decode comparison
+spanning two Arm core classes. This addresses the fleet-level headline number
+that ob-ami's master comparison table needs.
+
+Generated table: [`results/figures/e2e_fleet_comparison.md`](../results/figures/e2e_fleet_comparison.md)
+(generator: `scripts/gen_e2e_comparison.py` — do not hand-edit).
+
+### Data
+
+All entries are fp32, governor=performance, manifest-backed (`dirty=false`),
+random weights (benchmark only).
+
+| Device | CPU | Model | Runs | TTFT (s) | tok/s | Spread | Commit |
+|--------|-----|-------|------|----------|-------|--------|--------|
+| rk3588-t3 | Cortex-A76 @2.4 GHz | Qwen3.5-0.8B | 2 | 0.125 | 7.98 | 1.00× | `7962968` |
+| jetson-j1 | Cortex-A57 @1.48 GHz | Qwen3.5-0.8B | 3 | 0.375 | 2.69 | 1.03× | `2896dd0` |
+| rk3588-t3 | Cortex-A76 @2.4 GHz | Qwen3.5-4B | 2 | 0.964 | 1.04 | 1.00× | `2e752af` |
+| jetson-j1 | Cortex-A57 @1.48 GHz | Qwen3.5-4B | 3 | 2.321 | 0.43 | 1.00× | `b85fab1` |
+| rk3588-t4 | Cortex-A76 @2.4 GHz | Qwen3.5-4B | 1 | 11.76 | 0.09 | — | `def3f29` |
+
+### Cross-commit caveat
+
+> **These devices were NOT all measured at the same commit.** The GEMV
+> row-sweep optimization (§15, commit `2e752af`) delivered ~12× speedup over
+> the column-sweep baseline. Specifically:
+> - **rk3588-t4** (`def3f29`) ran the **pre-optimization** binary → 0.09 tok/s
+> - **rk3588-t3** (`2e752af`) ran the **post-optimization** binary → 1.04 tok/s
+> - Both are the same RK3588 SoC class; the 11.6× gap is software, not silicon.
+>
+> All other entries (A57 4B `b85fab1`, A57 0.8B `2896dd0`, A76 0.8B `7962968`)
+> include the GEMV optimization. The t4 pre-opt data point is retained as the
+> baseline that demonstrates the optimization's impact.
+
+### Cross-device scaling (matched GEMV code)
+
+With all entries running the optimized row-sweep GEMV (excluding the t4
+pre-optimization baseline):
+
+| Model | Cortex-A57 (Jetson) | Cortex-A76 (RK3588) | A76/A57 |
+|-------|---------------------|---------------------|---------|
+| 0.8B tok/s | 2.70 | 7.98 | **3.0×** |
+| 4B tok/s | 0.43 | 1.04 | **2.4×** |
+| 0.8B TTFT (s) | 0.37 | 0.125 | 3.0× |
+| 4B TTFT (s) | 2.32 | 0.96 | 2.4× |
+
+The A76 is 2.4–3.0× faster than the A57. This is consistent with:
+- ~1.6× clock advantage (2.4 GHz vs 1.48 GHz)
+- ~1.3× pipeline advantage (A76: 2× FMA/cycle; A57: 1× FMA/cycle, 3-wide vs 2-wide OoO)
+- 1.6 × 1.3 ≈ 2.1×, with the remaining ~1.2–1.4× from A76's superior
+  L1/L2 cache subsystem and memory-level parallelism
+- The 4B ratio (2.4×) is smaller than the 0.8B ratio (3.0×) because the larger
+  working set of 4B pushes both cores closer to DRAM bandwidth limits,
+  reducing the compute throughput gap.
+
+### Bottleneck breakdown
+
+The GEMV optimization didn't change *which* phase dominates — FFN matmuls
+remain the bottleneck everywhere:
+
+| Phase | A57 0.8B | A76 0.8B | A57 4B | A76 4B |
+|-------|----------|----------|--------|--------|
+| FFN | 55.9% | 54.1% | 69.9% | 72.4% |
+| GDN q/k/v proj | 24.5% | 29.9% | 15.0% | 13.8% |
+| GDN output proj | 10.5% | 8.2% | 7.9% | 8.1% |
+| Full attention | 8.3% | 7.5% | 7.1% | 5.6% |
+| GDN conv+decay+scan | 0.9% | 0.3% | 0.2% | 0.1% |
+
+FFN share increases with model size (56% → 70% A57, 54% → 72% A76 from 0.8B to 4B)
+because the FFN intermediate dimension scales faster than the GDN state.
+GDN's novel recurrent kernels (conv, decay, scan) remain <1% of total —
+confirming the model is **matmul-bound**, not recurrence-bound.
+
+### Implication for the GDN hypothesis
+
+The original hypothesis (ob-8qt.1, PLAN.md §3.1) was that GDN's sequential
+recurrence would be a CPU bottleneck, making CPU-first mapping advantageous.
+The data shows the opposite: **GDN recurrence is negligible cost; the
+dominant cost is the same dense matmuls (FFN, projections) that every
+transformer architecture has.** The GDN vs full-attention choice affects
+*memory traffic at long context* (KV cache vs fixed recurrent state), not
+*compute throughput at short context*. This should be tested at longer
+sequence lengths where the KV-cache advantage materialises.
+
+### A57 0.8B is practical for edge deployment
+
+At 2.7 tok/s with a 0.37s TTFT, the Jetson Nano (2014-era Cortex-A57,
+passively cooled at +1°C delta) can sustain real-time text generation for
+the 0.8B model. This is a usable rate for interactive chat or structured
+extraction on hardware that costs <$50 and draws ~5W.
