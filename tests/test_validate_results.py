@@ -18,6 +18,7 @@ from scripts.validate_results import (  # noqa: E402
     ABSURD_THROUGHPUT,
     E2E_SWEEP_COLS,
     GPU_MICRO_COLS,
+    KLEIDIAI_GDN_COLS,
     KLEIDIAI_MATMUL_COLS,
     LAYER_PROFILE_COLS,
     STANDARD_COLS,
@@ -33,6 +34,7 @@ from scripts.validate_results import (  # noqa: E402
     validate_csv,
     validate_e2e_sweep_row,
     validate_gpu_micro_row,
+    validate_kleidiai_gdn_row,
     validate_kleidiai_matmul_row,
     validate_layer_profile_row,
     validate_manifest,
@@ -210,6 +212,15 @@ class TestDetectCsvType:
         cols = ["shape", "impl", "GiB_s", "GFLOP_s"]
         assert detect_csv_type(cols) == "kleidiai_matmul"
 
+    def test_kleidiai_gdn_detected(self):
+        """KleidiAI GDN kernel CSV should be detected."""
+        assert detect_csv_type(KLEIDIAI_GDN_COLS) == "kleidiai_gdn"
+
+    def test_kleidiai_gdn_minimal_cols(self):
+        """Detection only needs the key columns."""
+        cols = ["kernel", "seq", "channels", "p50_us", "gib_per_s_p50"]
+        assert detect_csv_type(cols) == "kleidiai_gdn"
+
 
 # ---------------------------------------------------------------------------
 # expected_columns
@@ -245,6 +256,11 @@ class TestExpectedColumns:
         assert "us_per_call" in expected_columns("kleidiai_matmul")
         assert "GiB_s" in expected_columns("kleidiai_matmul")
         assert "GFLOP_s" in expected_columns("kleidiai_matmul")
+
+    def test_kleidiai_gdn_columns(self):
+        assert "kernel" in expected_columns("kleidiai_gdn")
+        assert "p50_us" in expected_columns("kleidiai_gdn")
+        assert "gib_per_s_p50" in expected_columns("kleidiai_gdn")
 
 
 # ---------------------------------------------------------------------------
@@ -594,7 +610,73 @@ class TestValidateKleidiaiMatmulRow:
         assert any("cannot parse GiB_s" in i.message for i in issues)
 
 
-class TestCheckManifestExists:
+# ---------------------------------------------------------------------------
+# KleidiAI GDN kernel row validation
+# ---------------------------------------------------------------------------
+
+
+def _kleidiai_gdn_row(**overrides):
+    """A valid KleidiAI GDN kernel benchmark row."""
+    base = {
+        "kernel": "cumdecay",
+        "shape": "64x160",
+        "seq": "64",
+        "channels": "160",
+        "repeats": "30",
+        "p50_us": "3.500",
+        "gib_per_s_p50": "21.80",
+    }
+    base.update(overrides)
+    return base
+
+
+class TestValidateKleidiaiGdnRow:
+    def test_valid_row_no_issues(self):
+        issues = []
+        validate_kleidiai_gdn_row(_kleidiai_gdn_row(), "test.csv", issues, 2)
+        assert issues == []
+
+    def test_valid_inf_throughput(self):
+        """'inf' is legitimate for sub-microsecond kernels."""
+        issues = []
+        validate_kleidiai_gdn_row(
+            _kleidiai_gdn_row(p50_us="0.000", gib_per_s_p50="inf"),
+            "test.csv",
+            issues,
+            2,
+        )
+        assert issues == []
+
+    def test_negative_p50(self):
+        issues = []
+        validate_kleidiai_gdn_row(_kleidiai_gdn_row(p50_us="-1.0"), "test.csv", issues, 2)
+        assert any("negative p50_us" in i.message for i in issues)
+
+    def test_absurd_throughput(self):
+        issues = []
+        validate_kleidiai_gdn_row(
+            _kleidiai_gdn_row(gib_per_s_p50=str(ABSURD_THROUGHPUT + 1)),
+            "test.csv",
+            issues,
+            2,
+        )
+        assert any("absurd gib_per_s_p50" in i.message for i in issues)
+
+    def test_negative_throughput(self):
+        issues = []
+        validate_kleidiai_gdn_row(_kleidiai_gdn_row(gib_per_s_p50="-5.0"), "test.csv", issues, 2)
+        assert any("negative gib_per_s_p50" in i.message for i in issues)
+
+    def test_malformed_p50(self):
+        issues = []
+        validate_kleidiai_gdn_row(_kleidiai_gdn_row(p50_us="abc"), "test.csv", issues, 2)
+        assert any("cannot parse p50_us" in i.message for i in issues)
+
+    def test_malformed_throughput(self):
+        issues = []
+        validate_kleidiai_gdn_row(_kleidiai_gdn_row(gib_per_s_p50="N/A"), "test.csv", issues, 2)
+        assert any("cannot parse gib_per_s_p50" in i.message for i in issues)
+
     def test_exact_match(self, tmp_path):
         manifest = tmp_path / "jetson-j1.json"
         manifest.write_text("{}")

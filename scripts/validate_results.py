@@ -173,6 +173,17 @@ KLEIDIAI_MATMUL_COLS = [
     "GFLOP_s",
 ]
 
+# KleidiAI GDN micro-kernel benchmark CSV (from kleidiai_submission/bench_kai_gdn.c)
+KLEIDIAI_GDN_COLS = [
+    "kernel",
+    "shape",
+    "seq",
+    "channels",
+    "repeats",
+    "p50_us",
+    "gib_per_s_p50",
+]
+
 # Device spec bandwidth (GiB/s) for sanity-check upper bounds.
 # From DEVICE_RUNBOOK.md "What we are actually testing".
 DEVICE_SPEC_BW = {
@@ -187,7 +198,7 @@ ABSURD_THROUGHPUT = 200.0  # GiB/s
 
 
 def detect_csv_type(header):
-    """Return CSV type: standard, sustained, power, layer_profile, delta_matmul, e2e_decode, ctx_sweep, e2e_sweep, e2e_ctxsweep, gpu_micro, or None."""
+    """Return CSV type: standard, sustained, power, layer_profile, delta_matmul, e2e_decode, ctx_sweep, e2e_sweep, e2e_ctxsweep, gpu_micro, kleidiai_matmul, kleidiai_gdn, or None."""
     cols = set(header)
     if cols >= set(STANDARD_COLS):
         return "standard"
@@ -211,6 +222,8 @@ def detect_csv_type(header):
         return "gpu_micro"
     if cols >= {"shape", "impl", "GiB_s", "GFLOP_s"}:
         return "kleidiai_matmul"
+    if cols >= {"kernel", "seq", "channels", "p50_us", "gib_per_s_p50"}:
+        return "kleidiai_gdn"
     return None
 
 
@@ -237,6 +250,8 @@ def expected_columns(csv_type):
         return GPU_MICRO_COLS
     if csv_type == "kleidiai_matmul":
         return KLEIDIAI_MATMUL_COLS
+    if csv_type == "kleidiai_gdn":
+        return KLEIDIAI_GDN_COLS
     return []
 
 
@@ -630,6 +645,36 @@ def validate_kleidiai_matmul_row(row, csv_name, issues, row_num):
         issues.append(Issue("WARNING", csv_name, f"row {row_num}: negative GFLOP_s={gflops}"))
 
 
+def validate_kleidiai_gdn_row(row, csv_name, issues, row_num):
+    """Validate a row of a KleidiAI GDN micro-kernel benchmark CSV."""
+    try:
+        us = float(row["p50_us"])
+    except (ValueError, KeyError, TypeError):
+        issues.append(Issue("ERROR", csv_name, f"row {row_num}: cannot parse p50_us"))
+        us = None
+    if us is not None and us < 0:
+        issues.append(Issue("WARNING", csv_name, f"row {row_num}: negative p50_us={us}"))
+
+    gib_raw = row.get("gib_per_s_p50", "")
+    if gib_raw == "inf":
+        pass  # legitimate for sub-microsecond kernels where timer resolution is 0
+    else:
+        try:
+            gibs = float(gib_raw)
+        except (ValueError, KeyError, TypeError):
+            issues.append(Issue("WARNING", csv_name, f"row {row_num}: cannot parse gib_per_s_p50"))
+            gibs = None
+        if gibs is not None:
+            if gibs < 0:
+                issues.append(
+                    Issue("WARNING", csv_name, f"row {row_num}: negative gib_per_s_p50={gibs}")
+                )
+            if gibs > ABSURD_THROUGHPUT:
+                issues.append(
+                    Issue("WARNING", csv_name, f"row {row_num}: absurd gib_per_s_p50={gibs}")
+                )
+
+
 def validate_csv(path, csv_name, issues):
     """Validate CSV schema and row-level data. Return (csv_type, row_count, manifest_ref)."""
     if not os.path.isfile(path):
@@ -722,6 +767,8 @@ def validate_csv(path, csv_name, issues):
                     validate_gpu_micro_row(row, csv_name, issues, i)
                 elif csv_type == "kleidiai_matmul":
                     validate_kleidiai_matmul_row(row, csv_name, issues, i)
+                elif csv_type == "kleidiai_gdn":
+                    validate_kleidiai_gdn_row(row, csv_name, issues, i)
 
             return csv_type, row_count, manifest_ref
 
