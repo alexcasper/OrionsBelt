@@ -149,6 +149,18 @@ E2E_CTXSWEEP_RAW_COLS = [
     "kv_cache_mb",
 ]
 
+# GPU (Mali/OpenCL) benchmark CSV — variable-length rows: some kernels
+# use 2 dims, others 3, so dim3 and later columns may be None.
+GPU_COLS = [
+    "# kernel",
+    "dim1",
+    "dim2",
+    "dim3",
+    "p50_ms",
+    "p95_ms",
+    "bw_mibs",
+]
+
 # Device spec bandwidth (GiB/s) for sanity-check upper bounds.
 # From DEVICE_RUNBOOK.md "What we are actually testing".
 DEVICE_SPEC_BW = {
@@ -162,7 +174,7 @@ ABSURD_THROUGHPUT = 200.0  # GiB/s
 
 
 def detect_csv_type(header):
-    """Return CSV type: standard, sustained, power, layer_profile, delta_matmul, e2e_decode, ctx_sweep, e2e_sweep, or None."""
+    """Return CSV type: standard, sustained, power, layer_profile, delta_matmul, e2e_decode, ctx_sweep, e2e_sweep, gpu, or None."""
     cols = set(header)
     if cols >= set(STANDARD_COLS):
         return "standard"
@@ -176,6 +188,8 @@ def detect_csv_type(header):
         return "delta_matmul"
     if cols >= {"tok_per_sec_mean", "gdn_proj_pct", "ffn_pct"}:
         return "e2e_decode"
+    if cols >= {"bw_mibs", "dim1"}:
+        return "gpu"
     if cols >= {"ctx_len", "gdn_layer_us", "full_attn_us", "kv_cache_mb"}:
         return "ctx_sweep"
     if cols >= {"run_id", "metric_name", "metric_component", "repeat_index"}:
@@ -204,6 +218,8 @@ def expected_columns(csv_type):
         return E2E_SWEEP_COLS
     if csv_type == "e2e_ctxsweep":
         return E2E_CTXSWEEP_RAW_COLS
+    if csv_type == "gpu":
+        return GPU_COLS
     return []
 
 
@@ -426,6 +442,38 @@ def validate_delta_matmul_row(row, csv_name, issues, row_num):
         issues.append(Issue("WARNING", csv_name, f"row {row_num}: p95 ({p95}) < p50 ({p50})"))
 
 
+def validate_gpu_row(row, csv_name, issues, row_num):
+    """Validate a single row of a GPU (Mali/OpenCL) benchmark CSV.
+
+    Rows are variable-length: some kernels use 2 dims, others 3, so
+    dim3, p95_ms, and bw_mibs may be None.  Only check values present.
+    """
+    try:
+        p50 = float(row["p50_ms"])
+    except (ValueError, KeyError, TypeError):
+        issues.append(Issue("ERROR", csv_name, f"row {row_num}: cannot parse p50_ms"))
+        return
+    if p50 <= 0:
+        issues.append(Issue("WARNING", csv_name, f"row {row_num}: non-positive p50_ms={p50}"))
+    # p95 and bw_mibs are optional for some kernel types
+    p95_raw = row.get("p95_ms")
+    if p95_raw is not None:
+        try:
+            p95 = float(p95_raw)
+            if p95 < p50:
+                issues.append(Issue("WARNING", csv_name, f"row {row_num}: p95 ({p95}) < p50 ({p50})"))
+        except (ValueError, TypeError):
+            pass
+    bw_raw = row.get("bw_mibs")
+    if bw_raw is not None:
+        try:
+            bw = float(bw_raw)
+            if bw <= 0:
+                issues.append(Issue("WARNING", csv_name, f"row {row_num}: non-positive bw_mibs={bw}"))
+        except (ValueError, TypeError):
+            pass
+
+
 def validate_ctx_sweep_row(row, csv_name, issues, row_num):
     """Validate a single row of a context-length sweep CSV (gdn_e2e_decode.c --ctx-sweep)."""
     try:
@@ -547,6 +595,8 @@ def validate_csv(path, csv_name, issues):
                     validate_layer_profile_row(row, csv_name, issues, i)
                 elif csv_type == "delta_matmul":
                     validate_delta_matmul_row(row, csv_name, issues, i)
+                elif csv_type == "gpu":
+                    validate_gpu_row(row, csv_name, issues, i)
                 elif csv_type == "e2e_decode":
                     # Basic sanity: tok_per_sec_mean must be positive
                     try:
