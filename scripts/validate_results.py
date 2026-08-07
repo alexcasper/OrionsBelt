@@ -536,7 +536,9 @@ def validate_gpu_micro_row(row, csv_name, issues, row_num):
         issues.append(Issue("ERROR", csv_name, f"row {row_num}: cannot parse dims: {e}"))
         return
     if dim1 < 1 or dim2 < 1:
-        issues.append(Issue("ERROR", csv_name, f"row {row_num}: non-positive dims dim1={dim1},dim2={dim2}"))
+        issues.append(
+            Issue("ERROR", csv_name, f"row {row_num}: non-positive dims dim1={dim1},dim2={dim2}")
+        )
 
     # dim3 is optional — some kernels only use 2 dims
     dim3_str = row.get("dim3", "")
@@ -546,7 +548,9 @@ def validate_gpu_micro_row(row, csv_name, issues, row_num):
             if dim3 < 1:
                 issues.append(Issue("ERROR", csv_name, f"row {row_num}: non-positive dim3={dim3}"))
         except ValueError:
-            issues.append(Issue("WARNING", csv_name, f"row {row_num}: non-integer dim3='{dim3_str}'"))
+            issues.append(
+                Issue("WARNING", csv_name, f"row {row_num}: non-integer dim3='{dim3_str}'")
+            )
 
     try:
         p50 = float(row["p50_ms"])
@@ -561,9 +565,13 @@ def validate_gpu_micro_row(row, csv_name, issues, row_num):
         try:
             p95 = float(p95_str)
             if p95 < p50:
-                issues.append(Issue("WARNING", csv_name, f"row {row_num}: p95 ({p95}) < p50 ({p50})"))
+                issues.append(
+                    Issue("WARNING", csv_name, f"row {row_num}: p95 ({p95}) < p50 ({p50})")
+                )
         except ValueError:
-            issues.append(Issue("WARNING", csv_name, f"row {row_num}: non-numeric p95_ms='{p95_str}'"))
+            issues.append(
+                Issue("WARNING", csv_name, f"row {row_num}: non-numeric p95_ms='{p95_str}'")
+            )
 
     try:
         bw = float(row["bw_mibs"])

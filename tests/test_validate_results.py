@@ -17,10 +17,10 @@ if _ROOT not in sys.path:
 from scripts.validate_results import (  # noqa: E402
     ABSURD_THROUGHPUT,
     E2E_SWEEP_COLS,
+    GPU_MICRO_COLS,
     LAYER_PROFILE_COLS,
     STANDARD_COLS,
     SUSTAINED_COLS,
-    GPU_MICRO_COLS,
     Issue,
     check_manifest_exists,
     detect_csv_type,
