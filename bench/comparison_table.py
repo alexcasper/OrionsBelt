@@ -38,9 +38,16 @@ def load_and_summarize(csv_paths: Sequence[str]) -> list[dict]:
     """
     groups: dict[tuple, list[float]] = defaultdict(list)
 
+    # Required columns from the frozen tidy/long schema (RESULTS_SCHEMA §1–3).
+    # CSVs that don't conform (raw kernel microbenchmarks, power logs, etc.)
+    # are silently skipped so the tool works on a mixed results/raw/ directory.
+    required_cols = {"context_length", "phase", "metric_name", "value"}
+
     for csv_path in csv_paths:
         with open(csv_path, newline="", encoding="utf-8") as f:
             reader = csv.DictReader(f)
+            if not reader.fieldnames or not required_cols.issubset(reader.fieldnames):
+                continue  # non-schema CSV — skip
             for row in reader:
                 # Skip rows from non-sweep CSVs (standard benchmark CSVs use a
                 # different schema without context_length/engine_gdn/value).

@@ -537,3 +537,28 @@ class TestMainCLI:
         assert rc == 1
         captured = capsys.readouterr()
         assert "No CSV files found" in captured.err
+
+    def test_non_schema_csvs_skipped(self, tmp_path):
+        """CSVs without required harness columns are silently skipped."""
+        # A valid harness-schema CSV (3 rows so p50 is well-defined)
+        good = tmp_path / "good.csv"
+        _write_csv(
+            good,
+            [
+                _row(value=100, repeat=0),
+                _row(value=110, repeat=1),
+                _row(value=120, repeat=2),
+            ],
+        )
+
+        # A raw kernel microbenchmark CSV (no context_length/phase/metric_name)
+        bad = tmp_path / "bad.csv"
+        bad.write_text(
+            "model,kernel,dispatch_path,seq,channels,p50_us,p95_us,gib_per_s_p50\n"
+            "Qwen3.5-4B,gdn_cumdecay,sve,64,2560,528.0,540.0,3.70\n",
+            encoding="utf-8",
+        )
+
+        summaries = load_and_summarize([str(good), str(bad)])
+        assert len(summaries) == 1
+        assert summaries[0]["p50"] == 110.0  # p50 of [100, 110, 120]
