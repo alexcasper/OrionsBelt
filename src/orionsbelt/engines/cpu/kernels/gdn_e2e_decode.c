@@ -604,11 +604,13 @@ static void full_attn_real_forward_int8kv(const Weights *w, LayerState *st,
         float inv_vs = 1.0f / st->kv_v_scale[kh];
         for (size_t d = 0; d < FULL_HEAD_DIM; ++d) {
             int kq = (int)lroundf(k[kh * FULL_HEAD_DIM + d] * inv_ks);
-            if (kq > 127) kq = 127;  if (kq < -128) kq = -128;
+            if (kq > 127) kq = 127;
+            if (kq < -128) kq = -128;
             st->kv_k_grow_q[pos * kv_dim + kh * FULL_HEAD_DIM + d] = (int8_t)kq;
 
             int vq = (int)lroundf(v[kh * FULL_HEAD_DIM + d] * inv_vs);
-            if (vq > 127) vq = 127;  if (vq < -128) vq = -128;
+            if (vq > 127) vq = 127;
+            if (vq < -128) vq = -128;
             st->kv_v_grow_q[pos * kv_dim + kh * FULL_HEAD_DIM + d] = (int8_t)vq;
         }
     }
@@ -986,11 +988,13 @@ int main(int argc, char **argv) {
                     for (size_t t = 0; t < max_ctx; ++t)
                         for (size_t d = 0; d < FULL_HEAD_DIM; ++d) {
                             int kq = (int)lroundf(tmp_k[t * kv_dim + kh * FULL_HEAD_DIM + d] * inv_k);
-                            if (kq > 127) kq = 127;  if (kq < -128) kq = -128;
+                            if (kq > 127) kq = 127;
+                            if (kq < -128) kq = -128;
                             states[l].kv_k_grow_q[t * kv_dim + kh * FULL_HEAD_DIM + d] = (int8_t)kq;
 
                             int vq = (int)lroundf(tmp_v[t * kv_dim + kh * FULL_HEAD_DIM + d] * inv_v);
-                            if (vq > 127) vq = 127;  if (vq < -128) vq = -128;
+                            if (vq > 127) vq = 127;
+                            if (vq < -128) vq = -128;
                             states[l].kv_v_grow_q[t * kv_dim + kh * FULL_HEAD_DIM + d] = (int8_t)vq;
                         }
                 }

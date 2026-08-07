@@ -175,16 +175,18 @@ Qwen3.5-4B at 100 GB/s (O6 LPDDR5 spec; RK3588 shared pool is 34 GiB/s per clust
 
 ## 7. End-to-end model decode: tokens/sec (measured)
 
-Qwen3.5-4B + 0.8B, fp32, A76 big cluster (cpu4-7), governor=performance, 128 decode tokens.
+Qwen3.5-4B + 0.8B, A76 big cluster (cpu4-7), governor=performance.
+Token counts differ by device/generation: t3 FP32 = 20 tokens, t3 INT8 = 16 tokens,
+t4 = 8 tokens (re-run, see per-row manifest for details).
 
 **After GEMV row-sweep optimization (commit `2e752af`, §FINDINGS-15):**
 
 | Device | Model | tok/s | TTFT (ms) | Git SHA | Manifest |
 |---|---|---:|---:|---|---|
-| rk3588-t3 | 4B   | 1.04 | — | `7962968` | `rk3588-t3_e2e.json` |
-| rk3588-t4 | 4B   | 1.11 | 898 | `b3c8203` | `rk3588-t4_gemv_optimized.json` |
-| rk3588-t3 | 0.8B | 7.98 | — | `41a847d` | `rk3588-t3_e2e.json` |
-| rk3588-t4 | 0.8B | 8.36 | 121 | `b3c8203` | `rk3588-t4_gemv_optimized.json` |
+| rk3588-t3 | 4B   | 1.04 | 964 | `7962968` | `rk3588-t3_e2e.json` |
+| rk3588-t4 | 4B   | 1.11 | 900 | `3d914b6` | `rk3588-t4_big_e2e.json` |
+| rk3588-t3 | 0.8B | 7.98 | 125 | `41a847d` | `rk3588-t3_08b_e2e.json` |
+| rk3588-t4 | 0.8B | 8.32 | 120 | `79668e3` | `rk3588-t4_08b_big_e2e.json` |
 
 > **10–15× speedup** from fixing the GEMV memory access pattern (column-sweep →
 > row-sweep + OpenMP tiles). The two boards agree within 7%, consistent with the
@@ -202,15 +204,17 @@ Qwen3.5-4B + 0.8B, fp32, A76 big cluster (cpu4-7), governor=performance, 128 dec
 
 | Device | Model | Quant | tok/s | TTFT (ms) | Git SHA | Manifest |
 |---|---|---|---:|---:|---|---|
-| rk3588-t3 | 4B   | INT8 | 1.84 | — | `bdca994` | — |
-| rk3588-t4 | 4B   | INT8 | 1.55 | 645 | `591232e` | `rk3588-t4_big_int8_e2e.json` |
-| rk3588-t3 | 0.8B | INT8 | 10.55 | — | `bdca994` | — |
-| rk3588-t4 | 0.8B | INT8 | 7.64 | 130 | `246d937` | `rk3588-t4_08b_big_int8_e2e.json` |
+| rk3588-t3 | 4B   | INT8 | 1.84 | 542 | `a8e2319` | `rk3588-t3_big_int8_e2e.json` |
+| rk3588-t4 | 4B   | INT8 | 1.83 | 545 | `861bdf2` | `rk3588-t4_big_int8_e2e.json` |
+| rk3588-t3 | 0.8B | INT8 | 10.58 | 94 | `d94864b` | `rk3588-t3_08b_big_int8_e2e.json` |
+| rk3588-t4 | 0.8B | INT8 | 10.03 | 100 | `d2262f1` | `rk3588-t4_08b_big_int8_e2e.json` |
 
 > INT8 weight-only quantization (per-column symmetric, NEON dequantize-on-the-fly)
-> cuts weight memory traffic 4×. t3 reported 1.79× speedup (4B) and 1.32× (0.8B)
-> over FP32 GEMV baseline. t4 cross-check confirms the optimisation direction;
-> absolute gap (16-28 %) is consistent with documented t3↔t4 board heterogeneity.
+> cuts weight memory traffic 4×. t3 reported 1.77× speedup (4B) and 1.33× (0.8B);
+> t4 confirms the optimisation direction with 1.65× (4B) and 1.21× (0.8B) over its
+> own FP32 baseline. Cross-board agreement at INT8 is ~0.5% (4B) and ~5% (0.8B),
+> tighter than the FP32 comparison because the bandwidth-bound decode is less
+> sensitive to board-level compute differences.
 > See FINDINGS.md "INT8 weight-only quantization" section for full analysis.
 
 ## 8. OpenMP multi-threading scaling (t4)
