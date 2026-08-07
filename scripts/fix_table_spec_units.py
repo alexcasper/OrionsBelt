@@ -10,8 +10,6 @@ Python 3.6 compatible (Jetson Nano rescue script).
 """
 import glob
 import os
-import re
-
 # Correct spec bandwidth in GiB/s (from bench/plots.py DEVICE_SPEC_BANDWIDTH)
 SPEC_GIBS = {
     "pi5": 15.8,
@@ -45,7 +43,7 @@ def fix_table_file(filepath):
     if new_spec is None:
         return False, "unknown device"
 
-    with open(filepath, "r") as f:
+    with open(filepath) as f:
         content = f.read()
 
     original = content
