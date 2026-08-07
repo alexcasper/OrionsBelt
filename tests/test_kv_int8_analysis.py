@@ -96,7 +96,9 @@ class TestGenerateReport:
         out_dir.mkdir(parents=True)
         monkeypatch.chdir(tmp_path)
         generate_report("rk3588-t3_big", str(out_dir))
-        report_path = out_dir / "kv_int8_scaling.md"
+        # generate_report writes a device-specific filename
+        # (rk3588-t3_big → kv_int8_scaling_t3.md)
+        report_path = out_dir / "kv_int8_scaling_t3.md"
         assert report_path.exists(), "Report file was not written"
         return report_path.read_text()
 
