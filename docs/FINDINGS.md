@@ -2632,6 +2632,8 @@ Files: `results/raw/rk3588-t4_4b_gemv_optimized.csv`, `results/raw/rk3588-t4_08b
 Manifest: `results/manifests/rk3588-t4_gemv_optimized.json` (sha `b3c8203`, dirty=false)
 Governor: performance. Cluster: big (A76 cores 4-7), 128 tokens × 1 run.
 
+---
+
 ## GDN-2 vs GDN-1 Gated Scan: Operator-Level Comparison on RK3588-t4
 
 **Date:** 2026-08-07
