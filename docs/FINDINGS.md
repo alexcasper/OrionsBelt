@@ -2500,7 +2500,8 @@ result credible when it arrives.
 **Device:** rk3588-t4 (RK3588, A76 big + A55 little)
 **Governor:** performance
 **Beads:** ob-82b (microbenchmark), ob-7b5 (research note)
-**Data:** `results/raw/rk3588-t4_gdn2_vs_gdn1_big.csv`, `_little.csv`
+**Data:** `results/raw/rk3588-t4_gdn2_vs_gdn1_big_clean.csv`, `_little_clean.csv` (clean-tree re-run, manifest: `rk3588-t4-gdn2-clean.json`)
+**Note:** Earlier dirty-tree CSVs (`_big.csv`, `_little.csv`) are superseded; numbers agree within measurement variance.
 
 ### Background
 
@@ -2522,8 +2523,8 @@ Theoretical cost ratio: **1.67× memory traffic, 2× compute**.
 
 | Config | GDN-1 p50 | GDN-2 p50 | Slowdown | GDN-1 GiB/s | GDN-2 GiB/s | GDN-1 GFLOP/s | GDN-2 GFLOP/s |
 |--------|-----------|-----------|----------|-------------|-------------|---------------|---------------|
-| 4B prefill (seq=64, ch=4096) | 257 µs | 688 µs | **2.68×** | 11.5 | 7.1 | 2.04 | 1.52 |
-| 0.8B prefill (seq=64, ch=2048) | 139 µs | 317 µs | **2.29×** | 10.7 | 7.7 | 1.89 | 1.65 |
+| 4B prefill (seq=64, ch=4096) | 260 µs | 671 µs | **2.58×** | 11.4 | 7.3 | 2.01 | 1.56 |
+| 0.8B prefill (seq=64, ch=2048) | 138 µs | 346 µs | **2.51×** | 10.7 | 7.1 | 1.90 | 1.52 |
 | 4B decode (seq=1, ch=4096) | 1.75 µs | 2.33 µs | **1.33×** | 43.6 | 45.8 | 4.68 | **7.02** |
 | 0.8B decode (seq=1, ch=2048) | 1.46 µs | 1.75 µs | **1.20×** | 26.2 | 30.5 | 2.81 | **4.68** |
 
@@ -2531,25 +2532,25 @@ Theoretical cost ratio: **1.67× memory traffic, 2× compute**.
 
 | Config | GDN-1 p50 | GDN-2 p50 | Slowdown | GDN-1 GiB/s | GDN-2 GiB/s |
 |--------|-----------|-----------|----------|-------------|-------------|
-| 4B prefill (seq=64, ch=4096) | 800 µs | 2912 µs | **3.64×** | 3.7 | 1.7 |
-| 0.8B prefill (seq=64, ch=2048) | 256 µs | 564 µs | **2.20×** | 5.8 | 4.4 |
-| 4B decode (seq=1, ch=4096) | 5.83 µs | 10.21 µs | **1.75×** | 13.1 | 10.5 |
-| 0.8B decode (seq=1, ch=2048) | 4.67 µs | 6.71 µs | **1.44×** | 8.2 | 8.0 |
+| 4B prefill (seq=64, ch=4096) | 781 µs | 3192 µs | **4.09×** | 3.8 | 1.5 |
+| 0.8B prefill (seq=64, ch=2048) | 257 µs | 618 µs | **2.41×** | 5.8 | 4.0 |
+| 4B decode (seq=1, ch=4096) | 5.54 µs | 9.92 µs | **1.79×** | 13.8 | 10.8 |
+| 0.8B decode (seq=1, ch=2048) | 4.38 µs | 6.71 µs | **1.53×** | 8.7 | 8.0 |
 
 ### Analysis
 
-1. **Prefill penalty is severe (2.2–3.6×).** At prefill, the recurrent
+1. **Prefill penalty is severe (2.4–4.1×).** At prefill, the recurrent
    state spans the full channel dimension and does not fit in L1. The scan
    is bandwidth-bound, and GDN-2's 5 streams vs GDN-1's 3 directly increase
-   memory traffic. The observed slowdown (2.2–3.6×) exceeds the theoretical
+   memory traffic. The observed slowdown (2.4–4.1×) exceeds the theoretical
    1.67× memory ratio because the extra 2 MULs per element add arithmetic
    latency that does not fully overlap with memory access.
 
-2. **Decode penalty is modest (1.2–1.75×).** At decode (seq=1), the state
+2. **Decode penalty is modest (1.2–1.8×).** At decode (seq=1), the state
    is a single vector of `channels` floats — 16 KiB for 4096 channels —
    which fits comfortably in L1 cache. The kernel becomes compute-bound,
    and GDN-2's 2× compute cost manifests as only a 1.2–1.3× slowdown on A76.
-   The A55 shows a slightly worse 1.4–1.75× ratio due to its simpler NEON
+   The A55 shows a slightly worse 1.5–1.8× ratio due to its simpler NEON
    FMA pipeline.
 
 3. **GDN-2 achieves HIGHER GFLOP/s at decode.** On the A76, GDN-2 decode
@@ -2559,7 +2560,7 @@ Theoretical cost ratio: **1.67× memory traffic, 2× compute**.
    bandwidth, far above DRAM bandwidth).
 
 4. **A55 prefill penalty is disproportionate.** The 4B prefill slowdown is
-   3.64× on A55 vs 2.68× on A76. The A55's in-order pipeline cannot overlap
+   4.09× on A55 vs 2.58× on A76. The A55's in-order pipeline cannot overlap
    the extra MULs with loads as effectively as the A76's out-of-order
    execution. This suggests GDN-2 is a worse fit for little cores.
 
@@ -2571,7 +2572,7 @@ for improved model quality (separate erase/write control). At edge scale:
 - **Decode (the hot path for autoregressive inference):** The cost is
   modest (1.2–1.3× on big cores). If GDN-2 improves long-context retrieval
   quality enough to justify this, it is viable.
-- **Prefill:** The 2.2–3.6× penalty is significant. For workloads with
+- **Prefill:** The 2.4–4.1× penalty is significant. For workloads with
   long prompts, prefill latency would increase substantially. Chunkwise
   prefill (amortizing over larger chunks) could mitigate this.
 
