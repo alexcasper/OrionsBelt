@@ -2942,6 +2942,38 @@ kernels. Both boards are RK3588 (4×A55 + 4×A76) but **different board vendors*
   now have clean post-optimization CSVs with <8% spread), but a new
   cross-board heterogeneity finding replaces it.
 
+### ⚠️ CORRECTION (ob-mrd.12, 2026-08-07) — the "single-thread" claim is false; the gap is a thread-count artifact
+
+The headline table and analysis above rest on the assumption that both boards
+ran **single-thread**. The committed manifests contradict this:
+
+| Run | Manifest | `effective_threads` | `threads_source` |
+|---|---|---:|---|
+| t3-clean | `rk3588-t3-clean.json` | **8** | `core_count_default` (OMP_NUM_THREADS unset → 8 cores) |
+| t4-clean | `rk3588-t4-clean.json` | **1** | `OMP_NUM_THREADS` (explicitly `=1`) |
+
+`t3-clean` is an **8-thread** run; `t4-clean` is genuinely **1-thread**. The
+1.25–4.87× "gap" is therefore primarily an **8-thread-vs-1-thread** confound,
+not evidence of a hardware difference. **No genuine single-thread t3 run
+exists** in committed data, so a strict 1-thread t3↔t4 comparison is not
+currently possible.
+
+The **equal-thread-count** comparison removes the confound. Both boards at
+8-thread (`rk3588-t4_big.csv` / `rk3588-t4.json` vs `rk3588-t3-clean.csv`):
+
+| Kernel (4B, seq=64) | t4 8-thread GiB/s | t3 8-thread GiB/s | t4÷t3 |
+|---|---:|---:|---:|
+| gdn_cumdecay | 22.47 | 21.06 | 1.07× |
+| gdn_gated_scan | 11.09 | 10.62 | 1.04× |
+| gdn_causal_dwconv1d | 23.00 | 18.73 | 1.23× |
+
+At equal thread count the two boards agree to within ~7% (cumdecay/scan) and
+**t4 is marginally faster**, consistent with its higher A76 clock (2400 vs
+2304 MHz). The "gap is REAL and hardware/environmental" conclusion above is
+**not supported** by these runs; it should be treated as unproven pending a
+genuine single-thread t3 capture. `comparison_table.md` carries the matching
+correction.
+
 ---
 
 ## 16. INT8 weight-only quantization: 1.16–1.77× additional decode speedup (2026-08-07)

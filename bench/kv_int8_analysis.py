@@ -51,6 +51,16 @@ def read_csv(path):
     return rows
 
 
+def _device_tag(device):
+    """Derive a short device tag for filenames (e.g. "rk3588-t3_big" → "t3").
+
+    Used so each fleet device gets its own report file
+    (kv_int8_scaling_{tag}.md) without collisions.
+    """
+    parts = device.replace("_", "-").split("-")
+    return parts[1] if len(parts) > 1 else device
+
+
 def generate_report(device, output_dir):
     lines = []
     lines.append("# INT8 KV Cache Quantization: Context-Length Scaling Analysis")
@@ -242,10 +252,7 @@ def generate_report(device, output_dir):
     lines.append("")
 
     output = "\n".join(lines) + "\n"
-    # Derive a short device tag for the filename (e.g. "rk3588-t3_big" → "t3")
-    parts = device.replace("_", "-").split("-")
-    dev_tag = parts[1] if len(parts) > 1 else device
-    out_path = os.path.join(output_dir, f"kv_int8_scaling_{dev_tag}.md")
+    out_path = os.path.join(output_dir, f"kv_int8_scaling_{_device_tag(device)}.md")
     with open(out_path, "w") as f:
         f.write(output)
     print(f"Report written to {out_path}")

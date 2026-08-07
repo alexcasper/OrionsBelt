@@ -10,12 +10,22 @@ See per-device tables (`*_table.md`) for full kernel-level detail._
 | rk3588-t3 (big) | `rk3588-t3-clean.csv` | `f015982` | **false** | performance | `rk3588-t3-clean.json` |
 | rk3588-t4 (big) | `rk3588-t4-clean.csv` | `1ca4d6d` | **false** | performance | `rk3588-t4-clean.json` |
 
-> Both t3 and t4 are clean-tree, single-thread, post-optimization runs (ob-aw9).
-> **Cross-board gap:** t3 is 1.6–2.9× faster than t4 despite t4 clocked higher
-> (2400 vs 2304 MHz). t3 is an unknown RK3588 board (kernel 5.10, CFS, 32 GB);
-> t4 is a Turing Machines RK1 (kernel 6.11, EEVDF, 8 GB). The gap is a genuine
-> hardware/environment difference, not a measurement artifact (see
-> [`FINDINGS.md`](../../docs/FINDINGS.md) §"Cross-Board Gap").
+> ⚠️ **Thread-count correction (ob-mrd.12, 2026-08-07):** the two CSVs above
+> were captured at **different** parallelism, not "single-thread" as previously
+> stated. `rk3588-t3-clean.json` records `effective_threads: 8`
+> (`threads_source: core_count_default` — `OMP_NUM_THREADS` was unset, so OpenMP
+> defaulted to all 8 cores). `rk3588-t4-clean.json` records `effective_threads: 1`
+> (`OMP_NUM_THREADS=1`). They are therefore **not directly comparable**.
+>
+> The like-for-like, equal-thread-count comparison is **t3-clean (8-thread) vs
+> `rk3588-t4_big.csv` (8-thread, `rk3588-t4.json`)**: cumdecay 21.06 vs **22.47**
+> GiB/s, gated scan 10.62 vs **11.09**, Conv1D 18.73 vs **23.00** — i.e. the two
+> boards are within ~7% and **t4 is marginally faster**, consistent with its
+> higher 2400 MHz clock. **No genuine single-thread t3 run exists**, so a strict
+> 1-thread t3↔t4 comparison is not possible from committed data. The
+> "1.6–2.9× cross-board gap" reported below is a **thread-count artifact**, not a
+> hardware difference. See the marked correction in
+> [`FINDINGS.md`](../../docs/FINDINGS.md) §"Cross-Board Gap".
 
 ## 1. Headline: GDN kernel bandwidth — RK3588 Cortex-A76 (big)
 
@@ -26,6 +36,10 @@ Qwen3.5-4B, prefill (seq=64), fp32 baseline, spec bandwidth 34.0 GiB/s.
 | gdn_cumdecay | 21.06 | 3.5% | 7.40 | 5.0% | 2.85× |
 | gdn_gated_scan | 10.62 | 5.4% | 5.67 | 7.4% | 1.87× |
 | gdn_causal_dwconv1d | 18.73 | 4.8% | 7.04 | 4.3% | 2.66× |
+
+> ⚠️ The `t3÷t4 ratio` column above compares **8-thread t3** against
+> **1-thread t4** and therefore overstates any real difference by the thread
+> count. Use it only alongside the equal-thread-count note above.
 
 > Both boards achieve well under the 34 GiB/s spec bandwidth per cluster. t3's
 > cumdecay reaches 62% of spec; t4 reaches 22%. The gap is systematic across
