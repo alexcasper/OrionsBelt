@@ -178,12 +178,12 @@ All figures above are verified against primary sources (Radxa product page and d
 | Per-layer engine mapping (NPU/GPU/CPU) | Hypothesis only — pending measurements |
 | Full inference results (tokens/sec, TTFT, memory) | Done — C decode loop (FP32+INT8), ctx-length scaling (§17–20), cross-device (A57+A76), sustained-load thermal stability (§18). [e2e comparison](./results/figures/e2e_fleet_comparison.md) |
 
-> **Results so far:** 120 CSVs from the device fleet, 85 provenance manifests, 76 generated figures/tables, 35 FINDINGS sections.
+> **Results so far:** 129 CSVs from the device fleet, 93 provenance manifests, 76 generated figures/tables, 35 FINDINGS sections.
 >
 > ```
 > results/
 >   raw/         <- 120 per-run CSVs across 5 devices
->   manifests/   <- 85 provenance manifests (git SHA, governor, thermals)
+>   manifests/   <- 93 provenance manifests (git SHA, governor, thermals)
 >   figures/     <- fleet analysis, comparison table, kernel/memory plots> ```
 >
 > See [`results/README.md`](./results/README.md) for the layout, [`docs/FINDINGS.md`](./docs/FINDINGS.md) for findings, and [`results/figures/fleet_bandwidth_scaling.md`](./results/figures/fleet_bandwidth_scaling.md) for the headline cross-device analysis.
