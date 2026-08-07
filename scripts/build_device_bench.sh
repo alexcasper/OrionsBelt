@@ -167,10 +167,14 @@ build_e2e_08b_int8() {
 echo ""
 echo "E2E decode benchmarks (INT8 weight-only quantization, ob-8qt.11):"
 build_e2e_int8 armv8a      "-march=armv8-a"
+build_e2e_int8 armv8.2dot  "-march=armv8.2-a+dotprod"
+build_e2e_int8 armv8.6i8mm "-march=armv8.2-a+i8mm"
+build_e2e_int8 armv9sve2   "-march=armv9-a+sve2+i8mm+bf16"
 build_e2e_int8 jetson_a57  "-mcpu=cortex-a57"
 build_e2e_int8 pi5_a76     "-mcpu=cortex-a76"
 build_e2e_int8 rk3588_a76  "-mcpu=cortex-a76"
 build_e2e_int8 rk3588_a55  "-mcpu=cortex-a55"
+build_e2e_int8 orion_a720  "-mcpu=cortex-a720"
 
 echo ""
 echo "E2E decode benchmarks (0.8B + INT8):"
@@ -179,6 +183,7 @@ build_e2e_08b_int8 jetson_a57  "-mcpu=cortex-a57"
 build_e2e_08b_int8 pi5_a76     "-mcpu=cortex-a76"
 build_e2e_08b_int8 rk3588_a76  "-mcpu=cortex-a76"
 build_e2e_08b_int8 rk3588_a55  "-mcpu=cortex-a55"
+build_e2e_08b_int8 orion_a720  "-mcpu=cortex-a720"
 
 cat <<'NOTE'
 

@@ -98,6 +98,10 @@ extern void gdn_causal_dwconv1d_f32(const float *in, const float *w, float *out,
 typedef struct {
     int8_t *q;   /* quantized weights [K×N] row-major int8 */
     float  *s;   /* per-column (output) scale [N] */
+#if defined(INT8_WEIGHTS) && defined(__ARM_FEATURE_DOTPROD)
+    int8_t *q_sdot; /* K-interleaved repack for SDOT GEMV (NULL if not DOTPROD) */
+    size_t  K, N;   /* dimensions at quantize time (for SDOT dispatch) */
+#endif
 } QW;
 
 /* Quantize a [K×N] float matrix to int8 + per-column scale (symmetric).
@@ -130,6 +134,23 @@ static void quantize_weight(const float *B_in, int8_t **q_out, float **s_out,
     *q_out = q;
     *s_out = s;
 }
+
+/* Repack quantized weights into K-interleaved layout for SDOT GEMV.
+ * Called after quantize_weight when __ARM_FEATURE_DOTPROD is active.
+ * Stores the repacked pointer back into the QW struct.
+ *
+ * repack_int8_k_interleaved is defined further down (with gemv_int8_sdot);
+ * forward-declare it here so this compiles instead of getting an implicit
+ * int-returning declaration that conflicts with its real int8_t* signature. */
+#if defined(__ARM_FEATURE_DOTPROD)
+static int8_t *repack_int8_k_interleaved(const int8_t *Bq, size_t K, size_t N);
+
+static void repack_qw_for_sdot(QW *qw, size_t K, size_t N) {
+    qw->q_sdot = repack_int8_k_interleaved(qw->q, K, N);
+    qw->K = K;
+    qw->N = N;
+}
+#endif
 #endif /* INT8_WEIGHTS */
 
 /* ---- Helpers ---- */
@@ -273,6 +294,139 @@ static void gemv_int8_neon(const float *a, const int8_t *Bq, const float *Bs,
             ct[j] *= Bs[jt + j];
     }
 }
+
+/* ---- SDOT-accelerated INT8 GEMV (ob-8qt.14) ----
+ *
+ * When __ARM_FEATURE_DOTPROD is available (Cortex-A76/A720 etc.), the int8→
+ * float32 dequantization in gemv_int8_neon wastes ~3 cycles per 4 elements
+ * on widen/convert instructions. This kernel keeps the entire dot-product in
+ * int8×int8 → int32, using the SDOT instruction, and only converts to float
+ * once at the end.
+ *
+ * Two changes vs gemv_int8_neon:
+ *   1. Input vector is quantized to int8 (symmetric, single scale factor).
+ *   2. Weights are repacked into a K-interleaved layout: for each group of
+ *      4 consecutive K-elements, the 4 weights for each output column are
+ *      stored contiguously. This lets one vdotq_lane_s32 instruction process
+ *      4 output columns × 4 K-elements = 16 multiply-accumulates.
+ *
+ * The repack is a one-time cost at weight quantization time; the per-call cost
+ * is just the input quantization (O(K)).
+ *
+ * Guarded by __ARM_FEATURE_DOTPROD; falls through to gemv_int8_neon on cores
+ * without dotprod (A57, A55, etc.).
+ */
+#if defined(INT8_WEIGHTS) && defined(__ARM_FEATURE_DOTPROD)
+#include <arm_neon.h>
+
+/* Repack [K×N] row-major int8 weights into K-interleaved layout for SDOT.
+ *
+ * Output layout: for each K-group g (g = 0..K_pad/4-1), for each column j:
+ *   out[(g*N + j)*4 + i] = in[(g*4+i)*N + j]   for i = 0..3
+ *
+ * This places 4 consecutive K-elements for each column contiguously, so that
+ * 4 consecutive columns' weights for a K-group form a 16-byte SDOT input.
+ * K is zero-padded to a multiple of 4.
+ */
+static int8_t *repack_int8_k_interleaved(const int8_t *Bq, size_t K, size_t N) {
+    size_t K_pad = (K + 3) & ~(size_t)3;
+    int8_t *out = calloc(K_pad * N, 1);  /* zero-padded */
+    if (!out) { fprintf(stderr, "OOM in repack_int8\n"); exit(1); }
+
+    for (size_t g = 0; g < K_pad / 4; ++g) {
+        for (size_t j = 0; j < N; ++j) {
+            for (size_t i = 0; i < 4; ++i) {
+                size_t k = g * 4 + i;
+                out[(g * N + j) * 4 + i] = (k < K) ? Bq[k * N + j] : 0;
+            }
+        }
+    }
+    return out;
+}
+
+/* Quantize a float input vector to int8 with symmetric scaling.
+ * Returns the scale factor via *scale_out. */
+static void quantize_input_int8(const float *a, int8_t *a_q, size_t K, float *scale_out) {
+    float max_abs = 0.0f;
+    for (size_t k = 0; k < K; ++k) {
+        float v = fabsf(a[k]);
+        if (v > max_abs) max_abs = v;
+    }
+    float scale = (max_abs > 0.0f) ? max_abs / 127.0f : 1.0f;
+    float inv = 1.0f / scale;
+    for (size_t k = 0; k < K; ++k) {
+        int vi = (int)lroundf(a[k] * inv);
+        if (vi > 127) vi = 127;
+        if (vi < -128) vi = -128;
+        a_q[k] = (int8_t)vi;
+    }
+    *scale_out = scale;
+}
+
+/* SDOT-based INT8 GEMV.
+ * a is [K] float, Bq_packed is K-interleaved repacked weights, Bs is [N] float
+ * weight scale, c is [N] float output.
+ *
+ * c[n] = Bs[n] * a_scale * sum_k(a_q[k] * Bq[k*N+n])
+ */
+static void gemv_int8_sdot(const float *a, const int8_t *Bq_packed,
+                           const float *Bs, float *c, size_t K, size_t N) {
+    size_t K_pad = (K + 3) & ~(size_t)3;
+
+    /* Quantize input vector */
+    int8_t a_q[K_pad];
+    memset(a_q, 0, K_pad);  /* zero-pad to multiple of 4 */
+    float a_scale;
+    quantize_input_int8(a, a_q, K, &a_scale);
+
+    /* Combined scale applied at the end */
+    float combined_scale_mul = a_scale;  /* each c[j] *= a_scale * Bs[j] */
+
+#ifdef _OPENMP
+#pragma omp parallel for schedule(static)
+#endif
+    for (size_t j4 = 0; j4 < N; j4 += 4) {
+        size_t cols = (N - j4 >= 4) ? 4 : (N - j4);
+
+        if (cols == 4) {
+            int32x4_t acc = vdupq_n_s32(0);
+
+            for (size_t g = 0; g < K_pad / 4; ++g) {
+                /* Load 16 repacked weight bytes for 4 columns at K-group g.
+                 * Layout: [Bq[k][j], Bq[k+1][j], Bq[k+2][j], Bq[k+3][j],
+                 *          Bq[k][j+1], ..., Bq[k+3][j+3]] */
+                int8x16_t w = vld1q_s8(Bq_packed + (g * N + j4) * 4);
+
+                /* Load 4 input int8 values (lane 0 of int8x8_t) */
+                int8x8_t a_vec = vld1_s8(a_q + g * 4);
+
+                /* SDOT: acc[i] += sum_{i'=0..3}(w[i*4+i'] * a_vec[i']) */
+                acc = vdotq_lane_s32(acc, w, a_vec, 0);
+            }
+
+            /* Convert int32 accumulators to float and apply combined scale */
+            float32x4_t favg = vcvtq_f32_s32(acc);
+            float32x4_t bsv = vld1q_f32(Bs + j4);
+            float32x4_t scale_v = vdupq_n_f32(combined_scale_mul);
+            favg = vmulq_f32(favg, vmulq_f32(bsv, scale_v));
+            vst1q_f32(c + j4, favg);
+        } else {
+            /* Scalar tail for last < 4 columns */
+            for (size_t jj = 0; jj < cols; ++jj) {
+                int32_t dot = 0;
+                for (size_t g = 0; g < K_pad / 4; ++g) {
+                    const int8_t *w = Bq_packed + (g * N + j4 + jj) * 4;
+                    const int8_t *aq = a_q + g * 4;
+                    dot += (int32_t)w[0]*aq[0] + (int32_t)w[1]*aq[1]
+                         + (int32_t)w[2]*aq[2] + (int32_t)w[3]*aq[3];
+                }
+                c[j4 + jj] = (float)dot * combined_scale_mul * Bs[j4 + jj];
+            }
+        }
+    }
+}
+#endif /* INT8_WEIGHTS && __ARM_FEATURE_DOTPROD */
+
 #endif /* INT8_WEIGHTS */
 
 /* Cache-blocked, NEON-vectorized matmul for M>1 (prefill path, ob-8qt.15).
@@ -430,13 +584,20 @@ static void matmul_int8_neon_m(const float *A, const int8_t *Bq, const float *Bs
 /* INT8 matmul wrapper: optimized GEMV for M=1, cache-blocked for M>1.
  * Only needed under -DINT8_WEIGHTS. */
 #ifdef INT8_WEIGHTS
-static void matmul_int8(const float *A, const int8_t *Bq, const float *Bs,
+static void matmul_int8(const float *A, const QW *qw,
                         float *C, size_t M, size_t K, size_t N) {
     if (M == 1) {
-        gemv_int8_neon(A, Bq, Bs, C, K, N);
+#if defined(__ARM_FEATURE_DOTPROD)
+        /* SDOT path: int8×int8 → int32 accumulation, no float dequant */
+        if (qw->q_sdot) {
+            gemv_int8_sdot(A, qw->q_sdot, qw->s, C, K, N);
+            return;
+        }
+#endif
+        gemv_int8_neon(A, qw->q, qw->s, C, K, N);
         return;
     }
-    matmul_int8_neon_m(A, Bq, Bs, C, M, K, N);
+    matmul_int8_neon_m(A, qw->q, qw->s, C, M, K, N);
 }
 #endif /* INT8_WEIGHTS */
 
@@ -444,7 +605,7 @@ static void matmul_int8(const float *A, const int8_t *Bq, const float *Bs,
  * otherwise falls through to the FP32 path. Bf is the float weight,
  * Bq is the QW (int8+scale), only one is used per compilation. */
 #ifdef INT8_WEIGHTS
-#define MM(A, Bf, Bq, C, M, K, N) matmul_int8(A, (Bq).q, (Bq).s, C, M, K, N)
+#define MM(A, Bf, Bq, C, M, K, N) matmul_int8(A, &(Bq), C, M, K, N)
 #else
 #define MM(A, Bf, Bq, C, M, K, N) matmul(A, Bf, C, M, K, N)
 #endif
@@ -883,17 +1044,22 @@ static void free_weights(Weights *w) {
     free(w->f_q_proj); free(w->f_k_proj); free(w->f_v_proj); free(w->f_o_proj);
     free(w->gate_proj); free(w->up_proj); free(w->down_proj);
 #ifdef INT8_WEIGHTS
-    free(w->g_q_proj_q.q);  free(w->g_q_proj_q.s);
-    free(w->g_k_proj_q.q);  free(w->g_k_proj_q.s);
-    free(w->g_v_proj_q.q);  free(w->g_v_proj_q.s);
-    free(w->g_o_proj_q.q);  free(w->g_o_proj_q.s);
-    free(w->f_q_proj_q.q);  free(w->f_q_proj_q.s);
-    free(w->f_k_proj_q.q);  free(w->f_k_proj_q.s);
-    free(w->f_v_proj_q.q);  free(w->f_v_proj_q.s);
-    free(w->f_o_proj_q.q);  free(w->f_o_proj_q.s);
-    free(w->gate_proj_q.q); free(w->gate_proj_q.s);
-    free(w->up_proj_q.q);   free(w->up_proj_q.s);
-    free(w->down_proj_q.q); free(w->down_proj_q.s);
+#if defined(__ARM_FEATURE_DOTPROD)
+#define FREE_QW(qw) do { free((qw).q); free((qw).s); free((qw).q_sdot); } while(0)
+#else
+#define FREE_QW(qw) do { free((qw).q); free((qw).s); } while(0)
+#endif
+    FREE_QW(w->g_q_proj_q);
+    FREE_QW(w->g_k_proj_q);
+    FREE_QW(w->g_v_proj_q);
+    FREE_QW(w->g_o_proj_q);
+    FREE_QW(w->f_q_proj_q);
+    FREE_QW(w->f_k_proj_q);
+    FREE_QW(w->f_v_proj_q);
+    FREE_QW(w->f_o_proj_q);
+    FREE_QW(w->gate_proj_q);
+    FREE_QW(w->up_proj_q);
+    FREE_QW(w->down_proj_q);
 #endif
 }
 
@@ -954,6 +1120,13 @@ int main(int argc, char **argv) {
 
     /* Allocate weights (random, benchmark only) */
     Weights w;
+    /* Zero first: under -DINT8_WEIGHTS with dotprod, QW.q_sdot/K/N (ob-8qt.14
+     * SDOT scaffolding) are never populated by quantize_weight() below and
+     * repack_qw_for_sdot() is not yet wired up anywhere, so without this,
+     * matmul_int8()'s `if (qw->q_sdot)` check reads indeterminate stack
+     * memory as a weight pointer. Zeroing keeps the SDOT path inert (falls
+     * through to the verified gemv_int8_neon path) until it's finished. */
+    memset(&w, 0, sizeof(w));
     w.embed = NULL;  /* not allocated (VOCAB×HIDDEN = 2.5 GB) — NULL prevents dangling */
     w.g_q_proj  = alloc_aligned(HIDDEN * KEY_DIM);
     w.g_k_proj  = alloc_aligned(HIDDEN * KEY_DIM);
@@ -1120,6 +1293,8 @@ int main(int argc, char **argv) {
         free(hidden); free(hidden_next);
         return 0;
     }
+
+    /* ---- Context-length sweep mode ----
      *
      * For each context length C: pre-fill full-attention KV caches with C-1
      * random tokens, then decode 1 token at position C-1, measuring per-layer-
