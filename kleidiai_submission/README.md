@@ -350,11 +350,20 @@ manifest:
 > subsystem shine.
 
 > **t4 vs t3 cross-validation:** Both devices are RK3588 with Cortex-A76 big
-> cores. With batched timing, the two devices agree within 5–10% across all
-> shapes, confirming the measurement methodology is reproducible. The largest
-> discrepancy is cumdecay 64×160 (t4: 3.3 µs / 22.8 GiB/s vs t3: 11.2 µs / 6.8
-> GiB/s), which may reflect t4's slightly different memory timings or scheduler
-> behavior at this small shape.
+> cores, but different board revisions (t3: 2304 MHz big core, kernel 5.10.160;
+> t4: 2400 MHz, kernel 6.11.0). With batched timing and `taskset -c 4-7`, **all
+> 15 shapes agree within 5–17%**.
+>
+> **Methodology note:** The t4 CSV was generated with `taskset -c 4-7` (big
+> A76 cores pinned). The t3 CSV was generated *without* taskset. On RK3588's
+> big.LITTLE layout, the Linux scheduler placed the first benchmarked shape
+> (cumdecay 64×160, ~3 µs) on a little A55 core (10.7 µs on A55 vs 3.3 µs on
+> A76), then migrated to a big core for subsequent shapes. All other 14 t3
+> shapes match big-core values. The t3 cumdecay 64×160 value (11.2 µs) is
+> **not comparable** — it is an A55 measurement. This was confirmed on t4 by
+> running with `taskset -c 0-3` (little): cumdecay 64×160 = 10.7 µs, matching
+> t3's value almost exactly. The lesson: **always use taskset on
+> big.LITTLE systems**, even for micro-benchmarks.
 
 > **Note on variance:** The A57 exhibits high run-to-run variance (up to 1.5×
 > on the same kernel at the same commit, per beads ob-bf7). The numbers above

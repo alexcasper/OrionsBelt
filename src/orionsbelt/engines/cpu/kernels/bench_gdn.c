@@ -27,8 +27,73 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <unistd.h>
 
 #include "gdn_sve.h"
+
+/* ----------------------------------------------------------------------- */
+/* CPU affinity check (big.LITTLE safety)                                  */
+/* ----------------------------------------------------------------------- */
+
+/* On Arm big.LITTLE systems (e.g. RK3588: 4× A55 + 4× A76), the Linux
+ * energy-aware scheduler may place short-lived tasks on little cores.
+ * Without taskset pinning, results for fast kernels are nondeterministic.
+ * This was the root cause of the cumdecay 64×160 methodology incident
+ * (ob-jvx): t3 CSV generated without taskset gave 11.2 µs (A55) instead
+ * of the correct 3.3 µs (A76). */
+
+static void check_affinity(const char *prog) {
+    long ncpu = sysconf(_SC_NPROCESSORS_ONLN);
+    if (ncpu <= 0) return;
+
+    int max_freq[64] = {0};
+    for (long c = 0; c < ncpu && c < 64; c++) {
+        char path[128];
+        snprintf(path, sizeof(path),
+                 "/sys/devices/system/cpu/cpu%ld/cpufreq/cpuinfo_max_freq", c);
+        FILE *f = fopen(path, "r");
+        if (f) { if (fscanf(f, "%d", &max_freq[c]) != 1) max_freq[c] = 0; fclose(f); }
+    }
+
+    int freq_min = 0, freq_max = 0;
+    for (long c = 0; c < ncpu; c++) {
+        if (max_freq[c] == 0) continue;
+        if (freq_min == 0 || max_freq[c] < freq_min) freq_min = max_freq[c];
+        if (max_freq[c] > freq_max) freq_max = max_freq[c];
+    }
+    if (freq_min == 0 || freq_max == 0 || freq_min == freq_max) return;
+
+    FILE *f = fopen("/proc/self/status", "r");
+    if (!f) return;
+    char line[256];
+    unsigned long allowed_mask = 0;
+    while (fgets(line, sizeof(line), f)) {
+        if (strncmp(line, "Cpus_allowed:", 13) == 0) {
+            unsigned long hi = 0, lo = 0;
+            int items = sscanf(line + 13, "%lx,%lx", &hi, &lo);
+            allowed_mask = (items == 2) ? lo : hi;
+            break;
+        }
+    }
+    fclose(f);
+    if (allowed_mask == 0) return;
+
+    int n_big = 0, n_little = 0, big_f = 0, little_f = 0;
+    for (long c = 0; c < ncpu && c < 32; c++) {
+        if (!(allowed_mask & (1UL << c)) || max_freq[c] == 0) continue;
+        if (max_freq[c] == freq_max) { n_big++; big_f = max_freq[c]; }
+        else { n_little++; little_f = max_freq[c]; }
+    }
+
+    if (n_big > 0 && n_little > 0) {
+        fprintf(stderr,
+            "\n  *** WARNING: affinity spans big.LITTLE cores (%d big @ %d kHz"
+            " + %d little @ %d kHz).\n"
+            "      Short kernels may land on little cores. Pin first:\n"
+            "        taskset -c <cores> %s ...\n\n",
+            n_big, big_f, n_little, little_f, prog ? prog : "bench_gdn");
+    }
+}
 
 /* Which path did the compiler actually select in gdn_sve.c? Mirrors its guard order exactly. */
 #if defined(__ARM_FEATURE_SVE)
@@ -322,6 +387,9 @@ int main(int argc, char **argv) {
     }
     if (repeats < 5) repeats = 5;            /* docs/METRICS.md: never report N<5 */
     if (repeats > MAX_REPEATS) repeats = MAX_REPEATS;
+
+    /* Check CPU affinity on big.LITTLE systems before running. */
+    check_affinity(argv[0]);
 
     /* Sustained-load mode: separate code path from the burst benchmark. */
     if (sustained > 0) {
