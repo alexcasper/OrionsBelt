@@ -40,6 +40,7 @@ FORCE=0
 REBUILD=0
 MODEL="4b"
 QUANT="fp32"
+KV_QUANT="fp32"
 BINARY=""
 K=src/orionsbelt/engines/cpu/kernels
 
@@ -54,6 +55,7 @@ while [[ $# -gt 0 ]]; do
         --binary)  BINARY="$2"; shift 2 ;;
         --model)   MODEL="$2"; shift 2 ;;   # 4b (default) or 08b
         --quant)   QUANT="$2"; shift 2 ;;   # fp32 (default) or int8
+        --kv-quant) KV_QUANT="$2"; shift 2 ;; # fp32 (default) or int8 (KV cache)
         --force)   FORCE=1; shift ;;
         --rebuild) REBUILD=1; shift ;;
         *) echo "Unknown option: $1" >&2; exit 1 ;;
@@ -71,6 +73,11 @@ case "$QUANT" in
     int8) QUANT_DEF="-DINT8_WEIGHTS" ;;
     *) echo "Unknown --quant: $QUANT (expected fp32 or int8)" >&2; exit 1 ;;
 esac
+case "$KV_QUANT" in
+    fp32) KV_DEF="" ;;
+    int8) KV_DEF="-DKV_INT8" ;;
+    *) echo "Unknown --kv-quant: $KV_QUANT (expected fp32 or int8)" >&2; exit 1 ;;
+esac
 if [ -z "$BINARY" ]; then
     if [ "$MODEL" = "4b" ]; then
         BINARY="dist/bench_gdn_e2e_decode"
@@ -79,6 +86,9 @@ if [ -z "$BINARY" ]; then
     fi
     if [ "$QUANT" = "int8" ]; then
         BINARY="${BINARY}_int8"
+    fi
+    if [ "$KV_QUANT" = "int8" ]; then
+        BINARY="${BINARY}_kvint8"
     fi
 fi
 
@@ -177,7 +187,7 @@ fi
 if [ "$NEED_BUILD" -eq 1 ]; then
     cc -O3 -fopenmp $ISA_FLAGS $MODEL_DEFINE -static \
         -Wno-aggressive-loop-optimizations \
-        ${QUANT_DEF:+$QUANT_DEF} \
+        ${QUANT_DEF:+$QUANT_DEF} ${KV_DEF:+$KV_DEF} \
         "$K/gdn_sve.c" "$K/gdn_delta_matmul.c" "$K/gdn_e2e_decode.c" \
         -I"$K/" -o "$BINARY" -lm 2>&1 || {
         echo "ERROR: build failed" >&2
