@@ -2929,3 +2929,95 @@ kernels. Both boards are RK3588 (4×A55 + 4×A76) but **different board vendors*
 - The original ob-bf7 spread concern is RESOLVED for stale data (both boards
   now have clean post-optimization CSVs with <8% spread), but a new
   cross-board heterogeneity finding replaces it.
+
+---
+
+## 16. Cross-device e2e decode comparison: A57 vs A76, 4B vs 0.8B (2026-08-07, ob-mrd.8)
+
+### Motivation
+
+With the A57 now running the 0.8B model variant (added by t3 at commit
+`a756662`), we have the first cross-device, cross-model e2e decode comparison
+spanning two Arm core classes. This addresses the fleet-level headline number
+that ob-ami's master comparison table needs.
+
+Generated table: [`results/figures/e2e_fleet_comparison.md`](../results/figures/e2e_fleet_comparison.md)
+(generator: `scripts/gen_e2e_comparison.py` — do not hand-edit).
+
+### Data
+
+All entries are fp32, governor=performance, manifest-backed (`dirty=false`),
+random weights (benchmark only).
+
+| Device | CPU | Model | Runs | TTFT (s) | tok/s | Spread | Commit |
+|--------|-----|-------|------|----------|-------|--------|--------|
+| rk3588-t3 | Cortex-A76 @2.4 GHz | Qwen3.5-0.8B | 2 | 0.125 | 7.98 | 1.00× | `7962968` |
+| jetson-j1 | Cortex-A57 @1.48 GHz | Qwen3.5-0.8B | 3 | 0.375 | 2.69 | 1.03× | `2896dd0` |
+| rk3588-t3 | Cortex-A76 @2.4 GHz | Qwen3.5-4B | 2 | 0.964 | 1.04 | 1.00× | `2e752af` |
+| rk3588-t4 | Cortex-A76 @2.4 GHz | Qwen3.5-4B | 1 | 11.76 | 0.09 | — | `def3f29` |
+| jetson-j1 | Cortex-A57 @1.48 GHz | Qwen3.5-4B | 3 | 44.2 | 0.02 | 1.15× | `a8b5195` |
+
+### Cross-commit caveat
+
+> **These devices were NOT all measured at the same commit.** The GEMV
+> row-sweep optimization (§15, commit `2e752af`) delivered ~12× speedup over
+> the column-sweep baseline. Specifically:
+> - **rk3588-t4** (`def3f29`) ran the **pre-optimization** binary → 0.09 tok/s
+> - **rk3588-t3** (`2e752af`) ran the **post-optimization** binary → 1.04 tok/s
+> - Both are the same RK3588 SoC class; the 11.6× gap is software, not silicon.
+>
+> The A57 numbers (`a8b5195` for 4B, `2896dd0` for 0.8B) both include the
+> GEMV optimization. A matched-commit cross-device table requires all fleet
+> nodes to re-run at a single HEAD — left as a follow-up.
+
+### Cross-device scaling (0.8B, matched GEMV code)
+
+Comparing A57 and A76 on the 0.8B model, both with the optimized row-sweep
+GEMV:
+
+| Metric | Cortex-A57 (Jetson) | Cortex-A76 (RK3588) | A76/A57 |
+|--------|---------------------|---------------------|---------|
+| tok/s | 2.70 | 7.98 | **3.0×** |
+| TTFT (s) | 0.37 | 0.125 | **3.0×** |
+
+The 3.0× ratio is consistent with:
+- ~1.6× clock advantage (2.4 GHz vs 1.48 GHz)
+- ~1.3× pipeline advantage (A76: 2× FMA/cycle; A57: 1× FMA/cycle, 3-wide vs 2-wide OoO)
+- 1.6 × 1.3 ≈ 2.1×, with the remaining ~1.4× likely from A76's superior
+  L1/L2 cache subsystem and memory-level parallelism
+
+### Bottleneck breakdown
+
+The GEMV optimization didn't change *which* phase dominates — FFN matmuls
+remain the bottleneck everywhere:
+
+| Phase | A57 0.8B | A76 0.8B | A76 4B |
+|-------|----------|----------|--------|
+| FFN | 55.9% | 54.1% | 72.4% |
+| GDN q/k/v proj | 24.5% | 29.9% | 13.8% |
+| GDN output proj | 10.5% | 8.2% | 8.1% |
+| Full attention | 8.3% | 7.5% | 5.6% |
+| GDN conv+decay+scan | 0.9% | 0.3% | 0.1% |
+
+FFN share increases with model size (56% → 72% from 0.8B to 4B on A76)
+because the FFN intermediate dimension scales faster than the GDN state.
+GDN's novel recurrent kernels (conv, decay, scan) remain <1% of total —
+confirming the model is **matmul-bound**, not recurrence-bound.
+
+### Implication for the GDN hypothesis
+
+The original hypothesis (ob-8qt.1, PLAN.md §3.1) was that GDN's sequential
+recurrence would be a CPU bottleneck, making CPU-first mapping advantageous.
+The data shows the opposite: **GDN recurrence is negligible cost; the
+dominant cost is the same dense matmuls (FFN, projections) that every
+transformer architecture has.** The GDN vs full-attention choice affects
+*memory traffic at long context* (KV cache vs fixed recurrent state), not
+*compute throughput at short context*. This should be tested at longer
+sequence lengths where the KV-cache advantage materialises.
+
+### A57 0.8B is practical for edge deployment
+
+At 2.7 tok/s with a 0.37s TTFT, the Jetson Nano (2014-era Cortex-A57,
+passively cooled at +1°C delta) can sustain real-time text generation for
+the 0.8B model. This is a usable rate for interactive chat or structured
+extraction on hardware that costs <$50 and draws ~5W.

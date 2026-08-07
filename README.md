@@ -170,16 +170,15 @@ All figures above are verified against primary sources (Radxa product page and d
 | Orion O6 board bring-up | **Pending** — board not yet in hand |
 | CIX Early Bird SDK / NPU toolchain access | **Pending** — not yet approved |
 | Per-layer engine mapping (NPU/GPU/CPU) | Hypothesis only — pending measurements |
-| Full inference results (tokens/sec, TTFT, memory) | Partial — C decode loop on A57 + RK3588 ([FINDINGS.md](./docs/FINDINGS.md) §14) |
+| Full inference results (tokens/sec, TTFT, memory) | Partial — C decode loop on A57 + RK3588, cross-device e2e table ([FINDINGS.md](./docs/FINDINGS.md) §14–16, [e2e comparison](./results/figures/e2e_fleet_comparison.md)) |
 
-> **Results so far:** 71 CSVs from the device fleet, 47 provenance manifests, 67 generated figures/tables, 28 FINDINGS sections.
+> **Results so far:** 73 CSVs from the device fleet, 48 provenance manifests, 68 generated figures/tables, 29 FINDINGS sections.
 >
 > ```
 > results/
->   raw/         <- 71 per-run CSVs across 5 devices
->   manifests/   <- 47 provenance manifests (git SHA, governor, thermals)
->   figures/     <- fleet analysis, comparison table, kernel/memory plots
-> ```
+>   raw/         <- 73 per-run CSVs across 5 devices
+>   manifests/   <- 48 provenance manifests (git SHA, governor, thermals)
+>   figures/     <- fleet analysis, comparison table, kernel/memory plots> ```
 >
 > See [`results/README.md`](./results/README.md) for the layout, [`docs/FINDINGS.md`](./docs/FINDINGS.md) for findings, and [`results/figures/fleet_bandwidth_scaling.md`](./results/figures/fleet_bandwidth_scaling.md) for the headline cross-device analysis.
 
