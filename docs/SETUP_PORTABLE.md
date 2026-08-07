@@ -19,10 +19,10 @@ Any 64-bit Arm (aarch64) device. The project's fleet spans:
 
 | Device | SoC | Cores | ISA | Spec BW | Binary |
 |---|---|---|---|---|---|
-| Raspberry Pi 5 | BCM2712 | 4× Cortex-A76 | Armv8.2-A + dotprod | ~17 GB/s | `bench_gdn_pi5_a76` |
-| RK3588 (big) | RK3588 | 4× Cortex-A76 | Armv8.2-A + dotprod | ~34 GB/s | `bench_gdn_rk3588_a76` |
+| Raspberry Pi 5 | BCM2712 | 4× Cortex-A76 | Armv8.2-A + dotprod | ~15.8 GiB/s | `bench_gdn_pi5_a76` |
+| RK3588 (big) | RK3588 | 4× Cortex-A76 | Armv8.2-A + dotprod | ~31.7 GiB/s | `bench_gdn_rk3588_a76` |
 | RK3588 (little) | RK3588 | 4× Cortex-A55 | Armv8.2-A + dotprod | — | `bench_gdn_rk3588_a55` |
-| Jetson Nano | Tegra X1 | 4× Cortex-A57 | Armv8.0-A (no dotprod) | ~25.6 GB/s | `bench_gdn_jetson_a57` |
+| Jetson Nano | Tegra X1 | 4× Cortex-A57 | Armv8.0-A (no dotprod) | ~23.8 GiB/s | `bench_gdn_jetson_a57` |
 
 ### OS and toolchain
 
@@ -201,7 +201,7 @@ git push origin bench/r5
 
 ## What the device benchmark tells us
 
-The devices span ~17 GB/s (Pi 5) → ~25.6 GB/s (Jetson) → ~34 GB/s (RK3588) of
+The devices span ~15.8 GiB/s (Pi 5) → ~23.8 GiB/s (Jetson) → ~31.7 GiB/s (RK3588) of
 spec memory bandwidth. The hypothesis is that GDN kernels are
 memory-bandwidth-bound at ~0.25 FLOP/byte — if so, achieved throughput should
 track bandwidth roughly linearly and **independently of core generation**.
@@ -228,9 +228,9 @@ NEON path (see [`FINDINGS.md`](./FINDINGS.md) for the full analysis):
 
 | Device | Spec BW | Achieved | % of spec |
 |---|---:|---:|---:|
-| Jetson Nano (A57) | 25.6 GB/s | 0.72 GiB/s | **3.0%** |
-| Raspberry Pi 5 (A76) | 17.0 GB/s | 1.84 GiB/s | 11.6% |
-| RK3588 big (A76) | 34.0 GB/s | 3.29 GiB/s | 10.4% |
+| Jetson Nano (A57) | 23.8 GiB/s | 0.72 GiB/s | **3.0%** |
+| Raspberry Pi 5 (A76) | 15.8 GiB/s | 1.84 GiB/s | 11.6% |
+| RK3588 big (A76) | 31.7 GiB/s | 3.29 GiB/s | 10.4% |
 
 The answer to the discriminating question above turned out to be **split**, so
 do not read a low Jetson number as a broken setup — it is real. Within the A76

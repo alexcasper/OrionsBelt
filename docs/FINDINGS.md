@@ -2633,8 +2633,8 @@ revealed that >99% of e2e decode time is spent in GEMV matmuls — FFN blocks
 (72%), GDN projections (14%), and output projections (8%) — while the GDN
 recurrent kernels (conv, decay, scan) account for **<0.1% combined**.
 
-Roofline analysis of the old GEMV showed why: it achieved only **0.9–1.4 GB/s**
-on a system with ~25 GB/s LPDDR4x bandwidth. The root cause was a
+Roofline analysis of the old GEMV showed why: it achieved only **0.9–1.4 GiB/s**
+on a system with ~25 GiB/s practical DRAM bandwidth. The root cause was a
 column-sweep access pattern that strides by N (up to 9216 floats = 36 KB)
 between consecutive K iterations, using only **0.17%** of each 64-byte cache
 line.
@@ -2654,15 +2654,15 @@ The change is 20 lines of C. No weight layout change, no new dependencies.
 
 | Model | Old GEMV tok/s | New GEMV tok/s | Speedup | Old s/tok | New s/tok | Achieved BW |
 |-------|---------------:|---------------:|--------:|----------:|----------:|------------:|
-| Qwen3.5-4B   | 0.07 | 1.04 | **14.9×** | 13.7 | 0.96 | 13.5 GB/s |
-| Qwen3.5-0.8B | 0.79 | 7.98 | **10.1×** | 1.27 | 0.125 | 14.3 GB/s |
+| Qwen3.5-4B   | 0.07 | 1.04 | **14.9×** | 13.7 | 0.96 | 13.5 GiB/s |
+| Qwen3.5-0.8B | 0.79 | 7.98 | **10.1×** | 1.27 | 0.125 | 14.3 GiB/s |
 
 Commits: old GEMV at `a756662`; optimized GEMV at `2e752af`. Both benchmarks
 run at clean commits with manifests (`dirty=false`), 20 tokens × 2 runs,
 consistent across replicates (within 1%).
 
-Achieved bandwidth: 54–57% of the RK3588 LPDDR4x-4266 theoretical peak (~25
-GB/s). The remaining gap is FMA compute latency and L2 cache miss overhead.
+Achieved bandwidth: 54–57% of the RK3588 practical DRAM bandwidth ceiling
+(~25 GiB/s measured, vs 33.8 GB/s theoretical at 2112 MHz). The remaining gap is FMA compute latency and L2 cache miss overhead.
 
 ### Correction to §12
 
@@ -3098,7 +3098,7 @@ The run script gains `--quant int8`.
 
 ### Results — RK3588 (governor=performance, 20 tokens × 2 runs, commit `c6dbb82`)
 
-| Model | Cluster | FP32 tok/s | INT8 tok/s | Speedup | INT8 GB/s |
+| Model | Cluster | FP32 tok/s | INT8 tok/s | Speedup | INT8 GiB/s |
 |-------|---------|-----------:|-----------:|--------:|----------:|
 | Qwen3.5-4B   | A76 big    | 1.04 | 1.84 | **1.77×** | ~5.9 |
 | Qwen3.5-4B   | A55 little  | 0.38 | 0.48 | **1.26×** | — |
@@ -3112,7 +3112,7 @@ FP32 baselines: commits `2e752af` (4B) / `7962968` (0.8B) from §15.
 
 ### Results — Jetson Nano A57 (governor=performance, 8 tokens × 3 runs, commit `660ce17`)
 
-| Model | FP32 tok/s | INT8 tok/s | Speedup | INT8 GB/s |
+| Model | FP32 tok/s | INT8 tok/s | Speedup | INT8 GiB/s |
 |-------|-----------:|-----------:|--------:|----------:|
 | Qwen3.5-0.8B | 2.70 | 3.01 | **1.11×** | — |
 | Qwen3.5-4B   | 0.43 | 0.59 | **1.36×** | — |
@@ -3155,10 +3155,10 @@ dequantization compute overhead more prominent relative to the memory savings.
 
 ### Achieved bandwidth analysis
 
-The 4B big-cluster INT8 run achieves ~5.9 GB/s on INT8 weight traffic — lower
-than the FP32 path's 13.5 GB/s. This is expected: the NEON dequantization
+The 4B big-cluster INT8 run achieves ~5.9 GiB/s on INT8 weight traffic — lower
+than the FP32 path's 13.5 GiB/s. This is expected: the NEON dequantization
 pipeline (3 widen/convert instructions per 4 elements) is now the limiter, not
-raw DRAM bandwidth. The theoretical maximum at 13.5 GB/s would be ~4.2 tok/s
+raw DRAM bandwidth. The theoretical maximum at 13.5 GiB/s would be ~4.2 tok/s
 (4× speedup); we capture 1.84/4.2 = **44% of theoretical**.
 
 Closing this gap would require eliminating the float32 conversion entirely —
