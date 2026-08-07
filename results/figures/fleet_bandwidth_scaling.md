@@ -8,11 +8,11 @@ from `METRICS.md` (~0.25 FLOP/byte).
 
 | Device | Cores | ISA | Spec BW (GiB/s) |
 |--------|-------|-----|-----------------|
-| Pi 5 | 4x Cortex-A76 @ 2.4 GHz | Armv8.2-A + dotprod | 17.0 |
-| RK3588 big | 4x Cortex-A76 @ 2.3 GHz | Armv8.2-A + dotprod | 34.0 |
-| RK3588 little | 4x Cortex-A55 @ 1.8 GHz | Armv8.2-A | 34.0 |
-| Jetson j1 | 4x Cortex-A57 @ 1.48 GHz | Armv8.0-A (NEON only) | 25.6 |
-| Jetson j2 | 4x Cortex-A57 @ 1.48 GHz | Armv8.0-A (NEON only) | 25.6 |
+| Pi 5 | 4x Cortex-A76 @ 2.4 GHz | Armv8.2-A + dotprod | 15.8 |
+| RK3588 big | 4x Cortex-A76 @ 2.3 GHz | Armv8.2-A + dotprod | 31.7 |
+| RK3588 little | 4x Cortex-A55 @ 1.8 GHz | Armv8.2-A | 31.7 |
+| Jetson j1 | 4x Cortex-A57 @ 1.48 GHz | Armv8.0-A (NEON only) | 23.8 |
+| Jetson j2 | 4x Cortex-A57 @ 1.48 GHz | Armv8.0-A (NEON only) | 23.8 |
 | **Orion O6** | 4x A720 big + 4x A720 mid + 4x A520 | Armv9.2-A | **93.1** |
 
 ## Achieved throughput vs spec bandwidth (4B model, seq=64)
@@ -28,11 +28,11 @@ See the optimization-impact section below for multi-threaded results.
 
 | Device | Spec (GiB/s) | CumDecay | Scan | DWConv1D | Scan/Spec | Scan spread |
 |--------|-------------|----------|------|----------|-----------|-------------|
-| Pi 5 | 17.0 | 3.74 | 1.20 | 3.23 | 7.1% | 7.4% |
-| RK3588 big | 34.0 | 7.40 | 5.67 | 7.04 | 16.7% | 7.4% |
-| RK3588 little | 34.0 | 1.45 | 0.82 | 1.20 | 2.4% | 7.2% |
-| Jetson j1 | 25.6 | 1.59 | 1.18 | 1.41 | 4.6% | 2.8% |
-| Jetson j2 | 25.6 | 1.50 | 1.09 | 0.93 | 4.3% | **16.7%** ⚠ |
+| Pi 5 | 15.8 | 3.74 | 1.20 | 3.23 | 7.6% | 7.4% |
+| RK3588 big | 31.7 | 7.40 | 5.67 | 7.04 | 17.9% | 7.4% |
+| RK3588 little | 31.7 | 1.45 | 0.82 | 1.20 | 2.6% | 7.2% |
+| Jetson j1 | 23.8 | 1.59 | 1.18 | 1.41 | 5.0% | 2.8% |
+| Jetson j2 | 23.8 | 1.50 | 1.09 | 0.93 | 4.6% | **16.7%** ⚠ |
 
 ⚠ 1 of 5 scan rows exceed the DEVICE_RUNBOOK's ~10% cleanliness threshold, worst Jetson j2 at 16.7%. The runbook says to suspect thermal throttling first. Treat flagged rows as indicative only.
 
@@ -40,22 +40,22 @@ See the optimization-impact section below for multi-threaded results.
 
 | Device | Spec (GiB/s) | CumDecay | Scan | DWConv1D | Scan/Spec | Scan spread |
 |--------|-------------|----------|------|----------|-----------|-------------|
-| Pi 5 | 17.0 | 4.47 | 4.43 | 4.55 | 26.1% | 6.5% |
-| RK3588 big | 34.0 | 8.15 | 6.93 | 6.82 | 20.4% | 5.7% |
-| RK3588 little | 34.0 | 1.65 | 1.48 | 1.54 | 4.4% | 2.4% |
-| Jetson j1 | 25.6 | 3.59 | 2.73 | 2.88 | 10.7% | **27.2%** ⚠ |
-| Jetson j2 | 25.6 | 3.24 | 1.65 | 2.43 | 6.4% | **40.8%** ⚠ |
+| Pi 5 | 15.8 | 4.47 | 4.43 | 4.55 | 28.0% | 6.5% |
+| RK3588 big | 31.7 | 8.15 | 6.93 | 6.82 | 21.9% | 5.7% |
+| RK3588 little | 31.7 | 1.65 | 1.48 | 1.54 | 4.7% | 2.4% |
+| Jetson j1 | 23.8 | 3.59 | 2.73 | 2.88 | 11.5% | **27.2%** ⚠ |
+| Jetson j2 | 23.8 | 3.24 | 1.65 | 2.43 | 6.9% | **40.8%** ⚠ |
 
 ⚠ 2 of 5 scan rows exceed the DEVICE_RUNBOOK's ~10% cleanliness threshold, worst Jetson j2 at 40.8%. The runbook says to suspect thermal throttling first. Treat flagged rows as indicative only.
 
 ## The discriminating test: Jetson (A57, more BW) vs Pi 5 (A76, less BW)
 
 The DEVICE_RUNBOOK poses this question: if the GDN scan kernel is
-bandwidth-bound, then the Jetson Nano (oldest cores, 25.6 GiB/s spec)
-should beat the Pi 5 (newest cores, 17.0 GiB/s spec). **If the Pi 5
+bandwidth-bound, then the Jetson Nano (oldest cores, 23.8 GiB/s spec)
+should beat the Pi 5 (newest cores, 15.8 GiB/s spec). **If the Pi 5
 wins comfortably, the bandwidth-bound thesis is wrong or incomplete.**
 
-| Kernel (4B) | Pi 5 (17.0) | Jetson j1 (25.6) | Jetson j2 (25.6) | Winner | Pi5/J1 ratio |
+| Kernel (4B) | Pi 5 (15.8) | Jetson j1 (23.8) | Jetson j2 (23.8) | Winner | Pi5/J1 ratio |
 |-------------|-------------|------------------|------------------|--------|-------------|
 | Cumulative Decay | 3.74 | 1.59 | 1.50 | **Pi 5** | 2.35x |
 | Gated Delta-Rule Scan | 1.20 | 1.18 | 1.09 | **Pi 5** | 1.02x |
@@ -104,11 +104,11 @@ linearly with spec bandwidth. Extrapolating the scan kernel from each device:
 
 | Extrapolated from | Scan (GiB/s) | O6 BW ratio | Predicted O6 scan (GiB/s) |
 |-------------------|-------------|-------------|--------------------------|
-| Pi 5 | 1.20 | 5.5x | 6.57 |
-| RK3588 big | 5.67 | 2.7x | 15.53 |
-| RK3588 little | 0.82 | 2.7x | 2.25 |
-| Jetson j1 | 1.18 | 3.6x | 4.29 |
-| Jetson j2 | 1.09 | 3.6x | 3.96 |
+| Pi 5 | 1.20 | 5.9x | 7.07 |
+| RK3588 big | 5.67 | 2.9x | 16.65 |
+| RK3588 little | 0.82 | 2.9x | 2.41 |
+| Jetson j1 | 1.18 | 3.9x | 4.62 |
+| Jetson j2 | 1.09 | 3.9x | 4.26 |
 
 **⚠ However, this linear extrapolation is almost certainly WRONG.**
 The discriminating test above shows the kernels are instruction-bound,

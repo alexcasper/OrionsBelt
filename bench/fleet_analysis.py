@@ -23,8 +23,9 @@ import os
 
 # ---------------------------------------------------------------------------
 # Device registry: name → (csv_path, spec_gibs, core_description)
-# Spec bandwidth in GiB/s (1 GB/s = 0.931 GiB/s, but DEVICE_RUNBOOK quotes in
-# GB/s and plots.py uses these GiB/s values directly for comparison).
+# Spec bandwidth in GiB/s.  Vendor datasheets quote GB/s (decimal); the bench
+# binary measures GiB/s (÷2^30).  We convert so Scan/Spec ratios are unit-
+# consistent: 1 GB/s = 0.9313 GiB/s.  ADR 0005 and DEVICE_RUNBOOK retain GB/s.
 # ---------------------------------------------------------------------------
 DEVICES = [
     # (display_name, csv_path, spec_gibs, cores, isa_generation)
@@ -34,32 +35,38 @@ DEVICES = [
     # (OMP_NUM_THREADS=1) for t4. ⚠ t3-clean was actually 8-thread — see ob-mrd.12/14.
     # Pi 5 was not part of the fleet sweep, so its data is
     # from a different commit — noted in the provenance audit below.
-    ("Pi 5", "results/raw/pi5-r5.csv", 17.0, "4x Cortex-A76 @ 2.4 GHz", "Armv8.2-A + dotprod"),
+    (
+        "Pi 5",
+        "results/raw/pi5-r5.csv",
+        15.8,
+        "4x Cortex-A76 @ 2.4 GHz",
+        "Armv8.2-A + dotprod",
+    ),  # 17.0 GB/s
     (
         "RK3588 big",
         "results/raw/rk3588-t4-clean.csv",
-        34.0,
+        31.7,  # 34.0 GB/s
         "4x Cortex-A76 @ 2.3 GHz",
         "Armv8.2-A + dotprod",
     ),
     (
         "RK3588 little",
         "results/raw/rk3588-t4-little-clean.csv",
-        34.0,
+        31.7,  # 34.0 GB/s
         "4x Cortex-A55 @ 1.8 GHz",
         "Armv8.2-A",
     ),
     (
         "Jetson j1",
         "results/raw/jetson-j1-clean.csv",
-        25.6,
+        23.8,  # 25.6 GB/s
         "4x Cortex-A57 @ 1.48 GHz",
         "Armv8.0-A (NEON only)",
     ),
     (
         "Jetson j2",
         "results/raw/jetson-j2-clean.csv",
-        25.6,
+        23.8,  # 25.6 GB/s
         "4x Cortex-A57 @ 1.48 GHz",
         "Armv8.0-A (NEON only)",
     ),
@@ -470,13 +477,13 @@ def generate_report(output_path):
     lines.append("## The discriminating test: Jetson (A57, more BW) vs Pi 5 (A76, less BW)")
     lines.append("")
     lines.append("The DEVICE_RUNBOOK poses this question: if the GDN scan kernel is")
-    lines.append("bandwidth-bound, then the Jetson Nano (oldest cores, 25.6 GiB/s spec)")
-    lines.append("should beat the Pi 5 (newest cores, 17.0 GiB/s spec). **If the Pi 5")
+    lines.append("bandwidth-bound, then the Jetson Nano (oldest cores, 23.8 GiB/s spec)")
+    lines.append("should beat the Pi 5 (newest cores, 15.8 GiB/s spec). **If the Pi 5")
     lines.append("wins comfortably, the bandwidth-bound thesis is wrong or incomplete.**")
     lines.append("")
 
     lines.append(
-        "| Kernel (4B) | Pi 5 (17.0) | Jetson j1 (25.6) | Jetson j2 (25.6) | Winner | Pi5/J1 ratio |"
+        "| Kernel (4B) | Pi 5 (15.8) | Jetson j1 (23.8) | Jetson j2 (23.8) | Winner | Pi5/J1 ratio |"
     )
     lines.append(
         "|-------------|-------------|------------------|------------------|--------|-------------|"

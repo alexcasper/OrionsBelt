@@ -186,12 +186,13 @@ KLEIDIAI_GDN_KERNEL_COLS = [
 ]
 
 # Device spec bandwidth (GiB/s) for sanity-check upper bounds.
-# From DEVICE_RUNBOOK.md "What we are actually testing".
+# Vendor datasheets quote GB/s; converted to GiB/s for unit-consistency
+# with the bench binary (÷2^30).  See ADR 0005 for GB/s originals.
 DEVICE_SPEC_BW = {
-    "pi5": 17.0,
-    "rk3588": 34.0,
-    "jetson": 25.6,
-    "orion": 100.0,  # CIX P1 SoC, LPDDR5X (ADR 0005)
+    "pi5": 15.8,  # 17.0 GB/s
+    "rk3588": 31.7,  # 34.0 GB/s
+    "jetson": 23.8,  # 25.6 GB/s
+    "orion": 93.1,  # 100 GB/s (CIX P1 SoC, LPDDR5X, ADR 0005)
 }
 
 # Absolute upper bound — no device should exceed this for a single kernel.
