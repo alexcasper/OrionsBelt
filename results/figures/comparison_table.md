@@ -160,7 +160,7 @@ Full table including 0.8B: [`memory_comparison.md`](memory_comparison.md)._
 
 ## 6. Decode bandwidth ceilings (analytical)
 
-Qwen3.5-4B at 100 GB/s (O6 LPDDR5 spec; RK3588 shared pool is 31.7 GiB/s per cluster).
+Qwen3.5-4B at 93.1 GiB/s (O6 LPDDR5 spec; RK3588 shared pool is 31.7 GiB/s per cluster).
 
 | Quantization | Weight traffic/token | State traffic/token | Total | Ceiling tok/s |
 |---|---:|---:|---:|---:|
