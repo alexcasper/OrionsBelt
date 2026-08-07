@@ -1657,6 +1657,17 @@ variable is thread count.
 
 **Data:** [`jetson-j1.csv`](../results/raw/jetson-j1.csv) · [`jetson-j2-omp-full.csv`](../results/raw/jetson-j2-omp-full.csv) · [`jetson-j2-full-optimized.csv`](../results/raw/jetson-j2-full-optimized.csv) (manifests: `jetson-j1.json` SHA `148db31`, `jetson-j2_*.json` dirty-tree).
 
+> **Decode timing caveat (ob-9xr):** The decode (seq=1) values in the table
+> above use single-call `clock_gettime` timing. On the A57, back-to-back
+> `clock_gettime` overhead is ~2.4 µs — a significant fraction of the 3–13 µs
+> decode kernel runtime. The corrected values (adaptive batched timing, 100
+> calls/measurement for kernels <20 µs) are in
+> [`jetson-j1-clean.csv`](../results/raw/jetson-j1-clean.csv) at commit
+> `5ea3d24`. Key corrections: gated_scan 4B decode 5.9→10.0 GiB/s (+70%),
+> cumdecay 0.8B decode 3.7→5.2 GiB/s (+43%). Prefill shapes are unaffected
+> (all >100 µs). The J2 OMP column has the same single-call limitation; a
+> corrected re-run is tracked as ob-9xr.
+
 ## 6. GDN-2 reference clone and decoupled-gating microbenchmark (2026-08-03)
 
 **Bead ob-y3f. NVLabs GatedDeltaNet-2 repo cloned and analysed; C kernel stub benchmarked on jetson-j2.**

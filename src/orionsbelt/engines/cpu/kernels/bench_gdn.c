@@ -41,6 +41,9 @@
 
 #define WARMUPS 3
 #define MAX_REPEATS 64
+#define BATCH 100  /* batched timing: amortize clock_gettime overhead on cores
+                    * with coarse CLOCK_MONOTONIC_RAW granularity (A57: ~2.4 µs).
+                    * Matches the KleidiAI bench fix (commit 7f418d2). */
 
 static double now_s(void) {
     struct timespec ts;
@@ -345,6 +348,7 @@ int main(int argc, char **argv) {
         printf("  sizeof(float)             : %zu\n", sizeof(float));
         printf("  warmups (discarded)       : %d\n", WARMUPS);
         printf("  timed repeats             : %d\n", repeats);
+        printf("  batched calls/repeat      : %d max (adaptive: probed per kernel)\n", BATCH);
         printf("  protocol                  : docs/METRICS.md (p50/p95, no single-best runs)\n\n");
     } else {
         printf("model,kernel,dispatch_path,seq,channels,repeats,"
@@ -393,20 +397,43 @@ int main(int argc, char **argv) {
 
         for (kernel_id k = K_DECAY; k < K_LAST; ++k) {
             double samples[MAX_REPEATS];
+
+            /* Adaptive batching: probe one call. If it's short enough that
+             * clock_gettime overhead (~2.4 µs on A57, ~291 ns on RK3588)
+             * dominates, use batched timing. Otherwise single-call — avoids
+             * thermal-throttling and state-accumulation artefacts on long
+             * kernels. */
+            double t_probe = now_s();
+            switch (k) {
+                case K_DECAY:      gdn_cumdecay_f32(a, out, seq, ch); break;
+                case K_SCAN:       gdn_gated_scan_f32(g, x, out, state, seq, ch); break;
+                case K_CONV:       gdn_causal_dwconv1d_f32(x, w, out, hist, seq, ch); break;
+                case K_DECAY_F16:  gdn_cumdecay_f16(a, decay_f16, seq, ch); break;
+                case K_SCAN_F16:   gdn_gated_scan_f16(g, x, out, state_f16, seq, ch); break;
+                case K_DECAY_BF16: gdn_cumdecay_bf16(a, decay_bf16, seq, ch); break;
+                case K_SCAN_BF16:  gdn_gated_scan_bf16(g, x, out, state_bf16, seq, ch); break;
+                case K_SCAN2:      gdn2_gated_scan_f32(g, a, wg, x, out, state, seq, ch); break;
+                case K_LAST: break;
+            }
+            t_probe = now_s() - t_probe;
+            int batch = (t_probe < 20e-6) ? BATCH : 1;
+
             for (int r = 0; r < WARMUPS + repeats; ++r) {
                 double t0 = now_s();
-                switch (k) {
-                    case K_DECAY:      gdn_cumdecay_f32(a, out, seq, ch); break;
-                    case K_SCAN:       gdn_gated_scan_f32(g, x, out, state, seq, ch); break;
-                    case K_CONV:       gdn_causal_dwconv1d_f32(x, w, out, hist, seq, ch); break;
-                    case K_DECAY_F16:  gdn_cumdecay_f16(a, decay_f16, seq, ch); break;
-                    case K_SCAN_F16:   gdn_gated_scan_f16(g, x, out, state_f16, seq, ch); break;
-                    case K_DECAY_BF16: gdn_cumdecay_bf16(a, decay_bf16, seq, ch); break;
-                    case K_SCAN_BF16:  gdn_gated_scan_bf16(g, x, out, state_bf16, seq, ch); break;
-                    case K_SCAN2:      gdn2_gated_scan_f32(g, a, wg, x, out, state, seq, ch); break;
-                    case K_LAST: break;
+                for (int b = 0; b < batch; ++b) {
+                    switch (k) {
+                        case K_DECAY:      gdn_cumdecay_f32(a, out, seq, ch); break;
+                        case K_SCAN:       gdn_gated_scan_f32(g, x, out, state, seq, ch); break;
+                        case K_CONV:       gdn_causal_dwconv1d_f32(x, w, out, hist, seq, ch); break;
+                        case K_DECAY_F16:  gdn_cumdecay_f16(a, decay_f16, seq, ch); break;
+                        case K_SCAN_F16:   gdn_gated_scan_f16(g, x, out, state_f16, seq, ch); break;
+                        case K_DECAY_BF16: gdn_cumdecay_bf16(a, decay_bf16, seq, ch); break;
+                        case K_SCAN_BF16:  gdn_gated_scan_bf16(g, x, out, state_bf16, seq, ch); break;
+                        case K_SCAN2:      gdn2_gated_scan_f32(g, a, wg, x, out, state, seq, ch); break;
+                        case K_LAST: break;
+                    }
                 }
-                double dt = now_s() - t0;
+                double dt = (now_s() - t0) / batch;
                 if (r >= WARMUPS) samples[r - WARMUPS] = dt;
             }
             stats_t s = summarize(samples, repeats);
