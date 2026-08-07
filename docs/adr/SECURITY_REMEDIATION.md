@@ -96,15 +96,18 @@ git push origin --force --tags
 **If the password has already been rotated (§4a), history purge is optional** —
 the exposed credential is useless. The `.gitignore` prevents new exposures.
 
-## 5. Current state
+## 5. Current state (updated 2026-08-07T22:27Z)
 
-| Branch | File at tip? | Gitignored? |
-|---|---|---|
-| `main` | No | Yes |
-| `bench/t4` | No | Yes |
-| `bench/j1` | **Yes** | No |
-| `origin/bench/r5` | **Yes** | No |
-| `origin/fix/integrate-and-repair-main` | **Yes** | No |
+| Branch | File at tip? | Gitignored? | Last checked |
+|---|---|---|---|
+| `main` | No | Yes | 2026-08-07T22:27Z |
+| `bench/t4` | No | Yes | 2026-08-07T22:27Z |
+| `bench/j1` | **No** ✓ | Yes | 2026-08-07T22:27Z (j1 cleaned up) |
+| `origin/bench/r5` | **Yes** | No | 2026-08-07T22:27Z |
+| `origin/fix/integrate-and-repair-main` | **Yes** | No | 2026-08-07T22:27Z |
+
+Progress since initial audit: **bench/j1** now clean (files untracked). Two
+branches remain with active exposure: `bench/r5` and `fix/integrate-and-repair-main`.
 
 ## 6. Recommendation
 
