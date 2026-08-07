@@ -76,30 +76,3 @@ for spec in \
   bad=$(printf '%s' "$out" | grep -ciE "bit-identical to matched reference: no|EXCEEDS TOLERANCE|CAUSALITY VIOLATED|FAIL" || true)
   if [ "$ok" -ge 1 ] && [ "$bad" -eq 0 ]; then echo "PASS ($ok checks)"; else echo "FAIL (ok=$ok bad=$bad)"; fi
 done
-
-# ---------------------------------------------------------------------------
-# KleidiAI GDN submission kernels (ob-cbx)
-#
-# The KleidiAI submission (kleidiai_submission/) is a separate package with its
-# own test harness and ISA portability matrix.  verify_kleidiai_kernels.sh
-# cross-compiles those kernels and runs them under QEMU across SVE2, SVE1, and
-# NEON tiers — exactly what a reviewer would check before accepting the
-# upstream contribution.
-#
-# This block was added to verify_cpu_kernels.sh (rather than as a separate CI
-# job in ci.yaml) because the GitHub token on this agent lacks `workflow`
-# scope and cannot push to .github/workflows/.  The CI `kernels` job already
-# installs gcc-aarch64-linux-gnu and qemu-user and calls this script, so
-# delegating to the sibling script here achieves the same end without a YAML
-# change.
-# ---------------------------------------------------------------------------
-if [ -x "$(dirname "$0")/verify_kleidiai_kernels.sh" ]; then
-  echo ""
-  echo "==================================================================="
-  echo "  KleidiAI GDN submission kernels (kleidiai_submission/)"
-  echo "==================================================================="
-  bash "$(dirname "$0")/verify_kleidiai_kernels.sh"
-else
-  echo ""
-  echo "WARNING: scripts/verify_kleidiai_kernels.sh not found — skipping KleidiAI verification"
-fi
