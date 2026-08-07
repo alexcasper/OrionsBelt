@@ -33,7 +33,70 @@ def load_rows():
             reader = csv.DictReader(fh)
             for row in reader:
                 rows.append(row)
+
+    # Deduplicate: when entries for the same device/model/quant exist from
+    # different runs (e.g. old "rk3588-t3" with cluster=big superseded by
+    # newer "rk3588-t3_big"), keep only the one with the most repeat_count.
+    # This prevents stale low-run entries from cluttering the comparison.
+    _dedup_rows(rows)
     return rows
+
+
+def _normalize_device(device, notes):
+    """Normalize device name: infer cluster from notes when not in the name."""
+    if "_big" in device or "_little" in device:
+        return device
+    cluster = "all"
+    if isinstance(notes, str) and "cluster=big" in notes:
+        cluster = "big"
+    elif isinstance(notes, str) and "cluster=little" in notes:
+        cluster = "little"
+    return f"{device}_{cluster}"
+
+
+def _dedup_rows(rows):
+    """Remove superseded rows: for the same (norm_device, model, quant, metric),
+    keep only the rows from the run with the highest repeat_count."""
+    # Group row indices by (norm_device, model, quant, metric)
+    from collections import defaultdict
+
+    groups = defaultdict(list)
+    for i, r in enumerate(rows):
+        device = r.get("device", "?")
+        model = r.get("model_checkpoint", "?")
+        quant = r.get("quantization", "fp32")
+        metric = r.get("metric_name", "")
+        norm = _normalize_device(device, r.get("notes", ""))
+        if "4B" in model:
+            model_short = "4B"
+        elif "0.8B" in model:
+            model_short = "0.8B"
+        else:
+            model_short = model
+        key = (norm, model_short, quant, metric)
+        try:
+            rep_count = int(r.get("repeat_count", "1"))
+        except ValueError:
+            rep_count = 1
+        groups[key].append((i, rep_count))
+
+    # For each group, find the max repeat_count and mark rows from other runs
+    # for removal.
+    remove = set()
+    for _key, indices in groups.items():
+        if len(indices) <= 1:
+            continue
+        max_rep = max(rc for _, rc in indices)
+        # Keep rows with the max repeat_count, remove others
+        keep_indices = {i for i, rc in indices if rc == max_rep}
+        for i, _rc in indices:
+            if i not in keep_indices:
+                remove.add(i)
+
+    if remove:
+        # Remove in reverse order to preserve indices
+        for i in sorted(remove, reverse=True):
+            del rows[i]
 
 
 def extract_metrics(rows):
