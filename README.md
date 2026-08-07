@@ -160,7 +160,7 @@ All figures above are verified against primary sources (Radxa product page and d
 | Device-fleet microbenchmarks (5 devices) | Done — [fleet analysis](./results/figures/fleet_bandwidth_scaling.md) |
 | Ablation matrix (6 configs, synthetic) | Done — [comparison table](./results/figures/ablation_comparison.md) |
 | Memory decomposition (analytical) | Done — [figures](./results/figures/) |
-| Architecture decision records (`docs/adr/`) | 10 ADRs recorded |
+| Architecture decision records (`docs/adr/`) | 8 ADRs recorded |
 | CPU GDN kernels (NEON/SVE/scalar) | Verified, benchmarked across fleet |
 | Mixed-precision state kernels (bf16/fp16) | Implemented, benchmarked on Jetson |
 | NPU operator-coverage audit (CIX NOE + RKNN) | Done — [FINDINGS.md](./docs/FINDINGS.md) §1, §7 |
@@ -178,7 +178,7 @@ All figures above are verified against primary sources (Radxa product page and d
 | Per-layer engine mapping (NPU/GPU/CPU) | Hypothesis only — pending measurements |
 | Full inference results (tokens/sec, TTFT, memory) | Partial — C decode loop on A57 + RK3588, ctx-length scaling proven (§17–20), [e2e comparison](./results/figures/e2e_fleet_comparison.md) |
 
-> **Results so far:** 119 CSVs from the device fleet, 84 provenance manifests, 76 generated figures/tables, 29 FINDINGS sections.
+> **Results so far:** 119 CSVs from the device fleet, 84 provenance manifests, 76 generated figures/tables, 35 FINDINGS sections.
 >
 > ```
 > results/
