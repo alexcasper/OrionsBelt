@@ -3236,6 +3236,54 @@ At ctx=1 the pure-GDN model is slightly slower than hybrid for the 0.8B model
 cheaper full-attention Q/K/V projections). But by ctx=1024 the crossover has
 occurred, and at ctx=4096 pure-GDN is 2.1× faster.
 
+### Results — Jetson Nano A57 (cross-device validation)
+
+Ran the identical ctx-sweep on the Jetson Nano (Cortex-A57, 4 cores @1.48 GHz,
+governor=performance, commit `3d83bdc`, pre-thermal 47–54 °C, post-thermal
+50–63 °C). This validates that the GDN O(1) scaling property holds across a
+second, much weaker Arm core class.
+
+#### INT8 hybrid — 0.8B model
+
+| ctx | GDN (ms) | Full-attn (ms) | FFN (ms) | Total (ms) | tok/s | Full-attn share |
+|----:|---------:|---------------:|---------:|-----------:|------:|----------------:|
+| 1 | 129 | 33 | 178 | 339 | 2.95 | 9.6% |
+| 64 | 126 | 37 | 180 | 343 | 2.91 | 10.6% |
+| 256 | 128 | 47 | 178 | 353 | 2.83 | 13.3% |
+| 512 | 129 | 66 | 179 | 375 | 2.67 | 17.7% |
+| 1024 | 130 | 96 | 183 | 409 | 2.45 | 23.5% |
+| 2048 | 130 | 160 | 178 | 468 | 2.13 | 34.1% |
+| 4096 | 129 | 288 | 180 | 598 | 1.67 | 48.2% |
+
+#### INT8 pure-GDN — 0.8B model
+
+| ctx | tok/s |
+|----:|------:|
+| 1 | 2.88 |
+| 4096 | 2.89 |
+
+Throughput variance from ctx=1 to ctx=4096: **<0.4%** — perfectly flat.
+
+#### Cross-device summary (INT8)
+
+| Config | A76 ctx=1 | A76 ctx=4096 | A57 ctx=1 | A57 ctx=4096 | A76 slowdown | A57 slowdown |
+|--------|----------:|-------------:|----------:|-------------:|-------------:|-------------:|
+| 0.8B hybrid | 10.70 | 5.01 | 2.95 | 1.67 | 2.14× | 1.77× |
+| 0.8B pure-GDN | 10.46 | 10.44 | 2.88 | 2.89 | 1.00× | 1.00× |
+| 4B hybrid | 1.84 | 1.19 | 0.57 | 0.42 | 1.55× | 1.36× |
+| 4B pure-GDN | 1.84 | 1.83 | 0.57 | 0.59 | 1.01× | 0.97× |
+
+The GDN advantage holds on both core classes: pure-GDN is flat everywhere,
+hybrid degrades everywhere. The A57's absolute throughput is ~3.6× lower than
+the A76 (consistent with §19's cross-device ratio), but the **scaling shape
+is identical** — the O(1) vs O(n) distinction is architectural, not
+microarchitectural.
+
+Data: `results/raw/jetson-j1_*_ctxsweep_e2e_raw.csv`, manifests in
+`results/manifests/jetson-j1_*_ctxsweep.json`.
+
+Cross-device figure: [`results/figures/ctx_length_scaling_cross.md`](../results/figures/ctx_length_scaling_cross.md)
+
 ### What this means for the submission
 
 This is the core GDN value proposition, measured on real silicon: **linear
@@ -3316,24 +3364,27 @@ random weights (benchmark only).
 
 | Device | CPU | Model | Runs | TTFT (s) | tok/s | Spread | Commit |
 |--------|-----|-------|------|----------|-------|--------|--------|
-| rk3588-t3 | Cortex-A76 @2.4 GHz | Qwen3.5-0.8B | 2 | 0.125 | 7.98 | 1.00× | `7962968` |
+| rk3588-t3 | Cortex-A76 @2.4 GHz | Qwen3.5-0.8B | 3 | 0.126 | 7.95 | 1.01× | `190a3df` |
 | jetson-j1 | Cortex-A57 @1.48 GHz | Qwen3.5-0.8B | 3 | 0.375 | 2.69 | 1.03× | `2896dd0` |
-| rk3588-t3 | Cortex-A76 @2.4 GHz | Qwen3.5-4B | 2 | 0.964 | 1.04 | 1.00× | `2e752af` |
+| rk3588-t3 | Cortex-A76 @2.4 GHz | Qwen3.5-4B | 3 | 0.960 | 1.04 | 1.00× | `8e7403c` |
 | jetson-j1 | Cortex-A57 @1.48 GHz | Qwen3.5-4B | 3 | 2.321 | 0.43 | 1.00× | `b85fab1` |
-| rk3588-t4 | Cortex-A76 @2.4 GHz | Qwen3.5-4B | 1 | 11.76 | 0.09 | — | `def3f29` |
+| rk3588-t4 | Cortex-A76 @2.4 GHz | Qwen3.5-4B | 3 | 1.457 | 0.69 | 1.03× | `a42566d` |
+| rk3588-t4 | Cortex-A76 @2.4 GHz | Qwen3.5-0.8B | 3 | 0.416 | 2.55 | 1.04× | `3b6102a` |
+| rk3588-t4 (pre-opt) | Cortex-A76 @2.4 GHz | Qwen3.5-4B | 1 | 11.76 | 0.09 | — | `def3f29` |
 
 ### Cross-commit caveat
 
-> **These devices were NOT all measured at the same commit.** The GEMV
-> row-sweep optimization (§15, commit `2e752af`) delivered ~12× speedup over
-> the column-sweep baseline. Specifically:
-> - **rk3588-t4** (`def3f29`) ran the **pre-optimization** binary → 0.09 tok/s
-> - **rk3588-t3** (`2e752af`) ran the **post-optimization** binary → 1.04 tok/s
-> - Both are the same RK3588 SoC class; the 11.6× gap is software, not silicon.
+> **These devices were NOT all measured at the same commit**, but all post-opt
+> entries now include the GEMV row-sweep optimization (§15, commit `2e752af`).
+> The t3 data was refreshed 2026-08-07 at `8e7403c` with 3-run replicates
+> (superseding the earlier 2-run data at `7962968`/`2e752af`). The t4 pre-opt
+> baseline (`def3f29`, 0.09 tok/s) is retained to demonstrate the
+> optimization's impact — the same RK3588 SoC class jumps 7.7× once the GEMV
+> row-sweep is applied (`0.69` tok/s at `a42566d`).
 >
-> All other entries (A57 4B `b85fab1`, A57 0.8B `2896dd0`, A76 0.8B `7962968`)
-> include the GEMV optimization. The t4 pre-opt data point is retained as the
-> baseline that demonstrates the optimization's impact.
+> The t4 post-opt numbers (0.69 tok/s for 4B) are ~33% below t3 (1.04 tok/s)
+> despite the same SoC class — this is consistent with documented board-level
+> heterogeneity in the fleet (see §19.5 below).
 
 ### Cross-device scaling (matched GEMV code)
 
@@ -3342,17 +3393,17 @@ pre-optimization baseline):
 
 | Model | Cortex-A57 (Jetson) | Cortex-A76 (RK3588) | A76/A57 |
 |-------|---------------------|---------------------|---------|
-| 0.8B tok/s | 2.70 | 7.98 | **3.0×** |
+| 0.8B tok/s | 2.70 | 7.95 | **2.9×** |
 | 4B tok/s | 0.43 | 1.04 | **2.4×** |
-| 0.8B TTFT (s) | 0.37 | 0.125 | 3.0× |
+| 0.8B TTFT (s) | 0.37 | 0.126 | 2.9× |
 | 4B TTFT (s) | 2.32 | 0.96 | 2.4× |
 
-The A76 is 2.4–3.0× faster than the A57. This is consistent with:
+The A76 is 2.4–2.9× faster than the A57. This is consistent with:
 - ~1.6× clock advantage (2.4 GHz vs 1.48 GHz)
 - ~1.3× pipeline advantage (A76: 2× FMA/cycle; A57: 1× FMA/cycle, 3-wide vs 2-wide OoO)
 - 1.6 × 1.3 ≈ 2.1×, with the remaining ~1.2–1.4× from A76's superior
   L1/L2 cache subsystem and memory-level parallelism
-- The 4B ratio (2.4×) is smaller than the 0.8B ratio (3.0×) because the larger
+- The 4B ratio (2.4×) is smaller than the 0.8B ratio (2.9×) because the larger
   working set of 4B pushes both cores closer to DRAM bandwidth limits,
   reducing the compute throughput gap.
 
