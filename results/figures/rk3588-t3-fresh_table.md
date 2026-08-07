@@ -1,4 +1,4 @@
-# rk3588-t3-clean — Microbenchmark Results
+# rk3588-t3-fresh — Microbenchmark Results
 
 _Source: committed CSVs in results/raw/_
 
