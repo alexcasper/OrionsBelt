@@ -18,6 +18,7 @@ from scripts.validate_results import (  # noqa: E402
     ABSURD_THROUGHPUT,
     E2E_SWEEP_COLS,
     GPU_MICRO_COLS,
+    KLEIDIAI_MATMUL_COLS,
     LAYER_PROFILE_COLS,
     STANDARD_COLS,
     SUSTAINED_COLS,
@@ -32,6 +33,7 @@ from scripts.validate_results import (  # noqa: E402
     validate_csv,
     validate_e2e_sweep_row,
     validate_gpu_micro_row,
+    validate_kleidiai_matmul_row,
     validate_layer_profile_row,
     validate_manifest,
     validate_standard_row,
@@ -199,6 +201,15 @@ class TestDetectCsvType:
         cols = ["bw_mibs", "p50_ms", "dim1"]
         assert detect_csv_type(cols) == "gpu_micro"
 
+    def test_kleidiai_matmul_detected(self):
+        """KleidiAI matmul CSV should be detected."""
+        assert detect_csv_type(KLEIDIAI_MATMUL_COLS) == "kleidiai_matmul"
+
+    def test_kleidiai_matmul_minimal_cols(self):
+        """Detection only needs the key columns."""
+        cols = ["shape", "impl", "GiB_s", "GFLOP_s"]
+        assert detect_csv_type(cols) == "kleidiai_matmul"
+
 
 # ---------------------------------------------------------------------------
 # expected_columns
@@ -229,6 +240,11 @@ class TestExpectedColumns:
     def test_gpu_micro_columns(self):
         assert "bw_mibs" in expected_columns("gpu_micro")
         assert "p50_ms" in expected_columns("gpu_micro")
+
+    def test_kleidiai_matmul_columns(self):
+        assert "us_per_call" in expected_columns("kleidiai_matmul")
+        assert "GiB_s" in expected_columns("kleidiai_matmul")
+        assert "GFLOP_s" in expected_columns("kleidiai_matmul")
 
 
 # ---------------------------------------------------------------------------
@@ -503,8 +519,76 @@ class TestValidateGpuMicroRow:
 
 
 # ---------------------------------------------------------------------------
-# check_manifest_exists
+# KleidiAI matmul row validation
 # ---------------------------------------------------------------------------
+
+
+def _kleidiai_row(**overrides):
+    """A valid KleidiAI matmul benchmark row."""
+    base = {
+        "shape": "decode_1x128x128",
+        "impl": "kleidiai",
+        "M": "1",
+        "K": "128",
+        "N": "128",
+        "us_per_call": "1.855",
+        "GiB_s": "33.41",
+        "GFLOP_s": "17.66",
+    }
+    base.update(overrides)
+    return base
+
+
+class TestValidateKleidiaiMatmulRow:
+    def test_valid_row_no_issues(self):
+        issues = []
+        validate_kleidiai_matmul_row(_kleidiai_row(), "test.csv", issues, 2)
+        assert issues == []
+
+    def test_valid_naive_impl(self):
+        issues = []
+        validate_kleidiai_matmul_row(
+            _kleidiai_row(impl="naive", us_per_call="13.620", GiB_s="4.55", GFLOP_s="2.41"),
+            "test.csv",
+            issues,
+            2,
+        )
+        assert issues == []
+
+    def test_non_positive_us(self):
+        issues = []
+        validate_kleidiai_matmul_row(_kleidiai_row(us_per_call="0.0"), "test.csv", issues, 2)
+        assert any("non-positive us_per_call" in i.message for i in issues)
+
+    def test_absurd_gibs(self):
+        issues = []
+        validate_kleidiai_matmul_row(
+            _kleidiai_row(GiB_s=str(ABSURD_THROUGHPUT + 1)),
+            "test.csv",
+            issues,
+            2,
+        )
+        assert any("absurd GiB_s" in i.message for i in issues)
+
+    def test_negative_gibs(self):
+        issues = []
+        validate_kleidiai_matmul_row(_kleidiai_row(GiB_s="-1.0"), "test.csv", issues, 2)
+        assert any("negative GiB_s" in i.message for i in issues)
+
+    def test_negative_gflops(self):
+        issues = []
+        validate_kleidiai_matmul_row(_kleidiai_row(GFLOP_s="-5.0"), "test.csv", issues, 2)
+        assert any("negative GFLOP_s" in i.message for i in issues)
+
+    def test_malformed_us(self):
+        issues = []
+        validate_kleidiai_matmul_row(_kleidiai_row(us_per_call="abc"), "test.csv", issues, 2)
+        assert any("cannot parse us_per_call" in i.message for i in issues)
+
+    def test_malformed_gibs(self):
+        issues = []
+        validate_kleidiai_matmul_row(_kleidiai_row(GiB_s="N/A"), "test.csv", issues, 2)
+        assert any("cannot parse GiB_s" in i.message for i in issues)
 
 
 class TestCheckManifestExists:
@@ -614,9 +698,43 @@ class TestMainEndToEnd:
         assert result == 2
 
 
-# ---------------------------------------------------------------------------
-# validate_csv() — edge cases
-# ---------------------------------------------------------------------------
+    def test_missing_csv_dir_exit_two(self, tmp_path):
+        """A non-existent CSV directory exits 2."""
+        result = self._run_main(tmp_path / "nonexistent", tmp_path / "manifests")
+        assert result == 2
+
+    def test_recursive_subdirectory_discovery(self, tmp_path):
+        """CSVs in subdirectories are discovered and validated."""
+        csv_dir = tmp_path / "raw"
+        man_dir = tmp_path / "manifests"
+        kleidiai_dir = csv_dir / "kleidiai"
+        kleidiai_dir.mkdir(parents=True)
+        man_dir.mkdir()
+
+        # Write a kleidiai matmul CSV in a subdirectory
+        header = ",".join(KLEIDIAI_MATMUL_COLS)
+        row = "decode_1x128x128,kleidiai,1,128,128,1.855,33.41,17.66"
+        (kleidiai_dir / "rk3588-t3_kleidiai_matmul.csv").write_text(
+            f"{header}\n{row}\n"
+        )
+
+        import scripts.validate_results as vr
+
+        orig_argv = sys.argv
+        sys.argv = [
+            "validate_results.py",
+            "--csv-dir",
+            str(csv_dir),
+            "--manifest-dir",
+            str(man_dir),
+        ]
+        try:
+            rc = vr.main()
+        finally:
+            sys.argv = orig_argv
+
+        # Should discover the subdirectory CSV (exit 1 = warnings, no errors)
+        assert rc >= 0  # no crash
 
 
 class TestValidateCsv:
@@ -690,7 +808,76 @@ class TestValidateCsv:
         assert row_count == 1
 
 
-class TestLoadManifest:
+    def test_profile_csv_validated(self, tmp_path):
+        header = "phase,ctx_len,layer_idx,layer_type,p50_us,p95_us,mean_us,n_samples"
+        row = "prefill,64,0,linear_attention,100.0,120.0,110.0,3"
+        path = tmp_path / "profile.csv"
+        path.write_text(f"{header}\n{row}\n")
+        issues = []
+        csv_type, row_count, _ = validate_csv(str(path), "profile.csv", issues)
+        assert csv_type == "layer_profile"
+        assert row_count == 1
+
+    def test_comment_prefixed_standard_csv(self, tmp_path):
+        """A CSV with a '# metadata' comment line before the header."""
+        comment = "# config=big_only_a76 binary=bench_gdn_a76 affinity=4-7\n"
+        header = ",".join(STANDARD_COLS)
+        row = "Qwen3.5-4B,gdn_cumdecay,neon,64,4096,30,100,120,20,1.5,0.3"
+        path = tmp_path / "affinity.csv"
+        path.write_text(f"{comment}{header}\n{row}\n")
+        issues = []
+        csv_type, row_count, _ = validate_csv(str(path), "affinity.csv", issues)
+        assert csv_type == "standard"
+        assert row_count == 1
+        assert not any(i.severity == "ERROR" for i in issues)
+
+    def test_commented_out_header_stripped(self, tmp_path):
+        """A CSV where the header itself is prefixed with '#'.
+
+        This happens in delta_matmul_study.csv: the header line is
+        '# config,binary,affinity,kernel,...' and should be uncommented.
+        """
+        lines = [
+            "# delta_matmul_affinity_study (ob-8qt.1)\n",
+            "# device: RK3588\n",
+            "# config,binary,affinity,kernel,M,K,N,repeats,p50_us,p95_us,gib_per_s_p50\n",
+            "big_only_a76,a76,4-7,gdn_delta_rule_matmul,1,128,128,30,3.500,3.501,17.71\n",
+        ]
+        path = tmp_path / "study.csv"
+        path.write_text("".join(lines))
+        issues = []
+        csv_type, row_count, _ = validate_csv(str(path), "study.csv", issues)
+        assert csv_type == "delta_matmul"
+        assert row_count == 1
+
+    def test_metadata_comment_with_commas_skipped(self, tmp_path):
+        """A '#'-prefixed line with commas but prose (not identifiers) is skipped."""
+        lines = [
+            "# config,binary,affinity,kernel,M,K,N,repeats,p50_us,p95_us,gib_per_s_p50\n",
+            "# (A76 on big cores, A55 on little cores — launched simultaneously)\n",
+            "big_only_a76,a76,4-7,gdn_delta_rule_matmul,1,128,128,30,3.500,3.501,17.71\n",
+        ]
+        path = tmp_path / "study2.csv"
+        path.write_text("".join(lines))
+        issues = []
+        csv_type, row_count, _ = validate_csv(str(path), "study2.csv", issues)
+        assert csv_type == "delta_matmul"
+        assert row_count == 1
+        assert not any("cannot parse" in i.message for i in issues)
+
+    def test_multi_section_csv_dedup_header(self, tmp_path):
+        """A CSV with repeated header lines between sections (affinity study)."""
+        header = ",".join(STANDARD_COLS)
+        row1 = "Qwen3.5-4B,gdn_cumdecay,neon,64,4096,30,100,120,20,1.5,0.3"
+        row2 = "Qwen3.5-4B,gdn_gated_scan,neon,64,4096,30,500,600,20,1.0,0.5"
+        comment = "# config=all_cores_a76 binary=bench_gdn_a76 affinity=all\n"
+        content = f"{header}\n{row1}\n{comment}{header}\n{row2}\n"
+        path = tmp_path / "multi.csv"
+        path.write_text(content)
+        issues = []
+        csv_type, row_count, _ = validate_csv(str(path), "multi.csv", issues)
+        assert csv_type == "standard"
+        assert row_count == 2
     def test_valid_json(self, tmp_path):
         path = tmp_path / "manifest.json"
         path.write_text('{"git": {"sha": "abc123"}}')
