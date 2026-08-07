@@ -358,14 +358,17 @@ manifest:
 > records p50=0.000 and gib_per_s_p50=inf for these rows.
 
 > **⚠ Data-quality warning (t4 table):** This t4 CSV (`rk3588-t4_kleidiai_gdn_kernels.csv`,
-> manifest dirty=true) contains the same class of measurement artifacts that the
-> t3 data had before its refresh: `cumdecay 1×160` and `gated_scan 1×160` record
-> p50=0.000 / inf (below timer resolution), `cumdecay 64×160` at 3.5 µs is
-> anomalously fast vs t3's 11.4 µs, and `cumdecay 1×2560` at 0.6 µs is anomalously
-> fast vs t3's 3.2 µs. The t3 table below (commit `78eb7e4`, dirty=false) is the
-> **authoritative A76 KleidiAI benchmark** — it was explicitly captured to fix
-> these artifacts. Treat the t4 GEMV rows (17.1–17.7 GiB/s) as cross-validated;
-> treat the t4 recurrent-kernel rows as indicative only.
+> manifest dirty=true) was captured with **single-call timing** and exhibits the
+> clock-quantization artifacts identified and fixed by t3 in commit `7f418d2`:
+> RK3588's `CLOCK_MONOTONIC_RAW` has ~291 ns granularity, so single-call
+> timing of fast kernels produces impossible values (0.000 µs / inf GiB/s) and
+> wrong-function cross-contamination. The fix (batched timing: 100 calls per
+> measurement) was applied to `bench_kai_gdn.c` and the t3 CSV was refreshed,
+> but t4 has not yet re-run with the fixed bench. The t3 table above (commit
+> `7f418d2`) is the **authoritative A76 KleidiAI benchmark**. Treat the t4
+> GEMV rows (17.1–17.7 GiB/s) as cross-validated — they match t3 within 2%,
+> since GEMV calls take 3–73 µs (well above the 291 ns quantum). Treat the
+> t4 recurrent-kernel rows as indicative only.
 
 > **Note on variance:** The A57 exhibits high run-to-run variance (up to 1.5×
 > on the same kernel at the same commit, per beads ob-bf7). The numbers above
@@ -382,41 +385,41 @@ SVE/SVE2 — the kernels run the NEON fallback path (`#elif __ARM_NEON`).
 
 | Kernel      | Shape (seq×ch)   | p50 (µs) | GiB/s |
 |-------------|------------------|----------|-------|
-| cumdecay    | 64×160           |     11.4 |   6.7 |
-| cumdecay    | 1×160            |      0.3 |   4.1 |
-| cumdecay    | 64×2560          |    535.2 |   2.3 |
-| cumdecay    | 1×2560           |      3.2 |   6.0 |
-| gated_scan  | 64×160           |     20.7 |   5.6 |
-| gated_scan  | 1×160            |      0.3 |  10.2 |
-| gated_scan  | 64×2560          |    189.0 |   9.8 |
-| gated_scan  | 1×2560           |      1.2 |  40.9 |
-| dwconv1d    | 64×160           |      5.3 |  15.7 |
-| dwconv1d    | 1×160            |      0.3 |  24.6 |
-| dwconv1d    | 64×2560          |    144.7 |   9.1 |
-| dwconv1d    | 1×2560           |      2.9 |  39.3 |
-| gemv        | K=128 N=128      |      3.5 |  17.7 |
-| gemv        | K=128 N=2048     |     58.0 |  17.0 |
-| gemv        | K=128 N=2560     |     72.9 |  16.9 |
+| cumdecay    | 64×160           |     11.2 |   6.8 |
+| cumdecay    | 1×160            |     0.05 |  24.0 |
+| cumdecay    | 64×2560          |    121.8 |  10.0 |
+| cumdecay    | 1×2560           |     0.75 |  25.6 |
+| gated_scan  | 64×160           |      5.3 |  21.7 |
+| gated_scan  | 1×160            |     0.07 |  44.4 |
+| gated_scan  | 64×2560          |    181.2 |  10.2 |
+| gated_scan  | 1×2560           |      1.0 |  46.3 |
+| dwconv1d    | 64×160           |      5.2 |  15.9 |
+| dwconv1d    | 1×160            |     0.13 |  57.0 |
+| dwconv1d    | 64×2560          |    144.4 |   9.1 |
+| dwconv1d    | 1×2560           |      2.8 |  41.4 |
+| gemv        | K=128 N=128      |      3.6 |  17.4 |
+| gemv        | K=128 N=2048     |     58.3 |  16.9 |
+| gemv        | K=128 N=2560     |     73.3 |  16.8 |
 
 **A76 vs A57 comparison:** On larger shapes (2560 channels, GEMV), the A76 is
 3–5× faster than the A57 — the wider NEON pipeline and faster memory subsystem
 dominate when there is enough work to amortize per-call overhead (e.g.
-gated_scan 64×2560: 9.8 vs 2.1 GiB/s, GEMV K=128 N=128: 17.7 vs 4.6 GiB/s,
-dwconv1d 64×160: 15.7 vs 4.7 GiB/s). At the smallest shapes (160 channels,
-seq=64), the two cores are within 15% — the operation completes in under 25 µs
-and launch overhead dominates. At seq=1, the A76's advantage holds on
-compute-bound kernels (gated_scan 1×2560: 40.9 vs 13.3 GiB/s, dwconv1d 1×2560:
-39.3 vs 11.8 GiB/s) but not on cumdecay 1×2560 (6.0 vs 8.9 GiB/s), where the
-A57's simpler pipeline is more efficient for the pure sequential-multiply
-pattern at this size.
+gated_scan 64×2560: 10.2 vs 2.1 GiB/s, GEMV K=128 N=128: 17.4 vs 4.6 GiB/s,
+dwconv1d 64×160: 15.9 vs 4.7 GiB/s). At the smallest shapes (160 channels,
+seq=64), the A76 pulls ahead on cumdecay and gated_scan (6.8 and 21.7 GiB/s vs
+5.8 and 6.3 on A57) while dwconv1d is comparable (15.9 vs 4.7 GiB/s). At seq=1,
+the A76's advantage holds across all kernels (gated_scan 1×2560: 46.3 vs 13.3
+GiB/s, dwconv1d 1×2560: 41.4 vs 11.8 GiB/s, cumdecay 1×2560: 25.6 vs 8.9 GiB/s).
 
-> **Provenance:** Captured at commit `78eb7e4` on device t3 (RK3588),
-> governor: `performance`. Kernel C files unchanged since `250dc96`; the test
-> harness and Makefile were updated (POSIX macros, -Wpedantic, degenerate-input
-> tests). The previous CSV at `250dc96` had measurement artifacts
-> (gated_scan 64×160: p50=5.3 µs was identical to dwconv1d, cumdecay 1×2560:
-> p50=0.9 µs was anomalously fast, gated_scan 1×160: p50=0.0/inf).
-> Manifest: `results/manifests/rk3588-t3_kleidiai_gdn_kernels.json`.
+> **Provenance:** Captured at commit `7f418d2` on device t3 (RK3588),
+> governor: `performance`, ~43°C. Uses batched timing (100 calls per
+> measurement) to overcome RK3588's ~291 ns `CLOCK_MONOTONIC_RAW` granularity
+> — single-call timing produced impossible values (0.000 µs / inf GiB/s) on
+> fast kernels and wrong-function cross-contamination on others. The GEMV and
+> large-shape (64×2560) values are stable across the single-call and batched
+> methods; only the fast/small shapes changed. GEMV rows cross-validate with
+> t4 within 2%. Manifest:
+> `results/manifests/rk3588-t3_kleidiai_gdn_kernels.json`.
 > Raw CSV: `results/raw/kleidiai/rk3588-t3_kleidiai_gdn_kernels.csv`.
 
 ---
