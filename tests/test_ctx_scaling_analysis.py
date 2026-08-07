@@ -164,20 +164,20 @@ class TestCollectData:
 class TestGenerateReport:
     def test_no_data_message(self, tmp_path):
         """When no CSVs exist, report says so explicitly."""
-        report = generate_report("nonexistent-device", "a76", CONFIGS_RK3588, str(tmp_path))
+        report = generate_report("nonexistent-device", "a76", "A76", CONFIGS_RK3588, str(tmp_path))
         assert "No ctx-sweep CSVs found" in report
 
     def test_report_has_title(self, tmp_path):
-        report = generate_report("rk3588-t3", "a76", CONFIGS_RK3588, str(tmp_path))
+        report = generate_report("rk3588-t3", "a76", "A76", CONFIGS_RK3588, str(tmp_path))
         assert "# Context-Length Scaling" in report
 
     def test_report_has_generated_by(self, tmp_path):
-        report = generate_report("rk3588-t3", "a76", CONFIGS_RK3588, str(tmp_path))
+        report = generate_report("rk3588-t3", "a76", "A76", CONFIGS_RK3588, str(tmp_path))
         assert "ctx_scaling_analysis.py" in report
         assert "Do not hand-edit" in report
 
     def test_report_mentions_core(self, tmp_path):
-        report = generate_report("rk3588-t3", "a76", CONFIGS_RK3588, str(tmp_path))
+        report = generate_report("rk3588-t3", "a76", "A76", CONFIGS_RK3588, str(tmp_path))
         assert "Cortex-A76" in report
 
     def test_report_with_data(self, tmp_path, monkeypatch):
@@ -201,7 +201,7 @@ class TestGenerateReport:
             ],
         )
         monkeypatch.chdir(tmp_path)
-        report = generate_report("rk3588-t3", "a76", CONFIGS_RK3588, str(tmp_path / "figures"))
+        report = generate_report("rk3588-t3", "a76", "A76", CONFIGS_RK3588, str(tmp_path / "figures"))
         assert "Throughput vs context length" in report
         assert "Full-attention share" in report
         assert "KV cache memory" in report
@@ -237,7 +237,7 @@ class TestGenerateReport:
             ],
         )
         monkeypatch.chdir(tmp_path)
-        report = generate_report("rk3588-t3", "a76", CONFIGS_RK3588, str(tmp_path / "figures"))
+        report = generate_report("rk3588-t3", "a76", "A76", CONFIGS_RK3588, str(tmp_path / "figures"))
         assert "10.00" in report
         assert "1.50" in report
 
@@ -261,7 +261,7 @@ class TestGenerateReport:
             ],
         )
         monkeypatch.chdir(tmp_path)
-        report = generate_report("rk3588-t3", "a76", CONFIGS_RK3588, str(tmp_path / "figures"))
+        report = generate_report("rk3588-t3", "a76", "A76", CONFIGS_RK3588, str(tmp_path / "figures"))
         assert "256 MB" in report
 
     def test_headline_section(self, tmp_path, monkeypatch):
@@ -294,7 +294,7 @@ class TestGenerateReport:
             ],
         )
         monkeypatch.chdir(tmp_path)
-        report = generate_report("rk3588-t3", "a76", CONFIGS_RK3588, str(tmp_path / "figures"))
+        report = generate_report("rk3588-t3", "a76", "A76", CONFIGS_RK3588, str(tmp_path / "figures"))
         assert "ctx=4096" in report
 
 
