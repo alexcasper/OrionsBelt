@@ -1,0 +1,4 @@
+# Build artifacts
+*.o
+test_kai_gdn
+bench_kai_gdn

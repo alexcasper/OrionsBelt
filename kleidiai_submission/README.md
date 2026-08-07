@@ -93,7 +93,7 @@ sequence models (Mamba, RWKV, RetNet, GDN all use some variant of it).
 
 ---
 
-## The NEON-Only GEMV (M=1 Decode-Path Delta-Rule Matmul)
+## The NEON GEMV (M=1 Decode-Path Delta-Rule Matmul)
 
 ```
 C[j] = Σ_k  A[k] · B[k][j]     (M=1, so this is a matrix-vector product)
@@ -112,7 +112,7 @@ break-even M is 3–6. Hand-NEON without packing wins 2.6–3.0× at M=1 — mak
 GEMV the right kernel for the decode path. See `gdn_delta_matmul.c` header for
 the full dual-path dispatch rationale.
 
-**This kernel is NEON-only** (no SME, no SVE dependency) because:
+**This kernel uses NEON FMA** (no SME, no SVE, no dotprod dependency) because:
 - The delta-rule operands are fp32 (per the project's quantization policy).
 - The decode target devices (e.g., Cortex-A76 on RK3588) predate i8mm and SVE.
 - NEON FMA at 4-wide is sufficient for the M=1 bandwidth-bound case.
@@ -132,11 +132,11 @@ kai_run_<operation>_<data-types>_<ISA>
 | `kai_run_gdn_cumdecay_f32_sve`                        | SVE (SVE1 floor)  |
 | `kai_run_gdn_gated_scan_f32_sve`                      | SVE (SVE1 floor)  |
 | `kai_run_gdn_causal_dwconv1d_f32_k4_sve`              | SVE (SVE1 floor)  |
-| `kai_run_gdn_gemv_f32_f32_f32_1x4_neon_dotprod`       | NEON + dotprod    |
+| `kai_run_gdn_gemv_f32_f32_f32_1x4_neon`             | NEON FMA          |
 
 The `_sve` suffix indicates the primary vectorization ISA (SVE1 baseline), with
-compile-time NEON and scalar fallbacks. The GEMV uses `_neon_dotprod` because
-it targets the NEON FMA path specifically. The `1x4` in the GEMV name encodes
+compile-time NEON and scalar fallbacks. The GEMV uses `_neon` because
+it targets the NEON FMA path specifically (fp32 operands, no SDOT). The `1x4` in the GEMV name encodes
 M=1 (single output row) and the 4-wide NEON accumulation.
 
 ---
@@ -206,7 +206,9 @@ the library), not a performance bottleneck.
 ```
 kleidiai_submission/
 ├── README.md                                         (this file)
-├── test_kai_gdn.c                                    (test harness)
+├── Makefile                                          (build: test, bench, clean)
+├── test_kai_gdn.c                                    (test harness, 10 suites)
+├── bench_kai_gdn.c                                   (micro-benchmark, CSV output)
 └── kai/ukernels/gdn/
     ├── kai_gdn_cumdecay_f32_sve.h
     ├── kai_gdn_cumdecay_f32_sve.c
@@ -214,18 +216,23 @@ kleidiai_submission/
     ├── kai_gdn_gated_scan_f32_sve.c
     ├── kai_gdn_causal_dwconv1d_f32_k4_sve.h
     ├── kai_gdn_causal_dwconv1d_f32_k4_sve.c
-    ├── kai_gdn_gemv_f32_f32_f32_1x4_neon_dotprod.h
-    └── kai_gdn_gemv_f32_f32_f32_1x4_neon_dotprod.c
+    ├── kai_gdn_gemv_f32_f32_f32_1x4_neon.h
+    └── kai_gdn_gemv_f32_f32_f32_1x4_neon.c
 ```
 
 ## Verification
 
 The test harness compares each kernel against a naive C reference implementation
-and prints `ALL TESTS PASSED` on success:
+and prints `ALL TESTS PASSED` on success (10 test suites: 6 correctness +
+4 edge-case tail-handling):
 
 ```bash
-gcc -O3 -march=armv8.2-a+simd \
-    -I kleidiai_submission \
+cd kleidiai_submission && make test
+```
+
+Or manually:
+```bash
+gcc -O3 -march=armv8-a -I kleidiai_submission \
     kleidiai_submission/test_kai_gdn.c \
     kleidiai_submission/kai/ukernels/gdn/*.c \
     -lm -o test_kai_gdn
@@ -240,6 +247,49 @@ aarch64-linux-gnu-gcc -O3 -march=armv8.2-a+sve \
     kleidiai_submission/kai/ukernels/gdn/*.c \
     -lm -o test_kai_gdn
 ```
+
+A micro-benchmark (`bench_kai_gdn`) measures per-kernel latency and
+achieved bandwidth at realistic GDN shapes:
+
+```bash
+cd kleidiai_submission && make bench
+```
+
+### A57 (Armv8.0, NEON path) — measured on Jetson Nano
+
+All numbers are p50 of 30 repeats (3 warmups discarded). The A57 is the
+lowest-end core in the test fleet (Armv8.0, 4-wide NEON, no dotprod/SVE),
+making it the worst-case portability floor.
+
+| Kernel      | Shape (seq×ch)   | p50 (µs) | GiB/s |
+|-------------|------------------|----------|-------|
+| cumdecay    | 64×160           |     11.8 |   6.5 |
+| cumdecay    | 1×160            |      0.3 |   4.6 |
+| cumdecay    | 64×2560          |    433.6 |   2.8 |
+| cumdecay    | 1×2560           |      2.1 |   9.2 |
+| gated_scan  | 64×160           |     18.2 |   6.3 |
+| gated_scan  | 1×160            |      0.3 |   9.5 |
+| gated_scan  | 64×2560          |    757.0 |   2.4 |
+| gated_scan  | 1×2560           |      3.8 |  12.5 |
+| dwconv1d    | 64×160           |     17.8 |   4.6 |
+| dwconv1d    | 1×160            |      0.7 |  10.6 |
+| dwconv1d    | 64×2560          |    475.5 |   2.8 |
+| dwconv1d    | 1×2560           |     10.2 |  11.3 |
+| gemv        | K=128 N=128      |     13.3 |   4.7 |
+| gemv        | K=128 N=2048     |    184.5 |   5.3 |
+| gemv        | K=128 N=2560     |    234.1 |   5.3 |
+
+> **Note on variance:** The A57 exhibits high run-to-run variance (up to 1.5×
+> on the same kernel at the same commit, per beads ob-bf7). The numbers above
+> are from representative single runs; cross-device comparisons must use
+> matched commits with multiple replicates. The GEMV NEON path uses
+> double-width unrolling (8 channels/iter) and `vfmaq_n_f32` scalar FMA,
+> matching the three recurrent kernels' pattern.
+
+At seq=64 (prefill chunk), all three recurrent kernels are bandwidth-bound
+(1.6–6.6 GiB/s vs the A57's 25.6 GiB/s spec). At seq=1 (decode), the working
+set fits in L1 and the kernels are launch-overhead-dominated, not
+bandwidth-limited. The GEMV at all sizes is bandwidth-bound at ~5 GiB/s.
 
 ---
 
