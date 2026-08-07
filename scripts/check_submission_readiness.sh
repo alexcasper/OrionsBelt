@@ -22,6 +22,11 @@ FAIL=0
 WARN=0
 SKIP=0
 
+# Temp dir for check 4; cleaned on EXIT so Ctrl-C doesn't leak it.
+_MEM_TMPDIR=""
+_trap_cleanup() { [ -n "$_MEM_TMPDIR" ] && rm -rf "$_MEM_TMPDIR"; true; }
+trap _trap_cleanup EXIT
+
 ok()   { echo "  ✓ $1"; PASS=$((PASS + 1)); }
 fail() { echo "  ✗ $1"; FAIL=$((FAIL + 1)); }
 warn() { echo "  ! $1"; WARN=$((WARN + 1)); }
@@ -76,9 +81,9 @@ echo "[4/8] Memory scaling plots"
 if [ "$PY_OK" -ne 1 ]; then
     skip "Python 3.7+ required (have ${PY_MAJOR}.${PY_MINOR}); run on CI or an x86 host"
 else
-    TMPDIR=$(mktemp -d)
-    if python3 scripts/generate_memory_plots.py --text-only --output-dir "$TMPDIR" > /dev/null 2>&1; then
-        if [ -f "$TMPDIR/memory_comparison.md" ]; then
+    _MEM_TMPDIR=$(mktemp -d)
+    if python3 scripts/generate_memory_plots.py --text-only --output-dir "$_MEM_TMPDIR" > /dev/null 2>&1; then
+        if [ -f "$_MEM_TMPDIR/memory_comparison.md" ]; then
             ok "Memory plots generate successfully"
         else
             fail "Memory plots script ran but no output file"
@@ -86,7 +91,8 @@ else
     else
         fail "Memory plots script failed"
     fi
-    rm -rf "$TMPDIR"
+    rm -rf "$_MEM_TMPDIR"
+    _MEM_TMPDIR=""
 fi
 
 # -------------------------------------------------------------------
