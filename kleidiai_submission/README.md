@@ -306,7 +306,7 @@ manifest:
 > recurrent kernels' pattern.
 
 At seq=64 (prefill chunk), all three recurrent kernels are bandwidth-bound
-(1.6–6.6 GiB/s vs the A57's 25.6 GiB/s spec). At seq=1 (decode), the working
+(1.6–6.6 GiB/s vs the A57's 23.8 GiB/s spec). At seq=1 (decode), the working
 set fits in L1 and the kernels are launch-overhead-dominated, not
 bandwidth-limited. The GEMV at all sizes is bandwidth-bound at ~5 GiB/s.
 
