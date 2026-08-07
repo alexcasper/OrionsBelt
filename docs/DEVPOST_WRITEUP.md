@@ -153,13 +153,13 @@ sizes (≤6 MiB) is negligible compared to 2.8 GiB of weight traffic.
 **Optimized C decode loop delivers 10.6 tok/s (INT8) on the same SoC.**
 Replacing the Python/transformers backend with a hand-tuned C decode loop
 (row-sweep NEON GEMV + OpenMP + INT8 weight-only quantization) yields a
-**26–30× cumulative speedup** over the naive baseline:
+**~26× cumulative speedup** over the naive baseline:
 
 | Implementation | 0.8B tok/s (A76) | 4B tok/s (A76) | 0.8B tok/s (A57) | 4B tok/s (A57) |
 |----------------|-----------------:|---------------:|-----------------:|---------------:|
 | Python/transformers (baseline) | ~0.68 | — | — | — |
-| C: row-sweep GEMV (FP32) | 7.98 | 1.04 | 2.70 | 0.43 |
-| C: + INT8 weight-only | **10.6** | **1.84** | **3.01** | **0.59** |
+| C: row-sweep GEMV (FP32) | 7.98 | 1.04 | 2.06 | 0.43 |
+| C: + INT8 weight-only | **10.6** | **1.84** | **2.45** | **0.51** |
 
 The optimization stack is pure memory-system engineering — no algorithmic
 changes to the model. GDN's novel recurrent kernels (conv, decay, scan)
@@ -408,7 +408,7 @@ ORIONS_FORCE_FP32=1 python3 bench/harness.py \
 - **Orion O6 results:** board has not arrived (externally gated procurement
   since project start). All NPU/GPU results are from toolchain analysis, not
   silicon measurement.
-- **Decode throughput optimized 26–30× from baseline:** the Python/transformers
+- **Decode throughput optimized ~26× from baseline:** the Python/transformers
   baseline ran at ~0.68 tok/s (bandwidth-bound). Our C decode loop with
   row-sweep NEON GEMV + INT8 weight-only quantization achieves 10.6 tok/s
   (0.8B, A76 INT8) and 1.84 tok/s (4B, A76 INT8). Decode remains
