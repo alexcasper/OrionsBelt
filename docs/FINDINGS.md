@@ -2014,6 +2014,9 @@ on the same cluster.
 All measurements: Qwen3.5-4B config (seq=64, channels=4096, 24 GDN layers), 30 repeats,
 governor=performance, thermals 38.8→41.6°C.
 
+**Data:** `results/raw/affinity/rk3588-t3_affinity.csv` + `results/manifests/rk3588-t3_affinity.json`
+(SHA `cceb04c`, dirty tree — benchmark had uncommitted affinity-study script changes; landed clean in `1940877`).
+
 | Config | Binary | Cores | gdn_gated_scan p50 (µs) | gdn_cumdecay p50 (µs) | gdn_causal_dwconv1d p50 (µs) |
 |---|---|---|---|---|---|
 | **big_only_a76** | A76 | 4-7 (big) | **284** | **88** | **95** |
