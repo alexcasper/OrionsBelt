@@ -74,14 +74,23 @@ static void bench_kernel(const char *name, const char *shape,
                          void *ctx,
                          double bytes_per_call)
 {
-    /* Warmup */
-    for (int i = 0; i < 3; ++i) fn(ctx);
+/* Clock granularity on some aarch64 SoCs (e.g. RK3588) is ~291 ns, and
+ * consecutive clock_gettime calls return the same timestamp 82% of the time.
+ * Single-call timing is meaningless for fast kernels — gated_scan 1x160
+ * genuinely completes in <291 ns, so p50 reads 0.000 us.
+ *
+ * Fix: batch BATCH calls per measurement.  100 calls of even the fastest
+ * kernel (~0.3 us) totals ~30 us — well above the clock quantum.  The
+ * reported per-call time is batch_time / BATCH. */
+#define BATCH 100
+
+    for (int i = 0; i < 20; ++i) fn(ctx);  /* warmup */
 
     double *samples = xmalloc((size_t)repeats * sizeof(double));
     for (int i = 0; i < repeats; ++i) {
         double t0 = now_us();
-        fn(ctx);
-        samples[i] = now_us() - t0;
+        for (int b = 0; b < BATCH; ++b) fn(ctx);
+        samples[i] = (now_us() - t0) / BATCH;
     }
     qsort(samples, (size_t)repeats, sizeof(double), cmp_double);
     double us = p50_val(samples, repeats);
@@ -164,7 +173,7 @@ int main(int argc, char **argv) {
 
     if (!csv) {
         printf("GDN KleidiAI kernel microbenchmark\n");
-        printf("  repeats per shape : %d (after 3 warmups)\n\n", repeats);
+        printf("  repeats per shape : %d × %d calls (after 20 warmups)\n\n", repeats, BATCH);
     }
 
     /* Detect ISA path */
