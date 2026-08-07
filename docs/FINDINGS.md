@@ -1336,7 +1336,7 @@ pinning, 30 repeats, 3 warmups).
 
 4. **cumdecay is now bandwidth-saturated**: 24.3 GiB/s on the A76 big cluster
    approaches the RK3588's **practical** DRAM bandwidth ceiling (~25 GiB/s
-   measured on t3, vs 33.8 GB/s theoretical at 2112 MHz — 79% STREAM
+   measured on t3, vs 31.7 GiB/s theoretical at 2112 MHz — 79% STREAM
    efficiency is typical for LPDDR4x). The theoretical spec is higher, but
    sustained workload bandwidth saturates well below it. Measurement:
    2026-08-07 on t3 (Turing RK1), DMC at 2112 MHz / performance governor,
