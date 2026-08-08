@@ -84,6 +84,7 @@ def test_csv_header_from_existing_results():
     ctx_sweep_marker = "gdn_layer_us"  # context-length sweep (gdn_e2e_decode.c --ctx-sweep)
     kleidiai_marker = "shape"  # KleidiAI micro-kernel bench (bench_kai_gdn.c)
     prefill_gemm_marker = "prefill_M"  # prefill GEMM benchmark (gdn_e2e_decode.c --prefill)
+    precision_cmp_marker = "variant"  # mixed-precision/prefill comparison CSVs (A/B variants)
     result_row_columns = set(RESULT_ROW_COLUMNS)
 
     checked = 0
@@ -102,6 +103,7 @@ def test_csv_header_from_existing_results():
             or e2e_ctxsweep_marker in cols
             or kleidiai_marker in cols
             or prefill_gemm_marker in cols
+            or precision_cmp_marker in cols
         ):
             continue  # different shape by design, not a conformance failure
         if e2e_decode_marker in cols:
