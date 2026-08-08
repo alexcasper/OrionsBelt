@@ -55,7 +55,7 @@ bench = [
 npu = []
 
 [project.urls]
-Repository = "https://github.com/OrionsBelt/OrionsBelt"
+Repository = "https://github.com/alexcasper/OrionsBelt"
 
 [tool.setuptools.packages.find]
 where = ["src"]
