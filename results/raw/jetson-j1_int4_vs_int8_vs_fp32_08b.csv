@@ -1,0 +1,4 @@
+model,variant,tok_per_sec,ttft_ms,p50_us,ffn_pct,gdn_proj_pct,full_pct,device,governor,git_sha
+Qwen3.5-0.8B,fp32,1.72,594.06,582820,52.1,25.0,8.0,jetson-a57,performance,5e16e96
+Qwen3.5-0.8B,int8,1.64,599.38,632736,50.4,22.8,8.5,jetson-a57,performance,5e16e96
+Qwen3.5-0.8B,int4,1.62,580.23,580228,53.1,22.1,9.3,jetson-a57,performance,5e16e96

@@ -4270,6 +4270,25 @@ matches the decode finding (§16: INT8 gives only 1.16–1.77× on A76 decode).
 For prefill, FP32 is preferred; INT8 remains valuable for bandwidth-bound
 decode (M=1).
 
+### Results — Jetson Nano Cortex-A57 (4 cores @ 1479 MHz, governor=performance)
+
+**Qwen3.5-0.8B (FP32, 24 layers, hidden=1024):**
+
+| Prefill len | Optimized TTFT | Naive TTFT | Speedup | Optimized tok/s |
+|------------:|---------------:|-----------:|--------:|----------------:|
+| 16          | 3.386 s        | 203.981 s  | **60.2×** | 4.73 |
+| 32          | 6.885 s        | 415.331 s  | **60.3×** | 4.65 |
+| 64          | 14.451 s       | 818.390 s  | **56.6×** | 4.43 |
+
+**Qwen3.5-4B (FP32, 32 layers, hidden=2560, optimized only):**
+
+| Prefill len | Optimized TTFT | Optimized tok/s |
+|------------:|---------------:|----------------:|
+| 16          | 27.985 s       | 0.57            |
+| 32          | 60.704 s       | 0.53            |
+
+A57 speedup (57–60×) falls between the A76 (49×) and A55 (78×) results, consistent with the A57's cache size (512 KB L2, same as A76) but narrower 2-wide pipeline (closer to A55). Manifest: `results/manifests/jetson-j1_prefill_a57.json`. Data: `results/raw/jetson-j1_prefill_a57.csv`.
+
 ### Key observations
 
 1. **49× prefill speedup on A76** — even larger than the §15 decode GEMV
@@ -4287,8 +4306,10 @@ decode (M=1).
    prefill due to dequantization overhead. The optimal dispatch is
    format-adaptive: INT8 for decode, FP32 for prefill.
 
-4. **A55 penalty amplifies** — the naive→gemm speedup is 78× on A55 vs 49×
-   on A76, confirming the cache pathology scales inversely with cache size.
+4. **Core-class scaling** — the naive→gemm speedup is 78× on A55, 57–60× on
+   A57, and 49× on A76, confirming the cache pathology scales inversely with
+   cache size and pipeline width. The A57 falls between A55 and A76, consistent
+   with its 512 KB L2 (same as A76) but 2-wide pipeline (closer to A55).
 
 ### Data
 
@@ -4298,3 +4319,78 @@ CSVs: `results/raw/rk3588-t4_prefill_{big,little}_{optimized,naive_m8}.csv`,
 Manifest: `results/manifests/rk3588-t4_prefill_gemm_optimization.json`.
 Governor: performance. Thermals: 39–41 °C (no throttling).
 Device: rk3588-t4 (RK3588, 2nd unit).
+
+---
+
+## 26. INT4 weight-only quantization: negative result on Cortex-A57 (2026-08-08, ob-8qt.16)
+
+### Motivation
+
+Natural extension of INT8 weight-only quantization (§16, 1.16–1.77×
+speedup): packed 4-bit nibbles halve weight memory traffic again versus
+INT8 (8× vs FP32). Decode is memory-bandwidth-bound, so the question is
+whether the extra bandwidth saving outweighs the higher unpack cost — the
+same roofline trade-off §16 used to judge INT8, applied one step further.
+
+### Implementation
+
+Per-output-column symmetric quantization to a signed 4-bit range
+(`[-8, 7]`, scale = `max_abs/7`), packed two nibbles per byte (even column
+in the high nibble, odd column in the low nibble). `gemv_int4_neon`
+unpacks 16 columns per iteration: mask+shift to split high/low nibbles,
+interleave back into column order, sign-extend 4-bit→8-bit, then the usual
+int8→int16→int32→float32 widening chain used by the INT8 kernel.
+
+**Bug found and fixed during review.** The unpack interleave used
+`vzip_u8(lo, hi)`, which produces column order `lo[0],hi[0],lo[1],hi[1],…`
+— but the packing convention puts the *even* column in the high nibble,
+so the correct order is `hi[0],lo[0],hi[1],lo[1],…` (`vzip_u8(hi, lo)`).
+The bug silently swapped every even/odd output column pair whenever the
+16-column NEON fast path fired (effectively always, since the scalar tail
+only ever handles the last `<16` columns). A standalone test comparing
+`gemv_int4_neon` against a scalar dequant+GEMV reference caught it
+immediately (exact match after the fix, `rel_err` from ~1.0–2.0 down to
+0). This is exactly the accuracy-regression check this bead's acceptance
+criteria called for and the original commit didn't include — worth
+flagging as a general lesson: bit-packing/unpacking kernels need a
+reference-comparison test, not just a benchmark, because a wrong but
+similarly-fast kernel produces a benchmark number that looks completely
+plausible.
+
+The bug does not change the instruction count or memory-access pattern of
+the NEON path (only which output float slot each unpacked value FMAs
+into), so it does not affect the timing conclusion below — but it means
+the kernel would have produced numerically wrong decode output if used
+for anything beyond benchmarking, prior to this fix.
+
+### Results — Jetson Nano A57 (0.8B, governor=performance, commit `a722289`/`5e16e96`)
+
+| Variant | tok/s | TTFT (ms) |
+|---|---:|---:|
+| FP32 | 1.72 | 594.06 |
+| INT8 | 1.64 | 599.38 |
+| INT4 | 1.62 | 580.23 |
+
+INT4 is **not faster than INT8, and both are slower than FP32** on this
+device. The 4-bit nibble unpack (mask+shift+zip+sign-extend+widen, ~6 NEON
+ops per 16 values) costs more than the int8 widen path (~3 ops per 8
+values) it replaces, and the A57's narrow 2-wide pipeline can't hide that
+extra latency. The 2× additional bandwidth reduction over INT8 doesn't
+compensate — consistent with §16's finding that dequantization overhead is
+proportionally worse on narrower cores, one step further down the
+precision ladder.
+
+### Implication
+
+INT4 weight-only quantization is not a portable win the way INT8 is — it
+needs measurement per core class, not an assumption that "more compression
+is always better" on bandwidth-bound decode. It may still pay off on
+wider-pipeline cores (A76/A720) or with hardware INT4 support, but that is
+unmeasured; this result is A57-only and should not be generalized to the
+fleet without a re-run on RK3588.
+
+### Data
+
+CSV: `results/raw/jetson-j1_int4_vs_int8_vs_fp32_08b.csv`.
+Manifest: `results/manifests/jetson-j1_int4_a57.json` (sha `a722289`,
+dirty=false). Device: jetson-j1 (Cortex-A57).

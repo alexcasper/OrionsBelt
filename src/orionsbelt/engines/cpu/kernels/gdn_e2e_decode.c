@@ -620,10 +620,166 @@ static void matmul_int8(const float *A, const QW *qw,
 }
 #endif /* INT8_WEIGHTS */
 
-/* Dispatch macro: uses INT8 GEMV when compiled with -DINT8_WEIGHTS,
- * otherwise falls through to the FP32 path. Bf is the float weight,
- * Bq is the QW (int8+scale), only one is used per compilation. */
-#ifdef INT8_WEIGHTS
+/* ---- INT4 weight-only quantization (ob-8qt.16) ----
+ *
+ * Stores weights as packed int4 nibbles (2/byte) + per-output-column float
+ * scale. 8× weight memory reduction vs FP32, 2× vs INT8. Decode is
+ * bandwidth-bound so halving weight traffic again has headroom — but int4
+ * unpack cost (shift+mask+sign-extend) is higher than int8 widen, so this
+ * needs measurement (see FINDINGS section).
+ *
+ * Compiled with -DINT4_WEIGHTS. Mutually exclusive with -DINT8_WEIGHTS.
+ * Packing: byte[k*(N/2) + j/2] holds columns 2*(j/2) (high nibble) and
+ * 2*(j/2)+1 (low nibble). Range [-8,7], scale = max_abs/7.
+ */
+#ifdef INT4_WEIGHTS
+static void quantize_weight_int4(const float *B_in, int8_t **q_out, float **s_out,
+                                 size_t K, size_t N) {
+    int8_t *q = calloc(K * (N / 2), 1);  /* packed nibbles */
+    float  *s = malloc(N * sizeof(float));
+    if (!q || !s) { fprintf(stderr, "OOM in quantize_int4\n"); exit(1); }
+    for (size_t n = 0; n < N; ++n) {
+        float max_abs = 0.0f;
+        for (size_t k = 0; k < K; ++k) {
+            float v = fabsf(B_in[k * N + n]);
+            if (v > max_abs) max_abs = v;
+        }
+        s[n] = (max_abs > 0.0f) ? max_abs / 7.0f : 1.0f;
+        float inv = 1.0f / s[n];
+        for (size_t k = 0; k < K; ++k) {
+            int vi = (int)lroundf(B_in[k * N + n] * inv);
+            if (vi > 7) vi = 7;
+            if (vi < -8) vi = -8;
+            vi &= 0x0F;  /* to unsigned nibble: -8→8, -1→15, 0→0, 7→7 */
+            size_t bidx = k * (N / 2) + n / 2;
+            if (n & 1) q[bidx] |= vi;        /* low nibble */
+            else      q[bidx] |= vi << 4;   /* high nibble */
+        }
+    }
+    *q_out = q;
+    *s_out = s;
+}
+
+/* INT4 GEMV for M=1 (decode). Unpacks 2 nibbles/byte via NEON shifts. */
+static void gemv_int4_neon(const float *a, const int8_t *Bq4, const float *Bs,
+                           float *c, size_t K, size_t N) {
+    const size_t TILE = 1024;
+    size_t Nh = N / 2;
+#ifdef _OPENMP
+#pragma omp parallel for schedule(static)
+#endif
+    for (size_t jt = 0; jt < N; jt += TILE) {
+        size_t tn = (N - jt >= TILE) ? TILE : (N - jt);
+        size_t jh = jt / 2;
+        float *ct = c + jt;
+        memset(ct, 0, tn * sizeof(float));
+
+        for (size_t k = 0; k < K; ++k) {
+            float ak = a[k];
+            const uint8_t *Br = (const uint8_t *)(Bq4 + k * Nh + jh);
+            size_t j = 0;
+#ifdef __ARM_NEON
+            float32x4_t akv = vdupq_n_f32(ak);
+            uint8x8_t  mask4 = vdup_n_u8(0x0F);
+            /* Process 16 columns per iteration (8 packed bytes) */
+            for (; j + 16 <= tn; j += 16) {
+                uint8x8_t pk = vld1_u8(Br + j/2);
+                /* Unpack: low nibbles (odd cols) and high nibbles (even cols) */
+                uint8x8_t lo = vand_u8(pk, mask4);
+                uint8x8_t hi = vshr_n_u8(pk, 4);
+                /* Packing convention (quantize_weight_int4): byte i holds
+                 * column 2*i in the HIGH nibble and column 2*i+1 in the LOW
+                 * nibble. So the interleaved column order is hi[0],lo[0],
+                 * hi[1],lo[1],... — vzip_u8(hi, lo), not (lo, hi). Getting
+                 * this backwards silently swaps every even/odd column pair
+                 * (caught by comparing against the scalar reference path). */
+                uint8x8x2_t zi = vzip_u8(hi, lo);
+                /* Sign-extend from unsigned 4-bit to signed 8-bit */
+                int8x8_t v0 = vreinterpret_s8_u8(zi.val[0]);
+                int8x8_t v1 = vreinterpret_s8_u8(zi.val[1]);
+                /* If nibble >= 8, subtract 16 (unsigned→signed 4-bit) */
+                uint8x8_t ge8_0 = vcge_u8(zi.val[0], vdup_n_u8(8));
+                uint8x8_t ge8_1 = vcge_u8(zi.val[1], vdup_n_u8(8));
+                v0 = vsub_s8(v0, vreinterpret_s8_u8(vand_u8(ge8_0, vdup_n_u8(16))));
+                v1 = vsub_s8(v1, vreinterpret_s8_u8(vand_u8(ge8_1, vdup_n_u8(16))));
+                /* Widen to float32 (8→16→32→f32) and FMA */
+                int16x8_t i16_0 = vmovl_s8(v0);
+                int16x8_t i16_1 = vmovl_s8(v1);
+                float32x4_t f0lo = vcvtq_f32_s32(vmovl_s16(vget_low_s16(i16_0)));
+                float32x4_t f0hi = vcvtq_f32_s32(vmovl_s16(vget_high_s16(i16_0)));
+                float32x4_t f1lo = vcvtq_f32_s32(vmovl_s16(vget_low_s16(i16_1)));
+                float32x4_t f1hi = vcvtq_f32_s32(vmovl_s16(vget_high_s16(i16_1)));
+                float32x4_t c0lo = vld1q_f32(ct + j);
+                float32x4_t c0hi = vld1q_f32(ct + j + 4);
+                float32x4_t c1lo = vld1q_f32(ct + j + 8);
+                float32x4_t c1hi = vld1q_f32(ct + j + 12);
+                c0lo = vfmaq_f32(c0lo, akv, f0lo);
+                c0hi = vfmaq_f32(c0hi, akv, f0hi);
+                c1lo = vfmaq_f32(c1lo, akv, f1lo);
+                c1hi = vfmaq_f32(c1hi, akv, f1hi);
+                vst1q_f32(ct + j, c0lo);
+                vst1q_f32(ct + j + 4, c0hi);
+                vst1q_f32(ct + j + 8, c1lo);
+                vst1q_f32(ct + j + 12, c1hi);
+            }
+            /* Scalar tail */
+            for (; j < tn; ++j) {
+                size_t bidx = k * Nh + (jt + j) / 2;
+                int nib = ((jt + j) & 1) ? (Bq4[bidx] & 0x0F) : ((Bq4[bidx] >> 4) & 0x0F);
+                if (nib >= 8) nib -= 16;
+                ct[j] += ak * (float)nib;
+            }
+#endif
+#ifndef __ARM_NEON
+            for (; j < tn; ++j) {
+                size_t bidx = k * Nh + (jt + j) / 2;
+                int nib = ((jt + j) & 1) ? (Bq4[bidx] & 0x0F) : ((Bq4[bidx] >> 4) & 0x0F);
+                if (nib >= 8) nib -= 16;
+                ct[j] += ak * (float)nib;
+            }
+#endif
+        }
+        /* Apply per-column scale */
+        size_t j = 0;
+#ifdef __ARM_NEON
+        for (; j + 4 <= tn; j += 4) {
+            float32x4_t cv = vld1q_f32(ct + j);
+            float32x4_t sv = vld1q_f32(Bs + jt + j);
+            vst1q_f32(ct + j, vmulq_f32(cv, sv));
+        }
+#endif
+        for (; j < tn; ++j)
+            ct[j] *= Bs[jt + j];
+    }
+}
+
+/* INT4 matmul wrapper: optimized GEMV for M=1, naive dequant for M>1. */
+static void matmul_int4(const float *A, const QW *qw,
+                        float *C, size_t M, size_t K, size_t N) {
+    if (M == 1) {
+        gemv_int4_neon(A, qw->q, qw->s, C, K, N);
+        return;
+    }
+    /* Prefill: dequant to FP32 and use FP32 GEMM (INT4 dequant overhead
+     * makes it slower than FP32 for compute-bound prefill, same as INT8) */
+    float *Bf = malloc((size_t)K * N * sizeof(float));
+    size_t Nh = N / 2;
+    for (size_t k = 0; k < K; ++k)
+        for (size_t n = 0; n < N; ++n) {
+            size_t bidx = k * Nh + n / 2;
+            int nib = (n & 1) ? (qw->q[bidx] & 0x0F) : ((qw->q[bidx] >> 4) & 0x0F);
+            if (nib >= 8) nib -= 16;
+            Bf[k * N + n] = (float)nib * qw->s[n];
+        }
+    matmul(A, Bf, C, M, K, N);
+    free(Bf);
+}
+#endif /* INT4_WEIGHTS */
+
+/* Dispatch macro: INT4 > INT8 > FP32 (mutually exclusive). */
+#if defined(INT4_WEIGHTS)
+#define MM(A, Bf, Bq, C, M, K, N) matmul_int4(A, &(Bq), C, M, K, N)
+#elif defined(INT8_WEIGHTS)
 #define MM(A, Bf, Bq, C, M, K, N) matmul_int8(A, &(Bq), C, M, K, N)
 #else
 #define MM(A, Bf, Bq, C, M, K, N) matmul(A, Bf, C, M, K, N)
@@ -1260,6 +1416,22 @@ int main(int argc, char **argv) {
     quantize_weight(w.down_proj, &w.down_proj_q.q, &w.down_proj_q.s, INTER, HIDDEN);
     if (!csv)
         printf("  Weight quantization: INT8 (weight-only, per-column symmetric scale)\n\n");
+#endif
+
+#ifdef INT4_WEIGHTS
+    quantize_weight_int4(w.g_q_proj,  &w.g_q_proj_q.q,  &w.g_q_proj_q.s,  HIDDEN, KEY_DIM);
+    quantize_weight_int4(w.g_k_proj,  &w.g_k_proj_q.q,  &w.g_k_proj_q.s,  HIDDEN, KEY_DIM);
+    quantize_weight_int4(w.g_v_proj,  &w.g_v_proj_q.q,  &w.g_v_proj_q.s,  HIDDEN, VALUE_DIM);
+    quantize_weight_int4(w.g_o_proj,  &w.g_o_proj_q.q,  &w.g_o_proj_q.s,  VALUE_DIM, HIDDEN);
+    quantize_weight_int4(w.f_q_proj,  &w.f_q_proj_q.q,  &w.f_q_proj_q.s,  HIDDEN, FULL_HEADS * FULL_HEAD_DIM);
+    quantize_weight_int4(w.f_k_proj,  &w.f_k_proj_q.q,  &w.f_k_proj_q.s,  HIDDEN, FULL_KV_HEADS * FULL_HEAD_DIM);
+    quantize_weight_int4(w.f_v_proj,  &w.f_v_proj_q.q,  &w.f_v_proj_q.s,  HIDDEN, FULL_KV_HEADS * FULL_HEAD_DIM);
+    quantize_weight_int4(w.f_o_proj,  &w.f_o_proj_q.q,  &w.f_o_proj_q.s,  FULL_HEADS * FULL_HEAD_DIM, HIDDEN);
+    quantize_weight_int4(w.gate_proj, &w.gate_proj_q.q, &w.gate_proj_q.s, HIDDEN, INTER);
+    quantize_weight_int4(w.up_proj,   &w.up_proj_q.q,   &w.up_proj_q.s,   HIDDEN, INTER);
+    quantize_weight_int4(w.down_proj, &w.down_proj_q.q, &w.down_proj_q.s, INTER, HIDDEN);
+    if (!csv)
+        printf("  Weight quantization: INT4 (weight-only, packed nibbles, per-column symmetric scale)\n\n");
 #endif
 
     /* Per-layer state */
