@@ -185,6 +185,46 @@ build_e2e_08b_int8 rk3588_a76  "-mcpu=cortex-a76"
 build_e2e_08b_int8 rk3588_a55  "-mcpu=cortex-a55"
 build_e2e_08b_int8 orion_a720  "-mcpu=cortex-a720"
 
+# INT4 weight-only quantization variant (-DINT4_WEIGHTS, ob-8qt.16)
+build_e2e_int4() {
+    local name="$1" flags="$2"
+    if $CC -O3 -fopenmp $flags -static -DINT4_WEIGHTS \
+        "$K/gdn_sve.c" "$K/gdn_delta_matmul.c" "$K/gdn_e2e_decode.c" \
+        -I"$K" -o "$OUT/bench_gdn_e2e_decode_${name}_int4" -lm 2>/dev/null; then
+        printf "  %-14s %-40s %s bytes\n" "e2e_${name}_int4" "$flags" \
+            "$(stat -c%s "$OUT/bench_gdn_e2e_decode_${name}_int4")"
+    else
+        printf "  %-14s %-40s SKIPPED\n" "e2e_${name}_int4" "$flags"
+    fi
+}
+build_e2e_08b_int4() {
+    local name="$1" flags="$2"
+    if $CC -O3 -fopenmp $flags -static -DMODEL_08B -DINT4_WEIGHTS \
+        "$K/gdn_sve.c" "$K/gdn_delta_matmul.c" "$K/gdn_e2e_decode.c" \
+        -I"$K" -o "$OUT/bench_gdn_e2e_decode_08b_${name}_int4" -lm 2>/dev/null; then
+        printf "  %-14s %-40s %s bytes\n" "e2e_08b_${name}_int4" "$flags" \
+            "$(stat -c%s "$OUT/bench_gdn_e2e_decode_08b_${name}_int4")"
+    else
+        printf "  %-14s %-40s SKIPPED\n" "e2e_08b_${name}_int4" "$flags"
+    fi
+}
+
+echo ""
+echo "E2E decode benchmarks (INT4 weight-only quantization, ob-8qt.16):"
+build_e2e_int4 armv8a      "-march=armv8-a"
+build_e2e_int4 jetson_a57  "-mcpu=cortex-a57"
+build_e2e_int4 pi5_a76     "-mcpu=cortex-a76"
+build_e2e_int4 rk3588_a76  "-mcpu=cortex-a76"
+build_e2e_int4 orion_a720  "-mcpu=cortex-a720"
+
+echo ""
+echo "E2E decode benchmarks (0.8B + INT4):"
+build_e2e_08b_int4 armv8a      "-march=armv8-a"
+build_e2e_08b_int4 jetson_a57  "-mcpu=cortex-a57"
+build_e2e_08b_int4 pi5_a76     "-mcpu=cortex-a76"
+build_e2e_08b_int4 rk3588_a76  "-mcpu=cortex-a76"
+build_e2e_08b_int4 orion_a720  "-mcpu=cortex-a720"
+
 cat <<'NOTE'
 
 Pick the most specific binary your device supports, then:
