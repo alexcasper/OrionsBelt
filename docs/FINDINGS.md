@@ -4385,3 +4385,31 @@ CSVs: `results/raw/rk3588-t4_{a76,a55}_{fp32,int8,int4}.csv`.
 Manifest: `results/manifests/rk3588-t4_int4.json`.
 Governor: performance. Thermals: 39–41 °C before and after (no throttling).
 Device: rk3588-t4 (RK3588, 2nd unit).
+
+## 27. ONNX Runtime CPU EP: GDN recurrence expressible via Loop but 16× slower than fused kernel (2026-08-08, ob-mrd.16)
+
+**Bead:** ob-mrd.16 — Audit ONNX Runtime CPU EP feasibility for Qwen3.5/GDN.
+**Full audit:** [`docs/research/ob-mrd.16-onnx-runtime-cpu-ep-gdn-audit.md`](research/ob-mrd.16-onnx-runtime-cpu-ep-gdn-audit.md).
+
+ONNX has no GDN primitive. The recurrence CAN be expressed via ONNX `Loop`
+(gate decay → error correction → state update → output projection per token),
+and ORT's CPU EP executes it correctly (rel_err 2.3×10⁻⁷ vs NumPy).
+
+However, ORT's generic `Loop` evaluates the body subgraph per iteration with
+no kernel fusion: ~49 µs/token for single-head V=128, vs ~3 µs for the
+project's fused C kernel — a **16× overhead**. There is also no Arm-specific
+tuning for the projection matmuls that dominate decode time.
+
+### Cross-toolchain positioning
+
+| Tool | Recurrence? | Optimized for Arm? |
+|------|-------------|-------------------|
+| CIX NOE / RKNN | ❌ cannot express | N/A (NPU only) |
+| KleidiAI | ❌ no scan | ✅ matmul only |
+| **ONNX Runtime** | **✅ via generic Loop** | **❌ generic** |
+| llama.cpp | ✅ dedicated op | ❌ generic vec_* |
+| **This project** | **✅** | **✅ SVE2/NEON/INT8/INT4** |
+
+ORT is the "third data point" confirming no existing CPU toolchain has
+optimized GDN kernels for Arm. Audit script: `scripts/ort_gdn_probe.py`.
+Device: rk3588-t4.
