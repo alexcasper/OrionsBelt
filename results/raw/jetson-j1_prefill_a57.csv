@@ -1,0 +1,9 @@
+model,variant,prefill_len,ttft_s,prefill_tps,p50_us,repeats,git_sha,device,governor,thermal_start_c,thermal_end_c
+Qwen3.5-0.8B,optimized,16,3.386,4.73,3386000,5,a722289,jetson-a57,performance,50,71
+Qwen3.5-0.8B,optimized,32,6.885,4.65,6884500,5,a722289,jetson-a57,performance,50,71
+Qwen3.5-0.8B,optimized,64,14.451,4.43,14451000,5,a722289,jetson-a57,performance,50,71
+Qwen3.5-0.8B,naive,16,203.981,0.08,203981000,5,a722289,jetson-a57,performance,50,67
+Qwen3.5-0.8B,naive,32,415.331,0.08,415331000,5,a722289,jetson-a57,performance,50,67
+Qwen3.5-0.8B,naive,64,818.390,0.08,818390000,5,a722289,jetson-a57,performance,50,67
+Qwen3.5-4B,optimized,16,27.985,0.57,27985000,5,a722289,jetson-a57,performance,50,72
+Qwen3.5-4B,optimized,32,60.704,0.53,60704000,5,a722289,jetson-a57,performance,50,72

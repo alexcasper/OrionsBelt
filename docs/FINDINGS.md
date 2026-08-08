@@ -4270,6 +4270,25 @@ matches the decode finding (§16: INT8 gives only 1.16–1.77× on A76 decode).
 For prefill, FP32 is preferred; INT8 remains valuable for bandwidth-bound
 decode (M=1).
 
+### Results — Jetson Nano Cortex-A57 (4 cores @ 1479 MHz, governor=performance)
+
+**Qwen3.5-0.8B (FP32, 24 layers, hidden=1024):**
+
+| Prefill len | Optimized TTFT | Naive TTFT | Speedup | Optimized tok/s |
+|------------:|---------------:|-----------:|--------:|----------------:|
+| 16          | 3.386 s        | 203.981 s  | **60.2×** | 4.73 |
+| 32          | 6.885 s        | 415.331 s  | **60.3×** | 4.65 |
+| 64          | 14.451 s       | 818.390 s  | **56.6×** | 4.43 |
+
+**Qwen3.5-4B (FP32, 32 layers, hidden=2560, optimized only):**
+
+| Prefill len | Optimized TTFT | Optimized tok/s |
+|------------:|---------------:|----------------:|
+| 16          | 27.985 s       | 0.57            |
+| 32          | 60.704 s       | 0.53            |
+
+A57 speedup (57–60×) falls between the A76 (49×) and A55 (78×) results, consistent with the A57's cache size (512 KB L2, same as A76) but narrower 2-wide pipeline (closer to A55). Manifest: `results/manifests/jetson-j1_prefill_a57.json`. Data: `results/raw/jetson-j1_prefill_a57.csv`.
+
 ### Key observations
 
 1. **49× prefill speedup on A76** — even larger than the §15 decode GEMV
@@ -4287,8 +4306,10 @@ decode (M=1).
    prefill due to dequantization overhead. The optimal dispatch is
    format-adaptive: INT8 for decode, FP32 for prefill.
 
-4. **A55 penalty amplifies** — the naive→gemm speedup is 78× on A55 vs 49×
-   on A76, confirming the cache pathology scales inversely with cache size.
+4. **Core-class scaling** — the naive→gemm speedup is 78× on A55, 57–60× on
+   A57, and 49× on A76, confirming the cache pathology scales inversely with
+   cache size and pipeline width. The A57 falls between A55 and A76, consistent
+   with its 512 KB L2 (same as A76) but 2-wide pipeline (closer to A55).
 
 ### Data
 
@@ -4299,7 +4320,7 @@ Manifest: `results/manifests/rk3588-t4_prefill_gemm_optimization.json`.
 Governor: performance. Thermals: 39–41 °C (no throttling).
 Device: rk3588-t4 (RK3588, 2nd unit).
 
-## 26. INT4 weight-only quantization: 1.40× decode speedup on little cores, compute-bound regression on big cores (2026-08-08, ob-8qt.16)
+## 26. INT4 weight-only quantization: core-type-dependent trade-off across the fleet (2026-08-08, ob-8qt.16)
 
 **Bead:** ob-8qt.16 — INT4 weight-only quantization for CPU decode GEMV.
 
@@ -4309,6 +4330,28 @@ is unchanged from §16 (INT8); the new complexity is nibble unpack: each 16-byte
 load yields 32 packed values that must be split (low/high nibble), sign-extended
 from 4-bit (`(x<<4)>>4` arithmetic shift), and interleaved (`vzipq_s8`) to
 restore column order before widening to float32 for FMA accumulation.
+
+### Implementation
+
+Per-output-column symmetric quantization to a signed 4-bit range
+(`[-8, 7]`, scale = `max_abs/7`), packed two nibbles per byte (even column
+in the high nibble, odd column in the low nibble). `gemv_int4_neon`
+unpacks 16 columns per iteration: mask+shift to split high/low nibbles,
+interleave back into column order, sign-extend 4-bit→8-bit, then the usual
+int8→int16→int32→float32 widening chain used by the INT8 kernel.
+
+**Bug found and fixed during review.** The unpack interleave used
+`vzip_u8(lo, hi)`, which produces column order `lo[0],hi[0],lo[1],hi[1],…`
+— but the packing convention puts the *even* column in the high nibble,
+so the correct order is `hi[0],lo[0],hi[1],lo[1],…` (`vzip_u8(hi, lo)`).
+The bug silently swapped every even/odd output column pair whenever the
+16-column NEON fast path fired (effectively always, since the scalar tail
+only ever handles the last `<16` columns). A standalone test comparing
+`gemv_int4_neon` against a scalar dequant+GEMV reference caught it
+immediately (exact match after the fix, `rel_err` from ~1.0–2.0 down to
+0). General lesson: bit-packing/unpacking kernels need a reference-
+comparison test, not just a benchmark, because a wrong but similarly-fast
+kernel produces a benchmark number that looks completely plausible.
 
 ### Accuracy
 
@@ -4328,7 +4371,7 @@ All pass the 20 dB SNR threshold. The ~1–2% relative error is expected for
 is higher than it would be for real trained weights (which have heavier tails),
 but the pattern is clear: INT4 introduces measurably more error than INT8.
 
-### Decode throughput (Qwen3.5-4B, 30 tokens, governor=performance)
+### Decode throughput — RK3588 (Qwen3.5-4B, 30 tokens, governor=performance)
 
 | Variant | A76 tok/s | vs FP32 | A55 tok/s | vs FP32 |
 |---------|----------:|--------:|----------:|--------:|
@@ -4336,13 +4379,24 @@ but the pattern is clear: INT4 introduces measurably more error than INT8.
 | INT8 | 1.82 | 1.64× | 0.51 | 1.28× |
 | INT4 | 1.55 | 1.40× | 0.56 | 1.40× |
 
-**INT4 vs INT8:**
+**INT4 vs INT8 on RK3588:**
 
 | | A76 | A55 |
 |--|-----|-----|
 | INT4 / INT8 | 0.85× | **1.10×** |
 
-### Roofline interpretation
+### Decode throughput — Jetson Nano A57 (0.8B, governor=performance)
+
+| Variant | tok/s | TTFT (ms) |
+|---|---:|---:|
+| FP32 | 1.72 | 594.06 |
+| INT8 | 1.64 | 599.38 |
+| INT4 | 1.62 | 580.23 |
+
+INT4 is **not faster than INT8, and both are slower than FP32** on this
+device.
+
+### Roofline interpretation — core-type-dependent
 
 The INT4 vs INT8 result diverges by core type, and the roofline model explains why:
 
@@ -4359,11 +4413,17 @@ The INT4 vs INT8 result diverges by core type, and the roofline model explains w
   bandwidth-bound, so the 2× weight-traffic reduction translates to a net win.
   INT4 is 10% faster than INT8 and 1.40× vs FP32.
 
+- **A57 (Jetson Nano, narrowest pipeline):** The A57's narrow 2-wide pipeline
+  can't hide the extra unpack latency (~6 NEON ops per 16 values vs ~3 for INT8).
+  INT4 is **not faster than INT8** — and both are slower than FP32 on the 0.8B
+  model where weights fit in L2.
+
 This is the **opposite** of the INT8→FP32 pattern (§16), where INT8 was
 faster than FP32 on *both* core types. The explanation is that INT8→FP32
 is a 4× traffic reduction with modest dequant overhead — even A76 benefits.
 INT4→INT8 is only 2× more traffic reduction but with proportionally more
-unpack overhead — A76 tips over into compute-bound.
+unpack overhead — A76 tips over into compute-bound, and A57 can't amortize
+it at all.
 
 ### Design implication
 
@@ -4373,18 +4433,19 @@ The optimal weight-precision dispatch is **core-type-aware**:
 |-----------|-----------------------|--------|
 | A76 (big, high BW) | INT8 | Bandwidth saved without compute penalty |
 | A55 (little, low BW) | INT4 | Extra bandwidth savings outweigh unpack cost |
+| A57 (narrow pipeline) | FP32/INT8 | INT4 unpack overhead dominates |
 
-For a heterogeneous deployment (e.g., RK3588 using all 8 cores), a mixed-
-precision strategy — INT8 on the big cluster + INT4 on the little cluster —
-would maximise aggregate throughput. This is an interesting direction for
-future work but was not implemented here.
+INT4 weight-only quantization is not a portable win the way INT8 is — it
+needs measurement per core class, not an assumption that "more compression
+is always better" on bandwidth-bound decode.
 
 ### Data
 
-CSVs: `results/raw/rk3588-t4_{a76,a55}_{fp32,int8,int4}.csv`.
-Manifest: `results/manifests/rk3588-t4_int4.json`.
-Governor: performance. Thermals: 39–41 °C before and after (no throttling).
-Device: rk3588-t4 (RK3588, 2nd unit).
+RK3588 CSVs: `results/raw/rk3588-t4_{a76,a55}_{fp32,int8,int4}.csv`.
+Manifest: `results/manifests/rk3588-t4_int4.json`. Device: rk3588-t4.
+Jetson CSV: `results/raw/jetson-j1_int4_vs_int8_vs_fp32_08b.csv`.
+Manifest: `results/manifests/jetson-j1_int4_a57.json` (sha `a722289`,
+dirty=false). Device: jetson-j1 (Cortex-A57).
 
 ## 27. ONNX Runtime CPU EP: GDN recurrence expressible via Loop but 16× slower than fused kernel (2026-08-08, ob-mrd.16)
 
