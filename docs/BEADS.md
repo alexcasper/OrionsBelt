@@ -56,7 +56,7 @@ collide when several agents create issues concurrently.
 
 | Type | Used here for |
 |---|---|
-| `epic` | The ten workstreams from `PLAN.md` §4 (E0–E9) |
+| `epic` | The ten workstreams from `docs/archive/PLAN.md` §4 (E0–E9) |
 | `task` | Concrete units of work |
 | `decision` | Forks that must be recorded as an ADR in `docs/adr/` |
 | `chore` | Hygiene, compliance, tooling |
@@ -83,7 +83,7 @@ Priority is `0`–`4`, **0 is highest**. Not "high"/"medium"/"low".
 | `portable` | Runs anywhere — safe to do before hardware arrives |
 | `hedge` | Belongs to the Edge AI fallback track (generic aarch64) |
 | `submission` | Directly required by Devpost rules |
-| `stretch` | Cut first under the descope ladder (`PLAN.md` §7) |
+| `stretch` | Cut first under the descope ladder (`docs/archive/PLAN.md` §7) |
 | `research` | GDN-2 investigation |
 
 ### Dependency direction
@@ -203,7 +203,7 @@ workspace is detected.
 2. `bd ready` showing an `external-gate` bead does **not** mean it is actionable. Those wait
    on third parties. Prefer `portable`-labelled work when hardware is unavailable.
 3. Do not close a benchmark bead without a committed run manifest. A number without
-   provenance is not a result (`PLAN.md` §9).
+   provenance is not a result (`docs/archive/PLAN.md` §9).
 4. Every `decision`-type bead must produce an ADR in `docs/adr/` before it closes; link it
    from the bead's notes.
 5. Record durable insights with `bd remember "..."` rather than creating memory files.
