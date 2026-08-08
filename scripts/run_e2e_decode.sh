@@ -17,6 +17,8 @@
 #   ./scripts/run_e2e_decode.sh --device rk3588-t3       # override output name
 #   ./scripts/run_e2e_decode.sh --runs 3                 # 3 independent runs for repeat stats
 #   ./scripts/run_e2e_decode.sh --rebuild                # force rebuild even if binary exists
+#   ./scripts/run_e2e_decode.sh --quant int8             # INT8 weight-only quantization
+#   ./scripts/run_e2e_decode.sh --model 08b --quant q8_0 # 0.8B model, Q8_0 block-quantized GEMV
 #
 # Output:
 #   results/raw/<device>_e2e_raw.csv         — raw binary output (simple CSV)
