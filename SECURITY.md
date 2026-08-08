@@ -8,8 +8,10 @@
 
 ### Summary
 
-The sudo password for Arm test devices (redacted; see bead `ob-3i5` for the
-value if needed, used in a `sudo -S` pipeline to set CPU governors) was
+The sudo password for Arm test devices (value deliberately not repeated
+here or in bead `ob-3i5` — see the remediation runbook below for how to
+obtain it out-of-band if needed; used in a `sudo -S` pipeline to set CPU
+governors) was committed to git in `.goose-task.md` and `.goose-loop.log`.
 Both files are now gitignored and untracked (since commit `e2d1c7e`), but the
 blobs remain reachable in history across all branches.
 
