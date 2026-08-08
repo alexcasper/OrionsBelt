@@ -223,7 +223,7 @@ advantage *grows* with context length.
 Two back-to-back 500-token sustained bursts (94s total) on the 0.8B INT8 model
 showed **0.3% throughput decay** and p99/p50 latency spread of 0.4%
 (FINDINGS.md §18). The burst benchmark numbers are steady-state sustainable,
-not peak-only artifacts — critical for an honest Physical AI submission.
+not peak-only artifacts — critical for an honest Edge AI submission.
 
 **Three-component memory decomposition, confirmed on real model weights:**
 
