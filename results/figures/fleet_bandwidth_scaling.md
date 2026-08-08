@@ -125,7 +125,7 @@ to its 4-5x bandwidth advantage**.
 - **Predicted O6 scan throughput: 17.0-28.4 GiB/s**
 - This is ~18-30% of spec bandwidth (93.1 GiB/s)
 
-**Optimized A76 reference.** t4 with 4-core OpenMP + NEON unrolling reads **11.51 GiB/s** — 2.0x the single-threaded baseline. The O6's A720 cores will benefit from both IPC gains AND the optimization stack, so the prediction above is conservative.
+**Optimized A76 reference.** t4 with 4-core OpenMP + NEON unrolling reads **11.09 GiB/s** — 2.0x the single-threaded baseline. The O6's A720 cores will benefit from both IPC gains AND the optimization stack, so the prediction above is conservative.
 
 ⚠ The fleet sweep (ob-bf7) inter-board gap is confounded by a thread-count mismatch (t3=8, t4=1; ob-mrd.12/14). This prediction uses t4 single-thread data and does not depend on resolving that gap.
 
