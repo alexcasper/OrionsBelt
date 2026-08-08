@@ -105,6 +105,7 @@ cutoff has passed with no board; any future arrival is additive bonus per ADR 00
 | #133 | j1 | Add PR #132 to merged PRs table + security: remove hardcoded password from purge scripts (ob-3i5) | MERGED |
 | #134 | j1 | Add PR #133 to merged PRs table in SUBMISSION_STATUS.md | MERGED |
 | #135 | j1 | Add PR #134 to merged PRs table + backfill 13 t4 retroactive manifests (ob-mrd.17) + stale branch cleanup + bench/r5 security tracking (ob-0vu) | MERGED |
+| #136 | j1 | Add PR #135 to merged PRs table + fix lint in gen_retroactive_manifests.py + document bench/r5 exposure in SECURITY.md (ob-0vu closed) | MERGED |
 
 ---
 
