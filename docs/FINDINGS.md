@@ -4460,3 +4460,52 @@ Manifest: `results/manifests/jetson-j1_llamacpp_vs_orionsbelt_08b.json`
 (sha `04bf610`, dirty=false, governor=performance).
 Our decode data: commit `5e16e96`. Our prefill data: commit `a722289`.
 llama.cpp: commit `69bf643`, built with gcc-8 for cortex-a57.
+
+## 28. Q8_0 block-quantized GEMV: 2.97× decode speedup, closing the gap with llama.cpp (2026-08-08, ob-8qt.17)
+
+**Motivation.** §27 showed llama.cpp Q8_0 decode is 3.14× faster than our FP32
+C loop (5.40 vs 1.72 tok/s), while our existing INT8 (per-column scale,
+per-element int8→float32 dequant) showed *no* speedup (1.64 tok/s). The
+root cause: our INT8 GEMV wastes ~50% more NEON ops/element than FP32 on
+int8→int16→int32→float32 widening, eating the 4× bandwidth savings.
+
+**Implementation.** Q8_0 block layout: per-block fp16 scale + 32 int8 values
+along K. The GEMV quantizes the activation vector to int8 **once** per call
+(amortized over all N output columns), then computes int8×int8 dot products
+via `vmull_s8` + `vpadalq_s16` — staying entirely in the integer domain
+with no per-element float conversion. Requires no SDOT (works on A57).
+
+### Results (A57, 4 cores, performance governor, commit `d223c19`)
+
+| Variant | tok/s | TTFT (ms) | vs FP32 | vs llama.cpp Q8_0 |
+|---|---:|---:|---:|---:|
+| FP32 | 1.72 | 594 | 1.0× | 0.32× |
+| INT8 (per-column) | 1.64 | 599 | 0.95× | 0.30× |
+| INT4 (nibble) | 1.62 | 580 | 0.94× | 0.30× |
+| **Q8_0 (block)** | **5.12** | **192** | **2.97×** | **0.95×** |
+| llama.cpp Q8_0 | 5.40 | — | 3.14× | 1.0× |
+
+Replicate confirmed: 5.12 tok/s across two 30-repeat runs (p50=193–195 ms,
+stddev <1%). Thermals 57→58 °C — no throttling. Bottleneck breakdown
+unchanged: FFN 53%, GDN projections 36%, full-attention 10%, GDN kernels
+<1%.
+
+### Why Q8_0 works where per-column INT8 didn't
+
+Three factors combine:
+
+1. **Amortized activation quantization**: The activation vector (K=1024 for
+   0.8B) is quantized to int8 once per GEMV call, reused across all N output
+   columns. Cost: K conversions amortized over N columns = negligible.
+2. **Integer-domain dot product**: `vmull_s8` (8 int8→8 int16) +
+   `vpadalq_s16` (pairwise add+accumulate to int32) is ~0.6 NEON ops/element,
+   vs ~1.5 for int8→float32 dequant+FMA and ~1.0 for FP32 FMA.
+3. **Block-local scale**: Per-32-element fp16 scale adapts to local weight
+   distribution, giving better quantization accuracy than per-column scale
+   (which must cover the entire K dimension with one scale).
+
+### Data
+
+CSV: `results/raw/jetson-j1_q80_vs_int8_vs_fp32_08b.csv`.
+Manifest: `results/manifests/jetson-j1_q80_a57.json` (sha `d223c19`,
+dirty=false, governor=performance). Two 30-repeat runs, stddev <1%.
