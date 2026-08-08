@@ -4298,3 +4298,90 @@ CSVs: `results/raw/rk3588-t4_prefill_{big,little}_{optimized,naive_m8}.csv`,
 Manifest: `results/manifests/rk3588-t4_prefill_gemm_optimization.json`.
 Governor: performance. Thermals: 39–41 °C (no throttling).
 Device: rk3588-t4 (RK3588, 2nd unit).
+
+## 26. INT4 weight-only quantization: 1.40× decode speedup on little cores, compute-bound regression on big cores (2026-08-08, ob-8qt.16)
+
+**Bead:** ob-8qt.16 — INT4 weight-only quantization for CPU decode GEMV.
+
+INT4 packs two signed 4-bit integers per byte (range −8..7), cutting weight
+memory traffic 8× vs FP32 and 2× vs INT8. The per-column float scale design
+is unchanged from §16 (INT8); the new complexity is nibble unpack: each 16-byte
+load yields 32 packed values that must be split (low/high nibble), sign-extended
+from 4-bit (`(x<<4)>>4` arithmetic shift), and interleaved (`vzipq_s8`) to
+restore column order before widening to float32 for FMA accumulation.
+
+### Accuracy
+
+`--verify-int4` compares INT4 GEMV against FP32 oracle on real model shapes:
+
+| Matrix | K | N | SNR (dB) | Max rel error |
+|--------|--:|--:|----------|---------------|
+| GDN q/k_proj | 2560 | 2048 | 46.9 | 1.39% |
+| GDN v_proj | 2560 | 4096 | 47.1 | 1.60% |
+| GDN o_proj | 4096 | 2560 | 48.1 | 1.11% |
+| Full q_proj | 2560 | 4096 | 47.0 | 1.69% |
+| FFN gate/up | 2560 | 9216 | 47.0 | 1.51% |
+| FFN down | 9216 | 2560 | 49.7 | 0.92% |
+
+All pass the 20 dB SNR threshold. The ~1–2% relative error is expected for
+4-bit quantization (vs ~0.4% for INT8). For random benchmark weights the SNR
+is higher than it would be for real trained weights (which have heavier tails),
+but the pattern is clear: INT4 introduces measurably more error than INT8.
+
+### Decode throughput (Qwen3.5-4B, 30 tokens, governor=performance)
+
+| Variant | A76 tok/s | vs FP32 | A55 tok/s | vs FP32 |
+|---------|----------:|--------:|----------:|--------:|
+| FP32 | 1.11 | 1.00× | 0.40 | 1.00× |
+| INT8 | 1.82 | 1.64× | 0.51 | 1.28× |
+| INT4 | 1.55 | 1.40× | 0.56 | 1.40× |
+
+**INT4 vs INT8:**
+
+| | A76 | A55 |
+|--|-----|-----|
+| INT4 / INT8 | 0.85× | **1.10×** |
+
+### Roofline interpretation
+
+The INT4 vs INT8 result diverges by core type, and the roofline model explains why:
+
+- **A76 (big cores, high bandwidth):** The nibble-unpack pipeline (mask +
+  arithmetic-shift + vzip + widen int8→int16→int32→float) adds ~7 instructions
+  per 32 elements, vs ~4 instructions per 8 elements for INT8 dequant. On A76,
+  where memory bandwidth is plentiful (2.3 GHz, wide L2/L3), the 2× weight-
+  traffic reduction is **dominated by the extra compute**. INT4 is 15% slower
+  than INT8. The core is compute-bound at INT4: the unpack pipeline can't keep
+  up with the FMA throughput.
+
+- **A55 (little cores, low bandwidth):** A55 has ~44% of A76's clock rate
+  (1.8 vs 2.3 GHz) and a narrower memory subsystem. Decode here is more deeply
+  bandwidth-bound, so the 2× weight-traffic reduction translates to a net win.
+  INT4 is 10% faster than INT8 and 1.40× vs FP32.
+
+This is the **opposite** of the INT8→FP32 pattern (§16), where INT8 was
+faster than FP32 on *both* core types. The explanation is that INT8→FP32
+is a 4× traffic reduction with modest dequant overhead — even A76 benefits.
+INT4→INT8 is only 2× more traffic reduction but with proportionally more
+unpack overhead — A76 tips over into compute-bound.
+
+### Design implication
+
+The optimal weight-precision dispatch is **core-type-aware**:
+
+| Core type | Best weight precision | Reason |
+|-----------|-----------------------|--------|
+| A76 (big, high BW) | INT8 | Bandwidth saved without compute penalty |
+| A55 (little, low BW) | INT4 | Extra bandwidth savings outweigh unpack cost |
+
+For a heterogeneous deployment (e.g., RK3588 using all 8 cores), a mixed-
+precision strategy — INT8 on the big cluster + INT4 on the little cluster —
+would maximise aggregate throughput. This is an interesting direction for
+future work but was not implemented here.
+
+### Data
+
+CSVs: `results/raw/rk3588-t4_{a76,a55}_{fp32,int8,int4}.csv`.
+Manifest: `results/manifests/rk3588-t4_int4.json`.
+Governor: performance. Thermals: 39–41 °C before and after (no throttling).
+Device: rk3588-t4 (RK3588, 2nd unit).
