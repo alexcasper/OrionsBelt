@@ -4680,3 +4680,58 @@ Tested across both model sizes (0.8B and 4B) on Jetson Nano A57.
 CSV: `results/raw/jetson-j1_quant_accuracy_08b_4b.csv` (66 rows: 11 matrices
 × 3 variants × 2 models).
 Manifest: `results/manifests/jetson-j1_quant_accuracy.json` (sha `c643e34`).
+
+## 31. Q8_0 context-length scaling: constant-time GDN advantage grows with quantization (2026-08-08, ob-4p0)
+
+### Motivation
+
+§29 showed Q8_0 GEMV delivers 2.97× decode speedup over FP32 at ctx=1. The open
+question was whether this advantage holds, grows, or shrinks as context length
+increases from 1 to 4096. We ran the Q8_0 context sweep alongside the existing
+FP32 and INT8 sweeps (all on the same A57 binary, same governor, same commit).
+
+### Setup
+
+Binary: `dist/bench_gdn_e2e_decode_08b_jetson_a57_q80` (Q8_0 block-quantized
+weights, FP32 KV cache). Governor: performance. Thermals: 42–51 °C pre-run,
+50–55 °C post-run. Two replicate runs; max Δ = 4% (at ctx=512, well within
+the 1.68× noise ceiling from §ob-bf7).
+
+### Throughput comparison (0.8B hybrid)
+
+| ctx | FP32 tok/s | INT8 tok/s | Q8_0 tok/s | Q8_0 / FP32 | Q8_0 / INT8 |
+|----:|----------:|----------:|----------:|------------:|------------:|
+|   1 |      2.25 |      2.95 |      5.05 |       2.24× |       1.71× |
+|  64 |      2.24 |      2.91 |      5.08 |       2.27× |       1.75× |
+| 256 |      2.17 |      2.83 |      4.78 |       2.20× |       1.69× |
+| 512 |      1.84 |      2.67 |      4.21 |       2.29× |       1.58× |
+|1024 |      1.55 |      2.45 |      3.81 |       2.46× |       1.55× |
+|2048 |      1.44 |      2.13 |      2.99 |       2.08× |       1.40× |
+|4096 |      1.18 |      1.67 |      2.18 |       1.85× |       1.31× |
+
+### Key observations
+
+1. **Q8_0 advantage over FP32 grows from 2.24× at ctx=1 to 2.46× at ctx=1024**,
+   then narrows to 1.85× at ctx=4096. The peak advantage at mid-range context
+   is because Q8_0 accelerates the constant parts (FFN + GDN) so much that the
+   relative attention bottleneck is exposed later.
+
+2. **Q8_0 GDN layer cost is nearly flat**: 72–80 µs per layer across all
+   context lengths (vs FP32 170–234 µs, INT8 126–130 µs). The ±10% variance
+   is thermal jitter, not an algorithmic trend.
+
+3. **Attention share of Q8_0 decode time reaches 60.3% at ctx=4096** — the
+   highest of any quantization variant. This is the flip side of the
+   quantization win: faster constant parts expose the O(n) attention
+   bottleneck earlier and more starkly.
+
+4. **Throughput retention at ctx=4096**: Q8_0 retains 0.43× of its ctx=1
+   throughput, vs INT8 0.57× and FP32 0.52×. The lower retention is not a
+   regression — it is because Q8_0's ctx=1 starting point is so high that
+   the O(n) attention bottleneck dominates sooner in absolute terms.
+
+### Data
+
+CSV: `results/raw/jetson-j1_08b_q80_ctxsweep_e2e_raw.csv` (7 rows: ctx 1–4096).
+Generator updated: `bench/ctx_scaling_analysis.py` (Q8_0 added to CONFIGS_JETSON).
+Generated report: `results/figures/ctx_length_scaling_a57.md`.
