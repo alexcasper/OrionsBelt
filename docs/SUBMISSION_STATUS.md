@@ -119,6 +119,7 @@ cutoff has passed with no board; any future arrival is additive bonus per ADR 00
 | #147 | j1 | Add PR #146 to merged PRs table in SUBMISSION_STATUS.md | MERGED |
 | #148 | j1 | Add PR #147 to merged PRs table in SUBMISSION_STATUS.md | MERGED |
 | #150 | j1 | Add PR #148 to merged PRs table + fix dirty-tree guard test (ob-7cf) + add tests for ort_gdn_probe numpy_gdn_reference (ob-9o7) | MERGED |
+| #151 | j1 | Add PR #150 to merged PRs table in SUBMISSION_STATUS.md + loop flush + beads export | MERGED |
 
 ---
 
