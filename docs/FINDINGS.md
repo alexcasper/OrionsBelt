@@ -4474,3 +4474,118 @@ tuning for the projection matmuls that dominate decode time.
 ORT is the "third data point" confirming no existing CPU toolchain has
 optimized GDN kernels for Arm. Audit script: `scripts/ort_gdn_probe.py`.
 Device: rk3588-t4.
+
+## 28. llama.cpp baseline: mature Q8_0/Q4_0 inference is 3.1× faster decode, 2.3× faster prefill than our C loop on A57 (2026-08-08, ob-mrd.15)
+
+**Motivation.** ob-mrd.9 discovered that mainline llama.cpp has a native
+`GGML_OP_GATED_DELTA_NET` CPU implementation (generic scalar, no NEON/SVE
+tuning). We ran Qwen3.5-0.8B through it on the Jetson Nano A57 (4 cores,
+performance governor) to get an honest "how does a mature, production-grade
+inference engine do" baseline, head-to-head with our hand-tuned C decode loop.
+
+**Setup.** llama.cpp built from source at commit `69bf643` with gcc-8,
+CPU-only, `-mcpu=cortex-a57+crypto+nodotprod+nosve`. Pre-built GGUF models
+from `ggml-org/Qwen3.5-0.8B-GGUF` (Q8_0: 784 MiB, Q4_0: 527 MiB).
+`llama-bench` with `-t 4 -ngl 0 -r 5`, matching our 4-thread OpenMP decode
+loop. Thermals 64→69 °C, no throttling.
+
+### Decode (token generation, tg32)
+
+| Engine | Quant | tok/s | ±std | vs our FP32 |
+|---|---|---:|---:|---:|
+| OrionsBelt C loop | FP32 | 1.72 | — | 1.0× |
+| OrionsBelt C loop | INT8 w-o | 1.64 | — | 0.95× |
+| OrionsBelt C loop | INT4 w-o | 1.62 | — | 0.94× |
+| llama.cpp | Q8_0 | **5.40** | 0.05 | **3.14×** |
+| llama.cpp | Q4_0 | **5.64** | 0.02 | **3.28×** |
+
+### Prefill (prompt processing)
+
+| Engine | Quant | pp16 | pp32 | pp64 |
+|---|---|---:|---:|---:|
+| OrionsBelt C loop | FP32 opt | 4.73 | 4.65 | 4.43 |
+| llama.cpp | Q8_0 | **10.42** | **10.82** | **10.80** |
+| llama.cpp | Q4_0 | **9.84** | **10.10** | **10.22** |
+
+### Interpretation
+
+llama.cpp is **3.1–3.3× faster in decode** and **2.2–2.4× faster in prefill**
+than our optimized C loop. This is a large gap. The most likely contributor
+is **quantized GEMV maturity**: Q8_0 weights are 4× smaller than FP32, and
+decode is bandwidth-bound (§16), so a theoretical 4× bandwidth reduction
+would predict ~6.9 tok/s; llama.cpp achieves 5.40 tok/s (78% of that ceiling).
+Our INT8 weight-only path (1.64 tok/s) shows no speedup over FP32 on A57,
+indicating our dequant+GEMV pipeline leaves most of the bandwidth savings on
+the table — likely due to per-column scale lookups and non-blocked memory
+layout. llama.cpp's Q8_0 format stores scale interleaved with 32-element
+blocks, enabling a tight NEON dot-product with minimal dequant overhead.
+
+The prefill gap (2.3×) is smaller than the decode gap (3.1×), consistent
+with prefill being more compute-bound: quantization helps less when the
+arithmetic intensity is higher.
+
+**Caveat — not a like-for-like kernel comparison.** Our C loop uses synthetic
+weights and a simplified forward pass; llama.cpp runs the real Qwen3.5
+architecture. The GDN-specific kernels in llama.cpp are untuned scalar code
+(FINDINGS §16 showed GDN kernels are <1% of decode time on both engines), so
+this gap is almost entirely in the **matmul/GEMV** layer, not the novel GDN
+ops. The implication for the project is clear: the optimization opportunity
+is in matching llama.cpp's quantized GEMV efficiency, not in further tuning
+the GDN-specific kernels which are already negligible.
+
+### Data
+
+CSV: `results/raw/jetson-j1_llamacpp_vs_orionsbelt_08b.csv`.
+Manifest: `results/manifests/jetson-j1_llamacpp_vs_orionsbelt_08b.json`
+(sha `04bf610`, dirty=false, governor=performance).
+Our decode data: commit `5e16e96`. Our prefill data: commit `a722289`.
+llama.cpp: commit `69bf643`, built with gcc-8 for cortex-a57.
+
+## 29. Q8_0 block-quantized GEMV: 2.97× decode speedup, closing the gap with llama.cpp (2026-08-08, ob-8qt.17)
+
+**Motivation.** §28 showed llama.cpp Q8_0 decode is 3.14× faster than our FP32
+C loop (5.40 vs 1.72 tok/s), while our existing INT8 (per-column scale,
+per-element int8→float32 dequant) showed *no* speedup (1.64 tok/s). The
+root cause: our INT8 GEMV wastes ~50% more NEON ops/element than FP32 on
+int8→int16→int32→float32 widening, eating the 4× bandwidth savings.
+
+**Implementation.** Q8_0 block layout: per-block fp16 scale + 32 int8 values
+along K. The GEMV quantizes the activation vector to int8 **once** per call
+(amortized over all N output columns), then computes int8×int8 dot products
+via `vmull_s8` + `vpadalq_s16` — staying entirely in the integer domain
+with no per-element float conversion. Requires no SDOT (works on A57).
+
+### Results (A57, 4 cores, performance governor, commit `d223c19`)
+
+| Variant | tok/s | TTFT (ms) | vs FP32 | vs llama.cpp Q8_0 |
+|---|---:|---:|---:|---:|
+| FP32 | 1.72 | 594 | 1.0× | 0.32× |
+| INT8 (per-column) | 1.64 | 599 | 0.95× | 0.30× |
+| INT4 (nibble) | 1.62 | 580 | 0.94× | 0.30× |
+| **Q8_0 (block)** | **5.12** | **192** | **2.97×** | **0.95×** |
+| llama.cpp Q8_0 | 5.40 | — | 3.14× | 1.0× |
+
+Replicate confirmed: 5.12 tok/s across two 30-repeat runs (p50=193–195 ms,
+stddev <1%). Thermals 57→58 °C — no throttling. Bottleneck breakdown
+unchanged: FFN 53%, GDN projections 36%, full-attention 10%, GDN kernels
+<1%.
+
+### Why Q8_0 works where per-column INT8 didn't
+
+Three factors combine:
+
+1. **Amortized activation quantization**: The activation vector (K=1024 for
+   0.8B) is quantized to int8 once per GEMV call, reused across all N output
+   columns. Cost: K conversions amortized over N columns = negligible.
+2. **Integer-domain dot product**: `vmull_s8` (8 int8→8 int16) +
+   `vpadalq_s16` (pairwise add+accumulate to int32) is ~0.6 NEON ops/element,
+   vs ~1.5 for int8→float32 dequant+FMA and ~1.0 for FP32 FMA.
+3. **Block-local scale**: Per-32-element fp16 scale adapts to local weight
+   distribution, giving better quantization accuracy than per-column scale
+   (which must cover the entire K dimension with one scale).
+
+### Data
+
+CSV: `results/raw/jetson-j1_q80_vs_int8_vs_fp32_08b.csv`.
+Manifest: `results/manifests/jetson-j1_q80_a57.json` (sha `d223c19`,
+dirty=false, governor=performance). Two 30-repeat runs, stddev <1%.
