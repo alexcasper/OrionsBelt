@@ -39,6 +39,7 @@ At 262K context on the 4B checkpoint, that difference is **23.95 GiB of RAM** �
 - **INT4 weight-only quantization** — core-type-dependent: 1.40× on A55 little cores (bandwidth wins), 15% slower than INT8 on A76 (compute-bound), no benefit on A57 (narrow pipeline can't hide unpack cost). The optimal precision is core-type-aware, not "always lower"
 - **Cache-blocked GEMM prefill** — 49–78× prefill speedup from switching naive single-row GEMV to cache-blocked GEMM at M>1, measured across the fleet
 - **ONNX Runtime CPU EP audit** — GDN recurrence is expressible via ONNX `Loop` but 16× slower than our fused kernel. Confirms no existing CPU toolchain has optimized GDN for Arm
+- **Hardware energy profiling** — INA3221 rail-level power characterization on Jetson Nano: 874–1250 mJ/GiB board-wide, power is constant across kernels, `performance` governor is both faster and 28% more energy-efficient than `ondemand`
 
 **What we did NOT achieve (stated honestly):**
 - Heterogeneous NPU/GPU/CPU dispatch — requires the Orion O6's GPU+NPU for a meaningful test; designed but not implemented
@@ -115,6 +116,22 @@ This is not a bug in one toolchain — it is an **architectural constraint** of 
 
 - **Pi 5 (A76, 15.8 GiB/s) vs Jetson (A57, 23.8 GiB/s):** Pi 5 is faster despite less bandwidth — confirming the kernels are instruction-bound, not bandwidth-bound
 - **big.LITTLE:** A76 big cores are 2–3× faster than A55 little cores; simultaneous big+little scheduling shows diminishing returns past 4 big cores
+
+### Energy efficiency: hardware power profiling on the Jetson A57
+
+The Jetson Nano's onboard **TI INA3221** power monitor (exposed via IIO sysfs) provides real-time rail-level power measurements — no external hardware needed. We profiled all three GDN kernels under sustained 10-second loads to measure energy per GiB:
+
+| Kernel | Throughput (GiB/s) | Δ Power board (mW) | Energy (mJ/GiB board) | Energy (mJ/GiB CPU) |
+|--------|-------------------:|-------------------:|----------------------:|--------------------:|
+| `gdn_gated_scan` | 0.74 | 925 | **1250** | 836 |
+| `gdn_causal_dwconv1d` | 0.88 | 903 | **1026** | 767 |
+| `gdn_cumdecay` | 1.06 | 925 | **874** | 667 |
+
+**Key finding: power is constant, energy scales with throughput.** All three kernels draw ~900–925 mW over idle (2.8 W board total), despite different throughput rates. The A57's power budget is dominated by memory subsystem overhead, not arithmetic. Energy-per-GiB therefore tracks 1/throughput — the fastest kernel is also the most energy-efficient. The GPU rail reads 0 mW throughout (NEON-only workload).
+
+**Governor matters for energy too:** `performance` is both 7% faster *and* 28% more energy-efficient than `ondemand` (1250 vs 1602 mJ/GiB board), because frequency ramping latency wastes energy on sustained workloads.
+
+Full characterization with provenance: FINDINGS §"INA3221 power/energy characterization".
 
 ### GDN-2 stretch comparison
 
