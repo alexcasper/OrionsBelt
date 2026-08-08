@@ -110,6 +110,7 @@ cutoff has passed with no board; any future arrival is additive bonus per ADR 00
 | #138 | j1 | Fix t4 8-thread provenance chain (ob-dpl): restore clean CSV+manifest (sha=7bbbc99, dirty=false), correct SHA citations in DEVPOST + SUBMISSION_STATUS + partial_comparison_table. Reviewer fix: precise wording on kernel code equivalence. | MERGED |
 | #139 | j1 | Close ob-dpl, add PR #137/#138 to merged PRs table in SUBMISSION_STATUS.md | MERGED |
 | #140 | j1 | Add PR #139 to merged PRs table in SUBMISSION_STATUS.md | MERGED |
+| #141 | j1 | Add PR #140 to merged PRs table in SUBMISSION_STATUS.md | MERGED |
 
 ---
 
