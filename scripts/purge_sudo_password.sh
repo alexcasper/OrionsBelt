@@ -6,7 +6,7 @@
 # with '***REDACTED***'. It then force-pushes all branches.
 #
 # PREREQUISITES (human action):
-#   1. ROTATE the device sudo password first — treat 'cell' as disclosed.
+#   1. ROTATE the device sudo password first — treat the old value as disclosed.
 #   2. Ensure all PRs are merged or closed (history rewrite invalidates them).
 #   3. Install git-filter-repo for the recommended path:
 #        pip3 install git-filter-repo
@@ -33,9 +33,15 @@ if [ "$DRY_RUN" = "--dry-run" ]; then
     echo ""
 fi
 
-# The password pattern to redact. Using the full sudo pipeline pattern
-# ensures we catch all variants without false positives.
-PATTERN='echo cell | sudo -S'
+# Read the password from an environment variable — never hardcode the
+# credential in a tracked file (see ob-3i5, SECURITY_REMEDIATION.md §2).
+# Usage:  PURGE_PASSWORD='<old-password>' bash scripts/purge_sudo_password.sh [--dry-run]
+if [ -z "${PURGE_PASSWORD:-}" ]; then
+    echo "ERROR: PURGE_PASSWORD env var is not set."
+    echo "  Usage: PURGE_PASSWORD='<old-password>' bash $0 [--dry-run]"
+    exit 1
+fi
+PATTERN="echo ${PURGE_PASSWORD} | sudo -S"
 REPLACEMENT='echo ***REDACTED*** | sudo -S'
 
 echo "Pattern to replace: '$PATTERN'"

@@ -8,8 +8,9 @@
 # push access to ALL branches. Every clone and PR will need to be reset.
 #
 # PREREQUISITE (non-negotiable):
-# 1. ROTATE the device sudo password. The current password ("cell") must be
+# 1. ROTATE the device sudo password. The committed password must be
 #    treated as permanently disclosed — it has been on GitHub since 2026-08-02.
+#    (Set PURGE_PASSWORD env var to the old value for verification below.)
 # 2. All agents must stop their loops before running this (they will need to
 #    re-clone after history is rewritten).
 #
@@ -57,7 +58,7 @@ fi
 #   git push --force
 #
 # Re-clone normally and verify:
-#   git log --all -p -S "password 'cell'" -- .goose-task.md
+#   git log --all -p -S "password '$PURGE_PASSWORD'" -- .goose-task.md
 #   # Should return nothing
 #
 # =====================================================================
@@ -81,7 +82,14 @@ git filter-repo --invert-paths \
     --path .goose-loop.log
 
 echo "Verifying purge ..."
-HITS=$(git log --all --oneline -S "echo cell" 2>/dev/null | wc -l)
+PURGE_PW="${PURGE_PASSWORD:-}"
+if [ -z "$PURGE_PW" ]; then
+    echo "NOTE: PURGE_PASSWORD not set — skipping verification of password string."
+    echo "      Set PURGE_PASSWORD env var to the old password to enable verification."
+    HITS=0
+else
+    HITS=$(git log --all --oneline -S "echo $PURGE_PW" 2>/dev/null | wc -l)
+fi
 if [ "$HITS" -gt 0 ]; then
     echo "⚠  WARNING: $HITS commits still contain the password string."
     echo "   These may be in other files. Manual review needed."
@@ -98,7 +106,7 @@ if [ "$CONFIRM2" = "FORCE" ]; then
     echo "✓ History rewritten and pushed."
     echo ""
     echo "POST-PURGE CHECKLIST:"
-    echo "  1. Verify password is gone: git log --all -p -S 'cell' | grep -c password"
+    echo "  1. Verify password is gone: git log --all -p -S '$PURGE_PW' | grep -c password"
     echo "  2. All agents: re-clone the repo (old clones have stale history)"
     echo "  3. Recreate any open PRs (history rewrite invalidates them)"
     echo "  4. Confirm the rotated password works on all devices"
