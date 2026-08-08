@@ -142,12 +142,27 @@ else bad "inventory wrote a file"; fi
 # --- run: guards ----------------------------------------------------------
 out=$(bash "$F" run 2>&1); contains "run refuses without --threads" "$out" "requires --threads"
 
-# Dirty-tree guard: exercise it in a scratch repo so the real tree is untouched.
-mkdir -p "$TMP/dirty" && (cd "$TMP/dirty" && git init -q . && git -c user.email=t@t -c user.name=t commit -q --allow-empty -m x && echo x > f)
-out=$(cd "$TMP/dirty" && FLEET_NODES="$TMP/nodes.conf" bash "$F" run --threads 1 2>&1)
-# fleet.sh checks its own repo root, so assert the guard exists and cites the bead.
-contains "dirty-tree guard cites the provenance defect" "$(grep -A3 'working tree is dirty' "$F")" "ob-bf7"
-contains "dirty-tree guard is overridable" "$(grep -c 'allow-dirty' "$F")" "" || true
+# Dirty-tree guard: fleet.sh resolves REPO_ROOT from BASH_SOURCE, not cwd.
+# Copy it into a scratch repo so we can dirty THAT tree and exercise the real
+# guard (ob-7cf: the old test ran the real fleet.sh from a scratch cwd, but
+# fleet.sh always checks its own checkout — clean — so the guard never fired
+# and cmd_run wrote a stray CSV into the shared FLEET_OUT, breaking the
+# later 'dry-run writes no CSV' assertion via cross-test contamination).
+mkdir -p "$TMP/dirty/scripts" "$TMP/dirty/dist"
+cp "$F" "$TMP/dirty/scripts/fleet.sh"
+cp "$REPO_ROOT/scripts/detect_isa.sh" "$TMP/dirty/scripts/" 2>/dev/null || true
+cp "$REPO_ROOT/scripts/capture_manifest.sh" "$TMP/dirty/scripts/" 2>/dev/null || true
+printf '#!/usr/bin/env bash\nexit 0\n' > "$TMP/dirty/scripts/build_device_bench.sh"
+for b in bench_gdn_jetson_a57 bench_gdn_rk3588_a76; do
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$TMP/dirty/dist/$b"; chmod +x "$TMP/dirty/dist/$b"
+done
+(cd "$TMP/dirty" && git init -q . && git add -A && git -c user.email=t@t -c user.name=t commit -q -m stage)
+echo x >> "$TMP/dirty/scripts/build_device_bench.sh"   # dirty the tracked tree
+out=$(cd "$TMP/dirty" && FLEET_NODES="$TMP/nodes.conf" FLEET_OUT="$TMP/dirty-out" \
+      bash scripts/fleet.sh run --threads 1 2>&1)
+contains "dirty-tree guard fires and refuses" "$out" "working tree is dirty"
+contains "dirty-tree guard cites the provenance defect" "$out" "ob-bf7"
+lacks "dirty-tree guard leaves no CSV behind" "$(ls "$TMP/dirty-out/raw" 2>/dev/null || true)" ".csv"
 
 # --- run: dry-run plumbing ------------------------------------------------
 out=$(bash "$F" run --threads 1 --dry-run 2>&1)

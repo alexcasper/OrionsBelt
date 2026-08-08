@@ -19,9 +19,6 @@ import argparse
 import time
 
 import numpy as np
-import onnx
-import onnxruntime as ort
-from onnx import TensorProto, helper, numpy_helper
 
 
 def build_gdn_loop_model(
@@ -40,6 +37,10 @@ def build_gdn_loop_model(
     Body uses Gather(iter_num) to read per-token q,k,v,g,beta.
     Scan output accumulates attn_t per iteration.
     """
+    # Lazy imports — keeps numpy_gdn_reference() testable without onnx installed
+    import onnx
+    from onnx import TensorProto, helper, numpy_helper
+
     V = head_dim
     if scale is None:
         scale = 1.0 / np.sqrt(V)
@@ -167,6 +168,9 @@ def numpy_gdn_reference(q, k, v, g, beta, state0):
 
 
 def main():
+    # Lazy import — numpy_gdn_reference() stays importable without onnxruntime
+    import onnxruntime as ort
+
     parser = argparse.ArgumentParser(description="ONNX Runtime GDN feasibility probe")
     parser.add_argument("--tokens", type=int, default=8)
     parser.add_argument("--dim", type=int, default=128)
