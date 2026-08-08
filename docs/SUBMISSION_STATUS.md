@@ -36,7 +36,7 @@ ADR 0007 — the submission framing is locked to Edge AI.
 | Submission prep (README, write-up, repro) | ✓ All beads closed | ob-fnq, ob-f7k, ob-kdi, ob-9e2 |
 | Compliance checklist | ✓ ob-9e2 closed | Apache-2.0, no credentials at tip of main/t4 |
 
-**Submission readiness:** 15/15 checks pass, 1788 tests, Ruff clean, CI green.
+**Submission readiness:** 15/15 checks pass, 1799 tests (1769 passed, 30 skipped), Ruff clean, CI green.
 
 ---
 
