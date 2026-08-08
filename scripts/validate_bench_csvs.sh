@@ -43,6 +43,8 @@ for csv in "$RAW"/*.csv; do
         *_gdn2_vs_gdn1_*) continue ;;
         # GPU microbenchmarks (OpenCL Mali, different schema — validated by validate_results.py)
         *_gpu_*) continue ;;
+        # Cross-quant comparison tables (aggregate multiple commits, no single-run manifest)
+        *_vs_*) continue ;;
     esac
 
     rows=$(($(wc -l < "$csv") - 1))  # subtract header
