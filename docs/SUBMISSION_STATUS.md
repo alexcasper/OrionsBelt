@@ -116,6 +116,7 @@ cutoff has passed with no board; any future arrival is additive bonus per ADR 00
 | #144 | j1 | Add PR #143 to merged PRs table in SUBMISSION_STATUS.md | MERGED |
 | #145 | j1 | Add PR #144 to merged PRs table in SUBMISSION_STATUS.md | MERGED |
 | #146 | j1 | Add PR #145 to merged PRs table in SUBMISSION_STATUS.md | MERGED |
+| #147 | j1 | Add PR #146 to merged PRs table in SUBMISSION_STATUS.md | MERGED |
 
 ---
 
