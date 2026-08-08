@@ -86,9 +86,9 @@ Block-quantized GEMV (fp16 scale + 32 int8 per block, matching llama.cpp's Q8_0 
 
 | Variant | 0.8B cos_sim | 0.8B rel_err | 4B cos_sim | 4B rel_err |
 |---|---:|---:|---:|---:|
-| Q8_0 | 1.000000 | 0.04–0.16% | 1.000000 | 0.04–0.10% |
+| Q8_0 | 1.000000 | 0.06–0.16% | 1.000000 | 0.04–0.10% |
 | INT8 | 1.000000 | 0.05–0.12% | 1.000000 | 0.04–0.17% |
-| INT4 | 0.99998 | 0.95–2.05% | 0.99999 | 0.95–1.93% |
+| INT4 | 0.99998 | 1.30–2.05% | 0.99999 | 0.95–1.93% |
 
 > Context-length sweep (A57, 0.8B hybrid model) shows Q8_0 retains 1.85–2.46× advantage over FP32 across all context lengths. The pure-GDN sweep confirms O(1) decode: Q8_0 throughput varies only ±3% from ctx=1 to ctx=4096. Full data: FINDINGS §29–31, CSVs `jetson-j1_quant_accuracy_08b_4b.csv` and `jetson-j1_08b_q80_ctxsweep_e2e_raw.csv`.
 
