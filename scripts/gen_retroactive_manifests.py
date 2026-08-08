@@ -4,6 +4,7 @@
 Uses an existing t4 retroactive manifest as the device-info template,
 varying only the CSV name and git SHA per file.
 """
+
 import json
 from datetime import datetime, timezone
 
