@@ -27,7 +27,7 @@ during the model survey (bead `ob-7fv`, see `docs/MODEL_SURVEY.md` §3).
 
 **Result:** Every file opens with `Apache License / Version 2.0, January 2004`.
 No custom Qwen license, no field-of-use restriction, no scale-gated clause
-(unlike Llama's community license). This satisfies risk R10 in PLAN.md's risk
+(unlike Llama's community license). This satisfies risk R10 in docs/archive/PLAN.md's risk
 register (checkpoint license restricting redistribution) — **not a risk for any
 candidate in this range.**
 

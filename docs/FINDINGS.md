@@ -20,7 +20,7 @@ constant — in which case it is fully unrolled and no loop survives into the IR
 count is a runtime input is rejected.
 
 This was measured, not assumed, and it is the empirical basis for the layer-to-engine mapping in
-[`PLAN.md`](./archive/PLAN.md) §3.1: **CPU hosts the GDN recurrence; accelerators take the dense math.**
+[`docs/archive/PLAN.md`](./archive/docs/archive/PLAN.md) §3.1: **CPU hosts the GDN recurrence; accelerators take the dense math.**
 
 ### Method
 
@@ -103,7 +103,7 @@ on-device execution — the board-gated half of this work, tracked in `ob-8xc`.
 
 ### Consequence for the design
 
-The mapping hypothesis in `PLAN.md` §3.1 was argued from workload shape and Arm-IP relevance
+The mapping hypothesis in `docs/archive/PLAN.md` §3.1 was argued from workload shape and Arm-IP relevance
 *before* this audit. It now has empirical support:
 
 - **GDN recurrence → CPU.** Not a preference. The NPU has no construct that expresses it.
@@ -231,7 +231,7 @@ production scale (262K context = 4,096 chunks per layer × 24 layers) without fa
 unanswered by this probe — but the compilation acceptance is itself a meaningful difference from the
 CIX platform, where no control-flow op is available at all.
 
-For the project's design (PLAN.md §3.1: CPU hosts the GDN recurrence), this cross-vendor probe
+For the project's design (docs/archive/PLAN.md §3.1: CPU hosts the GDN recurrence), this cross-vendor probe
 confirms the decision for both platforms: the safe assumption is that edge NPU toolchains cannot be
 relied upon to host a runtime-length recurrence, even if one vendor's compiler accepts the `Scan`
 construct.
@@ -377,7 +377,7 @@ Design notes worth keeping:
 - Written **vector-length-agnostic**, so they widen for free on a core with longer vectors even
   though Cortex-A720 is 128-bit.
 - The scan is deliberately the *outer* sequential half only, kept separate from per-chunk dense
-  math so the mapping ADR can offload the inner matmuls without touching this (PLAN.md §3.1).
+  math so the mapping ADR can offload the inner matmuls without touching this (docs/archive/PLAN.md §3.1).
 
 ### Verification results
 
@@ -805,7 +805,7 @@ explain the Pi 5's win despite less bandwidth.
 The `DEVICE_RUNBOOK` warns: *"If the Pi 5 wins comfortably, the thesis is wrong
 or incomplete, and we need to know that — several downstream decisions rest on it."*
 
-1. **CPU-first mapping (PLAN.md §3.1):** the argument that GDN layers should stay
+1. **CPU-first mapping (docs/archive/PLAN.md §3.1):** the argument that GDN layers should stay
    on the CPU because they are "memory-bandwidth-bound at decode" is **partially
    undermined** at prefill chunk sizes (seq=64). At decode (seq=1), the j2 data
    shows the opposite — data is L2-resident and throughput jumps to 9–17 GiB/s
@@ -1073,7 +1073,7 @@ headline should say "halves resident state during prefill," not "speeds up GDN."
 
 The benchmark now supports `--sustained <seconds>` which runs `gdn_gated_scan` on the
 Qwen3.5-4B config (seq=64) continuously for N seconds, sampling throughput and CPU
-temperature every 5 s. This directly addresses PLAN.md risk R7: on passively-cooled
+temperature every 5 s. This directly addresses docs/archive/PLAN.md risk R7: on passively-cooled
 edge hardware, a burst number that cannot be sustained is misleading.
 
 **Jetson-J1 (Cortex-A57, active fan cooling), 120-second sustained run:**
@@ -1225,7 +1225,7 @@ down when idle), the 7% throughput penalty under load means each GiB costs 28%
 more energy. The frequency ramping latency on A57 is high enough that sustained
 workloads never benefit from scaling.
 
-This directly validates PLAN.md's recommendation to use the `performance`
+This directly validates docs/archive/PLAN.md's recommendation to use the `performance`
 governor for all benchmarking. For bursty decode workloads (where idle gaps
 between tokens allow frequency to drop), `ondemand` might save idle energy — but
 that saving is irrelevant if it increases per-token energy under load.
@@ -1479,7 +1479,7 @@ matters for three non-obvious reasons:
 
 #### Implication for layer-to-engine mapping (ob-o4g)
 
-The working hypothesis (PLAN.md §3.1) — CPU hosts GDN sequential scan, GPU/NPU
+The working hypothesis (docs/archive/PLAN.md §3.1) — CPU hosts GDN sequential scan, GPU/NPU
 hosts matmuls — is confirmed by the data, but for a subtler reason than
 expected. It is not that the sequential scan is too slow for an accelerator; it
 is that (a) the scan is trivially cheap on CPU (5 µs/token), so moving it would
@@ -1795,7 +1795,7 @@ data from `src/orionsbelt/model/gdn_layer_info.py` (Qwen3.5-4B, 32 layers:
 balloons to 8.6 GB — a **171× difference**. GDN saves 8.5 GB of memory
 at this context length, which is the difference between fitting in 8 GB
 edge DRAM and not. Weights (11.2 GB at FP16) dominate at all context
-lengths, which is why INT4 weight quantization (PLAN.md §6, ADR 0004)
+lengths, which is why INT4 weight quantization (docs/archive/PLAN.md §6, ADR 0004)
 is the complementary half of the story.
 
 ---
@@ -2526,7 +2526,7 @@ primitives.** This is expected and is itself a useful finding:
    so the GPU's compute advantage is irrelevant — it's pure memory
    bandwidth, and the A76's L1/L2 cache hierarchy wins.
 
-### What this means for the heterogeneous mapping (PLAN.md §3.1)
+### What this means for the heterogeneous mapping (docs/archive/PLAN.md §3.1)
 
 **On t3 (RK3588):** GDN scan kernels should stay on CPU. The GPU offers no
 advantage for the channel-wise recurrence. This *confirms* the CPU-first
@@ -2858,7 +2858,7 @@ that remains open.
 
 Ran `gdn_gated_scan` (the heaviest GDN kernel, 4B prefill config: seq=64,
 channels=4096) for 60 seconds on each cluster with throughput and
-temperature sampled every 5s. Purpose: test PLAN.md risk R7 — "burst numbers
+temperature sampled every 5s. Purpose: test docs/archive/PLAN.md risk R7 — "burst numbers
 that cannot be sustained are misleading on passively-cooled edge hardware."
 
 ### Big Cluster (A76, cpu4-7)
@@ -3485,7 +3485,7 @@ taskset -c 4-7 ./bench_e2e_ctx --ctx-sweep 1,64,256,512,1024,2048,4096 --csv
 
 ## 18. Sustained-load thermal stability: no throttling on RK3588 (2026-08-07)
 
-**Addresses PLAN.md risk R7: burst numbers must be sustainable.**
+**Addresses docs/archive/PLAN.md risk R7: burst numbers must be sustainable.**
 
 Ran two back-to-back sustained bursts of 500 tokens each (94s total sustained
 decode) on the 0.8B INT8 model, big cluster (A76, 4 cores, governor=performance).
@@ -3590,7 +3590,7 @@ confirming the model is **matmul-bound**, not recurrence-bound.
 
 ### Implication for the GDN hypothesis
 
-The original hypothesis (ob-8qt.1, PLAN.md §3.1) was that GDN's sequential
+The original hypothesis (ob-8qt.1, docs/archive/PLAN.md §3.1) was that GDN's sequential
 recurrence would be a CPU bottleneck, making CPU-first mapping advantageous.
 The data shows the opposite: **GDN recurrence is negligible cost; the
 dominant cost is the same dense matmuls (FFN, projections) that every

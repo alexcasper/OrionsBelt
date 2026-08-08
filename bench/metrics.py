@@ -40,7 +40,7 @@ class Summary:
 
     Per METRICS.md section 7: p50 and p95 are mandatory; ``spread`` and
     ``normalized_spread`` make cross-context noise comparable despite very
-    different absolute magnitudes (PLAN.md R7: thermal variance on
+    different absolute magnitudes (docs/archive/PLAN.md R7: thermal variance on
     passively-cooled edge hardware).
     """
 

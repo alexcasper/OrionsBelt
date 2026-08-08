@@ -501,7 +501,7 @@ class TestCLI:
 
         The frozen schema validates git_sha as 7-40 hex, so a placeholder like
         "0000000" would validate clean and produce a CSV that looks publishable
-        with no provenance at all (PLAN.md section 9).
+        with no provenance at all (docs/archive/PLAN.md section 9).
         """
         monkeypatch.chdir(tmp_path)
         with pytest.raises(RuntimeError, match="un-attributable"):

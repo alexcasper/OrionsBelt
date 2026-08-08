@@ -45,7 +45,7 @@ from dataclasses import dataclass, field
 # Constants
 # ---------------------------------------------------------------------------
 
-# Canonical context-length sweep points (PLAN.md §5, METRICS.md §7).
+# Canonical context-length sweep points (docs/archive/PLAN.md §5, METRICS.md §7).
 CANONICAL_LENGTHS = [4096, 32768, 131072, 262144]
 
 # Approximate chars-per-token for English text (GPT-style BPE average).

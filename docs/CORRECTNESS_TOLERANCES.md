@@ -8,7 +8,7 @@
 
 ## 1. Purpose
 
-Per PLAN.md §9: *"speed that changes outputs is not speed."*  The correctness
+Per docs/archive/PLAN.md §9: *"speed that changes outputs is not speed."*  The correctness
 oracle enforces this by comparing every candidate implementation's outputs
 (quantized NPU, GPU scan kernel, custom CPU kernel) against a golden reference
 generated from the unmodified HuggingFace model in float32 on CPU.

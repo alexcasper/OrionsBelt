@@ -196,7 +196,7 @@ at prefill and arithmetic-latency-bound at decode on in-order cores.
 
 This is a publishable negative/partial result: we tested the decoupled-gating
 hypothesis at edge scale and found that it is NOT free, with the cost profile
-depending sharply on the execution regime. Per PLAN.md §9, reporting this honestly
+depending sharply on the execution regime. Per docs/archive/PLAN.md §9, reporting this honestly
 scores under Potential Impact and costs nothing under scrutiny.
 
 ---

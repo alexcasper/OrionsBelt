@@ -5,7 +5,7 @@
 [huggingface/transformers](https://github.com/huggingface/transformers) `main`
 (sha fetched 2026-08-02), cross-referenced with `config.json` for both the 0.8 B
 and 4 B checkpoints. This supersedes any figure quoted from a secondary source
-(PER PLAN.md §2.3).
+(PER docs/archive/PLAN.md §2.3).
 
 ---
 
@@ -201,7 +201,7 @@ if not is_flash_linear_attention_available() or not is_causal_conv1d_available()
 
 **Neither `fla` nor `causal_conv1d` ships a build for Arm (AArch64) or Vulkan.**
 On NVIDIA GB10 (SM121) the same gap already occurs. **Arm is the same hole,
-wider** — this is the project's central contribution (PLAN.md §3).
+wider** — this is the project's central contribution (docs/archive/PLAN.md §3).
 
 The PyTorch fallbacks are functionally correct but:
 - The chunked fallback has a Python-level `for i in range(0, num_chunks)` loop

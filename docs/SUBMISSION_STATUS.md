@@ -103,7 +103,7 @@ via `bd export`). No code conflicts.
 ## 6. Recommended framing for T-4
 
 If the board has not arrived by Aug 10, **let T-4 fire without
-controversy**. The submission already clears PLAN.md §8's minimum-viable
+controversy**. The submission already clears docs/archive/PLAN.md §8's minimum-viable
 bar with real measured numbers — not the "credible plan" ADR 0004
 described on Aug 2 when zero benchmark numbers existed.
 

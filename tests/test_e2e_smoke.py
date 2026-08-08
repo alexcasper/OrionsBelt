@@ -79,7 +79,7 @@ class TestMultiContextSweep:
         assert len(two) == 2 * len(one)
 
     def test_contexts_are_independently_separable(self, tmp_path):
-        """A truncated sweep must still yield usable data (PLAN.md section 5/R4)."""
+        """A truncated sweep must still yield usable data (docs/archive/PLAN.md section 5/R4)."""
         rows, _ = _sweep(tmp_path, context_lengths=(64, 128))
         for ctx in (64, 128):
             subset = [r for r in rows if r.context_length == ctx]

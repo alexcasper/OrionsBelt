@@ -219,7 +219,7 @@ repeats invalidates the run for headline reporting (METRICS.md §8).
 
 ## 8. Provenance: every number has a manifest
 
-**A number without a manifest is not a result** (PLAN.md §9).
+**A number without a manifest is not a result** (docs/archive/PLAN.md §9).
 
 Every benchmark run produces two artifacts:
 
@@ -243,7 +243,7 @@ links each row to the exact code commit that produced it.
 ## 9. Correctness validation
 
 **The correctness oracle gates every optimization.** Speed that changes outputs is
-not speed (PLAN.md §9).
+not speed (docs/archive/PLAN.md §9).
 
 The x86/CUDA reference inference (`ob-aqv`) serves as the correctness oracle — its
 outputs are the ground truth against which all optimised paths are compared. The

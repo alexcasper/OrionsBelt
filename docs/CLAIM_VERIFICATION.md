@@ -148,7 +148,7 @@ MG MS-R1, BeiQi AI PC) and is fully public — so BSP-level work is ungated too.
 | Claim | Status |
 |---|---|
 | 3:1 hybrid: three Gated DeltaNet layers per one Gated Attention layer | ✅ **Confirmed by primary source** — the load-bearing claim holds |
-| Small dense variants exist at 0.8B, 2B, 4B, 9B | ✅ Confirmed — PLAN.md's 0.8B–4B target range is viable |
+| Small dense variants exist at 0.8B, 2B, 4B, 9B | ✅ Confirmed — docs/archive/PLAN.md's 0.8B–4B target range is viable |
 | 262K native context | ✅ Confirmed: "Native context is 262,144 tokens." ~1M requires **YaRN rope scaling** via `rope_scaling`; plain loading gives the native window only |
 
 Concretely useful details found:

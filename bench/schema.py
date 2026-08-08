@@ -4,7 +4,7 @@ This module is the machine-enforced counterpart to the human contract in
 ``docs/RESULTS_SCHEMA.md``. The two describe the same frozen results schema from two
 angles and MUST be changed together, in the same commit: if you add, rename, or remove a
 column, an enum value, or a metric here, make the matching edit there, and vice versa.
-Per PLAN.md section 2.4 and section 5, this schema is an early, frozen dependency of the
+Per docs/archive/PLAN.md section 2.4 and section 5, this schema is an early, frozen dependency of the
 benchmark harness, the plotting code, and the final comparison table — renaming or
 removing anything already in use invalidates already-collected data. See the "changing
 this schema" section of the doc before touching either file.
@@ -62,7 +62,7 @@ class Engine(Enum):
 
 
 class Phase(Enum):
-    """Prefill vs decode. Never averaged into one throughput number -- see PLAN.md 2.4."""
+    """Prefill vs decode. Never averaged into one throughput number -- see docs/archive/PLAN.md 2.4."""
 
     PREFILL = "prefill"
     DECODE = "decode"
