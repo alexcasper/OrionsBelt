@@ -1132,8 +1132,9 @@ int main(int argc, char **argv) {
     }
 
     /* Validate token count — 0 or negative causes division by zero in
-     * mean/percentile stats and array underflow in the sort loop. */
-    if (num_tokens < 1) {
+     * mean/percentile stats and array underflow in the sort loop.
+     * Skip for prefill mode (doesn't use the decode loop). */
+    if (prefill_M == 0 && num_tokens < 1) {
         fprintf(stderr, "Error: --tokens must be >= 1 (got %d)\n", num_tokens);
         return 1;
     }

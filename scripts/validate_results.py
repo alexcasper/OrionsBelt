@@ -185,6 +185,18 @@ KLEIDIAI_GDN_KERNEL_COLS = [
     "gib_per_s_p50",
 ]
 
+# Cache-blocked prefill GEMM benchmark (ob-8qt.15, FINDINGS §25):
+# bench_gdn_e2e_decode's `--prefill M --csv` output.
+PREFILL_GEMM_COLS = [
+    "model",
+    "prefill_M",
+    "ttft_ms",
+    "tok_per_sec_prefill",
+    "gdn_us",
+    "full_us",
+    "ffn_us",
+]
+
 # Device spec bandwidth (GiB/s) for sanity-check upper bounds.
 # Vendor datasheets quote GB/s; converted to GiB/s for unit-consistency
 # with the bench binary (÷2^30).  See ADR 0005 for GB/s originals.
@@ -200,7 +212,7 @@ ABSURD_THROUGHPUT = 200.0  # GiB/s
 
 
 def detect_csv_type(header):
-    """Return CSV type: standard, sustained, power, layer_profile, delta_matmul, e2e_decode, ctx_sweep, e2e_sweep, e2e_ctxsweep, gpu_micro, kleidiai_matmul, kleidiai_gdn, or None."""
+    """Return CSV type: standard, sustained, power, layer_profile, delta_matmul, e2e_decode, ctx_sweep, e2e_sweep, e2e_ctxsweep, gpu_micro, kleidiai_matmul, kleidiai_gdn, prefill_gemm, or None."""
     cols = set(header)
     if cols >= set(STANDARD_COLS):
         return "standard"
@@ -226,6 +238,8 @@ def detect_csv_type(header):
         return "kleidiai_matmul"
     if cols >= {"kernel", "shape", "p50_us", "gib_per_s_p50"}:
         return "kleidiai_gdn_kernel"
+    if cols >= {"prefill_M", "ttft_ms", "tok_per_sec_prefill"}:
+        return "prefill_gemm"
     return None
 
 
@@ -254,6 +268,8 @@ def expected_columns(csv_type):
         return KLEIDIAI_MATMUL_COLS
     if csv_type == "kleidiai_gdn_kernel":
         return KLEIDIAI_GDN_KERNEL_COLS
+    if csv_type == "prefill_gemm":
+        return PREFILL_GEMM_COLS
     return []
 
 
@@ -778,6 +794,16 @@ def validate_csv(path, csv_name, issues):
                     validate_kleidiai_matmul_row(row, csv_name, issues, i)
                 elif csv_type == "kleidiai_gdn_kernel":
                     validate_kleidiai_gdn_kernel_row(row, csv_name, issues, i)
+                elif csv_type == "prefill_gemm":
+                    # Basic sanity: prefill tok/s must be positive and plausible.
+                    try:
+                        tps = float(row.get("tok_per_sec_prefill", 0))
+                        if tps <= 0 or tps > 1000:
+                            issues.append(
+                                Issue("WARNING", csv_name, f"row {i}: implausible prefill tok/s {tps}")
+                            )
+                    except ValueError:
+                        pass
 
             return csv_type, row_count, manifest_ref
 
