@@ -53,7 +53,7 @@ At 262K context on the 4B checkpoint, that difference is **23.95 GiB of RAM** �
 
 ### Headline: GDN kernel bandwidth on RK3588 Cortex-A76
 
-Qwen3.5-4B, prefill (seq=64), fp32 baseline, 8-thread (big cluster). Two independent RK3588 nodes (t3, t4 Turing Machines RK1). Kernel code is byte-identical at both commits (diff in `bench_gdn.c` is empty between f015982 and 1ca4d6d).
+Qwen3.5-4B, prefill (seq=64), fp32 baseline, 8-thread (big cluster). Two independent RK3588 nodes (t3, t4 Turing Machines RK1). Kernel logic is unchanged between commits (the only diff in `bench_gdn.c` between f015982 and 7bbbc99 is a `_POSIX_C_SOURCE` feature-test macro added for strict-C11 portability in 197dc2f — no behavioral change).
 
 | Kernel | GiB/s (t3) | Spread | GiB/s (t4) | Spread | t3÷t4 |
 |---|---:|---:|---:|---:|---:|
@@ -61,7 +61,7 @@ Qwen3.5-4B, prefill (seq=64), fp32 baseline, 8-thread (big cluster). Two indepen
 | Gated delta-rule scan | 10.62 | 5.4% | 11.09 | 5.2% | 0.96× |
 | Causal Conv1D | 18.73 | 4.8% | 23.00 | 8.5% | 0.81× |
 
-> t3 manifest git_sha `f015982`, dirty=false; t4 manifest git_sha `1ca4d6d`,
+> t3 manifest git_sha `f015982`, dirty=false; t4 manifest git_sha `7bbbc99`,
 > dirty=false; 30 repeats each. The boards agree within 4–19% (t4 marginally
 > faster), confirming the result is hardware-reproducible. Cumulative decay
 > reaches 66% of the 31.7 GiB/s spec bandwidth; gated scan runs at a lower
