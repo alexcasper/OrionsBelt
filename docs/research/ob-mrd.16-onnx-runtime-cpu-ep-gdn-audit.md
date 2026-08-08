@@ -98,7 +98,7 @@ both ORT and llama.cpp leave: architecture-specific micro-kernels for GDN.
 ## 6. Sources
 
 - ORT 1.28.0 installed via pip on rk3588-t4 (aarch64 manylinux wheel)
-- Probe script: [`scripts/ort_gdn_probe.py`](../scripts/ort_gdn_probe.py)
+- Probe script: [`scripts/ort_gdn_probe.py`](../../scripts/ort_gdn_probe.py)
 - ONNX opset 27 spec: https://github.com/onnx/onnx/blob/main/docs/Operators.md
 - FINDINGS §1-§2a: prior NOE/RKNN ONNX probe work
 - FINDINGS §ob-mrd.9: llama.cpp GDN op audit (companion)
