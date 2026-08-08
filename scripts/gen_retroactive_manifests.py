@@ -5,8 +5,6 @@ Uses an existing t4 retroactive manifest as the device-info template,
 varying only the CSV name and git SHA per file.
 """
 import json
-import sys
-import subprocess
 from datetime import datetime, timezone
 
 TEMPLATE = "results/manifests/rk3588-t4_big_singlethread.json"
@@ -27,6 +25,7 @@ CSV_TO_SHA = {
     "rk3588-t4_prefill_little_naive_m8":    "98629691f15b7c1c6ee928272d4aee62f1778349",
     "rk3588-t4_prefill_little_optimized":   "98629691f15b7c1c6ee928272d4aee62f1778349",
 }
+
 
 def main():
     with open(TEMPLATE) as f:
@@ -53,9 +52,10 @@ def main():
         with open(out_path, "w") as f:
             json.dump(manifest, f, indent=2)
             f.write("\n")
-        print("  wrote {}".format(out_path))
+        print(f"  wrote {out_path}")
 
-    print("\nGenerated {} retroactive manifests".format(len(CSV_TO_SHA)))
+    print(f"\nGenerated {len(CSV_TO_SHA)} retroactive manifests")
+
 
 if __name__ == "__main__":
     main()
