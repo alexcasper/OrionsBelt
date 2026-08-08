@@ -4174,3 +4174,127 @@ for correct big-core provenance.
 > with taskset**, even for micro-benchmarks. Short-running kernels (< 10 µs)
 > are especially vulnerable to scheduler placement on little cores, which
 > can inflate apparent latency by 3–4×.
+
+## 25. Cache-blocked GEMM for prefill (M>1): 49–78× prefill speedup (2026-08-08, ob-8qt.15)
+
+### Motivation
+
+FINDINGS §15 explicitly flagged this as the next high-impact optimization:
+"cache-blocking the matmul for prefill (M>1), where the naive triple loop
+also wastes bandwidth." The decode (M=1) GEMV was already optimized in §15
+(row-sweep + OpenMP, 10–15× speedup), but the M>1 prefill path fell through
+to a naive triple-nested scalar loop with:
+
+- **No NEON** — pure scalar FP multiply-accumulate.
+- **No OpenMP** — single-threaded, wasting 3 of 4 big cores.
+- **Column-major B access** — `B[k*N+j]` strides by N (up to 9216 floats =
+  36 KB) between consecutive K iterations, giving ~0.17% cache-line utilization
+  (same pathology as the old GEMV in §15).
+
+Additionally, the INT8 M>1 path dequantized the **entire weight matrix**
+(K×N floats) before calling the naive loop — a large temporary allocation
+plus a full extra data pass.
+
+### Fix
+
+Added `gemm_neon()` — a cache-blocked GEMM generalising the §15 row-sweep
+pattern to M>1:
+
+- **K-outer, N-inner** loop ordering: each B row accessed sequentially → ~100%
+  cache-line utilization. B elements are reused M times (once per output row),
+  giving higher arithmetic intensity than M=1 GEMV.
+- **OpenMP `parallel for`** over N-tiles (1024-element tiles).
+- **NEON FMA** inner loop (4×float32 per iteration).
+
+For M=1 this is functionally identical to `gemv_neon`. For the INT8 path,
+`gemm_int8_neon()` dequantizes on-the-fly (no full-matrix allocation), with
+NEON int8→float widening.
+
+Also added:
+- `--prefill M` benchmark mode (processes M tokens in one forward pass).
+- `--verify-matmul` correctness check (gemm_neon vs naive, 6 test cases).
+- `--naive` flag (forces old scalar path for A/B comparison).
+
+### Correctness verification
+
+All 6 test cases (varying M, K, N) pass with **zero error** — bit-exact match
+between gemm_neon and matmul_naive.
+
+### Results — RK3588 Cortex-A76 big cluster (cores 4-7, governor=performance)
+
+**Qwen3.5-0.8B — prefill TTFT:**
+
+| M | Old (naive) TTFT | New (gemm) TTFT | Speedup | Old tok/s | New tok/s |
+|---|-----------------:|----------------:|--------:|----------:|----------:|
+| 8 | 31,244 ms | 633 ms | **49.4×** | 0.26 | 12.63 |
+| 16 | >120,000 ms (est) | 1,358 ms | — | — | 11.78 |
+| 32 | >120,000 ms (est) | 2,608 ms | — | — | 12.27 |
+| 64 | >120,000 ms (est) | 5,171 ms | — | — | 12.38 |
+
+The naive version at M≥16 exceeds the 120 s timeout; extrapolating from the
+M=8 ratio, M=64 naive would take ~400+ seconds vs 5.2 seconds optimized.
+
+**Qwen3.5-4B — prefill TTFT (optimized only, naive too slow to measure):**
+
+| M | TTFT (gemm) | tok/s |
+|---|------------:|------:|
+| 8 | 3,166 ms | 2.53 |
+| 16 | 6,214 ms | 2.57 |
+| 32 | 12,511 ms | 2.56 |
+| 64 | 24,808 ms | 2.58 |
+
+### Results — RK3588 Cortex-A55 little cluster (cores 0-3)
+
+**Qwen3.5-0.8B — prefill TTFT:**
+
+| M | Old (naive) TTFT | New (gemm) TTFT | Speedup | Old tok/s | New tok/s |
+|---|-----------------:|----------------:|--------:|----------:|----------:|
+| 8 | 256,131 ms | 3,285 ms | **78.0×** | 0.03 | 2.44 |
+
+The speedup on the A55 is **1.6× larger** than on the A76 (78× vs 49×),
+because the A55 has less cache (256 KB L2 vs 512 KB) and weaker scalar
+throughput, making the naive column-major access pattern proportionally
+more catastrophic.
+
+### Results — INT8 weight-only prefill (0.8B, A76)
+
+| M | Old (dequant+naive) | New (gemm_int8) | Speedup |
+|---|--------------------:|----------------:|--------:|
+| 8 | 23,690 ms | 786 ms | **30.1×** |
+
+Note: INT8 prefill (786 ms) is **slower** than FP32 prefill (633 ms) at M=8
+on A76. This is expected: at M>1 the computation is more compute-bound (B
+elements reused M times → higher arithmetic intensity), so the 4× bandwidth
+reduction from INT8 is outweighed by the dequantization overhead. This
+matches the decode finding (§16: INT8 gives only 1.16–1.77× on A76 decode).
+For prefill, FP32 is preferred; INT8 remains valuable for bandwidth-bound
+decode (M=1).
+
+### Key observations
+
+1. **49× prefill speedup on A76** — even larger than the §15 decode GEMV
+   fix (10–15×), because the naive M>1 path had no NEON at all (the decode
+   M=1 path at least used `gemv_neon` after §15).
+
+2. **Prefill throughput is roughly constant across M** (12.2–12.6 tok/s for
+   0.8B, 2.5–2.6 tok/s for 4B). This confirms the M>1 matmul is **compute-bound**
+   at these batch sizes: B elements are reused M times, giving arithmetic
+   intensity far above the 0.25 FLOP/byte roofline. This is distinct from
+   decode (M=1) which is **bandwidth-bound**.
+
+3. **INT8 is slower than FP32 for prefill** — a key design insight: INT8
+   weight quantization helps bandwidth-bound decode but hurts compute-bound
+   prefill due to dequantization overhead. The optimal dispatch is
+   format-adaptive: INT8 for decode, FP32 for prefill.
+
+4. **A55 penalty amplifies** — the naive→gemm speedup is 78× on A55 vs 49×
+   on A76, confirming the cache pathology scales inversely with cache size.
+
+### Data
+
+CSVs: `results/raw/rk3588-t4_prefill_{big,little}_{optimized,naive_m8}.csv`,
+`results/raw/rk3588-t4_prefill_big_4b_optimized.csv`,
+`results/raw/rk3588-t4_prefill_big_int8_{optimized,naive_m8}.csv`.
+Manifest: `results/manifests/rk3588-t4_prefill_gemm_optimization.json`.
+Governor: performance. Thermals: 39–41 °C (no throttling).
+Device: rk3588-t4 (RK3588, 2nd unit).
