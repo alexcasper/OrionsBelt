@@ -23,7 +23,7 @@ Device            run_id_sha            dirty   CumDecay  Scan    DWConv1D  GDN2
   Jetson j2 (canon) 6ea1771              dirty   1.15   0.73   1.04     —  
   Pi5 r5           28729f3              dirty   3.74   1.20   3.23     —  
   Pi5 j1           f127a11              dirty   2.93   1.84   2.37     —  
-  RK3588 t4 big    28729f3              dirty   22.47  11.09  23.00  6.84 
+  RK3588 t4 big    7bbbc99              CLEAN   22.47  11.09  23.00  6.84 
   RK3588 t3 big    553a96e              CLEAN   23.17  10.33  21.34  9.04 
   RK3588 t4 little 28729f3              dirty   5.87   3.53   5.13   1.52 
   RK3588 t3 little 553a96e              CLEAN   5.56   2.71   5.35   1.24 

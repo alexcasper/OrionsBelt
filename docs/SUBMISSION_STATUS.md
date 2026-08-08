@@ -45,7 +45,7 @@ ADR 0007 — the submission framing is locked to Edge AI.
 | Claim (DEVPOST_SUBMISSION.md) | Source CSV | Match? |
 |---|---|---|
 | Cumulative decay 21.06 GiB/s (t3) | rk3588-t3-clean.csv | ✓ |
-| Cumulative decay 22.47 GiB/s (t4) | rk3588-t4-big.csv | ✓ |
+| Cumulative decay 22.47 GiB/s (t4) | rk3588-t4_big.csv | ✓ |
 | Gated scan 10.62 / 11.09 GiB/s | same CSVs | ✓ |
 | Causal Conv1D 18.73 / 23.00 GiB/s | same CSVs | ✓ |
 | fp16 decay 37.20 GiB/s (1.77×) | rk3588-t3-clean.csv | ✓ |
