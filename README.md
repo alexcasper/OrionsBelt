@@ -178,7 +178,7 @@ All figures above are verified against primary sources (Radxa product page and d
 | Per-layer engine mapping (NPU/GPU/CPU) | Hypothesis only — pending measurements |
 | Full inference results (tokens/sec, TTFT, memory) | Done — C decode loop (FP32+INT8), ctx-length scaling (§17–20), cross-device (A57+A76), sustained-load thermal stability (§18). [e2e comparison](./results/figures/e2e_fleet_comparison.md) |
 
-> **Results so far:** 148 CSVs from the device fleet, 117 provenance manifests, 89 generated figures/tables, 41 FINDINGS sections.
+> **Results so far:** 148 CSVs from the device fleet, 118 provenance manifests, 88 generated figures/tables, 41 FINDINGS sections.
 > (Counted recursively — `results/raw/` and `results/manifests/` include
 > subdirectories `ablation/`, `affinity/`, and `kleidiai/`, which hold real
 > fleet benchmark data, not scratch files. A non-recursive `ls *.csv` count
@@ -187,7 +187,7 @@ All figures above are verified against primary sources (Radxa product page and d
 > ```
 > results/
 >   raw/         <- 148 per-run CSVs across 5 devices (incl. ablation/, affinity/, kleidiai/ subdirs)
->   manifests/   <- 117 provenance manifests (git SHA, governor, thermals)
+>   manifests/   <- 118 provenance manifests (git SHA, governor, thermals)
 >   figures/     <- fleet analysis, comparison table, kernel/memory plots> ```
 >
 > See [`results/README.md`](./results/README.md) for the layout, [`docs/FINDINGS.md`](./docs/FINDINGS.md) for findings, and [`results/figures/fleet_bandwidth_scaling.md`](./results/figures/fleet_bandwidth_scaling.md) for the headline cross-device analysis.
