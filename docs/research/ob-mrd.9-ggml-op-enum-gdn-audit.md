@@ -74,7 +74,7 @@ struct ggml_tensor * ggml_gated_delta_net(
 
 The `K` parameter supports chunkwise processing: `K=1` keeps only the final state;
 `K>1` retains intermediate state snapshots for re-computation. This is the same
-chunkwise-recurrence design the project targets (PLAN.md §3.1).
+chunkwise-recurrence design the project targets (docs/archive/PLAN.md §3.1).
 
 ### 2b. The per-token recurrence (the exact delta rule)
 

@@ -1,7 +1,7 @@
 # Benchmark harness
 
 Measurement apparatus for the project. Built deliberately **hardware-independent**
-(PLAN.md section 1) so it is finished before any board arrives — the moment hardware
+(docs/archive/PLAN.md section 1) so it is finished before any board arrives — the moment hardware
 exists we should be profiling within hours, not still writing a runner.
 
 | File | Purpose | Owning bead |
@@ -13,7 +13,7 @@ exists we should be profiling within hours, not still writing a runner.
 
 ## Two rules that are not negotiable
 
-1. **Every run emits a manifest.** Per PLAN.md section 9, a number without provenance is
+1. **Every run emits a manifest.** Per docs/archive/PLAN.md section 9, a number without provenance is
    not a result. On passively-cooled edge hardware, thermal state alone can move
    throughput enough to invalidate a comparison.
 2. **Memory must be attributed three ways** — weights, full-attention KV cache, and GDN

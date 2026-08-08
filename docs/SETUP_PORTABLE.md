@@ -120,7 +120,7 @@ mkdir -p results/raw results/manifests
 python3 bench/manifest.py > results/manifests/pi5-r5.json
 ```
 
-A number without a manifest is not a result (PLAN.md §9).
+A number without a manifest is not a result (docs/archive/PLAN.md §9).
 
 ### Read thermals after the run
 

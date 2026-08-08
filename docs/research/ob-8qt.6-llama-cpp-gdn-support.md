@@ -171,7 +171,7 @@ forward pass.
 
 So the tooling gap is **specific to accelerator compilers (NOE) and fixed kernel
 libraries (KleidiAI)**, not to CPU inference engines. A CPU-first engine sidesteps
-the entire problem class — which is exactly the design premise of PLAN.md §3.1
+the entire problem class — which is exactly the design premise of docs/archive/PLAN.md §3.1
 ("CPU hosts the GDN recurrence"). llama.cpp is existence proof that the premise is
 sound at the *engine* level, even though it fails at the *accelerator-compiler*
 level.
@@ -244,7 +244,7 @@ Two consequences:
    INT4/i8mm KleidiAI delta-rule matmuls (ADR [0006](../adr/0006-quantization-policy.md)).
    The contribution (three named kernels upstreamable to KleidiAI that exist nowhere
    today for non-SME Armv9.2) is unchanged — llama.cpp is the *baseline to beat*,
-   and the CPU-hosted-recurrence design (PLAN.md §3.1) is now backed by an
+   and the CPU-hosted-recurrence design (docs/archive/PLAN.md §3.1) is now backed by an
    independent engine-level existence proof.
 
 ### For `ob-mrd.2` (disk budget) — NOT moot; the checkpoint is a live target

@@ -2,7 +2,7 @@
 
 **Bead:** `ob-37v` · **Date:** 2026-08-02 · **Source:** HuggingFace `config.json` + transformers `modeling_qwen3_5.py` (main branch, commit retrieved 2026-08-02)
 
-This document confirms the GDN layer structure by reading the actual modeling code, not secondary sources. Every figure below is traceable to either the checkpoint's `config.json` or the `Qwen3_5GatedDeltaNet` class in `transformers`. It supersedes any quoted figure from a survey, paper, or earlier document, per `PLAN.md` §3.
+This document confirms the GDN layer structure by reading the actual modeling code, not secondary sources. Every figure below is traceable to either the checkpoint's `config.json` or the `Qwen3_5GatedDeltaNet` class in `transformers`. It supersedes any quoted figure from a survey, paper, or earlier document, per `docs/archive/PLAN.md` §3.
 
 ---
 
@@ -17,7 +17,7 @@ Both checkpoints use `full_attention_interval: 4` — every 4th layer (0-indexed
 
 The `layer_types` array in `config.json` is an explicit per-layer list, read directly — not inferred from the interval. The full-attention layers are at indices {3, 7, 11, 15, 19, 23, 27, 31} (4B) and {3, 7, 11, 15, 19, 23} (0.8B).
 
-**This is the ground truth** for `PLAN.md` §3.1's "16 engine boundary crossings per token" — 8 full-attention layers alternate with GDN blocks, so a CPU/accelerator split crosses 16 times (8 out, 8 back) per token during decode.
+**This is the ground truth** for `docs/archive/PLAN.md` §3.1's "16 engine boundary crossings per token" — 8 full-attention layers alternate with GDN blocks, so a CPU/accelerator split crosses 16 times (8 out, 8 back) per token during decode.
 
 ---
 
@@ -129,7 +129,7 @@ During prefill, the sequence is split into chunks of `chunk_size=64` tokens:
 2. **Cross-chunk:** sequential scan over chunks, each carrying the recurrent state forward
 3. **Decay:** cumulative sum of `g` within each chunk → exponential decay mask
 
-The chunkwise path processes 64 tokens in parallel within each chunk, then chains chunks sequentially. This is where the `fla` library's optimized `chunk_gated_delta_rule` kernel provides the 1.38–1.49× speedup over the naive path (`PLAN.md` §2.4).
+The chunkwise path processes 64 tokens in parallel within each chunk, then chains chunks sequentially. This is where the `fla` library's optimized `chunk_gated_delta_rule` kernel provides the 1.38–1.49× speedup over the naive path (`docs/archive/PLAN.md` §2.4).
 
 **Chunk size 64** is hardcoded as the default in the torch fallback. The `fla` library kernel may use a different internal chunk size.
 
@@ -215,6 +215,6 @@ The KV cache grows linearly: at 262K context, 4B's 8 full-attn layers hold 8 × 
 ### What this means for the project
 
 1. **The memory claim is structural**, not a tuning parameter — the recurrent state's shape has no sequence dimension by construction.
-2. **The fast-path kernel gap is real** — `fla` and `causal_conv1d` are the optimized implementations; without them, the PyTorch fallback runs, but slower (`PLAN.md` §3 "the kernel gap").
+2. **The fast-path kernel gap is real** — `fla` and `causal_conv1d` are the optimized implementations; without them, the PyTorch fallback runs, but slower (`docs/archive/PLAN.md` §3 "the kernel gap").
 3. **All GDN computation is in fp32** — quantization must keep the recurrent state and accumulation in fp32; only weights and activations can be quantized (per `ob-qpa` quantization policy).
 4. **The delta rule has 5 sequential steps per token** — decay, retrieve, delta, update, output — explaining the latency-bound behavior observed on RK3588 (`FINDINGS.md` §6).

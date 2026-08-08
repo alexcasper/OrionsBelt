@@ -1,7 +1,7 @@
 """Correctness oracle comparison with configurable tolerances (bead ob-3uh).
 
 Provides the tolerance framework for comparing model outputs against a
-golden reference (x86/CUDA inference).  Per PLAN.md §9: *"speed that
+golden reference (x86/CUDA inference).  Per docs/archive/PLAN.md §9: *"speed that
 changes outputs is not speed."*  This module makes that enforceable.
 
 Three comparison modes:

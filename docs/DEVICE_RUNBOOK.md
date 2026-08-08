@@ -89,7 +89,7 @@ sudo bash scripts/o6_system_baseline.sh --json      # machine-readable
 
 Tested on RK3588 (2-cluster), works unchanged on the O6 (3-cluster).
 
-A number without a manifest is not a result (`PLAN.md` §9). If the device has Python 3.10+:
+A number without a manifest is not a result (`docs/archive/PLAN.md` §9). If the device has Python 3.10+:
 
 ```bash
 scp bench/manifest.py <device>:/tmp/
@@ -150,7 +150,7 @@ The discriminating case is that the ordering is inverted:
 **If the Jetson beats the Pi 5 on the scan kernel** despite three ISA generations less capability,
 that is real evidence for bandwidth-boundedness rather than a confirmation-biased result.
 **If the Pi 5 wins comfortably**, the thesis is wrong or incomplete, and we need to know that —
-several downstream decisions (the CPU-first mapping in `PLAN.md` §3.1, deprioritising the bf16
+several downstream decisions (the CPU-first mapping in `docs/archive/PLAN.md` §3.1, deprioritising the bf16
 state variant, prioritising weight quantization) rest on it.
 
 Either outcome is publishable. Report whichever happens.

@@ -1,6 +1,6 @@
 """Run manifest — provenance capture for benchmark runs.
 
-Per PLAN.md section 9: "a number without a manifest is not a result." On a
+Per docs/archive/PLAN.md section 9: "a number without a manifest is not a result." On a
 passively-cooled edge board, thermal state alone can move throughput enough to
 invalidate a comparison, so this module exists to make that state visible and
 recorded rather than assumed. ``docs/RESULTS_SCHEMA.md`` and ``bench/schema.py``
@@ -248,7 +248,7 @@ def _isa_features() -> dict[str, bool] | None:
 def _thermal_zones() -> list[dict[str, Any]] | None:
     """Snapshot of /sys/class/thermal/thermal_zone*/{temp,type} at capture time.
 
-    On a passively-cooled edge board this is the whole point (PLAN.md
+    On a passively-cooled edge board this is the whole point (docs/archive/PLAN.md
     section 9): thermal state alone can move throughput enough to invalidate
     a comparison. temp is left in the raw millidegree-C integer /sys reports
     (not divided down) so this module makes no assumption about a particular
