@@ -4270,6 +4270,25 @@ matches the decode finding (§16: INT8 gives only 1.16–1.77× on A76 decode).
 For prefill, FP32 is preferred; INT8 remains valuable for bandwidth-bound
 decode (M=1).
 
+### Results — Jetson Nano Cortex-A57 (4 cores @ 1479 MHz, governor=performance)
+
+**Qwen3.5-0.8B (FP32, 24 layers, hidden=1024):**
+
+| Prefill len | Optimized TTFT | Naive TTFT | Speedup | Optimized tok/s |
+|------------:|---------------:|-----------:|--------:|----------------:|
+| 16          | 3.386 s        | 203.981 s  | **60.2×** | 4.73 |
+| 32          | 6.885 s        | 415.331 s  | **60.3×** | 4.65 |
+| 64          | 14.451 s       | 818.390 s  | **56.6×** | 4.43 |
+
+**Qwen3.5-4B (FP32, 32 layers, hidden=2560, optimized only):**
+
+| Prefill len | Optimized TTFT | Optimized tok/s |
+|------------:|---------------:|----------------:|
+| 16          | 27.985 s       | 0.57            |
+| 32          | 60.704 s       | 0.53            |
+
+A57 speedup (57–60×) falls between the A76 (49×) and A55 (78×) results, consistent with the A57's cache size (512 KB L2, same as A76) but narrower 2-wide pipeline (closer to A55). Manifest: `results/manifests/jetson-j1_prefill_a57.json`. Data: `results/raw/jetson-j1_prefill_a57.csv`.
+
 ### Key observations
 
 1. **49× prefill speedup on A76** — even larger than the §15 decode GEMV
@@ -4287,8 +4306,10 @@ decode (M=1).
    prefill due to dequantization overhead. The optimal dispatch is
    format-adaptive: INT8 for decode, FP32 for prefill.
 
-4. **A55 penalty amplifies** — the naive→gemm speedup is 78× on A55 vs 49×
-   on A76, confirming the cache pathology scales inversely with cache size.
+4. **Core-class scaling** — the naive→gemm speedup is 78× on A55, 57–60× on
+   A57, and 49× on A76, confirming the cache pathology scales inversely with
+   cache size and pipeline width. The A57 falls between A55 and A76, consistent
+   with its 512 KB L2 (same as A76) but 2-wide pipeline (closer to A55).
 
 ### Data
 
