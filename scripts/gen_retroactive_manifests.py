@@ -11,19 +11,19 @@ TEMPLATE = "results/manifests/rk3588-t4_big_singlethread.json"
 
 # (csv_name, first_commit_sha) pairs
 CSV_TO_SHA = {
-    "rk3588-t4_a55_fp32":                   "80f61bf168f86318295aa2f16a4899a6308fb612",
-    "rk3588-t4_a55_int4":                   "80f61bf168f86318295aa2f16a4899a6308fb612",
-    "rk3588-t4_a55_int8":                   "80f61bf168f86318295aa2f16a4899a6308fb612",
-    "rk3588-t4_a76_fp32":                   "80f61bf168f86318295aa2f16a4899a6308fb612",
-    "rk3588-t4_a76_int4":                   "80f61bf168f86318295aa2f16a4899a6308fb612",
-    "rk3588-t4_a76_int8":                   "80f61bf168f86318295aa2f16a4899a6308fb612",
-    "rk3588-t4_prefill_big_4b_optimized":   "98629691f15b7c1c6ee928272d4aee62f1778349",
-    "rk3588-t4_prefill_big_int8_naive_m8":  "98629691f15b7c1c6ee928272d4aee62f1778349",
+    "rk3588-t4_a55_fp32": "80f61bf168f86318295aa2f16a4899a6308fb612",
+    "rk3588-t4_a55_int4": "80f61bf168f86318295aa2f16a4899a6308fb612",
+    "rk3588-t4_a55_int8": "80f61bf168f86318295aa2f16a4899a6308fb612",
+    "rk3588-t4_a76_fp32": "80f61bf168f86318295aa2f16a4899a6308fb612",
+    "rk3588-t4_a76_int4": "80f61bf168f86318295aa2f16a4899a6308fb612",
+    "rk3588-t4_a76_int8": "80f61bf168f86318295aa2f16a4899a6308fb612",
+    "rk3588-t4_prefill_big_4b_optimized": "98629691f15b7c1c6ee928272d4aee62f1778349",
+    "rk3588-t4_prefill_big_int8_naive_m8": "98629691f15b7c1c6ee928272d4aee62f1778349",
     "rk3588-t4_prefill_big_int8_optimized": "98629691f15b7c1c6ee928272d4aee62f1778349",
-    "rk3588-t4_prefill_big_naive_m8":       "98629691f15b7c1c6ee928272d4aee62f1778349",
-    "rk3588-t4_prefill_big_optimized":      "98629691f15b7c1c6ee928272d4aee62f1778349",
-    "rk3588-t4_prefill_little_naive_m8":    "98629691f15b7c1c6ee928272d4aee62f1778349",
-    "rk3588-t4_prefill_little_optimized":   "98629691f15b7c1c6ee928272d4aee62f1778349",
+    "rk3588-t4_prefill_big_naive_m8": "98629691f15b7c1c6ee928272d4aee62f1778349",
+    "rk3588-t4_prefill_big_optimized": "98629691f15b7c1c6ee928272d4aee62f1778349",
+    "rk3588-t4_prefill_little_naive_m8": "98629691f15b7c1c6ee928272d4aee62f1778349",
+    "rk3588-t4_prefill_little_optimized": "98629691f15b7c1c6ee928272d4aee62f1778349",
 }
 
 
