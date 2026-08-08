@@ -8,7 +8,7 @@ one decode-path GEMV — to KleidiAI. None of these operations have an equivalen
 in the current KleidiAI library.
 
 **Origin:** These kernels were written, verified, and profiled in the
-[OrionsBelt](https://github.com/gastownhall/OrionsBelt) project
+[OrionsBelt](https://github.com/alexcasper/OrionsBelt) project
 (`src/orionsbelt/engines/cpu/kernels/gdn_sve.c`,
 `gdn_delta_matmul.c`). The implementations here are extracted and reformatted as
 standalone KleidiAI micro-kernels, preserving the verified arithmetic while
