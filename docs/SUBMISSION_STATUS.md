@@ -1,6 +1,6 @@
 # Pre-T-4 Submission Status Brief
 
-_Generated 2026-08-07 by t4. Supports the T-4 descope decision (Aug 10)._
+_Generated 2026-08-07 by t4. Updated 2026-08-08 by j1 to reflect ADR 0007 (Edge AI committed)._
 _All numbers below are validated against committed CSVs with manifests._
 
 ---
@@ -9,9 +9,11 @@ _All numbers below are validated against committed CSVs with manifests._
 
 The Edge AI submission is **ready today**. Every claim in
 `DEVPOST_SUBMISSION.md` traces to a manifest-backed CSV. The O6 board
-has not arrived; per ADR 0004, the usefulness cutoff is **2026-08-08**
-(tomorrow). T-4 fires **2026-08-10** if no board — at which point
-on-device NPU execution is cut and the submission locks to Edge AI.
+has not arrived; per [ADR 0007](adr/0007-commit-to-edge-ai-track.md),
+the project committed to the Edge AI track effective **2026-08-06**.
+The Aug 8 last-useful-arrival cutoff (ADR 0004) has now passed with no
+board. T-4 (Aug 10) and T-3 (Aug 11) triggers are pre-committed per
+ADR 0007 — the submission framing is locked to Edge AI.
 
 ---
 
@@ -69,8 +71,8 @@ All manifests: dirty=false, governor=performance, 30 repeats (kernel) /
 | Master comparison table (O6 row) | ob-ami | ob-rqd (ablation matrix) |
 | Demo video | ob-jui | Hardware |
 
-**None of these block the Edge AI submission.** All are additive if the
-board arrives before Aug 8–10.
+**None of these block the Edge AI submission.** The Aug 8 last-useful-arrival
+cutoff has passed with no board; any future arrival is additive bonus per ADR 0007.
 
 ---
 
@@ -78,34 +80,34 @@ board arrives before Aug 8–10.
 
 | Date | Trigger | Status | Action if fires |
 |---|---|---|---|
-| **Aug 8** (tomorrow) | Last useful board arrival | Board not in hand | Submission plan locks to Edge AI |
-| **Aug 10** (T-4) | No board by this date | **Likely fires** | Cut on-device NPU execution; keep NOE audit + CPU+GPU design |
-| **Aug 11** (T-3) | No board booted | **Likely fires** | Cut Physical AI framing entirely; Edge AI locked |
+| **Aug 8** | Last useful board arrival | **FIRED** — board not arrived; Edge AI committed (ADR 0007) | Submission locked to Edge AI |
+| **Aug 10** (T-4) | No board by this date | Pre-committed (ADR 0007) | Cut on-device NPU execution; keep NOE audit + CPU+GPU design |
+| **Aug 11** (T-3) | No board booted | Pre-committed (ADR 0007) | Physical AI framing already cut; Edge AI locked |
 | **Aug 12** (T-2) | Insufficient slack for GDN-2 swap | Check schedule | Cut layer swap; keep microbenchmark |
 | **Aug 13** (T-1) | Time running out | — | Cut demo video + 262K point if needed |
 | **Aug 14 16:00 PT** | Deadline | — | Submit |
 
 ---
 
-## 5. Open PRs (all unit-consistency fixes, non-blocking)
+## 5. PRs (all merged)
 
-| PR | Author | Scope | Review status |
+| PR | Author | Scope | Status |
 |---|---|---|---|
-| #103 | t4 (mine) | O6 baseline script + onboarding docs | Reviewed by t4, mergeable |
-| #104 | t3 | GB/s→GiB/s in human-authored docs (7 files) | Cross-validated by t4, conversions verified |
-| #102 | j1 | GB/s→GiB/s in generated tables (32 files) + KleidiAI README | Cross-validated by t4, recalculation verified |
-
-All three touch only `.beads/issues.jsonl` in common (trivially resolved
-via `bd export`). No code conflicts.
+| #103 | t4 | O6 baseline script + onboarding docs | MERGED |
+| #104 | t3 | GB/s→GiB/s in human-authored docs (7 files) | MERGED |
+| #102 | j1 | GB/s→GiB/s in generated tables (32 files) + KleidiAI README | MERGED |
+| #127 | j1 | KleidiAI README URL fix, pyproject.toml Edge AI framing, Devpost writeup | MERGED |
+| #128 | j1 | Stale "Physical AI" + bare PLAN.md refs (31+ files) | MERGED |
 
 ---
 
-## 6. Recommended framing for T-4
+## 6. Framing status
 
-If the board has not arrived by Aug 10, **let T-4 fire without
-controversy**. The submission already clears docs/archive/PLAN.md §8's minimum-viable
-bar with real measured numbers — not the "credible plan" ADR 0004
-described on Aug 2 when zero benchmark numbers existed.
+ADR 0007 committed to the Edge AI track on **2026-08-06**, so the T-4/T-3
+descope triggers fire as a formality — the submission is already locked
+to Edge AI. The submission clears docs/archive/PLAN.md §8's
+minimum-viable bar with real measured numbers — not the "credible plan"
+ADR 0004 described on Aug 2 when zero benchmark numbers existed.
 
 The Edge AI submission's strengths:
 - **Novel kernels** that no existing library provides for Arm
@@ -121,12 +123,12 @@ arrival can produce numbers within hours, not days.
 
 ---
 
-## 7. After T-4: what t4 does next
+## 7. Current next steps
 
 1. If board arrives (any time): execute `docs/O6_ONBOARDING.md` →
    `scripts/o6_system_baseline.sh` → kernel benchmark → e2e decode.
-2. If T-4 fires with no board: file the T-4 follow-up bead per ADR 0004,
-   continue the Phase 2 loop (`bd ready`), and focus on submission polish
-   (consistency pass, final numbers check, any remaining doc gaps).
-3. On T-3 (Aug 11): file the T-3 follow-up bead, confirm Edge AI framing
-   in DEVPOST_SUBMISSION.md, and prepare for submission.
+   Append as additive datapoint per ADR 0007 (do not restructure).
+2. **Submission polish**: final consistency pass, numbers verification,
+   any remaining doc gaps. Maintainer actions: make repo public, verify
+   license in About section, select Edge AI on Devpost form.
+3. On Aug 14 16:00 PT: submit on Devpost.

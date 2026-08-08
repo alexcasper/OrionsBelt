@@ -20,7 +20,7 @@ constant — in which case it is fully unrolled and no loop survives into the IR
 count is a runtime input is rejected.
 
 This was measured, not assumed, and it is the empirical basis for the layer-to-engine mapping in
-[`docs/archive/PLAN.md`](./archive/docs/archive/PLAN.md) §3.1: **CPU hosts the GDN recurrence; accelerators take the dense math.**
+[`docs/archive/PLAN.md`](./archive/PLAN.md) §3.1: **CPU hosts the GDN recurrence; accelerators take the dense math.**
 
 ### Method
 
