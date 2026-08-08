@@ -1,0 +1,24 @@
+{
+    "manifest_version": 1,
+    "run_id": "j1_20260808T071941Z_c643e34",
+    "timestamp_utc": "2026-08-08T07:19:41Z",
+    "source": "scripts/capture_manifest.sh",
+    "git": {
+        "sha": "c643e34255c66b8d8a3461d4140021fb134d1562",
+        "dirty": true
+    },
+    "description": "Per-matmul quantization accuracy validation: FP32 vs Q8_0/INT8/INT4 at real model shapes",
+    "csv": "results/raw/jetson-j1_quant_accuracy_08b_4b.csv",
+    "method": "--verify-quant mode: random FP32 weights (fixed seed), FP32 GEMV reference, quantized GEMV comparison",
+    "models": ["Qwen3.5-0.8B", "Qwen3.5-4B"],
+    "variants": ["Q8_0", "INT8", "INT4"],
+    "matrices_per_model": 11,
+    "host": {
+        "hostname": "j1",
+        "machine": "aarch64",
+        "kernel": "4.9.337-tegra",
+        "cpu_model": "ARMv8 Processor rev 1 (v8l)",
+        "core_count": 4,
+        "governor": "performance"
+    }
+}

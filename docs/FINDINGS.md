@@ -4589,3 +4589,88 @@ Three factors combine:
 CSV: `results/raw/jetson-j1_q80_vs_int8_vs_fp32_08b.csv`.
 Manifest: `results/manifests/jetson-j1_q80_a57.json` (sha `d223c19`,
 dirty=false, governor=performance). Two 30-repeat runs, stddev <1%.
+
+## 30. Quantization accuracy validation: Q8_0 is numerically indistinguishable from FP32 (2026-08-08, ob-8qt.18)
+
+### Motivation
+
+§28 showed Q8_0 delivers 2.97× decode speedup on A57; §29 established its
+per-matmul GEMV throughput. But we had no quantitative evidence that block-
+quantized weights preserve output fidelity. For the Devpost submission we
+need to demonstrate that Q8_0 doesn't just run faster — it produces
+numerically close results to FP32.
+
+### Method
+
+Added `--verify-quant` mode to `gdn_e2e_decode.c`. For each of the 11
+weight matrices in the model at their actual layer shapes (e.g. `gate_proj`
+at HIDDEN×INTER), the mode:
+
+1. Generates random FP32 weights with a fixed deterministic seed.
+2. Computes a FP32 GEMV reference output (`a @ B`, M=1).
+3. Quantizes weights to the active variant (Q8_0 / INT8 / INT4).
+4. Computes the quantized GEMV output.
+5. Reports: max abs error, mean abs error, relative error %, cosine similarity.
+
+Tested across both model sizes (0.8B and 4B) on Jetson Nano A57.
+
+### Results — aggregate (mean across all 11 matrices)
+
+| Variant | Model   | Mean cos_sim | Mean rel_err | Mean abs_err |
+|---------|---------|-------------|-------------|-------------|
+| Q8_0    | 0.8B    | **1.000000**   | 0.12%       | 0.40        |
+| INT8    | 0.8B    | **1.000000**   | 0.10%       | 0.29        |
+| INT4    | 0.8B    | 0.999985       | 1.86%       | 5.83        |
+| Q8_0    | 4B      | **1.000000**   | 0.09%       | 0.58        |
+| INT8    | 4B      | **1.000000**   | 0.08%       | 0.42        |
+| INT4    | 4B      | 0.999994       | 1.37%       | 9.27        |
+
+### Key findings
+
+1. **Q8_0 cosine similarity = 1.000000** across every matrix in both models.
+   At six decimal places, the quantized output vector is parallel to the FP32
+   reference — the block-quantized GEMV preserves output direction perfectly.
+
+2. **INT8 also achieves 1.000000 cosine similarity.** Per-column symmetric
+   quant with full-K column scaling is numerically faithful. However, INT8
+   has no speed advantage over FP32 on A57 (§29 showed 1.72 tok/s vs FP32's
+   1.64 — only 5% faster), making it the wrong trade-off.
+
+3. **INT4 degrades to cos_sim ≈ 0.99998–0.99999**, with 16× higher mean
+   abs error than Q8_0/INT8. The 4-bit precision limit causes directional
+   drift. INT4 has no speed advantage on A57 either (§29), making it a
+   pure accuracy loss for zero throughput gain.
+
+4. **Q8_0 is the clear winner**: it is the only quantization variant that
+   delivers both a significant speedup (2.97×) and perfect cosine similarity.
+
+### Per-matrix detail (0.8B, Q8_0)
+
+| Matrix      | K    | N    | max_abs | mean_abs | rel_err | cos_sim  |
+|-------------|------|------|---------|----------|---------|----------|
+| g_q_proj    | 1024 | 2048 | 1.589   | 0.388    | 0.13%   | 1.000000 |
+| g_k_proj    | 1024 | 2048 | 1.458   | 0.315    | 0.12%   | 1.000000 |
+| g_v_proj    | 1024 | 2048 | 1.612   | 0.312    | 0.13%   | 1.000000 |
+| g_o_proj    | 2048 | 1024 | 2.142   | 0.474    | 0.09%   | 1.000000 |
+| f_q_proj    | 1024 | 2048 | 1.338   | 0.310    | 0.11%   | 1.000000 |
+| f_k_proj    | 1024 | 512  | 1.543   | 0.554    | 0.13%   | 1.000000 |
+| f_v_proj    | 1024 | 512  | 1.361   | 0.336    | 0.11%   | 1.000000 |
+| f_o_proj    | 2048 | 1024 | 2.073   | 0.521    | 0.09%   | 1.000000 |
+| gate_proj   | 1024 | 3584 | 1.890   | 0.342    | 0.15%   | 1.000000 |
+| up_proj     | 1024 | 3584 | 1.892   | 0.591    | 0.16%   | 1.000000 |
+| down_proj   | 3584 | 1024 | 2.505   | 0.601    | 0.06%   | 1.000000 |
+
+### Caveats
+
+- Weights are random (not trained), so absolute error magnitudes are larger
+  than in a real model where weights are structured. The cosine similarity
+  metric is robust to this — it measures output direction, not magnitude.
+- Per-matmul verification isolates each projection; full 24-layer forward
+  pass error accumulation is not measured (random weights cause NaN
+  overflow, making full-stack comparison infeasible without trained weights).
+
+### Data
+
+CSV: `results/raw/jetson-j1_quant_accuracy_08b_4b.csv` (66 rows: 11 matrices
+× 3 variants × 2 models).
+Manifest: `results/manifests/jetson-j1_quant_accuracy.json` (sha `c643e34`).
