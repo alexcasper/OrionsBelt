@@ -4791,7 +4791,7 @@ Three replicate runs; max Δ = 2.1% (ctx=1).
    The A57 lacks INT4 dot-product instructions, so each 4-bit weight requires
    multiple instructions to convert to a usable value.
 
-2. **INT4 GDN layer cost (195 µs) exceeds FP32 GDN cost (170 µs) at ctx=1**
+2. **INT4 GDN layer cost (195 ms) exceeds FP32 GDN cost (170 ms) at ctx=1**
    — the dequant overhead applies to every weight access in the GEMV, making
    the GDN recurrence slower, not faster.
 
