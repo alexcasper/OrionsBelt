@@ -4716,9 +4716,9 @@ the 1.68× noise ceiling from §ob-bf7).
    is because Q8_0 accelerates the constant parts (FFN + GDN) so much that the
    relative attention bottleneck is exposed later.
 
-2. **Q8_0 GDN layer cost is nearly flat**: 72–80 µs per token, aggregated
-   across all 18 GDN layers, across all context lengths (vs FP32 167–237 µs,
-   INT8 126–130 µs). The ±10% variance is thermal jitter, not an algorithmic
+2. **Q8_0 GDN layer cost is nearly flat**: 73–80 ms per token, aggregated
+   across all 18 GDN layers, across all context lengths (vs FP32 167–237 ms,
+   INT8 126–130 ms). The ±10% variance is thermal jitter, not an algorithmic
    trend.
 
 3. **Attention share of Q8_0 decode time reaches 60.3% at ctx=4096** — the
