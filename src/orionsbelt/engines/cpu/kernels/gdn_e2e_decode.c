@@ -681,15 +681,19 @@ static void gemv_int4_neon(const float *a, const int8_t *Bq4, const float *Bs,
 #ifdef __ARM_NEON
             float32x4_t akv = vdupq_n_f32(ak);
             uint8x8_t  mask4 = vdup_n_u8(0x0F);
-            int8x8_t   sign_adj = vdup_n_s8(0);
             /* Process 16 columns per iteration (8 packed bytes) */
             for (; j + 16 <= tn; j += 16) {
                 uint8x8_t pk = vld1_u8(Br + j/2);
-                /* Unpack: low nibbles (even cols) and high nibbles (odd cols) */
+                /* Unpack: low nibbles (odd cols) and high nibbles (even cols) */
                 uint8x8_t lo = vand_u8(pk, mask4);
                 uint8x8_t hi = vshr_n_u8(pk, 4);
-                /* Interleave: lo[0],hi[0],lo[1],hi[1],... → 16 values */
-                uint8x8x2_t zi = vzip_u8(lo, hi);
+                /* Packing convention (quantize_weight_int4): byte i holds
+                 * column 2*i in the HIGH nibble and column 2*i+1 in the LOW
+                 * nibble. So the interleaved column order is hi[0],lo[0],
+                 * hi[1],lo[1],... — vzip_u8(hi, lo), not (lo, hi). Getting
+                 * this backwards silently swaps every even/odd column pair
+                 * (caught by comparing against the scalar reference path). */
+                uint8x8x2_t zi = vzip_u8(hi, lo);
                 /* Sign-extend from unsigned 4-bit to signed 8-bit */
                 int8x8_t v0 = vreinterpret_s8_u8(zi.val[0]);
                 int8x8_t v1 = vreinterpret_s8_u8(zi.val[1]);

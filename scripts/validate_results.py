@@ -197,6 +197,28 @@ PREFILL_GEMM_COLS = [
     "ffn_us",
 ]
 
+# A/B prefill benchmark with a manual --naive/--optimized variant column
+# (ob-8qt.15, jetson-j1_prefill_a57.csv style — distinct from PREFILL_GEMM_COLS'
+# --prefill --csv machine format above).
+PREFILL_AB_COLS = [
+    "model",
+    "variant",
+    "prefill_len",
+    "ttft_s",
+    "prefill_tps",
+    "p50_us",
+]
+
+# INT4 vs INT8 vs FP32 decode comparison (ob-8qt.16, FINDINGS §26).
+QUANT_COMPARISON_COLS = [
+    "model",
+    "variant",
+    "tok_per_sec",
+    "ttft_ms",
+    "ffn_pct",
+    "gdn_proj_pct",
+]
+
 # Device spec bandwidth (GiB/s) for sanity-check upper bounds.
 # Vendor datasheets quote GB/s; converted to GiB/s for unit-consistency
 # with the bench binary (÷2^30).  See ADR 0005 for GB/s originals.
@@ -212,7 +234,7 @@ ABSURD_THROUGHPUT = 200.0  # GiB/s
 
 
 def detect_csv_type(header):
-    """Return CSV type: standard, sustained, power, layer_profile, delta_matmul, e2e_decode, ctx_sweep, e2e_sweep, e2e_ctxsweep, gpu_micro, kleidiai_matmul, kleidiai_gdn, prefill_gemm, or None."""
+    """Return CSV type: standard, sustained, power, layer_profile, delta_matmul, e2e_decode, ctx_sweep, e2e_sweep, e2e_ctxsweep, gpu_micro, kleidiai_matmul, kleidiai_gdn, prefill_gemm, prefill_ab, quant_comparison, or None."""
     cols = set(header)
     if cols >= set(STANDARD_COLS):
         return "standard"
@@ -240,6 +262,10 @@ def detect_csv_type(header):
         return "kleidiai_gdn_kernel"
     if cols >= {"prefill_M", "ttft_ms", "tok_per_sec_prefill"}:
         return "prefill_gemm"
+    if cols >= {"variant", "prefill_len", "ttft_s", "prefill_tps"}:
+        return "prefill_ab"
+    if cols >= {"variant", "tok_per_sec", "ffn_pct", "gdn_proj_pct"}:
+        return "quant_comparison"
     return None
 
 
@@ -270,6 +296,10 @@ def expected_columns(csv_type):
         return KLEIDIAI_GDN_KERNEL_COLS
     if csv_type == "prefill_gemm":
         return PREFILL_GEMM_COLS
+    if csv_type == "prefill_ab":
+        return PREFILL_AB_COLS
+    if csv_type == "quant_comparison":
+        return QUANT_COMPARISON_COLS
     return []
 
 
@@ -801,6 +831,24 @@ def validate_csv(path, csv_name, issues):
                         if tps <= 0 or tps > 1000:
                             issues.append(
                                 Issue("WARNING", csv_name, f"row {i}: implausible prefill tok/s {tps}")
+                            )
+                    except ValueError:
+                        pass
+                elif csv_type == "prefill_ab":
+                    try:
+                        tps = float(row.get("prefill_tps", 0))
+                        if tps <= 0 or tps > 1000:
+                            issues.append(
+                                Issue("WARNING", csv_name, f"row {i}: implausible prefill tok/s {tps}")
+                            )
+                    except ValueError:
+                        pass
+                elif csv_type == "quant_comparison":
+                    try:
+                        tps = float(row.get("tok_per_sec", 0))
+                        if tps <= 0 or tps > 1000:
+                            issues.append(
+                                Issue("WARNING", csv_name, f"row {i}: implausible tok/s {tps}")
                             )
                     except ValueError:
                         pass
