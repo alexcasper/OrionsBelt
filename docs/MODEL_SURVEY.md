@@ -3,7 +3,7 @@
 Bead `ob-7fv` (child of `ob-xh3`, blocks `ob-eae`). Hardware-independent — every figure below is
 derived from HuggingFace Hub API responses, raw `config.json` / `LICENSE` files fetched directly
 from the `Qwen` org, and the [transformers `Qwen3.5` docs](https://huggingface.co/docs/transformers/model_doc/qwen3_5).
-This file does not contradict [`docs/archive/PLAN.md`](./archive/docs/archive/PLAN.md) or [`CLAIM_VERIFICATION.md`](./CLAIM_VERIFICATION.md);
+This file does not contradict [`docs/archive/PLAN.md`](./archive/PLAN.md) or [`CLAIM_VERIFICATION.md`](./CLAIM_VERIFICATION.md);
 it adds per-checkpoint detail underneath their verified facts. Surveyed 2026-08-02.
 
 **Scope note:** the family also ships 27B / 35B‑A3B / 122B‑A10B(-FP8) MoE and dense checkpoints
@@ -292,4 +292,4 @@ narrative clarity, not by squeezing under a memory ceiling.
 - [Qwen3.5 — transformers docs](https://huggingface.co/docs/transformers/model_doc/qwen3_5) (`Qwen3_5TextConfig`, `Qwen3_5Config`, `Qwen3_5ForCausalLM` vs `Qwen3_5ForConditionalGeneration`)
 - HuggingFace Hub API, `GET /api/models/<repo>` (`safetensors` dtype/parameter totals, `siblings` file listings) — queried directly for all eight repos above
 - Raw `model.safetensors(.index).json` headers, fetched via HTTP range request — used to compute the `language_model` / `visual` / `mtp` parameter split in §4
-- [`docs/archive/PLAN.md`](./archive/docs/archive/PLAN.md) and [`CLAIM_VERIFICATION.md`](./CLAIM_VERIFICATION.md) (ground truth this survey does not contradict)
+- [`docs/archive/PLAN.md`](./archive/PLAN.md) and [`CLAIM_VERIFICATION.md`](./CLAIM_VERIFICATION.md) (ground truth this survey does not contradict)
