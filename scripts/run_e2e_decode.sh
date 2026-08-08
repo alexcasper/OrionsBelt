@@ -54,7 +54,7 @@ while [[ $# -gt 0 ]]; do
         --runs)    RUNS="$2"; shift 2 ;;
         --binary)  BINARY="$2"; shift 2 ;;
         --model)   MODEL="$2"; shift 2 ;;   # 4b (default) or 08b
-        --quant)   QUANT="$2"; shift 2 ;;   # fp32 (default) or int8
+        --quant)   QUANT="$2"; shift 2 ;;   # fp32 (default), int8, or q8_0
         --kv-quant) KV_QUANT="$2"; shift 2 ;; # fp32 (default) or int8 (KV cache)
         --force)   FORCE=1; shift ;;
         --rebuild) REBUILD=1; shift ;;
@@ -71,7 +71,8 @@ esac
 case "$QUANT" in
     fp32) QUANT_DEF="" ;;
     int8) QUANT_DEF="-DINT8_WEIGHTS" ;;
-    *) echo "Unknown --quant: $QUANT (expected fp32 or int8)" >&2; exit 1 ;;
+    q8_0) QUANT_DEF="-DQ80_WEIGHTS" ;;
+    *) echo "Unknown --quant: $QUANT (expected fp32, int8, or q8_0)" >&2; exit 1 ;;
 esac
 case "$KV_QUANT" in
     fp32) KV_DEF="" ;;
@@ -86,6 +87,9 @@ if [ -z "$BINARY" ]; then
     fi
     if [ "$QUANT" = "int8" ]; then
         BINARY="${BINARY}_int8"
+    fi
+    if [ "$QUANT" = "q8_0" ]; then
+        BINARY="${BINARY}_q80"
     fi
     if [ "$KV_QUANT" = "int8" ]; then
         BINARY="${BINARY}_kvint8"
@@ -138,6 +142,9 @@ if [ "$CLUSTER" != "all" ]; then
 fi
 if [ "$QUANT" = "int8" ]; then
     DEVICE_NAME="${DEVICE_NAME}_int8"
+fi
+if [ "$QUANT" = "q8_0" ]; then
+    DEVICE_NAME="${DEVICE_NAME}_q80"
 fi
 
 echo "  Device:  $DEVICE_NAME"

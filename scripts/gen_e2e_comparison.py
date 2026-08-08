@@ -399,6 +399,45 @@ def generate_table(data, base_commit=None, commit_info=None):
 
         lines.append("")
 
+        lines.append("")
+
+    # Q8_0 vs FP32 speedup (if both exist for same device/model)
+    q80_entries = {k: v for k, v in data.items() if k[2] == "q8_0"}
+    if q80_entries:
+        lines.append("## Q8_0 vs FP32 Speedup")
+        lines.append("")
+        lines.append("| Device | Model | FP32 tok/s | Q8_0 tok/s | Speedup |")
+        lines.append("|--------|-------|-----------:|-----------:|--------:|")
+
+        for (device, model, _), q_entry in sorted(q80_entries.items()):
+            norm_device = device.replace("_q80", "")
+            fp32_key = (norm_device, model)
+            if fp32_key in fp32_map:
+                f_entry = fp32_map[fp32_key]
+                fp32_tok = (
+                    sum(f_entry["tok_per_sec"]) / len(f_entry["tok_per_sec"])
+                    if f_entry["tok_per_sec"]
+                    else 0
+                )
+                q80_tok = (
+                    sum(q_entry["tok_per_sec"]) / len(q_entry["tok_per_sec"])
+                    if q_entry["tok_per_sec"]
+                    else 0
+                )
+                speedup = q80_tok / fp32_tok if fp32_tok > 0 else 0
+                lines.append(
+                    f"| {device} | {model} | {fp32_tok:.2f} | {q80_tok:.2f} | **{speedup:.2f}×** |"
+                )
+            else:
+                q80_tok = (
+                    sum(q_entry["tok_per_sec"]) / len(q_entry["tok_per_sec"])
+                    if q_entry["tok_per_sec"]
+                    else 0
+                )
+                lines.append(f"| {device} | {model} | — | {q80_tok:.2f} | — |")
+
+        lines.append("")
+
     lines.append("## Data Sources")
     lines.append("")
     for f in sorted(RAW_DIR.glob("*_e2e_schema.csv")):

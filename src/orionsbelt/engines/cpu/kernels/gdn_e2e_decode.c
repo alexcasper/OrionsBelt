@@ -1577,6 +1577,7 @@ int main(int argc, char **argv) {
     int prefill_M = 0;
     int verify_matmul = 0;
     int verify_int4 = 0;
+    int verify_quant = 0;
     int use_naive = 0;
     const char *ctx_lens_str = NULL;
     for (int i = 1; i < argc; ++i) {
@@ -1597,6 +1598,8 @@ int main(int argc, char **argv) {
             verify_matmul = 1;
         else if (strcmp(argv[i], "--verify-int4") == 0)
             verify_int4 = 1;
+        else if (strcmp(argv[i], "--verify-quant") == 0)
+            verify_quant = 1;
         else if (strcmp(argv[i], "--naive") == 0)
             use_naive = 1;
         else if (strcmp(argv[i], "--help") == 0) {
@@ -1610,6 +1613,9 @@ int main(int argc, char **argv) {
             printf("  --verify-matmul   Verify gemm_neon correctness vs naive matmul, then exit\n");
 #ifdef INT4_WEIGHTS
             printf("  --verify-int4     Verify INT4 GEMV accuracy vs FP32 oracle, then exit\n");
+#endif
+#if defined(Q80_WEIGHTS) || defined(INT8_WEIGHTS) || defined(INT4_WEIGHTS)
+            printf("  --verify-quant    Verify quantized GEMV accuracy vs FP32 at real model shapes, then exit\n");
 #endif
             printf("  --naive           Force naive scalar matmul for M>1 (A/B comparison)\n");
             return 0;
@@ -1751,6 +1757,111 @@ int main(int argc, char **argv) {
         printf("\n%s: %d/%d passed (SNR > 20 dB threshold)\n",
                failures ? "FAILED" : "ALL PASS", n_tests - failures, n_tests);
         return failures ? 1 : 0;
+    }
+#endif
+
+    /* ---- --verify-quant: quantized GEMV accuracy vs FP32 at real model shapes (ob-8qt.18) ----
+     *
+     * For each of the 11 weight matrices in the model at their actual shapes,
+     * generates random FP32 weights with a fixed seed, computes the FP32 GEMV
+     * reference output, then quantizes and computes the quantized GEMV output.
+     * Reports max_abs, mean_abs, rel_err, and cosine similarity.
+     * Outputs CSV rows for fleet comparison.
+     * Available under Q80_WEIGHTS, INT8_WEIGHTS, or INT4_WEIGHTS. */
+#if defined(Q80_WEIGHTS) || defined(INT8_WEIGHTS) || defined(INT4_WEIGHTS)
+    if (verify_quant) {
+        struct { size_t K, N; const char *name; } tests[] = {
+            { HIDDEN, KEY_DIM,                     "g_q_proj" },
+            { HIDDEN, KEY_DIM,                     "g_k_proj" },
+            { HIDDEN, VALUE_DIM,                   "g_v_proj" },
+            { VALUE_DIM, HIDDEN,                   "g_o_proj" },
+            { HIDDEN, FULL_HEADS * FULL_HEAD_DIM,  "f_q_proj" },
+            { HIDDEN, FULL_KV_HEADS * FULL_HEAD_DIM, "f_k_proj" },
+            { HIDDEN, FULL_KV_HEADS * FULL_HEAD_DIM, "f_v_proj" },
+            { FULL_HEADS * FULL_HEAD_DIM, HIDDEN,  "f_o_proj" },
+            { HIDDEN, INTER,                       "gate_proj" },
+            { HIDDEN, INTER,                       "up_proj" },
+            { INTER, HIDDEN,                       "down_proj" },
+        };
+        int n_tests = sizeof(tests) / sizeof(tests[0]);
+        unsigned vseed = 42;
+
+#if defined(Q80_WEIGHTS)
+        const char *variant = "Q8_0";
+#elif defined(INT4_WEIGHTS)
+        const char *variant = "INT4";
+#else
+        const char *variant = "INT8";
+#endif
+
+        /* CSV header */
+        printf("model,quant_variant,matrix,K,N,max_abs,mean_abs,rel_err_pct,cos_sim\n");
+
+        for (int t = 0; t < n_tests; ++t) {
+            size_t K = tests[t].K, N = tests[t].N;
+            float *B = malloc(K * N * sizeof(float));
+            float *a = malloc(K * sizeof(float));
+            float *c_fp32 = malloc(N * sizeof(float));
+            float *c_quant = malloc(N * sizeof(float));
+
+            /* Random weights & activation (fixed seed, reproducible) */
+            for (size_t i = 0; i < K * N; ++i)
+                B[i] = ((float)(vseed = (vseed * 1103515245 + 12345)) / 2147483647.0f - 0.5f) * 2.0f;
+            for (size_t i = 0; i < K; ++i)
+                a[i] = ((float)(vseed = (vseed * 1103515245 + 12345)) / 2147483647.0f - 0.5f) * 2.0f;
+
+            /* FP32 reference GEMV */
+            matmul(a, B, c_fp32, 1, K, N);
+
+            /* Quantized GEMV */
+#if defined(Q80_WEIGHTS)
+            {
+                Q8Block *qb;
+                quantize_weight_q8_0(B, &qb, K, N);
+                gemv_q8_0_neon(a, qb, c_quant, K, N);
+                free(qb);
+            }
+#elif defined(INT4_WEIGHTS)
+            {
+                uint8_t *q4; float *s4;
+                quantize_weight_int4(B, &q4, &s4, K, N);
+                gemv_int4_neon(a, q4, s4, c_quant, K, N);
+                free(q4); free(s4);
+            }
+#else /* INT8_WEIGHTS */
+            {
+                QW qw; memset(&qw, 0, sizeof(qw));
+                quantize_weight(B, &qw.q, &qw.s, K, N);
+                gemv_int8_neon(a, qw.q, qw.s, c_quant, K, N);
+                free(qw.q); free(qw.s);
+            }
+#endif
+
+            /* Compare: max_abs, mean_abs, rel_err, cos_sim */
+            float max_abs = 0.0f, max_ref = 0.0f;
+            double sum_abs = 0.0, dot = 0.0, nrm_a = 0.0, nrm_b = 0.0;
+            for (size_t i = 0; i < N; ++i) {
+                float diff = fabsf(c_fp32[i] - c_quant[i]);
+                if (diff > max_abs) max_abs = diff;
+                float ar = fabsf(c_fp32[i]);
+                if (ar > max_ref) max_ref = ar;
+                sum_abs += diff;
+                dot  += (double)c_fp32[i] * c_quant[i];
+                nrm_a += (double)c_fp32[i] * c_fp32[i];
+                nrm_b += (double)c_quant[i] * c_quant[i];
+            }
+            float mean_abs = (float)(sum_abs / N);
+            float rel_err = (max_ref > 0) ? (max_abs / max_ref) * 100.0f : 0.0f;
+            double cos_sim = (nrm_a > 0.0 && nrm_b > 0.0)
+                ? dot / (sqrt(nrm_a) * sqrt(nrm_b)) : 0.0;
+
+            printf("%s,%s,%s,%zu,%zu,%.4f,%.4f,%.2f,%f\n",
+                   MODEL_NAME, variant, tests[t].name, K, N,
+                   max_abs, mean_abs, rel_err, cos_sim);
+
+            free(B); free(a); free(c_fp32); free(c_quant);
+        }
+        return 0;
     }
 #endif
 

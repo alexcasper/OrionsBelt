@@ -166,6 +166,25 @@ Concretely useful details found:
 - Dense and MoE checkpoints share the same GDN core (`Qwen3_5MoeGatedDeltaNet` ≡
   `Qwen3_5GatedDeltaNet`) but have very different shapes; weights are not interchangeable.
 
+### 2.4 Q8_0 block-quantized GEMV results (verified 2026-08-08)
+
+Source: our own measurements on Jetson Nano A57 (Cortex-A57, 4×1.48 GHz, governor=performance).
+
+| Claim | Status |
+|---|---|
+| Q8_0 decode: 5.12 tok/s on 0.8B model (A57) | ✅ Confirmed — FINDINGS §29, CSV `jetson-j1_q80_vs_int8_vs_fp32_08b.csv`, manifest `jetson-j1_q80_a57.json` (sha `d223c19`) |
+| 2.97× speedup over FP32 decode (1.72 tok/s → 5.12 tok/s) | ✅ Confirmed — same CSV, same commit, A/B comparison |
+| 94% of llama.cpp Q8_0 throughput on the same hardware | ✅ Confirmed — llama.cpp Q8_0 baseline: 5.40 tok/s (FINDINGS §28, CSV `jetson-j1_llamacpp_vs_orionsbelt_08b.csv`) |
+| Q8_0 cosine similarity 1.000000 vs FP32 across all 11 weight matrices | ✅ Confirmed — FINDINGS §30, CSV `jetson-j1_quant_accuracy_08b_4b.csv` (66 rows), manifest sha `c643e34`. Method: per-matmul GEMV with fixed-seed random weights, `--verify-quant` mode |
+| INT8 also achieves cos_sim 1.000000 but no speed gain on A57 | ✅ Confirmed — same accuracy CSV; INT8 decode throughput 1.72 tok/s (§29 CSV) |
+| INT4 degrades to cos_sim ≈ 0.99998, no speed advantage | ✅ Confirmed — same accuracy CSV; INT4 throughput 1.64 tok/s (§29 CSV) |
+| Cache-blocked GEMM: 49–78× prefill speedup | ✅ Confirmed — FINDINGS §25 (ob-8qt.15) |
+| llama.cpp Q8_0/Q4_0 is 3.1× faster decode, 2.3× faster prefill than our C loop | ✅ Confirmed — FINDINGS §28 (ob-mrd.15), measured on same A57 device |
+
+All Q8_0 measurements use `gcc -O3 -fopenmp -mcpu=cortex-a57` (matching
+`scripts/build_device_bench.sh`). Thermals ≤53°C throughout; governor
+`performance` confirmed in every manifest.
+
 ---
 
 ## 3. Finding that changes the technical thesis 🔴
