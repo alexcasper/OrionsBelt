@@ -186,7 +186,13 @@ All figures above are verified against primary sources (Radxa product page and d
 > (Counted recursively — `results/raw/` and `results/manifests/` include
 > subdirectories `ablation/`, `affinity/`, and `kleidiai/`, which hold real
 > fleet benchmark data, not scratch files. A non-recursive `ls *.csv` count
-> will undercount by the contents of those subdirectories.)
+> will undercount by the contents of those subdirectories. The figures
+> count EXCLUDES `results/figures/README.md` itself — that's an index
+> file, not a generated figure; `find results/figures -type f | wc -l`
+> overcounts by one for this reason. This off-by-one has regressed twice
+> already — recount with
+> `find results/figures -type f ! -name README.md | wc -l` before editing
+> this line.)
 >
 > ```
 > results/
