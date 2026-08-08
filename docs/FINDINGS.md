@@ -3501,7 +3501,7 @@ throughput throughout each burst.
 
 **Conclusion**: the RK3588's active cooling handles sustained decode without
 thermal throttling. The burst benchmark numbers in §15–17 are steady-state
-sustainable numbers, not peak-only artifacts. This matters for the Physical AI
+sustainable numbers, not peak-only artifacts. This matters for the Edge AI
 submission criterion: honest sustained throughput, not a one-shot burst.
 
 **Data:** [`results/raw/rk3588-t3_sustained_thermal.txt`](../results/raw/rk3588-t3_sustained_thermal.txt) · [`rk3588-t4_sustained_thermal.txt`](../results/raw/rk3588-t4_sustained_thermal.txt) (independent cross-check).
