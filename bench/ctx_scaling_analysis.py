@@ -67,6 +67,8 @@ CONFIGS_JETSON = [
     ("4B FP32 hybrid", "{d}_4b_fp32_ctxsweep", False),
     ("4B FP32 pure-GDN", "{d}_4b_fp32_puregdn_ctxsweep", True),
     ("0.8B Q8_0 hybrid", "{d}_08b_q80_ctxsweep", False),
+    ("0.8B Q8_0 pure-GDN", "{d}_08b_q80_puregdn_ctxsweep", True),
+    ("0.8B INT4 hybrid", "{d}_08b_int4_ctxsweep", False),
     ("0.8B INT8 hybrid", "{d}_08b_int8_ctxsweep", False),
     ("0.8B INT8 pure-GDN", "{d}_08b_int8_puregdn_ctxsweep", True),
     ("0.8B FP32 hybrid", "{d}_08b_fp32_ctxsweep", False),

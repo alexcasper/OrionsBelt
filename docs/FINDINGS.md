@@ -4716,9 +4716,9 @@ the 1.68× noise ceiling from §ob-bf7).
    is because Q8_0 accelerates the constant parts (FFN + GDN) so much that the
    relative attention bottleneck is exposed later.
 
-2. **Q8_0 GDN layer cost is nearly flat**: 72–80 µs per token, aggregated
-   across all 18 GDN layers, across all context lengths (vs FP32 167–237 µs,
-   INT8 126–130 µs). The ±10% variance is thermal jitter, not an algorithmic
+2. **Q8_0 GDN layer cost is nearly flat**: 73–80 ms per token, aggregated
+   across all 18 GDN layers, across all context lengths (vs FP32 167–237 ms,
+   INT8 126–130 ms). The ±10% variance is thermal jitter, not an algorithmic
    trend.
 
 3. **Attention share of Q8_0 decode time reaches 60.3% at ctx=4096** — the
@@ -4731,8 +4731,84 @@ the 1.68× noise ceiling from §ob-bf7).
    regression — it is because Q8_0's ctx=1 starting point is so high that
    the O(n) attention bottleneck dominates sooner in absolute terms.
 
+### Pure-GDN confirmation: Q8_0 O(1) decode
+
+We also ran the pure-GDN sweep (all layers are GDN, no full-attention layers).
+With zero KV cache, throughput must be perfectly flat if the GDN recurrent state
+is truly O(1). It is:
+
+| ctx | Q8_0 pure-GDN tok/s | INT8 pure-GDN tok/s |
+|----:|--------------------:|--------------------:|
+|   1 |               4.97  |               2.88  |
+|  64 |               4.91  |               2.88  |
+| 256 |               4.96  |               2.86  |
+| 512 |               4.68  |               2.89  |
+|1024 |               4.95  |               2.87  |
+|2048 |               4.87  |               2.87  |
+|4096 |               5.00  |               2.89  |
+
+Q8_0 pure-GDN throughput variance is ±3% across ctx 1–4096 — confirming the
+GDN recurrent state is genuinely constant-time, not just "slow-growing."
+
 ### Data
 
-CSV: `results/raw/jetson-j1_08b_q80_ctxsweep_e2e_raw.csv` (7 rows: ctx 1–4096).
-Generator updated: `bench/ctx_scaling_analysis.py` (Q8_0 added to CONFIGS_JETSON).
+CSVs: `results/raw/jetson-j1_08b_q80_ctxsweep_e2e_raw.csv` (7 rows) and
+`results/raw/jetson-j1_08b_q80_puregdn_ctxsweep_e2e_raw.csv` (7 rows).
+Manifests: `results/manifests/jetson-j1_08b_q80_ctxsweep.json` and
+`results/manifests/jetson-j1_08b_q80_puregdn_ctxsweep.json`.
+## 32. INT4 context-length sweep: dequant overhead makes INT4 slower than FP32 at short context on A57 (2026-08-08, ob-brn)
+
+### Motivation
+
+§26 showed INT4 weight-only quantization provides no benefit on the A57 at
+ctx=8 (1.62 tok/s vs INT8 1.64 tok/s). The open question was whether this
+holds across context lengths or whether INT4's lower memory footprint wins
+at long context where bandwidth pressure increases.
+
+### Setup
+
+Binary: `dist/bench_gdn_e2e_decode_08b_jetson_a57_int4` (INT4 nibble-packed
+weights, FP32 KV cache). Governor: performance. Thermals: 42–50 °C pre-run.
+Three replicate runs; max Δ = 2.1% (ctx=1).
+
+### Result: INT4 is slower than FP32 at short context, catches up at long context
+
+| ctx | FP32 tok/s | INT8 tok/s | INT4 tok/s | INT4 / FP32 | INT4 / INT8 |
+|----:|----------:|----------:|----------:|------------:|------------:|
+|   1 |      2.25 |      2.95 |      1.90 |       0.84× |       0.64× |
+|  64 |      2.24 |      2.91 |      1.88 |       0.84× |       0.65× |
+| 256 |      2.17 |      2.83 |      1.85 |       0.85× |       0.65× |
+| 512 |      1.84 |      2.67 |      1.78 |       0.97× |       0.67× |
+|1024 |      1.55 |      2.45 |      1.69 |       1.09× |       0.69× |
+|2048 |      1.44 |      2.13 |      1.53 |       1.06× |       0.72× |
+|4096 |      1.18 |      1.67 |      1.26 |       1.07× |       0.75× |
+
+### Key observations
+
+1. **INT4 is 16% slower than FP32 at ctx=1** (1.90 vs 2.25 tok/s). The
+   4-bit dequantization overhead (unpack nibbles, sign-extend, scale) costs
+   more cycles than the bandwidth saves on the A57's narrow in-order pipeline.
+   The A57 lacks INT4 dot-product instructions, so each 4-bit weight requires
+   multiple instructions to convert to a usable value.
+
+2. **INT4 GDN layer cost (195 ms) exceeds FP32 GDN cost (170 ms) at ctx=1**
+   — the dequant overhead applies to every weight access in the GEMV, making
+   the GDN recurrence slower, not faster.
+
+3. **INT4 catches up to FP32 at ctx≥1024** (1.09× at ctx=1024). At long
+   context, the O(n) attention bottleneck dominates total decode time, and
+   INT4's slightly faster FFN (lower bandwidth) tips the balance. But INT4
+   never catches up to INT8 (always ≥25% slower).
+
+4. **Implication for quantization strategy**: on cores without INT4 dot-product
+   support (A57, A55), INT4 is a net negative. Q8_0 (§29–31) is the clear
+   winner — it provides bandwidth reduction with zero dequant overhead because
+   the int8 values can be used directly in NEON dot-product or accumulate
+   instructions.
+
+### Data
+
+CSV: `results/raw/jetson-j1_08b_int4_ctxsweep_e2e_raw.csv` (7 rows).
+Manifest: `results/manifests/jetson-j1_08b_int4_ctxsweep.json`.
+Generator: `bench/ctx_scaling_analysis.py` (INT4 added to CONFIGS_JETSON).
 Generated report: `results/figures/ctx_length_scaling_a57.md`.
