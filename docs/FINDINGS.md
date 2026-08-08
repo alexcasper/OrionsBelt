@@ -4731,8 +4731,30 @@ the 1.68× noise ceiling from §ob-bf7).
    regression — it is because Q8_0's ctx=1 starting point is so high that
    the O(n) attention bottleneck dominates sooner in absolute terms.
 
+### Pure-GDN confirmation: Q8_0 O(1) decode
+
+We also ran the pure-GDN sweep (all layers are GDN, no full-attention layers).
+With zero KV cache, throughput must be perfectly flat if the GDN recurrent state
+is truly O(1). It is:
+
+| ctx | Q8_0 pure-GDN tok/s | INT8 pure-GDN tok/s |
+|----:|--------------------:|--------------------:|
+|   1 |               4.97  |               2.88  |
+|  64 |               4.91  |               2.88  |
+| 256 |               4.96  |               2.86  |
+| 512 |               4.68  |               2.89  |
+|1024 |               4.95  |               2.87  |
+|2048 |               4.87  |               2.87  |
+|4096 |               5.00  |               2.89  |
+
+Q8_0 pure-GDN throughput variance is ±3% across ctx 1–4096 — confirming the
+GDN recurrent state is genuinely constant-time, not just "slow-growing."
+
 ### Data
 
-CSV: `results/raw/jetson-j1_08b_q80_ctxsweep_e2e_raw.csv` (7 rows: ctx 1–4096).
-Generator updated: `bench/ctx_scaling_analysis.py` (Q8_0 added to CONFIGS_JETSON).
+CSVs: `results/raw/jetson-j1_08b_q80_ctxsweep_e2e_raw.csv` (7 rows) and
+`results/raw/jetson-j1_08b_q80_puregdn_ctxsweep_e2e_raw.csv` (7 rows).
+Manifests: `results/manifests/jetson-j1_08b_q80_ctxsweep.json` and
+`results/manifests/jetson-j1_08b_q80_puregdn_ctxsweep.json`.
+Generator: `bench/ctx_scaling_analysis.py` (Q8_0 hybrid + pure-GDN in CONFIGS_JETSON).
 Generated report: `results/figures/ctx_length_scaling_a57.md`.
