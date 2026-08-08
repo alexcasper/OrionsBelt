@@ -35,6 +35,9 @@ At 262K context on the 4B checkpoint, that difference is **23.95 GiB of RAM** �
 - **GDN-2 vs GDN-1 comparison** — the decoupled gating in GDN-2 costs 1.2–1.5× at decode on big cores (2.2–2.4× on little), 2.2–2.7× at prefill
 - **Analytical memory model** decomposing weights, KV cache, and recurrent state at every context length
 - **End-to-end model decode** — C decode loop with row-sweep NEON GEMV + INT8 weight-only quantization: **10.6 tok/s (0.8B, A76)**, **2.45 tok/s (0.8B, A57)**, 1.84 tok/s (4B, A76), 0.51 tok/s (4B, A57). ~26× cumulative speedup over the Python/transformers baseline
+- **INT4 weight-only quantization** — core-type-dependent: 1.40× on A55 little cores (bandwidth wins), 15% slower than INT8 on A76 (compute-bound), no benefit on A57 (narrow pipeline can't hide unpack cost). The optimal precision is core-type-aware, not "always lower"
+- **Cache-blocked GEMM prefill** — 49–78× prefill speedup from switching naive single-row GEMV to cache-blocked GEMM at M>1, measured across the fleet
+- **ONNX Runtime CPU EP audit** — GDN recurrence is expressible via ONNX `Loop` but 16× slower than our fused kernel. Confirms no existing CPU toolchain has optimized GDN for Arm
 
 **What we did NOT achieve (stated honestly):**
 - Heterogeneous NPU/GPU/CPU dispatch — requires the Orion O6's GPU+NPU for a meaningful test; designed but not implemented
@@ -170,7 +173,7 @@ Specifically:
 
 - **Repository:** https://github.com/alexcasper/OrionsBelt
 - **License:** Apache-2.0
-- **Findings (40 sections, 4396 lines):** [`docs/FINDINGS.md`](../docs/FINDINGS.md)
+- **Findings (41 sections, 4476 lines):** [`docs/FINDINGS.md`](../docs/FINDINGS.md)
 - **Comparison table:** [`results/figures/comparison_table.md`](../results/figures/comparison_table.md)
 - **Fleet bandwidth analysis:** [`results/figures/fleet_bandwidth_scaling.md`](../results/figures/fleet_bandwidth_scaling.md)
 - **Memory scaling figures:** [`results/figures/memory_comparison.md`](../results/figures/memory_comparison.md)

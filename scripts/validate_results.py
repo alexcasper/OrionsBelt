@@ -830,7 +830,9 @@ def validate_csv(path, csv_name, issues):
                         tps = float(row.get("tok_per_sec_prefill", 0))
                         if tps <= 0 or tps > 1000:
                             issues.append(
-                                Issue("WARNING", csv_name, f"row {i}: implausible prefill tok/s {tps}")
+                                Issue(
+                                    "WARNING", csv_name, f"row {i}: implausible prefill tok/s {tps}"
+                                )
                             )
                     except ValueError:
                         pass
@@ -839,7 +841,9 @@ def validate_csv(path, csv_name, issues):
                         tps = float(row.get("prefill_tps", 0))
                         if tps <= 0 or tps > 1000:
                             issues.append(
-                                Issue("WARNING", csv_name, f"row {i}: implausible prefill tok/s {tps}")
+                                Issue(
+                                    "WARNING", csv_name, f"row {i}: implausible prefill tok/s {tps}"
+                                )
                             )
                     except ValueError:
                         pass

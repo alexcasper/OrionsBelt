@@ -108,6 +108,14 @@ typedef struct {
 #endif
 } QW;
 
+/* Packed int4 weight storage (ob-8qt.16). Two signed 4-bit values per byte
+ * (range -8..7): even column in the low nibble, odd column in the high
+ * nibble. Per-column float scale, same design as QW/INT8. */
+typedef struct {
+    uint8_t *q;  /* packed int4 weights [K × ceil(N/2)] row-major */
+    float   *s;  /* per-column (output) scale [N] */
+} QW4;
+
 /* Quantize a [K×N] float matrix to int8 + per-column scale (symmetric).
  * B_in is read-only; q and s are allocated and filled.
  * Only needed under -DINT8_WEIGHTS. */
@@ -622,22 +630,34 @@ static void matmul_int8(const float *A, const QW *qw,
 
 /* ---- INT4 weight-only quantization (ob-8qt.16) ----
  *
- * Stores weights as packed int4 nibbles (2/byte) + per-output-column float
- * scale. 8× weight memory reduction vs FP32, 2× vs INT8. Decode is
- * bandwidth-bound so halving weight traffic again has headroom — but int4
- * unpack cost (shift+mask+sign-extend) is higher than int8 widen, so this
- * needs measurement (see FINDINGS section).
+ * Natural extension of INT8 weight-only quant: packs two signed 4-bit
+ * integers per byte (-8..7), cutting weight memory traffic 8x vs FP32 and
+ * 2x vs INT8. Per-column float scale (same design as INT8). Decode is
+ * bandwidth-bound, so the 2x weight-traffic reduction is the primary win,
+ * offset by increased nibble-unpack compute (NEON: mask + shift + interleave
+ * per 16 bytes).
  *
- * Compiled with -DINT4_WEIGHTS. Mutually exclusive with -DINT8_WEIGHTS.
- * Packing: byte[k*(N/2) + j/2] holds columns 2*(j/2) (high nibble) and
- * 2*(j/2)+1 (low nibble). Range [-8,7], scale = max_abs/7.
+ * Compiled in with -DINT4_WEIGHTS (mutually exclusive with INT8_WEIGHTS).
+ * Packing: even column -> low nibble, odd column -> high nibble.
+ *
+ * Numerically verified (standalone reference-comparison test, not just a
+ * benchmark) against a scalar dequant+GEMV/GEMM reference across shapes
+ * including odd/non-power-of-2 K/N/M: exact match. See FINDINGS §26 for
+ * the history of a real column-order bug this class of test caught in an
+ * earlier, differently-convention'd implementation of this same kernel.
  */
 #ifdef INT4_WEIGHTS
-static void quantize_weight_int4(const float *B_in, int8_t **q_out, float **s_out,
+
+/* Quantize a [K×N] float matrix to packed signed int4 + per-column scale.
+ * Two values per byte: even column -> low nibble, odd column -> high nibble.
+ * Value range: -8..7 (4-bit signed). */
+static void quantize_weight_int4(const float *B_in, uint8_t **q_out, float **s_out,
                                  size_t K, size_t N) {
-    int8_t *q = calloc(K * (N / 2), 1);  /* packed nibbles */
+    size_t q_cols = (N + 1) / 2;
+    uint8_t *q = calloc(K * q_cols, 1);  /* zero-init (we OR nibbles in) */
     float  *s = malloc(N * sizeof(float));
-    if (!q || !s) { fprintf(stderr, "OOM in quantize_int4\n"); exit(1); }
+    if (!q || !s) { fprintf(stderr, "OOM in quantize_weight_int4\n"); exit(1); }
+
     for (size_t n = 0; n < N; ++n) {
         float max_abs = 0.0f;
         for (size_t k = 0; k < K; ++k) {
@@ -647,105 +667,134 @@ static void quantize_weight_int4(const float *B_in, int8_t **q_out, float **s_ou
         s[n] = (max_abs > 0.0f) ? max_abs / 7.0f : 1.0f;
         float inv = 1.0f / s[n];
         for (size_t k = 0; k < K; ++k) {
-            int vi = (int)lroundf(B_in[k * N + n] * inv);
+            float scaled = B_in[k * N + n] * inv;
+            int vi = (int)lroundf(scaled);
             if (vi > 7) vi = 7;
             if (vi < -8) vi = -8;
-            vi &= 0x0F;  /* to unsigned nibble: -8→8, -1→15, 0→0, 7→7 */
-            size_t bidx = k * (N / 2) + n / 2;
-            if (n & 1) q[bidx] |= vi;        /* low nibble */
-            else      q[bidx] |= vi << 4;   /* high nibble */
+            vi &= 0x0F;  /* store as unsigned nibble (8→-8, 15→-1, etc.) */
+            if (n % 2 == 0)
+                q[k * q_cols + n / 2] |= (uint8_t)vi;          /* low nibble */
+            else
+                q[k * q_cols + n / 2] |= (uint8_t)(vi << 4);  /* high nibble */
         }
     }
     *q_out = q;
     *s_out = s;
 }
 
-/* INT4 GEMV for M=1 (decode). Unpacks 2 nibbles/byte via NEON shifts. */
-static void gemv_int4_neon(const float *a, const int8_t *Bq4, const float *Bs,
+/* INT4 GEMV: dequantize-on-the-fly with NEON nibble unpack.
+ * a is [K] float, Bq is [K×ceil(N/2)] packed uint8, Bs is [N] float scale,
+ * c is [N] float.
+ *
+ * Row-sweep with per-column scale. Loads 16 bytes per K-step (32 packed
+ * int4 values), splits low/high nibbles, sign-extends, interleaves to
+ * restore column order, then widens to float for FMA accumulation. */
+static void gemv_int4_neon(const float *a, const uint8_t *Bq, const float *Bs,
                            float *c, size_t K, size_t N) {
     const size_t TILE = 1024;
-    size_t Nh = N / 2;
+    size_t q_cols = (N + 1) / 2;
+
 #ifdef _OPENMP
 #pragma omp parallel for schedule(static)
 #endif
     for (size_t jt = 0; jt < N; jt += TILE) {
         size_t tn = (N - jt >= TILE) ? TILE : (N - jt);
-        size_t jh = jt / 2;
         float *ct = c + jt;
+
         memset(ct, 0, tn * sizeof(float));
 
         for (size_t k = 0; k < K; ++k) {
             float ak = a[k];
-            const uint8_t *Br = (const uint8_t *)(Bq4 + k * Nh + jh);
+            const uint8_t *Brow = Bq + k * q_cols + jt / 2;
             size_t j = 0;
 #ifdef __ARM_NEON
             float32x4_t akv = vdupq_n_f32(ak);
-            uint8x8_t  mask4 = vdup_n_u8(0x0F);
-            /* Process 16 columns per iteration (8 packed bytes) */
-            for (; j + 16 <= tn; j += 16) {
-                uint8x8_t pk = vld1_u8(Br + j/2);
-                /* Unpack: low nibbles (odd cols) and high nibbles (even cols) */
-                uint8x8_t lo = vand_u8(pk, mask4);
-                uint8x8_t hi = vshr_n_u8(pk, 4);
-                /* Packing convention (quantize_weight_int4): byte i holds
-                 * column 2*i in the HIGH nibble and column 2*i+1 in the LOW
-                 * nibble. So the interleaved column order is hi[0],lo[0],
-                 * hi[1],lo[1],... — vzip_u8(hi, lo), not (lo, hi). Getting
-                 * this backwards silently swaps every even/odd column pair
-                 * (caught by comparing against the scalar reference path). */
-                uint8x8x2_t zi = vzip_u8(hi, lo);
-                /* Sign-extend from unsigned 4-bit to signed 8-bit */
-                int8x8_t v0 = vreinterpret_s8_u8(zi.val[0]);
-                int8x8_t v1 = vreinterpret_s8_u8(zi.val[1]);
-                /* If nibble >= 8, subtract 16 (unsigned→signed 4-bit) */
-                uint8x8_t ge8_0 = vcge_u8(zi.val[0], vdup_n_u8(8));
-                uint8x8_t ge8_1 = vcge_u8(zi.val[1], vdup_n_u8(8));
-                v0 = vsub_s8(v0, vreinterpret_s8_u8(vand_u8(ge8_0, vdup_n_u8(16))));
-                v1 = vsub_s8(v1, vreinterpret_s8_u8(vand_u8(ge8_1, vdup_n_u8(16))));
-                /* Widen to float32 (8→16→32→f32) and FMA */
-                int16x8_t i16_0 = vmovl_s8(v0);
-                int16x8_t i16_1 = vmovl_s8(v1);
-                float32x4_t f0lo = vcvtq_f32_s32(vmovl_s16(vget_low_s16(i16_0)));
-                float32x4_t f0hi = vcvtq_f32_s32(vmovl_s16(vget_high_s16(i16_0)));
-                float32x4_t f1lo = vcvtq_f32_s32(vmovl_s16(vget_low_s16(i16_1)));
-                float32x4_t f1hi = vcvtq_f32_s32(vmovl_s16(vget_high_s16(i16_1)));
-                float32x4_t c0lo = vld1q_f32(ct + j);
-                float32x4_t c0hi = vld1q_f32(ct + j + 4);
-                float32x4_t c1lo = vld1q_f32(ct + j + 8);
-                float32x4_t c1hi = vld1q_f32(ct + j + 12);
-                c0lo = vfmaq_f32(c0lo, akv, f0lo);
-                c0hi = vfmaq_f32(c0hi, akv, f0hi);
-                c1lo = vfmaq_f32(c1lo, akv, f1lo);
-                c1hi = vfmaq_f32(c1hi, akv, f1hi);
-                vst1q_f32(ct + j, c0lo);
-                vst1q_f32(ct + j + 4, c0hi);
-                vst1q_f32(ct + j + 8, c1lo);
-                vst1q_f32(ct + j + 12, c1hi);
-            }
-            /* Scalar tail */
-            for (; j < tn; ++j) {
-                size_t bidx = k * Nh + (jt + j) / 2;
-                int nib = ((jt + j) & 1) ? (Bq4[bidx] & 0x0F) : ((Bq4[bidx] >> 4) & 0x0F);
-                if (nib >= 8) nib -= 16;
-                ct[j] += ak * (float)nib;
+            for (; j + 32 <= tn; j += 32) {
+                /* Load 16 bytes = 32 packed int4 values (columns j..j+31) */
+                uint8x16_t raw = vld1q_u8(Brow + j / 2);
+                /* Low nibbles: (byte & 0x0F) → unsigned 0-15 */
+                uint8x16_t lo_u = vandq_u8(raw, vdupq_n_u8(0x0F));
+                /* High nibbles: (byte >> 4) → unsigned 0-15 */
+                uint8x16_t hi_u = vshrq_n_u8(raw, 4);
+                /* Sign-extend from 4-bit to 8-bit: (x << 4) >> 4 (arithmetic) */
+                int8x16_t lo_s = vshrq_n_s8(
+                    vshlq_n_s8(vreinterpretq_s8_u8(lo_u), 4), 4);
+                int8x16_t hi_s = vshrq_n_s8(
+                    vshlq_n_s8(vreinterpretq_s8_u8(hi_u), 4), 4);
+                /* Interleave: lo={c0,c2,...}, hi={c1,c3,...} → {c0,c1,...,c15},
+                 *                                          {c16,c17,...,c31} */
+                int8x16x2_t inter = vzipq_s8(lo_s, hi_s);
+
+                /* Process 16 values from inter.val[0] (columns j..j+15) */
+                {
+                    int16x8_t  i16a = vmovl_s8(vget_low_s8(inter.val[0]));
+                    int16x8_t  i16b = vmovl_s8(vget_high_s8(inter.val[0]));
+                    int32x4_t  i32a = vmovl_s16(vget_low_s16(i16a));
+                    int32x4_t  i32b = vmovl_s16(vget_high_s16(i16a));
+                    int32x4_t  i32c = vmovl_s16(vget_low_s16(i16b));
+                    int32x4_t  i32d = vmovl_s16(vget_high_s16(i16b));
+                    float32x4_t fa = vcvtq_f32_s32(i32a);
+                    float32x4_t fb = vcvtq_f32_s32(i32b);
+                    float32x4_t fc = vcvtq_f32_s32(i32c);
+                    float32x4_t fd = vcvtq_f32_s32(i32d);
+                    float32x4_t ca = vld1q_f32(ct + j);
+                    float32x4_t cb = vld1q_f32(ct + j + 4);
+                    float32x4_t cc = vld1q_f32(ct + j + 8);
+                    float32x4_t cd = vld1q_f32(ct + j + 12);
+                    ca = vfmaq_f32(ca, akv, fa);
+                    cb = vfmaq_f32(cb, akv, fb);
+                    cc = vfmaq_f32(cc, akv, fc);
+                    cd = vfmaq_f32(cd, akv, fd);
+                    vst1q_f32(ct + j, ca);
+                    vst1q_f32(ct + j + 4, cb);
+                    vst1q_f32(ct + j + 8, cc);
+                    vst1q_f32(ct + j + 12, cd);
+                }
+                /* Process 16 values from inter.val[1] (columns j+16..j+31) */
+                {
+                    int16x8_t  i16a = vmovl_s8(vget_low_s8(inter.val[1]));
+                    int16x8_t  i16b = vmovl_s8(vget_high_s8(inter.val[1]));
+                    int32x4_t  i32a = vmovl_s16(vget_low_s16(i16a));
+                    int32x4_t  i32b = vmovl_s16(vget_high_s16(i16a));
+                    int32x4_t  i32c = vmovl_s16(vget_low_s16(i16b));
+                    int32x4_t  i32d = vmovl_s16(vget_high_s16(i16b));
+                    float32x4_t fa = vcvtq_f32_s32(i32a);
+                    float32x4_t fb = vcvtq_f32_s32(i32b);
+                    float32x4_t fc = vcvtq_f32_s32(i32c);
+                    float32x4_t fd = vcvtq_f32_s32(i32d);
+                    float32x4_t ca = vld1q_f32(ct + j + 16);
+                    float32x4_t cb = vld1q_f32(ct + j + 20);
+                    float32x4_t cc = vld1q_f32(ct + j + 24);
+                    float32x4_t cd = vld1q_f32(ct + j + 28);
+                    ca = vfmaq_f32(ca, akv, fa);
+                    cb = vfmaq_f32(cb, akv, fb);
+                    cc = vfmaq_f32(cc, akv, fc);
+                    cd = vfmaq_f32(cd, akv, fd);
+                    vst1q_f32(ct + j + 16, ca);
+                    vst1q_f32(ct + j + 20, cb);
+                    vst1q_f32(ct + j + 24, cc);
+                    vst1q_f32(ct + j + 28, cd);
+                }
             }
 #endif
-#ifndef __ARM_NEON
+            /* Scalar tail (handles remainder after NEON, or all if no NEON) */
             for (; j < tn; ++j) {
-                size_t bidx = k * Nh + (jt + j) / 2;
-                int nib = ((jt + j) & 1) ? (Bq4[bidx] & 0x0F) : ((Bq4[bidx] >> 4) & 0x0F);
-                if (nib >= 8) nib -= 16;
-                ct[j] += ak * (float)nib;
+                uint8_t byte = Brow[j / 2];
+                int8_t val = (j % 2 == 0) ? (int8_t)(byte & 0x0F)
+                                          : (int8_t)(byte >> 4);
+                if (val >= 8) val -= 16;  /* sign-extend from 4-bit */
+                ct[j] += ak * (float)val;
             }
-#endif
         }
-        /* Apply per-column scale */
+
+        /* Apply per-column scale (NEON-vectorized) */
         size_t j = 0;
 #ifdef __ARM_NEON
         for (; j + 4 <= tn; j += 4) {
             float32x4_t cv = vld1q_f32(ct + j);
             float32x4_t sv = vld1q_f32(Bs + jt + j);
-            vst1q_f32(ct + j, vmulq_f32(cv, sv));
+            cv = vmulq_f32(cv, sv);
+            vst1q_f32(ct + j, cv);
         }
 #endif
         for (; j < tn; ++j)
@@ -753,27 +802,129 @@ static void gemv_int4_neon(const float *a, const int8_t *Bq4, const float *Bs,
     }
 }
 
-/* INT4 matmul wrapper: optimized GEMV for M=1, naive dequant for M>1. */
-static void matmul_int4(const float *A, const QW *qw,
+/* INT4 GEMM for M>1 prefill (ob-8qt.16).
+ * Same nibble-unpack logic as gemv_int4_neon, generalised to M rows.
+ * Each B row segment is reused across all M output rows. */
+static void gemm_int4_neon(const float *A, const uint8_t *Bq, const float *Bs,
+                           float *C, size_t M, size_t K, size_t N) {
+    const size_t TILE = 1024;
+    size_t q_cols = (N + 1) / 2;
+
+#ifdef _OPENMP
+#pragma omp parallel for schedule(static)
+#endif
+    for (size_t jt = 0; jt < N; jt += TILE) {
+        size_t tn = (N - jt >= TILE) ? TILE : (N - jt);
+
+        for (size_t i = 0; i < M; ++i)
+            memset(C + i * N + jt, 0, tn * sizeof(float));
+
+        for (size_t k = 0; k < K; ++k) {
+            const uint8_t *Brow = Bq + k * q_cols + jt / 2;
+            for (size_t i = 0; i < M; ++i) {
+                float ak = A[i * K + k];
+                float *ct = C + i * N + jt;
+                size_t j = 0;
+#ifdef __ARM_NEON
+                float32x4_t akv = vdupq_n_f32(ak);
+                for (; j + 32 <= tn; j += 32) {
+                    uint8x16_t raw = vld1q_u8(Brow + j / 2);
+                    uint8x16_t lo_u = vandq_u8(raw, vdupq_n_u8(0x0F));
+                    uint8x16_t hi_u = vshrq_n_u8(raw, 4);
+                    int8x16_t lo_s = vshrq_n_s8(
+                        vshlq_n_s8(vreinterpretq_s8_u8(lo_u), 4), 4);
+                    int8x16_t hi_s = vshrq_n_s8(
+                        vshlq_n_s8(vreinterpretq_s8_u8(hi_u), 4), 4);
+                    int8x16x2_t inter = vzipq_s8(lo_s, hi_s);
+
+                    {
+                        int16x8_t  i16a = vmovl_s8(vget_low_s8(inter.val[0]));
+                        int16x8_t  i16b = vmovl_s8(vget_high_s8(inter.val[0]));
+                        int32x4_t  i32a = vmovl_s16(vget_low_s16(i16a));
+                        int32x4_t  i32b = vmovl_s16(vget_high_s16(i16a));
+                        int32x4_t  i32c = vmovl_s16(vget_low_s16(i16b));
+                        int32x4_t  i32d = vmovl_s16(vget_high_s16(i16b));
+                        float32x4_t fa = vcvtq_f32_s32(i32a);
+                        float32x4_t fb = vcvtq_f32_s32(i32b);
+                        float32x4_t fc = vcvtq_f32_s32(i32c);
+                        float32x4_t fd = vcvtq_f32_s32(i32d);
+                        float32x4_t ca = vld1q_f32(ct + j);
+                        float32x4_t cb = vld1q_f32(ct + j + 4);
+                        float32x4_t cc = vld1q_f32(ct + j + 8);
+                        float32x4_t cd = vld1q_f32(ct + j + 12);
+                        ca = vfmaq_f32(ca, akv, fa);
+                        cb = vfmaq_f32(cb, akv, fb);
+                        cc = vfmaq_f32(cc, akv, fc);
+                        cd = vfmaq_f32(cd, akv, fd);
+                        vst1q_f32(ct + j, ca);
+                        vst1q_f32(ct + j + 4, cb);
+                        vst1q_f32(ct + j + 8, cc);
+                        vst1q_f32(ct + j + 12, cd);
+                    }
+                    {
+                        int16x8_t  i16a = vmovl_s8(vget_low_s8(inter.val[1]));
+                        int16x8_t  i16b = vmovl_s8(vget_high_s8(inter.val[1]));
+                        int32x4_t  i32a = vmovl_s16(vget_low_s16(i16a));
+                        int32x4_t  i32b = vmovl_s16(vget_high_s16(i16a));
+                        int32x4_t  i32c = vmovl_s16(vget_low_s16(i16b));
+                        int32x4_t  i32d = vmovl_s16(vget_high_s16(i16b));
+                        float32x4_t fa = vcvtq_f32_s32(i32a);
+                        float32x4_t fb = vcvtq_f32_s32(i32b);
+                        float32x4_t fc = vcvtq_f32_s32(i32c);
+                        float32x4_t fd = vcvtq_f32_s32(i32d);
+                        float32x4_t ca = vld1q_f32(ct + j + 16);
+                        float32x4_t cb = vld1q_f32(ct + j + 20);
+                        float32x4_t cc = vld1q_f32(ct + j + 24);
+                        float32x4_t cd = vld1q_f32(ct + j + 28);
+                        ca = vfmaq_f32(ca, akv, fa);
+                        cb = vfmaq_f32(cb, akv, fb);
+                        cc = vfmaq_f32(cc, akv, fc);
+                        cd = vfmaq_f32(cd, akv, fd);
+                        vst1q_f32(ct + j + 16, ca);
+                        vst1q_f32(ct + j + 20, cb);
+                        vst1q_f32(ct + j + 24, cc);
+                        vst1q_f32(ct + j + 28, cd);
+                    }
+                }
+#endif
+                for (; j < tn; ++j) {
+                    uint8_t byte = Brow[j / 2];
+                    int8_t val = (j % 2 == 0) ? (int8_t)(byte & 0x0F)
+                                              : (int8_t)(byte >> 4);
+                    if (val >= 8) val -= 16;
+                    ct[j] += ak * (float)val;
+                }
+            }
+        }
+
+        /* Apply per-column scale for all M rows */
+        for (size_t i = 0; i < M; ++i) {
+            float *ct = C + i * N + jt;
+            size_t j = 0;
+#ifdef __ARM_NEON
+            for (; j + 4 <= tn; j += 4) {
+                float32x4_t cv = vld1q_f32(ct + j);
+                float32x4_t sv = vld1q_f32(Bs + jt + j);
+                cv = vmulq_f32(cv, sv);
+                vst1q_f32(ct + j, cv);
+            }
+#endif
+            for (; j < tn; ++j)
+                ct[j] *= Bs[jt + j];
+        }
+    }
+}
+
+/* INT4 matmul wrapper (ob-8qt.16): dispatches GEMV (M=1) or GEMM (M>1). */
+static void matmul_int4(const float *A, const QW4 *qw,
                         float *C, size_t M, size_t K, size_t N) {
     if (M == 1) {
         gemv_int4_neon(A, qw->q, qw->s, C, K, N);
         return;
     }
-    /* Prefill: dequant to FP32 and use FP32 GEMM (INT4 dequant overhead
-     * makes it slower than FP32 for compute-bound prefill, same as INT8) */
-    float *Bf = malloc((size_t)K * N * sizeof(float));
-    size_t Nh = N / 2;
-    for (size_t k = 0; k < K; ++k)
-        for (size_t n = 0; n < N; ++n) {
-            size_t bidx = k * Nh + n / 2;
-            int nib = (n & 1) ? (qw->q[bidx] & 0x0F) : ((qw->q[bidx] >> 4) & 0x0F);
-            if (nib >= 8) nib -= 16;
-            Bf[k * N + n] = (float)nib * qw->s[n];
-        }
-    matmul(A, Bf, C, M, K, N);
-    free(Bf);
+    gemm_int4_neon(A, qw->q, qw->s, C, M, K, N);
 }
+
 #endif /* INT4_WEIGHTS */
 
 /* Dispatch macro: INT4 > INT8 > FP32 (mutually exclusive). */
@@ -843,10 +994,16 @@ typedef struct {
     float *down_proj;  /* INTER x HIDDEN */
     /* Embedding / LM head */
     float *embed;      /* VOCAB x HIDDEN (tied) */
-    /* INT8 quantized versions (populated when INT8_WEIGHTS is defined) */
+    /* Quantized weight versions: QW4 under INT4_WEIGHTS, QW under INT8_WEIGHTS */
+#if defined(INT4_WEIGHTS)
+    QW4 g_q_proj_q, g_k_proj_q, g_v_proj_q, g_o_proj_q;
+    QW4 f_q_proj_q, f_k_proj_q, f_v_proj_q, f_o_proj_q;
+    QW4 gate_proj_q, up_proj_q, down_proj_q;
+#elif defined(INT8_WEIGHTS)
     QW g_q_proj_q, g_k_proj_q, g_v_proj_q, g_o_proj_q;
     QW f_q_proj_q, f_k_proj_q, f_v_proj_q, f_o_proj_q;
     QW gate_proj_q, up_proj_q, down_proj_q;
+#endif
 } Weights;
 
 static void gdn_layer_forward(const Weights *w, LayerState *st, const float *hidden_in,
@@ -1218,7 +1375,20 @@ static void free_weights(Weights *w) {
     free(w->g_conv_w); free(w->g_beta);
     free(w->f_q_proj); free(w->f_k_proj); free(w->f_v_proj); free(w->f_o_proj);
     free(w->gate_proj); free(w->up_proj); free(w->down_proj);
-#ifdef INT8_WEIGHTS
+#if defined(INT4_WEIGHTS)
+#define FREE_QW(qw) do { free((qw).q); free((qw).s); } while(0)
+    FREE_QW(w->g_q_proj_q);
+    FREE_QW(w->g_k_proj_q);
+    FREE_QW(w->g_v_proj_q);
+    FREE_QW(w->g_o_proj_q);
+    FREE_QW(w->f_q_proj_q);
+    FREE_QW(w->f_k_proj_q);
+    FREE_QW(w->f_v_proj_q);
+    FREE_QW(w->f_o_proj_q);
+    FREE_QW(w->gate_proj_q);
+    FREE_QW(w->up_proj_q);
+    FREE_QW(w->down_proj_q);
+#elif defined(INT8_WEIGHTS)
 #if defined(__ARM_FEATURE_DOTPROD)
 #define FREE_QW(qw) do { free((qw).q); free((qw).s); free((qw).q_sdot); } while(0)
 #else
@@ -1253,6 +1423,7 @@ int main(int argc, char **argv) {
     int pure_gdn = 0;
     int prefill_M = 0;
     int verify_matmul = 0;
+    int verify_int4 = 0;
     int use_naive = 0;
     const char *ctx_lens_str = NULL;
     for (int i = 1; i < argc; ++i) {
@@ -1271,6 +1442,8 @@ int main(int argc, char **argv) {
             prefill_M = atoi(argv[++i]);
         else if (strcmp(argv[i], "--verify-matmul") == 0)
             verify_matmul = 1;
+        else if (strcmp(argv[i], "--verify-int4") == 0)
+            verify_int4 = 1;
         else if (strcmp(argv[i], "--naive") == 0)
             use_naive = 1;
         else if (strcmp(argv[i], "--help") == 0) {
@@ -1282,6 +1455,9 @@ int main(int argc, char **argv) {
             printf("  --prefill M       Process M tokens in one pass (measures TTFT / prefill cost)\n");
             printf("                    Exercises the cache-blocked M>1 matmul path (ob-8qt.15)\n");
             printf("  --verify-matmul   Verify gemm_neon correctness vs naive matmul, then exit\n");
+#ifdef INT4_WEIGHTS
+            printf("  --verify-int4     Verify INT4 GEMV accuracy vs FP32 oracle, then exit\n");
+#endif
             printf("  --naive           Force naive scalar matmul for M>1 (A/B comparison)\n");
             return 0;
         }
@@ -1354,6 +1530,76 @@ int main(int argc, char **argv) {
         printf("\n%s: %d/%d passed\n", failures ? "FAILED" : "ALL PASS", n_tests - failures, n_tests);
         return failures ? 1 : 0;
     }
+
+    /* ---- --verify-int4: INT4 accuracy vs FP32 oracle (ob-8qt.16) ----
+     *
+     * Generates random weight matrices at real model shapes, quantizes to
+     * INT4, runs both FP32 GEMV and INT4 GEMV on random inputs, and compares.
+     * Reports max abs error, max relative error, and SNR (dB).
+     * Exits 0 on success (SNR > 20 dB on all matrices) or 1 on failure. */
+#ifdef INT4_WEIGHTS
+    if (verify_int4) {
+        struct { size_t K, N; const char *desc; } tests[] = {
+            { HIDDEN, KEY_DIM,                     "GDN q/k_proj" },
+            { HIDDEN, VALUE_DIM,                   "GDN v_proj" },
+            { VALUE_DIM, HIDDEN,                   "GDN o_proj" },
+            { HIDDEN, FULL_HEADS * FULL_HEAD_DIM,  "Full q_proj" },
+            { HIDDEN, INTER,                       "FFN gate/up" },
+            { INTER, HIDDEN,                       "FFN down" },
+        };
+        int n_tests = sizeof(tests) / sizeof(tests[0]);
+        int failures = 0;
+        unsigned vseed = 42;
+
+        printf("Verifying INT4 GEMV accuracy vs FP32 oracle (%d matrices):\n\n", n_tests);
+
+        for (int t = 0; t < n_tests; ++t) {
+            size_t K = tests[t].K, N = tests[t].N;
+            float *B = malloc(K * N * sizeof(float));
+            float *a = malloc(K * sizeof(float));
+            float *c_fp32 = malloc(N * sizeof(float));
+            float *c_int4 = malloc(N * sizeof(float));
+
+            for (size_t i = 0; i < K * N; ++i)
+                B[i] = ((float)(vseed = (vseed * 1103515245 + 12345)) / 2147483647.0f - 0.5f) * 2.0f;
+            for (size_t i = 0; i < K; ++i)
+                a[i] = ((float)(vseed = (vseed * 1103515245 + 12345)) / 2147483647.0f - 0.5f) * 2.0f;
+
+            matmul(a, B, c_fp32, 1, K, N);
+
+            uint8_t *q4; float *s4;
+            quantize_weight_int4(B, &q4, &s4, K, N);
+            gemv_int4_neon(a, q4, s4, c_int4, K, N);
+
+            double sig_energy = 0.0, err_energy = 0.0;
+            float max_err = 0.0f, max_val = 0.0f;
+            for (size_t i = 0; i < N; ++i) {
+                float diff = fabsf(c_fp32[i] - c_int4[i]);
+                if (diff > max_err) max_err = diff;
+                float av = fabsf(c_fp32[i]);
+                if (av > max_val) max_val = av;
+                sig_energy += (double)c_fp32[i] * c_fp32[i];
+                err_energy += (double)diff * diff;
+            }
+            float rel_err = (max_val > 0) ? max_err / max_val : max_err;
+            double snr_db = (err_energy > 0.0)
+                ? 10.0 * log10(sig_energy / err_energy)
+                : 999.0;
+            int ok = (snr_db > 20.0);
+            if (!ok) failures++;
+
+            printf("  %-14s K=%-5zu N=%-5zu  SNR=%.1f dB  max_rel_err=%.2f%%  %s\n",
+                   tests[t].desc, K, N, snr_db, rel_err * 100.0f,
+                   ok ? "PASS" : "FAIL");
+
+            free(B); free(a); free(c_fp32); free(c_int4); free(q4); free(s4);
+        }
+
+        printf("\n%s: %d/%d passed (SNR > 20 dB threshold)\n",
+               failures ? "FAILED" : "ALL PASS", n_tests - failures, n_tests);
+        return failures ? 1 : 0;
+    }
+#endif
 
     unsigned seed = 12345;
 
