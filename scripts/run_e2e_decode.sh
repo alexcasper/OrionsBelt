@@ -18,6 +18,7 @@
 #   ./scripts/run_e2e_decode.sh --runs 3                 # 3 independent runs for repeat stats
 #   ./scripts/run_e2e_decode.sh --rebuild                # force rebuild even if binary exists
 #   ./scripts/run_e2e_decode.sh --quant int8             # INT8 weight-only quantization
+#   ./scripts/run_e2e_decode.sh --quant int4             # INT4 nibble-packed quantization
 #   ./scripts/run_e2e_decode.sh --model 08b --quant q8_0 # 0.8B model, Q8_0 block-quantized GEMV
 #
 # Output:
@@ -56,7 +57,7 @@ while [[ $# -gt 0 ]]; do
         --runs)    RUNS="$2"; shift 2 ;;
         --binary)  BINARY="$2"; shift 2 ;;
         --model)   MODEL="$2"; shift 2 ;;   # 4b (default) or 08b
-        --quant)   QUANT="$2"; shift 2 ;;   # fp32 (default), int8, or q8_0
+        --quant)   QUANT="$2"; shift 2 ;;   # fp32 (default), int8, int4, or q8_0
         --kv-quant) KV_QUANT="$2"; shift 2 ;; # fp32 (default) or int8 (KV cache)
         --force)   FORCE=1; shift ;;
         --rebuild) REBUILD=1; shift ;;
