@@ -71,8 +71,9 @@ esac
 case "$QUANT" in
     fp32) QUANT_DEF="" ;;
     int8) QUANT_DEF="-DINT8_WEIGHTS" ;;
+    int4) QUANT_DEF="-DINT4_WEIGHTS" ;;
     q8_0) QUANT_DEF="-DQ80_WEIGHTS" ;;
-    *) echo "Unknown --quant: $QUANT (expected fp32, int8, or q8_0)" >&2; exit 1 ;;
+    *) echo "Unknown --quant: $QUANT (expected fp32, int8, int4, or q8_0)" >&2; exit 1 ;;
 esac
 case "$KV_QUANT" in
     fp32) KV_DEF="" ;;
@@ -87,6 +88,9 @@ if [ -z "$BINARY" ]; then
     fi
     if [ "$QUANT" = "int8" ]; then
         BINARY="${BINARY}_int8"
+    fi
+    if [ "$QUANT" = "int4" ]; then
+        BINARY="${BINARY}_int4"
     fi
     if [ "$QUANT" = "q8_0" ]; then
         BINARY="${BINARY}_q80"
@@ -142,6 +146,9 @@ if [ "$CLUSTER" != "all" ]; then
 fi
 if [ "$QUANT" = "int8" ]; then
     DEVICE_NAME="${DEVICE_NAME}_int8"
+fi
+if [ "$QUANT" = "int4" ]; then
+    DEVICE_NAME="${DEVICE_NAME}_int4"
 fi
 if [ "$QUANT" = "q8_0" ]; then
     DEVICE_NAME="${DEVICE_NAME}_q80"
