@@ -2,7 +2,7 @@
   "caller": {},
   "git": {
     "dirty": true,
-    "sha": "4ad11c62add5cf2be752394b2a055c9a52209f6d"
+    "sha": "3ec1575f4fc5561211a62495e850be74e321e53a"
   },
   "host": {
     "core_count": 8,
@@ -80,7 +80,7 @@
   },
   "manifest_version": 1,
   "memory": {
-    "mem_available_kb": 3921080,
+    "mem_available_kb": 4835224,
     "mem_total_kb": 8120248
   },
   "parallelism": {
@@ -90,7 +90,7 @@
     "omp_proc_bind": null,
     "threads_source": "core_count_default"
   },
-  "run_id": "t4_20260808T061531Z_4ad11c6",
+  "run_id": "t4_20260808T045920Z_3ec1575",
   "software": {
     "packages": {
       "numpy": "2.5.1",
@@ -138,5 +138,5 @@
       "zone": "thermal_zone6"
     }
   ],
-  "timestamp_utc": "2026-08-08T06:15:31Z"
+  "timestamp_utc": "2026-08-08T04:59:20Z"
 }

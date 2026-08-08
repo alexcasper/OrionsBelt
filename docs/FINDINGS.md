@@ -4320,17 +4320,16 @@ Manifest: `results/manifests/rk3588-t4_prefill_gemm_optimization.json`.
 Governor: performance. Thermals: 39–41 °C (no throttling).
 Device: rk3588-t4 (RK3588, 2nd unit).
 
----
+## 26. INT4 weight-only quantization: core-type-dependent trade-off across the fleet (2026-08-08, ob-8qt.16)
 
-## 26. INT4 weight-only quantization: negative result on Cortex-A57 (2026-08-08, ob-8qt.16)
+**Bead:** ob-8qt.16 — INT4 weight-only quantization for CPU decode GEMV.
 
-### Motivation
-
-Natural extension of INT8 weight-only quantization (§16, 1.16–1.77×
-speedup): packed 4-bit nibbles halve weight memory traffic again versus
-INT8 (8× vs FP32). Decode is memory-bandwidth-bound, so the question is
-whether the extra bandwidth saving outweighs the higher unpack cost — the
-same roofline trade-off §16 used to judge INT8, applied one step further.
+INT4 packs two signed 4-bit integers per byte (range −8..7), cutting weight
+memory traffic 8× vs FP32 and 2× vs INT8. The per-column float scale design
+is unchanged from §16 (INT8); the new complexity is nibble unpack: each 16-byte
+load yields 32 packed values that must be split (low/high nibble), sign-extended
+from 4-bit (`(x<<4)>>4` arithmetic shift), and interleaved (`vzipq_s8`) to
+restore column order before widening to float32 for FMA accumulation.
 
 ### Implementation
 
@@ -4350,20 +4349,43 @@ The bug silently swapped every even/odd output column pair whenever the
 only ever handles the last `<16` columns). A standalone test comparing
 `gemv_int4_neon` against a scalar dequant+GEMV reference caught it
 immediately (exact match after the fix, `rel_err` from ~1.0–2.0 down to
-0). This is exactly the accuracy-regression check this bead's acceptance
-criteria called for and the original commit didn't include — worth
-flagging as a general lesson: bit-packing/unpacking kernels need a
-reference-comparison test, not just a benchmark, because a wrong but
-similarly-fast kernel produces a benchmark number that looks completely
-plausible.
+0). General lesson: bit-packing/unpacking kernels need a reference-
+comparison test, not just a benchmark, because a wrong but similarly-fast
+kernel produces a benchmark number that looks completely plausible.
 
-The bug does not change the instruction count or memory-access pattern of
-the NEON path (only which output float slot each unpacked value FMAs
-into), so it does not affect the timing conclusion below — but it means
-the kernel would have produced numerically wrong decode output if used
-for anything beyond benchmarking, prior to this fix.
+### Accuracy
 
-### Results — Jetson Nano A57 (0.8B, governor=performance, commit `a722289`/`5e16e96`)
+`--verify-int4` compares INT4 GEMV against FP32 oracle on real model shapes:
+
+| Matrix | K | N | SNR (dB) | Max rel error |
+|--------|--:|--:|----------|---------------|
+| GDN q/k_proj | 2560 | 2048 | 46.9 | 1.39% |
+| GDN v_proj | 2560 | 4096 | 47.1 | 1.60% |
+| GDN o_proj | 4096 | 2560 | 48.1 | 1.11% |
+| Full q_proj | 2560 | 4096 | 47.0 | 1.69% |
+| FFN gate/up | 2560 | 9216 | 47.0 | 1.51% |
+| FFN down | 9216 | 2560 | 49.7 | 0.92% |
+
+All pass the 20 dB SNR threshold. The ~1–2% relative error is expected for
+4-bit quantization (vs ~0.4% for INT8). For random benchmark weights the SNR
+is higher than it would be for real trained weights (which have heavier tails),
+but the pattern is clear: INT4 introduces measurably more error than INT8.
+
+### Decode throughput — RK3588 (Qwen3.5-4B, 30 tokens, governor=performance)
+
+| Variant | A76 tok/s | vs FP32 | A55 tok/s | vs FP32 |
+|---------|----------:|--------:|----------:|--------:|
+| FP32 | 1.11 | 1.00× | 0.40 | 1.00× |
+| INT8 | 1.82 | 1.64× | 0.51 | 1.28× |
+| INT4 | 1.55 | 1.40× | 0.56 | 1.40× |
+
+**INT4 vs INT8 on RK3588:**
+
+| | A76 | A55 |
+|--|-----|-----|
+| INT4 / INT8 | 0.85× | **1.10×** |
+
+### Decode throughput — Jetson Nano A57 (0.8B, governor=performance)
 
 | Variant | tok/s | TTFT (ms) |
 |---|---:|---:|
@@ -4372,30 +4394,88 @@ for anything beyond benchmarking, prior to this fix.
 | INT4 | 1.62 | 580.23 |
 
 INT4 is **not faster than INT8, and both are slower than FP32** on this
-device. The 4-bit nibble unpack (mask+shift+zip+sign-extend+widen, ~6 NEON
-ops per 16 values) costs more than the int8 widen path (~3 ops per 8
-values) it replaces, and the A57's narrow 2-wide pipeline can't hide that
-extra latency. The 2× additional bandwidth reduction over INT8 doesn't
-compensate — consistent with §16's finding that dequantization overhead is
-proportionally worse on narrower cores, one step further down the
-precision ladder.
+device.
 
-### Implication
+### Roofline interpretation — core-type-dependent
+
+The INT4 vs INT8 result diverges by core type, and the roofline model explains why:
+
+- **A76 (big cores, high bandwidth):** The nibble-unpack pipeline (mask +
+  arithmetic-shift + vzip + widen int8→int16→int32→float) adds ~7 instructions
+  per 32 elements, vs ~4 instructions per 8 elements for INT8 dequant. On A76,
+  where memory bandwidth is plentiful (2.3 GHz, wide L2/L3), the 2× weight-
+  traffic reduction is **dominated by the extra compute**. INT4 is 15% slower
+  than INT8. The core is compute-bound at INT4: the unpack pipeline can't keep
+  up with the FMA throughput.
+
+- **A55 (little cores, low bandwidth):** A55 has ~44% of A76's clock rate
+  (1.8 vs 2.3 GHz) and a narrower memory subsystem. Decode here is more deeply
+  bandwidth-bound, so the 2× weight-traffic reduction translates to a net win.
+  INT4 is 10% faster than INT8 and 1.40× vs FP32.
+
+- **A57 (Jetson Nano, narrowest pipeline):** The A57's narrow 2-wide pipeline
+  can't hide the extra unpack latency (~6 NEON ops per 16 values vs ~3 for INT8).
+  INT4 is **not faster than INT8** — and both are slower than FP32 on the 0.8B
+  model where weights fit in L2.
+
+This is the **opposite** of the INT8→FP32 pattern (§16), where INT8 was
+faster than FP32 on *both* core types. The explanation is that INT8→FP32
+is a 4× traffic reduction with modest dequant overhead — even A76 benefits.
+INT4→INT8 is only 2× more traffic reduction but with proportionally more
+unpack overhead — A76 tips over into compute-bound, and A57 can't amortize
+it at all.
+
+### Design implication
+
+The optimal weight-precision dispatch is **core-type-aware**:
+
+| Core type | Best weight precision | Reason |
+|-----------|-----------------------|--------|
+| A76 (big, high BW) | INT8 | Bandwidth saved without compute penalty |
+| A55 (little, low BW) | INT4 | Extra bandwidth savings outweigh unpack cost |
+| A57 (narrow pipeline) | FP32/INT8 | INT4 unpack overhead dominates |
 
 INT4 weight-only quantization is not a portable win the way INT8 is — it
 needs measurement per core class, not an assumption that "more compression
-is always better" on bandwidth-bound decode. It may still pay off on
-wider-pipeline cores (A76/A720) or with hardware INT4 support, but that is
-unmeasured; this result is A57-only and should not be generalized to the
-fleet without a re-run on RK3588.
+is always better" on bandwidth-bound decode.
 
 ### Data
 
-CSV: `results/raw/jetson-j1_int4_vs_int8_vs_fp32_08b.csv`.
+RK3588 CSVs: `results/raw/rk3588-t4_{a76,a55}_{fp32,int8,int4}.csv`.
+Manifest: `results/manifests/rk3588-t4_int4.json`. Device: rk3588-t4.
+Jetson CSV: `results/raw/jetson-j1_int4_vs_int8_vs_fp32_08b.csv`.
 Manifest: `results/manifests/jetson-j1_int4_a57.json` (sha `a722289`,
 dirty=false). Device: jetson-j1 (Cortex-A57).
 
-## 27. llama.cpp baseline: mature Q8_0/Q4_0 inference is 3.1× faster decode, 2.3× faster prefill than our C loop on A57 (2026-08-08, ob-mrd.15)
+## 27. ONNX Runtime CPU EP: GDN recurrence expressible via Loop but 16× slower than fused kernel (2026-08-08, ob-mrd.16)
+
+**Bead:** ob-mrd.16 — Audit ONNX Runtime CPU EP feasibility for Qwen3.5/GDN.
+**Full audit:** [`docs/research/ob-mrd.16-onnx-runtime-cpu-ep-gdn-audit.md`](research/ob-mrd.16-onnx-runtime-cpu-ep-gdn-audit.md).
+
+ONNX has no GDN primitive. The recurrence CAN be expressed via ONNX `Loop`
+(gate decay → error correction → state update → output projection per token),
+and ORT's CPU EP executes it correctly (rel_err 2.3×10⁻⁷ vs NumPy).
+
+However, ORT's generic `Loop` evaluates the body subgraph per iteration with
+no kernel fusion: ~49 µs/token for single-head V=128, vs ~3 µs for the
+project's fused C kernel — a **16× overhead**. There is also no Arm-specific
+tuning for the projection matmuls that dominate decode time.
+
+### Cross-toolchain positioning
+
+| Tool | Recurrence? | Optimized for Arm? |
+|------|-------------|-------------------|
+| CIX NOE / RKNN | ❌ cannot express | N/A (NPU only) |
+| KleidiAI | ❌ no scan | ✅ matmul only |
+| **ONNX Runtime** | **✅ via generic Loop** | **❌ generic** |
+| llama.cpp | ✅ dedicated op | ❌ generic vec_* |
+| **This project** | **✅** | **✅ SVE2/NEON/INT8/INT4** |
+
+ORT is the "third data point" confirming no existing CPU toolchain has
+optimized GDN kernels for Arm. Audit script: `scripts/ort_gdn_probe.py`.
+Device: rk3588-t4.
+
+## 28. llama.cpp baseline: mature Q8_0/Q4_0 inference is 3.1× faster decode, 2.3× faster prefill than our C loop on A57 (2026-08-08, ob-mrd.15)
 
 **Motivation.** ob-mrd.9 discovered that mainline llama.cpp has a native
 `GGML_OP_GATED_DELTA_NET` CPU implementation (generic scalar, no NEON/SVE
@@ -4461,9 +4541,9 @@ Manifest: `results/manifests/jetson-j1_llamacpp_vs_orionsbelt_08b.json`
 Our decode data: commit `5e16e96`. Our prefill data: commit `a722289`.
 llama.cpp: commit `69bf643`, built with gcc-8 for cortex-a57.
 
-## 28. Q8_0 block-quantized GEMV: 2.97× decode speedup, closing the gap with llama.cpp (2026-08-08, ob-8qt.17)
+## 29. Q8_0 block-quantized GEMV: 2.97× decode speedup, closing the gap with llama.cpp (2026-08-08, ob-8qt.17)
 
-**Motivation.** §27 showed llama.cpp Q8_0 decode is 3.14× faster than our FP32
+**Motivation.** §28 showed llama.cpp Q8_0 decode is 3.14× faster than our FP32
 C loop (5.40 vs 1.72 tok/s), while our existing INT8 (per-column scale,
 per-element int8→float32 dequant) showed *no* speedup (1.64 tok/s). The
 root cause: our INT8 GEMV wastes ~50% more NEON ops/element than FP32 on
