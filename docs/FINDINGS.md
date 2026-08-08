@@ -587,8 +587,8 @@ waiting for the chain to resolve; with two chains, the scheduler can interleave 
 >
 > **Update (fleet sweep, 2026-08-06):** The full fleet sweep (j2, commit `6a4d8ab`)
 > re-ran all four devices at commit `234807d`, single-threaded (`OMP_NUM_THREADS=1`),
-> clean tree. j1 single-threaded reads 1.18 GiB/s scan, j2 1.09 GiB/s — see the
-> fleet table below for the current numbers.
+> clean tree. j1 single-threaded reads 1.14 GiB/s scan (updated by batched-timing
+> fix `414b622`), j2 1.09 GiB/s — see the fleet table below for the current numbers.
 
 **Qwen3.5-0.8B (C=2048, T=64):**
 
@@ -764,16 +764,17 @@ Full analysis is regenerable via `python3 bench/fleet_analysis.py` and committed
 ### Achieved throughput (4B model, seq=64, baseline fp32, single-threaded)
 
 RK3588, Jetson j1, and Jetson j2 data are from the **fleet sweep** (ob-bf7):
-commit `234807d`, clean tree, single-threaded (`OMP_NUM_THREADS=1`). Pi 5 was
-not part of the fleet sweep; its data is from an earlier commit. See the
-optimization-impact section below for multi-threaded results.
+commit `234807d`, clean tree, single-threaded (`OMP_NUM_THREADS=1`). Jetson j1
+was subsequently refreshed with the batched-timing fix (commit `414b622`,
+ob-9xr). Pi 5 was not part of the fleet sweep; its data is from an earlier
+commit. See the optimization-impact section below for multi-threaded results.
 
 | Device | Spec | CumDecay | Scan | DWConv1D | Scan/Spec |
 |--------|------|----------|------|----------|-----------|
 | Pi 5 | 15.8 | 3.74 | 1.20 | 3.23 | 7.6% |
 | RK3588 big | 31.7 | 7.46 | 5.75 | 6.99 | 18.1% |
 | RK3588 little | 31.7 | 1.48 | 0.72 | 0.70 | 2.3% |
-| Jetson j1 | 23.8 | 1.59 | 1.18 | 1.41 | 5.0% |
+| Jetson j1 | 23.8 | 1.68 | 1.14 | 1.32 | 4.8% |
 | Jetson j2 | 23.8 | 1.50 | 1.09 | 0.93 | 4.6% |
 
 ### The discriminating test: Pi 5 (A76, less BW) vs Jetson (A57, more BW)
@@ -784,9 +785,9 @@ Pi 5 (15.8 GiB/s, newest A76 cores).
 
 | Kernel | Pi 5 | Jetson j1 | Jetson j2 | Winner | Pi5/J1 |
 |--------|------|-----------|-----------|--------|--------|
-| CumDecay | 3.74 | 1.16 | 1.32 | **Pi 5** | 3.22x |
-| Scan | 1.20 | 0.72 | 1.13 | **Pi 5** | 1.67x |
-| DWConv1D | 3.23 | 1.04 | 1.20 | **Pi 5** | 3.11x |
+| CumDecay | 3.74 | 1.68 | 1.50 | **Pi 5** | 2.23x |
+| Scan | 1.20 | 1.14 | 1.09 | **Pi 5** | 1.05x |
+| DWConv1D | 3.23 | 1.32 | 0.93 | **Pi 5** | 2.45x |
 
 **Result: the Pi 5 wins on ALL three kernels despite having 33% LESS spec
 bandwidth.** The bandwidth-bound hypothesis does NOT hold at seq=64 working set
@@ -884,7 +885,7 @@ This resolves the provenance question that dominated earlier analysis:
 |---|---|---:|---|
 | RK3588 big | t3 **2.91** vs t4 **5.75** | **1.98×** | same commit, clean, single-threaded |
 | RK3588 little | t3 **0.55** vs t4 **0.72** | **1.31×** | same commit, clean, single-threaded |
-| Jetson | j1 **1.18** vs j2 **1.09** | **1.08×** | same commit, clean, single-threaded |
+| Jetson | j1 **1.14** vs j2 **1.09** | **1.05×** | j1 updated post-sweep (batched-timing fix, `414b622`); j2 at fleet sweep `234807d` |
 
 > ⚠ **The following conclusion is superseded by the correction above.** The
 > "genuine hardware effect" claim is not supported because t3 ran 8-thread
