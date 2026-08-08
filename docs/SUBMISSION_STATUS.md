@@ -98,6 +98,7 @@ cutoff has passed with no board; any future arrival is additive bonus per ADR 00
 | #102 | j1 | GB/s→GiB/s in generated tables (32 files) + KleidiAI README | MERGED |
 | #127 | j1 | KleidiAI README URL fix, pyproject.toml Edge AI framing, Devpost writeup | MERGED |
 | #128 | j1 | Stale "Physical AI" + bare PLAN.md refs (31+ files) | MERGED |
+| #129 | j1 | SUBMISSION_STATUS.md Aug 8 cutoff + 3 broken link fixes | MERGED |
 
 ---
 
