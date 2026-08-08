@@ -4590,6 +4590,12 @@ CSV: `results/raw/jetson-j1_q80_vs_int8_vs_fp32_08b.csv`.
 Manifest: `results/manifests/jetson-j1_q80_a57.json` (sha `d223c19`,
 dirty=false, governor=performance). Two 30-repeat runs, stddev <1%.
 
+**Cross-validation:** the standard fleet harness (`run_e2e_decode.sh --quant q8_0`,
+3 independent runs at commit `dd77a26`) confirms 4.89±0.06 tok/s — slightly
+lower than the 5.12 A/B number due to static linking (`-static`) and different
+build flags in the harness. Both are valid; the 2.97× speedup is the
+controlled A/B comparison (same build, same seed, only quant variant differs).
+
 ## 30. Quantization accuracy validation: Q8_0 is numerically indistinguishable from FP32 (2026-08-08, ob-8qt.18)
 
 ### Motivation
