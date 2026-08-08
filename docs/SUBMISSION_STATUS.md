@@ -101,6 +101,7 @@ cutoff has passed with no board; any future arrival is additive bonus per ADR 00
 | #129 | j1 | SUBMISSION_STATUS.md Aug 8 cutoff + 3 broken link fixes | MERGED |
 | #130 | j1 | Fix stale FINDINGS section count (38→46), add PR #129, fix repo URL in pyproject.toml | MERGED |
 | #131 | j1 | Add PR #130 to merged PRs table in SUBMISSION_STATUS.md | MERGED |
+| #132 | j1 | Add PR #131 to merged PRs table in SUBMISSION_STATUS.md | MERGED |
 
 ---
 
