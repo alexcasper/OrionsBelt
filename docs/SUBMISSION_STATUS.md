@@ -106,6 +106,8 @@ cutoff has passed with no board; any future arrival is additive bonus per ADR 00
 | #134 | j1 | Add PR #133 to merged PRs table in SUBMISSION_STATUS.md | MERGED |
 | #135 | j1 | Add PR #134 to merged PRs table + backfill 13 t4 retroactive manifests (ob-mrd.17) + stale branch cleanup + bench/r5 security tracking (ob-0vu) | MERGED |
 | #136 | j1 | Add PR #135 to merged PRs table + fix lint in gen_retroactive_manifests.py + document bench/r5 exposure in SECURITY.md (ob-0vu closed) | MERGED |
+| #137 | j1 | Add PR #136 to merged PRs table in SUBMISSION_STATUS.md | MERGED |
+| #138 | j1 | Fix t4 8-thread provenance chain (ob-dpl): restore clean CSV+manifest (sha=7bbbc99, dirty=false), correct SHA citations in DEVPOST + SUBMISSION_STATUS + partial_comparison_table. Reviewer fix: precise wording on kernel code equivalence. | MERGED |
 
 ---
 
