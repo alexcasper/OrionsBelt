@@ -4624,12 +4624,12 @@ Tested across both model sizes (0.8B and 4B) on Jetson Nano A57.
 
 | Variant | Model   | Mean cos_sim | Mean rel_err | Mean abs_err |
 |---------|---------|-------------|-------------|-------------|
-| Q8_0    | 0.8B    | **1.000000**   | 0.12%       | 0.40        |
-| INT8    | 0.8B    | **1.000000**   | 0.10%       | 0.29        |
-| INT4    | 0.8B    | 0.999985       | 1.86%       | 5.83        |
-| Q8_0    | 4B      | **1.000000**   | 0.09%       | 0.58        |
-| INT8    | 4B      | **1.000000**   | 0.08%       | 0.42        |
-| INT4    | 4B      | 0.999994       | 1.37%       | 9.27        |
+| Q8_0    | 0.8B    | **1.000000**   | 0.12%       | 0.43        |
+| INT8    | 0.8B    | **1.000000**   | 0.09%       | 0.31        |
+| INT4    | 0.8B    | 0.999986       | 1.75%       | 6.30        |
+| Q8_0    | 4B      | **1.000000**   | 0.08%       | 0.60        |
+| INT8    | 4B      | **1.000000**   | 0.08%       | 0.47        |
+| INT4    | 4B      | 0.999994       | 1.39%       | 11.44       |
 
 ### Key findings
 
@@ -4642,7 +4642,7 @@ Tested across both model sizes (0.8B and 4B) on Jetson Nano A57.
    has no speed advantage over FP32 on A57 (§29 showed 1.72 tok/s vs FP32's
    1.64 — only 5% faster), making it the wrong trade-off.
 
-3. **INT4 degrades to cos_sim ≈ 0.99998–0.99999**, with 16× higher mean
+3. **INT4 degrades to cos_sim ≈ 0.99998–0.99999**, with 15–19× higher mean
    abs error than Q8_0/INT8. The 4-bit precision limit causes directional
    drift. INT4 has no speed advantage on A57 either (§29), making it a
    pure accuracy loss for zero throughput gain.
@@ -4679,7 +4679,7 @@ Tested across both model sizes (0.8B and 4B) on Jetson Nano A57.
 
 CSV: `results/raw/jetson-j1_quant_accuracy_08b_4b.csv` (66 rows: 11 matrices
 × 3 variants × 2 models).
-Manifest: `results/manifests/jetson-j1_quant_accuracy.json` (sha `c643e34`).
+Manifest: `results/manifests/jetson-j1_quant_accuracy_08b_4b.json` (sha `c643e34`).
 
 ## 31. Q8_0 context-length scaling: constant-time GDN advantage grows with quantization (2026-08-08, ob-4p0)
 
@@ -4716,9 +4716,10 @@ the 1.68× noise ceiling from §ob-bf7).
    is because Q8_0 accelerates the constant parts (FFN + GDN) so much that the
    relative attention bottleneck is exposed later.
 
-2. **Q8_0 GDN layer cost is nearly flat**: 72–80 µs per layer across all
-   context lengths (vs FP32 170–234 µs, INT8 126–130 µs). The ±10% variance
-   is thermal jitter, not an algorithmic trend.
+2. **Q8_0 GDN layer cost is nearly flat**: 72–80 µs per token, aggregated
+   across all 18 GDN layers, across all context lengths (vs FP32 167–237 µs,
+   INT8 126–130 µs). The ±10% variance is thermal jitter, not an algorithmic
+   trend.
 
 3. **Attention share of Q8_0 decode time reaches 60.3% at ctx=4096** — the
    highest of any quantization variant. This is the flip side of the
