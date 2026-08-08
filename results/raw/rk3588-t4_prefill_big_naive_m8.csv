@@ -1,0 +1,2 @@
+model,prefill_M,ttft_ms,tok_per_sec_prefill,gdn_us,full_us,ffn_us
+Qwen3.5-0.8B,8,31243.96,0.26,13053830,2231539,15958593
