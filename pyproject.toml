@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "orionsbelt"
 version = "0.1.0"
-description = "Optimizing a Qwen3.5 Gated DeltaNet hybrid model for Arm silicon (CIX P1 / Orion O6)."
+description = "Optimizing Qwen3.5 Gated DeltaNet for Arm edge silicon — CPU kernels, KleidiAI contribution, multi-device fleet benchmarks."
 readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.10"
