@@ -547,8 +547,25 @@ _BASE_EARLY = "dd50acd"  # "Create project brief for Qwen3.5 optimization"
 _DESC_DIVERGED = "9c8d239"  # descendant of _BASE_EARLY, touches src/ (kernel)
 
 
+def _is_shallow_checkout() -> bool:
+    """CI uses fetch-depth=1 (shallow); historical SHAs are unreachable there."""
+    import subprocess
+
+    r = subprocess.run(
+        ["git", "rev-parse", "--is-shallow-repository"],
+        capture_output=True,
+        text=True,
+    )
+    return r.returncode == 0 and r.stdout.strip() == "true"
+
+
 class TestCheckCommitLineage:
     """Test the git-provenance commit classifier."""
+
+    pytestmark = pytest.mark.skipif(
+        _is_shallow_checkout(),
+        reason="historical commit SHAs unreachable in shallow CI checkout",
+    )
 
     def test_base_commit_self_matches(self):
         """The base commit itself is classified as 'matched'."""

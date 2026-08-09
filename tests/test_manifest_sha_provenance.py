@@ -28,6 +28,25 @@ def _git_cat_file(sha: str) -> bool:
     return r.returncode == 0
 
 
+def _is_shallow_checkout() -> bool:
+    """CI uses fetch-depth=1 (shallow); historical SHAs are unreachable there.
+
+    The three SHA-resolution tests below rely on ``git cat-file`` to verify
+    that manifest SHAs resolve. On a shallow checkout only the HEAD commit is
+    available, so every manifest appears stale. Skip them there — they still
+    run in full clones (local dev, the on-device fleet).
+    """
+    r = subprocess.run(
+        ["git", "rev-parse", "--is-shallow-repository"],
+        capture_output=True,
+        text=True,
+    )
+    return r.returncode == 0 and r.stdout.strip() == "true"
+
+
+_shallow = _is_shallow_checkout()
+
+
 def _load_named_manifests():
     """Load all named (non-generic-retro) manifests."""
     manifests = []
@@ -68,6 +87,7 @@ class TestManifestShaProvenance:
                 missing.append(fn)
         assert not missing, f"Manifests missing git.sha: {missing}"
 
+    @pytest.mark.skipif(_shallow, reason="historical SHAs unreachable in shallow CI checkout")
     def test_stale_shas_have_resolved_equivalent(self, named_manifests):
         """If git.sha is unreachable, it must be either resolved or documented as
         genuinely unrecoverable.
@@ -106,6 +126,7 @@ class TestManifestShaProvenance:
             unresolved
         )
 
+    @pytest.mark.skipif(_shallow, reason="historical SHAs unreachable in shallow CI checkout")
     def test_sha_note_documented_for_stale_shas(self, named_manifests):
         """Stale SHAs must have a human-readable note explaining the gap."""
         missing_notes = []
@@ -124,6 +145,7 @@ class TestManifestShaProvenance:
 
         assert not missing_notes, f"Stale SHA manifests missing sha_note: {missing_notes}"
 
+    @pytest.mark.skipif(_shallow, reason="historical SHAs unreachable in shallow CI checkout")
     def test_all_resolved_shas_valid(self, named_manifests):
         """Every sha_resolved field must point to a valid git object."""
         invalid = []

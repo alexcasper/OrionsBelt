@@ -371,8 +371,18 @@ class TestBuildGdnLoopModel:
 # ---------------------------------------------------------------------------
 
 
+try:
+    import onnxruntime as _ort  # noqa: F401
+
+    _HAS_ORT = True
+except ImportError:
+    _HAS_ORT = False
+
+
 class TestMain:
     """Test main() — full ORT probe pipeline with tiny dimensions."""
+
+    pytestmark = pytest.mark.skipif(not _HAS_ORT, reason="onnxruntime not installed")
 
     def test_main_success(self, monkeypatch, capsys):
         """main() builds model, runs ORT, checks correctness — returns 0."""
@@ -416,6 +426,8 @@ class TestMain:
 
 class TestMainErrorPaths:
     """Cover error-handling branches in main()."""
+
+    pytestmark = pytest.mark.skipif(not _HAS_ORT, reason="onnxruntime not installed")
 
     def test_build_failure_returns_1(self, monkeypatch, capsys):
         """When build_gdn_loop_model raises, main() returns 1."""
