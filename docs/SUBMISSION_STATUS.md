@@ -176,6 +176,8 @@ cutoff has passed with no board; any future arrival is additive bonus per ADR 00
 | #180 | t3 | SDOT INT8 cross-device validation + rebase provenance fixes | MERGED |
 | #181 | t4 | Device bench + submission readiness fixes + GDN-2 unit tests | MERGED |
 | #182 | t3 | Fix ruff format + keep branch current with main | MERGED |
+| #183 | t3 | Regenerated fleet_cross_device.png after t4 PR merge | MERGED |
+| #184 | t4 | Doc consistency fixes — stale counts + PR table backfill | MERGED |
 
 ---
 
