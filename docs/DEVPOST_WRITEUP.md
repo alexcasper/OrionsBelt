@@ -254,8 +254,19 @@ We implemented a NumPy reference of GDN-2's decoupled erase/write gating
 (FINDINGS.md §6, `bench/gdn2_reference.py`) and microbenchmarked it against
 standard GDN gating. The decoupled gates separate erase (β_t) and write (w_t)
 into channel-wise operations rather than tying them through a single scalar.
-The microbenchmark shows the compute cost is comparable; the retrieval
-quality hypothesis requires a model-level swap that is a stretch goal.
+The microbenchmark shows the compute cost is comparable. We then attempted
+the retrieval-quality test directly: swapping GDN-1's layer-0 for a GDN-2
+module in a live Qwen3.5-0.8B checkpoint and running 30-step isolated MSE
+distillation (see [`gdn2_swap_findings.md`](./gdn2_swap_findings.md)).
+MSE dropped 94%, but cross-entropy loss recovered only 18% of the gap.
+A 10-prompt RULER multi-key retrieval evaluation
+([`gdn2_ruler_findings.md`](./gdn2_ruler_findings.md)) showed GDN-2 at 10%
+accuracy vs GDN-1's 30% (below the 20% random baseline), with 5× worse
+log-probabilities. This is an honest negative result: the 30-step
+single-layer adaptation is insufficient to test whether decoupled gating
+improves retrieval, not evidence against the GDN-2 architecture itself.
+Full fine-tuning or smart gate initialization from GDN-1's β values is
+needed for a meaningful comparison.
 
 ### Potential impact (20 pts)
 
@@ -438,8 +449,12 @@ ORIONS_FORCE_FP32=1 python3 bench/harness.py \
   efficiency (SDOT). See FINDINGS.md §15–16, §33–34.
 - **bf16/fp16 model inference on RK3588:** OneDNN's bf16 path hangs on
   Cortex-A76. Model inference runs in fp32 only on this platform.
-- **GDN-2 layer swap into a live checkpoint:** stretch goal not reached.
-  NumPy reference and microbenchmark are done; full model swap is future work.
+- **GDN-2 layer swap into a live checkpoint:** completed on RK3588 (t3).
+  Layer 0 swapped, 30-step isolated MSE distillation achieved 94% MSE
+  reduction but only 18% CE recovery. RULER retrieval: 10% vs 30% baseline
+  (below random) — insufficient adaptation, not architectural failure.
+  See [`gdn2_swap_findings.md`](./gdn2_swap_findings.md) and
+  [`gdn2_ruler_findings.md`](./gdn2_ruler_findings.md).
 - **Dynamic heterogeneous dispatcher:** designed but not implemented (requires
   the O6's GPU+NPU for a meaningful test). The phase-dependent routing policy
   is described in [`NPU_OFFLOAD_DESIGN.md`](./NPU_OFFLOAD_DESIGN.md) §4.4.
