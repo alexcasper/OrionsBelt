@@ -187,7 +187,7 @@ int main(void) {
     {
         /* Use real-ish shapes: K=head_dim, N=larger to exercise vectorized path */
         size_t K5 = 128, N5 = 512;
-        float *W5 = malloc(K5 * N5 * sizeof(float));
+        float *W5 = xmalloc(K5 * N5 * sizeof(float));
         unsigned s5 = 99;
         for (size_t i = 0; i < K5 * N5; ++i)
             W5[i] = ((float)(rand_r(&s5) % 2000) - 1000) / 1000.0f;
@@ -198,13 +198,13 @@ int main(void) {
         /* Repack for SDOT */
         int8_t *q5_sdot = repack_int8_k_interleaved(q5, K5, N5);
 
-        float *a5 = malloc(K5 * sizeof(float));
+        float *a5 = xmalloc(K5 * sizeof(float));
         for (size_t k = 0; k < K5; ++k)
             a5[k] = ((float)(rand_r(&s5) % 2000) - 1000) / 1000.0f;
 
-        float *c_neon = malloc(N5 * sizeof(float));
-        float *c_sdot = malloc(N5 * sizeof(float));
-        float *c_fp32 = malloc(N5 * sizeof(float));
+        float *c_neon = xmalloc(N5 * sizeof(float));
+        float *c_sdot = xmalloc(N5 * sizeof(float));
+        float *c_fp32 = xmalloc(N5 * sizeof(float));
 
         gemv_neon(a5, W5, c_fp32, K5, N5);
         gemv_int8_neon(a5, q5, sc5, c_neon, K5, N5);
