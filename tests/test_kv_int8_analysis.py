@@ -238,3 +238,98 @@ class TestGenerateReport:
         report = self._run_report(tmp_path, monkeypatch)
         assert "Improvement" in report
         assert "INT8 KV only" in report
+
+    def test_no_fp32w_int8kv_skips_kv_only_speedup(self, tmp_path, monkeypatch):
+        """When fp32w_int8kv is missing, kv_only_fa stays 0, speedup line skipped."""
+        results_raw = tmp_path / "results" / "raw"
+        results_raw.mkdir(parents=True)
+
+        device = "rk3588-t3_big"
+        ctx_lens = [1, 4096]
+        # FP32 baseline + INT8 both, but NO fp32w_int8kv
+        for suffix, fa_mult, tps_base in [
+            ("fp32w_fp32kv", 200, 10.0),
+            ("int8w_int8kv", 100, 20.0),
+        ]:
+            _write_kv_csv(
+                results_raw / f"{device}_ctx_sweep_4b_{suffix}.csv",
+                [
+                    {
+                        "model": "4B",
+                        "ctx_len": str(ctx),
+                        "gdn_layer_us": "100",
+                        "full_attn_us": str(fa_mult * ctx),
+                        "ffn_us": "50",
+                        "total_us": str(350 + fa_mult * (ctx - 1)),
+                        "tok_per_sec": str(tps_base / ctx),
+                        "kv_cache_mb": str(4.0 * ctx if "fp32kv" in suffix else 1.0 * ctx),
+                    }
+                    for ctx in ctx_lens
+                ],
+            )
+
+        report = self._run_report(tmp_path, monkeypatch)
+        assert "Impact at ctx=4096" in report
+        # KV-only speedup line should NOT appear (kv_only_fa == 0)
+        assert "INT8 KV only" not in report
+        # But degradation analysis should still be present
+        assert "Throughput degradation" in report
+
+    def test_only_int8w_int8kv_no_fp32_baseline(self, tmp_path, monkeypatch):
+        """Only int8w_int8kv present, no fp32w_fp32kv → no impact table, no gdn section."""
+        results_raw = tmp_path / "results" / "raw"
+        results_raw.mkdir(parents=True)
+
+        device = "rk3588-t3_big"
+        # Only INT8 config
+        _write_kv_csv(
+            results_raw / f"{device}_ctx_sweep_4b_int8w_int8kv.csv",
+            _make_config_rows([1, 4096]),
+        )
+
+        report = self._run_report(tmp_path, monkeypatch)
+        assert "### Throughput by configuration" in report
+        # Impact table requires both fp32w_fp32kv and int8w_int8kv
+        assert "Impact at" not in report
+        # GDN section requires fp32w_fp32kv data
+        assert "GDN layer cost" not in report
+
+
+# ---------------------------------------------------------------------------
+# main() — CLI entry point
+# ---------------------------------------------------------------------------
+
+
+class TestMain:
+    def test_main_writes_report(self, tmp_path, monkeypatch):
+        """main() writes a report file for the default device."""
+        import bench.kv_int8_analysis as mod
+
+        out_dir = tmp_path / "figures"
+        out_dir.mkdir(parents=True)
+        monkeypatch.setattr(
+            "sys.argv",
+            ["kv_int8_analysis.py", "--device", "rk3588-t3_big", "--output-dir", str(out_dir)],
+        )
+        monkeypatch.chdir(tmp_path)
+        mod.main()
+        report_path = out_dir / "kv_int8_scaling_t3.md"
+        assert report_path.exists()
+        text = report_path.read_text()
+        assert "# INT8 KV Cache Quantization" in text
+
+    def test_main_via_runpy(self, tmp_path, monkeypatch):
+        """Running the script as __main__ via runpy covers the __main__ guard."""
+        import runpy
+
+        out_dir = tmp_path / "figures"
+        out_dir.mkdir(parents=True)
+        monkeypatch.setattr(
+            "sys.argv",
+            ["kv_int8_analysis.py", "--device", "rk3588-t3_big", "--output-dir", str(out_dir)],
+        )
+        monkeypatch.chdir(tmp_path)
+        script_path = str(Path(__file__).resolve().parent.parent / "bench" / "kv_int8_analysis.py")
+        runpy.run_path(script_path, run_name="__main__")
+        report_path = out_dir / "kv_int8_scaling_t3.md"
+        assert report_path.exists()

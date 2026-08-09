@@ -938,3 +938,138 @@ class TestNoNumpyFallback:
 if __name__ == "__main__":
     _run_all()
     print("\n✓ All standalone checks passed.")
+
+
+# ===========================================================================
+# Coverage gap tests (ob-d78)
+# ===========================================================================
+
+
+class TestCompareReferenceEdgeCases:
+    """Cover branches in compare_reference that existing tests miss."""
+
+    def test_no_perplexity_in_either_entry(self):
+        """When neither entry has perplexity, the perplexity block is skipped."""
+        ref = {"context_length": 128, "argmax_token": 42}
+        cand = {"context_length": 128, "argmax_token": 42}
+        cfg = ToleranceConfig()
+        report = compare_reference(ref, cand, cfg)
+        # Should still pass — just no perplexity metric
+        assert report.passed
+        ppl_metrics = [m for m in report.metrics if "perplexity" in m.name.lower()]
+        assert len(ppl_metrics) == 0
+
+    def test_perplexity_only_in_reference(self):
+        """Perplexity present in ref but not cand → skipped."""
+        ref = {"context_length": 128, "perplexity": 10.0, "argmax_token": 42}
+        cand = {"context_length": 128, "argmax_token": 42}
+        cfg = ToleranceConfig()
+        report = compare_reference(ref, cand, cfg)
+        ppl_metrics = [m for m in report.metrics if "perplexity" in m.name.lower()]
+        assert len(ppl_metrics) == 0
+
+    def test_topk_empty_indices_skipped(self):
+        """Top-k windows with empty indices → ref_indices falsy → overlap skipped."""
+        ref_window = {"position_from_end": -1, "indices": [], "values": []}
+        cand_window = {"position_from_end": -1, "indices": [], "values": []}
+        ref = _make_ref_entry(topk_window=[ref_window])
+        cand = _make_ref_entry(topk_window=[cand_window])
+        cfg = ToleranceConfig(topk=5)
+        report = compare_reference(ref, cand, cfg)
+        # No overlap metric since all indices were empty
+        overlap_metrics = [m for m in report.metrics if "topk_window_overlap" in m.name]
+        assert len(overlap_metrics) == 0
+
+    def test_topk_some_empty_some_not(self):
+        """Mix of empty and non-empty indices → partial overlap computed."""
+        empty_w = {"position_from_end": -1, "indices": [], "values": []}
+        full_ref_w = {"position_from_end": -1, "indices": [1, 2, 3], "values": [3, 2, 1]}
+        full_cand_w = {"position_from_end": -1, "indices": [1, 2, 4], "values": [3, 2, 1]}
+        ref = _make_ref_entry(topk_window=[empty_w, full_ref_w])
+        cand = _make_ref_entry(topk_window=[empty_w, full_cand_w])
+        cfg = ToleranceConfig(topk=3, topk_min_accuracy=0.5)
+        report = compare_reference(ref, cand, cfg)
+        overlap_metrics = [m for m in report.metrics if "topk_window_overlap" in m.name]
+        assert len(overlap_metrics) == 1
+        # 2/3 overlap from the non-empty window
+        assert overlap_metrics[0].value == pytest.approx(2 / 3)
+
+
+class TestMainCLIErrorPaths:
+    """Cover FileNotFoundError and JSONDecodeError handlers in main()."""
+
+    def test_reference_file_not_found(self, tmp_path):
+        """Missing reference file → parser.error → SystemExit(2)."""
+        cand_path = tmp_path / "cand.json"
+        cand_path.write_text(json.dumps({"logits": [[1.0, 2.0]]}))
+        with pytest.raises(SystemExit) as exc_info:
+            correctness_main([
+                "--reference", str(tmp_path / "nonexistent.json"),
+                "--candidate", str(cand_path),
+            ])
+        assert exc_info.value.code == 2
+
+    def test_reference_json_decode_error(self, tmp_path):
+        """Malformed JSON in reference file → parser.error → SystemExit(2)."""
+        ref_path = tmp_path / "ref.json"
+        ref_path.write_text("{not valid json")
+        cand_path = tmp_path / "cand.json"
+        cand_path.write_text(json.dumps({"logits": [[1.0, 2.0]]}))
+        with pytest.raises(SystemExit) as exc_info:
+            correctness_main([
+                "--reference", str(ref_path),
+                "--candidate", str(cand_path),
+            ])
+        assert exc_info.value.code == 2
+
+    def test_candidate_file_not_found(self, tmp_path):
+        """Missing candidate file → parser.error → SystemExit(2)."""
+        ref_path = tmp_path / "ref.json"
+        ref_path.write_text(json.dumps({"logits": [[1.0, 2.0]]}))
+        with pytest.raises(SystemExit) as exc_info:
+            correctness_main([
+                "--reference", str(ref_path),
+                "--candidate", str(tmp_path / "nonexistent.json"),
+            ])
+        assert exc_info.value.code == 2
+
+    def test_candidate_json_decode_error(self, tmp_path):
+        """Malformed JSON in candidate file → parser.error → SystemExit(2)."""
+        ref_path = tmp_path / "ref.json"
+        ref_path.write_text(json.dumps({"logits": [[1.0, 2.0]]}))
+        cand_path = tmp_path / "cand.json"
+        cand_path.write_text("<<<broken>>>")
+        with pytest.raises(SystemExit) as exc_info:
+            correctness_main([
+                "--reference", str(ref_path),
+                "--candidate", str(cand_path),
+            ])
+        assert exc_info.value.code == 2
+
+
+class TestMainEntryRunpy:
+    """Cover the __main__ guard via runpy."""
+
+    def test_runpy_main(self, tmp_path, monkeypatch):
+        """Running correctness.py as __main__ via runpy exercises sys.exit(main())."""
+        import runpy
+
+        ref = {"logits": [[1.0, 2.0, 3.0]]}
+        ref_path = tmp_path / "ref.json"
+        ref_path.write_text(json.dumps(ref))
+        cand_path = tmp_path / "cand.json"
+        cand_path.write_text(json.dumps(ref))
+
+        monkeypatch.setattr(
+            "sys.argv",
+            [
+                "correctness.py",
+                "--reference", str(ref_path),
+                "--candidate", str(cand_path),
+            ],
+        )
+        script_path = str(Path(__file__).resolve().parent.parent / "bench" / "correctness.py")
+        with pytest.raises(SystemExit) as exc_info:
+            runpy.run_path(script_path, run_name="__main__")
+        # Matching logits → passed → exit 0
+        assert exc_info.value.code == 0
