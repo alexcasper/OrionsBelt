@@ -150,6 +150,7 @@ cutoff has passed with no board; any future arrival is additive bonus per ADR 00
 | #157 | j1 | Add 19 missing merged PRs (#106–#126) to SUBMISSION_STATUS table | MERGED |
 | #158 | t3 | Re-run KleidiAI bench with taskset -c 4-7 — fix cumdecay 64×160 A55 mis-measurement + suppress -Wunused-but-set-variable + improve big.LITTLE affinity warning | MERGED |
 | #159 | t3 | Fix GPU kernel read-step matrix notation (S_h^T) + add PRs #156–#158 to table + stale FINDINGS line count + warn on unrecognized CLI args + fix -Wmaybe-uninitialized in e2e_decode | MERGED |
+| #160 | t3 | Add missing PRs #100–#101 to merged PRs table (gap before #102) + beads sync after ob-502 note | MERGED |
 
 ---
 
