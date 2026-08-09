@@ -5517,7 +5517,7 @@ architecture. Full end-to-end fine-tuning is needed for a fair comparison.
 
 | Run | Commit | Device | Manifest |
 |-----|--------|--------|----------|
-| 30-step random | `06f3a9f` | rk3588-t3 A76 | `gdn2_swap_t3.json` |
+| 30-step random | `8faec1e` | rk3588-t3 A76 | `gdn2_swap_t3.json` |
 | 30-step smart init | `8faec1e` | rk3588-t3 A76 | `gdn2_swap_smart_init_t3.json` |
 | 100-step random | `937ba25` | rk3588-t3 A76 | `gdn2_swap_100step_t3.json` |
 | RULER GDN-1 | `1743c3e` | rk3588-t3 A76 | `ruler_gdn1_t3.json` |
