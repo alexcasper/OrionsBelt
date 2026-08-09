@@ -183,9 +183,9 @@ t4 = 8 tokens (re-run, see per-row manifest for details).
 
 | Device | Model | tok/s | TTFT (ms) | Git SHA | Manifest |
 |---|---|---:|---:|---|---|
-| rk3588-t3 | 4B   | 1.04 | 964 | `7962968` | `rk3588-t3_e2e.json` |
+| rk3588-t3 | 4B   | 1.04 | 964 | `2e752af` | `rk3588-t3_e2e.json` |
 | rk3588-t4 | 4B   | 1.11 | 900 | `3d914b6` | `rk3588-t4_big_e2e.json` |
-| rk3588-t3 | 0.8B | 7.98 | 125 | `41a847d` | `rk3588-t3_08b_e2e.json` |
+| rk3588-t3 | 0.8B | 7.98 | 125 | `7962968` | `rk3588-t3_08b_e2e.json` |
 | rk3588-t4 | 0.8B | 8.32 | 120 | `79668e3` | `rk3588-t4_08b_big_e2e.json` |
 
 > **10–15× speedup** from fixing the GEMV memory access pattern (column-sweep →
@@ -204,9 +204,9 @@ t4 = 8 tokens (re-run, see per-row manifest for details).
 
 | Device | Model | Quant | tok/s | TTFT (ms) | Git SHA | Manifest |
 |---|---|---|---:|---:|---|---|
-| rk3588-t3 | 4B   | INT8 | 1.84 | 542 | `a8e2319` | `rk3588-t3_big_int8_e2e.json` |
+| rk3588-t3 | 4B   | INT8 | 1.84 | 542 | `d5d867d` | `rk3588-t3_big_int8_e2e.json` |
 | rk3588-t4 | 4B   | INT8 | 1.83 | 545 | `861bdf2` | `rk3588-t4_big_int8_e2e.json` |
-| rk3588-t3 | 0.8B | INT8 | 10.58 | 94 | `d94864b` | `rk3588-t3_08b_big_int8_e2e.json` |
+| rk3588-t3 | 0.8B | INT8 | 10.58 | 94 | `a8e2319` | `rk3588-t3_08b_big_int8_e2e.json` |
 | rk3588-t4 | 0.8B | INT8 | 10.03 | 100 | `d2262f1` | `rk3588-t4_08b_big_int8_e2e.json` |
 
 > INT8 weight-only quantization (per-column symmetric, NEON dequantize-on-the-fly)
