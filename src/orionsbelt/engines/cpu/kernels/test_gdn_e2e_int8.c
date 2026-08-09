@@ -28,6 +28,10 @@
 
 #include <math.h>
 
+#ifndef INT8_WEIGHTS
+#error "test_gdn_e2e_int8.c requires -DINT8_WEIGHTS (quantize_weight is ifdef-guarded)"
+#endif
+
 /* xmalloc() already defined in gdn_e2e_decode.c (included above). */
 
 int main(void) {

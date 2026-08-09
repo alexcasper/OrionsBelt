@@ -2695,10 +2695,6 @@ int main(int argc, char **argv) {
         return 1;
     }
     double *tok_times = xmalloc(num_tokens * sizeof(double));
-<<<<<<< HEAD
-    if (!tok_times) { fprintf(stderr, "OOM allocating tok_times\n"); return 1; }
-=======
->>>>>>> 8c4792a (t3: add xmalloc/xcalloc wrappers to bench_gdn.c and gdn_e2e_decode.c (44+20 call sites))
     double t_start_all = now_us();
 
     for (int t = 0; t < num_tokens; ++t) {
