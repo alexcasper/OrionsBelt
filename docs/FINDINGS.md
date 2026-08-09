@@ -5453,3 +5453,72 @@ regardless of whether the tensor is 1KB or 100KB).
 - **No profiling events**: The RustiCL/Panfrost stack does not expose OpenCL profiling
   events (CL_PROFILING), so GPU-side timing was unavailable. All measurements are
   host-side wall-clock with blocking calls.
+
+## 40. GDN-2 layer swap, smart gate initialization, and RULER retrieval evaluation (2026-08-09, ob-68l/ob-t3b.9/ob-zak)
+
+**Goal:** Test whether GDN-2 (decoupled erase/write gating) can replace GDN-1
+layers in a Qwen3.5-0.8B checkpoint and whether the swap preserves retrieval
+quality. Full details in [`gdn2_swap_findings.md`](./gdn2_swap_findings.md)
+and [`gdn2_ruler_findings.md`](./gdn2_ruler_findings.md).
+
+### GDN-2 layer swap with isolated MSE distillation
+
+Layer 0 of Qwen3.5-0.8B (18 GDN-1 + 6 full-attention in a 3:1 pattern) was
+swapped to GDN-2. Full-model backprop is infeasible on RK3588 CPU (436 s/step),
+so an **isolated MSE distillation** approach was used: capture GDN-1's input/output
+in a single no-grad forward pass, then train only the ~4.2 M new gate parameters
+against the cached output (6.6 s/step, 66× faster).
+
+| Metric | Value |
+|--------|-------|
+| Post-swap CE loss increase | +9.0 (2.91 → 11.91) |
+| CE recovery after 30 steps | 17.1% (→ 10.37) |
+| Isolated MSE reduction (30 steps) | 94% (0.023 → 0.0036) |
+
+### Smart gate initialization (ob-t3b.9)
+
+Broadcasting GDN-1's learned β values to GDN-2's per-channel gates (instead of
+random Xavier init) provides a measurable but modest improvement:
+
+| Metric | Random init | Smart init | Δ |
+|--------|------------|------------|---|
+| Initial MSE | 0.0228 | 0.0181 | −20.6% |
+| CE recovery | 17.1% | 19.9% | +2.8 pp |
+| MSE at step 30 | 0.0036 | 0.0036 | ~same |
+
+Both strategies converge to the same MSE — initialization affects the start
+point, not the destination. Smart init gives ~3× adaptation for free (matches
+100-step random init's 19.6% recovery at only 30 steps).
+
+### Adaptation depth sweep (100 steps)
+
+Tripling steps (30→100) dropped MSE 66% (0.0036→0.0012) but improved CE
+recovery by only +2.5 pp (17.1%→19.6%). Below MSE ≈ 0.004, further reduction
+yields diminishing CE returns — the ~80% residual gap is **structural**
+(downstream layer amplification), not optimization-limited.
+
+### RULER multi-key retrieval (ob-zak)
+
+Log-likelihood scoring on 10 prompts × 5 keys each (commit `1743c3e`):
+
+| Metric | GDN-1 | GDN-2 (30-step adapted) |
+|--------|-------|--------------------------|
+| Accuracy | 30% (3/10) | 10% (1/10) |
+| Avg correct log-prob | −14.6 | −71.2 |
+| Random baseline | 20% | 20% |
+
+GDN-2 at 30-step adaptation falls below random baseline — the model is too
+degraded to test the retrieval hypothesis. The 5× log-prob degradation is
+consistent across all prompts. This negative result reflects **insufficient
+adaptation** (only 1 layer, isolated training), not a flaw in the GDN-2
+architecture. Full end-to-end fine-tuning is needed for a fair comparison.
+
+### Provenance
+
+| Run | Commit | Device | Manifest |
+|-----|--------|--------|----------|
+| 30-step random | `8faec1e` | rk3588-t3 A76 | `gdn2_swap_t3.json` |
+| 30-step smart init | `8faec1e` | rk3588-t3 A76 | `gdn2_swap_smart_init_t3.json` |
+| 100-step random | `937ba25` | rk3588-t3 A76 | `gdn2_swap_100step_t3.json` |
+| RULER GDN-1 | `1743c3e` | rk3588-t3 A76 | `ruler_gdn1_t3.json` |
+| RULER GDN-2 | `1743c3e` | rk3588-t3 A76 | `ruler_gdn2_t3.json` |
