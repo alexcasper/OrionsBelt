@@ -7,6 +7,16 @@ export PATH="$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH
 cd "$HOME/OrionsBelt" || { echo "no ~/OrionsBelt"; exit 1; }
 HOST=$(hostname); BRANCH="bench/$HOST"
 LOG="$HOME/OrionsBelt/.goose-loop.log"; TASK="$HOME/OrionsBelt/.goose-task.md"; GOOSE="$HOME/.local/bin/goose"
+# Guard against duplicate instances: if another goose-loop.sh is already
+# running, exit silently. Prevents two agents working the same branch
+# concurrently (seen on t3 2026-08-09: two sessions spawned two goose
+# agents; the stale one generated 146 runaway gitignored manifests).
+# Anchored ^bash excludes the tmux wrapper that launches this script.
+_OTHER=$(pgrep -f "^bash goose-loop.sh" | grep -v "^$$\$" | head -1)
+if [ -n "$_OTHER" ]; then
+  echo "[guard] another goose-loop.sh (PID $_OTHER) is already running — exiting" >>"$LOG"
+  exit 0
+fi
 TEMPLATE="$HOME/OrionsBelt/docs/agent-task.template.md"
 # Max session age before forced fresh start. A resumed session can drift
 # arbitrarily far behind main if it never re-reads the task template's
