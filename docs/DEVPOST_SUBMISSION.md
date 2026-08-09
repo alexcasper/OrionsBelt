@@ -56,7 +56,7 @@ At 262K context on the 4B checkpoint, that difference is **23.95 GiB of RAM** �
 
 ### Headline: GDN kernel bandwidth on RK3588 Cortex-A76
 
-Qwen3.5-4B, prefill (seq=64), fp32 baseline, 8-thread (big cluster). Two independent RK3588 nodes (t3, t4 Turing Machines RK1). Kernel logic is unchanged between commits (the only diff in `bench_gdn.c` between f015982 and 7bbbc99 is a `_POSIX_C_SOURCE` feature-test macro added for strict-C11 portability in 197dc2f — no behavioral change).
+Qwen3.5-4B, prefill (seq=64), fp32 baseline, 8-thread (big cluster). Two independent RK3588 nodes (t3, t4 Turing Machines RK1). Kernel computation is unchanged between commits (diffs in `bench_gdn.c` between f015982 and 8227e98 are infrastructure only: `_POSIX_C_SOURCE` macro, SPDX header, `xmalloc` safety wrapper — no behavioral change to kernel arithmetic).
 
 | Kernel | GiB/s (t3) | Spread | GiB/s (t4) | Spread | t3÷t4 |
 |---|---:|---:|---:|---:|---:|
