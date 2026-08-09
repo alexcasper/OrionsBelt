@@ -107,6 +107,13 @@ extern void gdn_causal_dwconv1d_f32(const float *in, const float *w, float *out,
 #define FULL_KV_HEADS 4
 #endif
 
+/* Geometry invariant: FULL_HEAD_DIM must be divisible by 8 for NEON
+ * vectorization (8 × float32x4_t or 16 × int8x16_t per pass).  This
+ * lets the compiler prove that scalar tail loops are dead code and
+ * silences -Waggressive-loop-optimizations. */
+_Static_assert(FULL_HEAD_DIM % 8 == 0,
+               "FULL_HEAD_DIM must be a multiple of 8 for NEON");
+
 /* ---- INT8 weight-only quantization ----
  *
  * Stores weights as int8 + per-output-column float scale. Dequantizes
@@ -1533,7 +1540,6 @@ static void full_attn_real_forward(const Weights *w, LayerState *st,
     float *k = alloc_aligned(kv_dim);
     float *v = alloc_aligned(kv_dim);
     float *attn_out = alloc_aligned(q_dim);
-    float *scores = alloc_aligned(ctx);
 
     /* Q/K/V projections (same as simulated mode) */
     MM(hidden_in, w->f_q_proj, w->f_q_proj_q, q, 1, HIDDEN, q_dim);
@@ -1544,13 +1550,21 @@ static void full_attn_real_forward(const Weights *w, LayerState *st,
     memcpy(st->kv_k_grow + pos * kv_dim, k, kv_dim * sizeof(float));
     memcpy(st->kv_v_grow + pos * kv_dim, v, kv_dim * sizeof(float));
 
-    /* GQA attention: each Q head attends to its KV head group */
+    /* GQA attention: each Q head attends to its KV head group.
+     * Heads are independent — parallelize across cores for a fair comparison
+     * with the OpenMP-parallelized GDN kernels (ob-m2j).
+     * schedule(static) keeps GQA groups contiguous so each core reads its
+     * KV cache partition once from L3 and reuses it from L2. */
     const size_t groups = FULL_HEADS / FULL_KV_HEADS;
     const float scale = 1.0f / sqrtf((float)FULL_HEAD_DIM);
 
+#ifdef _OPENMP
+#pragma omp parallel for schedule(static)
+#endif
     for (size_t h = 0; h < FULL_HEADS; ++h) {
         size_t kh = h / groups;
         const float *qh = q + h * FULL_HEAD_DIM;
+        float *scores = alloc_aligned(ctx);
 
         /* Score = Q[h] . K_cache[t, kh] * scale
          * NEON-vectorized dot product: 8-wide FMA for ILP (ob-8qt.21).
@@ -1605,6 +1619,7 @@ static void full_attn_real_forward(const Weights *w, LayerState *st,
                 out_h[d] += weight * vt[d];
 #endif
         }
+        free(scores);
     }
 
     /* Output projection + residual */
@@ -1615,7 +1630,7 @@ static void full_attn_real_forward(const Weights *w, LayerState *st,
     /* Advance position */
     st->kv_pos = pos + 1;
 
-    free(q); free(k); free(v); free(attn_out); free(scores);
+    free(q); free(k); free(v); free(attn_out);
 }
 #endif /* !KV_INT8 */
 
@@ -1645,7 +1660,6 @@ static void full_attn_real_forward_int8kv(const Weights *w, LayerState *st,
     float *k = alloc_aligned(kv_dim);
     float *v = alloc_aligned(kv_dim);
     float *attn_out = alloc_aligned(q_dim);
-    float *scores = alloc_aligned(ctx);
 
     MM(hidden_in, w->f_q_proj, w->f_q_proj_q, q, 1, HIDDEN, q_dim);
     MM(hidden_in, w->f_k_proj, w->f_k_proj_q, k, 1, HIDDEN, kv_dim);
@@ -1671,14 +1685,19 @@ static void full_attn_real_forward_int8kv(const Weights *w, LayerState *st,
         }
     }
 
-    /* GQA attention with INT8 KV cache */
+    /* GQA attention with INT8 KV cache.
+     * Parallelize across cores — same rationale as FP32 path (ob-m2j). */
     const size_t groups = FULL_HEADS / FULL_KV_HEADS;
     const float scale = 1.0f / sqrtf((float)FULL_HEAD_DIM);
 
+#ifdef _OPENMP
+#pragma omp parallel for schedule(static)
+#endif
     for (size_t h = 0; h < FULL_HEADS; ++h) {
         size_t kh = h / groups;
         const float *qh = q + h * FULL_HEAD_DIM;
         const float sk = st->kv_k_scale[kh];  /* per-head K scale */
+        float *scores = alloc_aligned(ctx);
 
 #if defined(__ARM_FEATURE_DOTPROD)
         /* SDOT scoring: quantize Q per head to int8, then vdotq_s32 (ob-8qt.21).
@@ -1772,10 +1791,13 @@ static void full_attn_real_forward_int8kv(const Weights *w, LayerState *st,
         for (size_t t = 0; t < ctx; ++t) {
             const int8_t *vt = st->kv_v_grow_q + t * kv_dim + kh * FULL_HEAD_DIM;
             float ew = scores[t] / sum_exp * sv;  /* effective weight with V scale */
-            size_t d = 0;
 #ifdef __ARM_NEON
+            /* NEON vectorized: widen int8 → int16 → int32 → float, then FMA.
+             * FULL_HEAD_DIM % 8 == 0 (guaranteed by _Static_assert), so the
+             * 8-wide loop consumes all elements — the 4-wide and scalar
+             * tails below are dead code, kept for non-multiple-of-8 safety. */
             float32x4_t ewv = vdupq_n_f32(ew);
-            for (; d + 8 <= FULL_HEAD_DIM; d += 8) {
+            for (size_t d = 0; d + 8 <= FULL_HEAD_DIM; d += 8) {
                 int8x8_t   i8  = vld1_s8((const int8_t*)(vt + d));
                 int16x8_t  i16 = vmovl_s8(i8);
                 int32x4_t  i32lo = vmovl_s16(vget_low_s16(i16));
@@ -1789,19 +1811,13 @@ static void full_attn_real_forward_int8kv(const Weights *w, LayerState *st,
                 vst1q_f32(out_h + d, olo);
                 vst1q_f32(out_h + d + 4, ohi);
             }
-            for (; d + 4 <= FULL_HEAD_DIM; d += 4) {
-                int8x8_t  i8  = vld1_s8((const int8_t*)(vt + d));
-                int16x8_t i16 = vmovl_s8(i8);
-                int32x4_t i32 = vmovl_s16(vget_low_s16(i16));
-                float32x4_t fq = vcvtq_f32_s32(i32);
-                float32x4_t oh = vld1q_f32(out_h + d);
-                oh = vfmaq_f32(oh, ewv, fq);
-                vst1q_f32(out_h + d, oh);
-            }
-#endif
-            for (; d < FULL_HEAD_DIM; ++d)
+#else
+            /* Scalar fallback (no NEON) */
+            for (size_t d = 0; d < FULL_HEAD_DIM; ++d)
                 out_h[d] += ew * (float)vt[d];
+#endif
         }
+        free(scores);
     }
 
     /* Output projection + residual */
@@ -1811,7 +1827,7 @@ static void full_attn_real_forward_int8kv(const Weights *w, LayerState *st,
 
     st->kv_pos = pos + 1;
 
-    free(q); free(k); free(v); free(attn_out); free(scores);
+    free(q); free(k); free(v); free(attn_out);
 }
 #endif /* KV_INT8 */
 
