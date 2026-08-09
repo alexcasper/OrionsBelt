@@ -28,6 +28,7 @@ from scripts.validate_results import (  # noqa: E402
     SUSTAINED_COLS,
     Issue,
     check_manifest_exists,
+    check_readme_counts,
     detect_csv_type,
     expected_columns,
     find_device_spec,
@@ -1180,3 +1181,145 @@ class TestMainExtras:
         (csv_dir / "schema.csv").write_text(f"{header}\n{row}\n")
         rc = self._run_main(csv_dir, man_dir, quiet=True)
         assert rc == 0
+
+
+# ---------------------------------------------------------------------------
+# check_readme_counts
+# ---------------------------------------------------------------------------
+
+
+class TestCheckReadmeCounts:
+    """Unit tests for the README 'Results so far' cross-check."""
+
+    @staticmethod
+    def _make_repo(tmp_path, n_csv=2, n_manifest=1, n_figures=1, n_findings=1):
+        """Create a minimal repo structure with matching README counts."""
+        root = tmp_path / "repo"
+        raw = root / "results" / "raw"
+        man = root / "results" / "manifests"
+        fig = root / "results" / "figures"
+        docs = root / "docs"
+        raw.mkdir(parents=True)
+        man.mkdir(parents=True)
+        fig.mkdir(parents=True)
+        docs.mkdir(parents=True)
+
+        for i in range(n_csv):
+            (raw / f"bench_{i}.csv").write_text("data")
+        for i in range(n_manifest):
+            (man / f"device_{i}.json").write_text("{}")
+        for i in range(n_figures):
+            (fig / f"plot_{i}.png").write_text("png")
+        # Always create figures/README.md (the index file that should be excluded)
+        (fig / "README.md").write_text("# Index")
+        # FINDINGS.md with n_findings ## headers
+        findings_lines = ["# FINDINGS\n"]
+        for i in range(n_findings):
+            findings_lines.append(f"## {i + 1}. Finding number {i + 1}\nbody\n")
+        (docs / "FINDINGS.md").write_text("".join(findings_lines))
+
+        # README.md with the "Results so far" line
+        readme = (
+            f"> **Results so far:** {n_csv} CSVs from the device fleet, "
+            f"{n_manifest} provenance manifests, {n_figures} generated "
+            f"figures/tables, {n_findings} FINDINGS sections.\n"
+        )
+        (root / "README.md").write_text(readme)
+        return root
+
+    def test_matching_counts_no_issues(self, tmp_path):
+        """Correct counts produce no issues."""
+        root = self._make_repo(tmp_path, n_csv=3, n_manifest=2, n_figures=4, n_findings=5)
+        issues = []
+        check_readme_counts(issues, repo_root=str(root))
+        assert issues == []
+
+    def test_wrong_csv_count(self, tmp_path):
+        """Stale CSV count is flagged."""
+        root = self._make_repo(tmp_path, n_csv=3)
+        # Tamper with README to claim wrong count
+        readme = root / "README.md"
+        readme.write_text(
+            "> **Results so far:** 99 CSVs from the device fleet, "
+            "1 provenance manifests, 1 generated figures/tables, 1 FINDINGS sections.\n"
+        )
+        issues = []
+        check_readme_counts(issues, repo_root=str(root))
+        assert len(issues) == 1
+        assert "CSVs" in issues[0].message
+
+    def test_wrong_manifest_count(self, tmp_path):
+        """Stale manifest count is flagged."""
+        root = self._make_repo(tmp_path, n_manifest=5)
+        readme = root / "README.md"
+        readme.write_text(
+            "> **Results so far:** 2 CSVs from the device fleet, "
+            "99 provenance manifests, 1 generated figures/tables, 1 FINDINGS sections.\n"
+        )
+        issues = []
+        check_readme_counts(issues, repo_root=str(root))
+        msgs = [i.message for i in issues]
+        assert any("manifests" in m for m in msgs)
+
+    def test_wrong_figures_count(self, tmp_path):
+        """Stale figures count is flagged."""
+        root = self._make_repo(tmp_path, n_figures=3)
+        readme = root / "README.md"
+        readme.write_text(
+            "> **Results so far:** 2 CSVs from the device fleet, "
+            "1 provenance manifests, 99 generated figures/tables, 1 FINDINGS sections.\n"
+        )
+        issues = []
+        check_readme_counts(issues, repo_root=str(root))
+        msgs = [i.message for i in issues]
+        assert any("figures" in m for m in msgs)
+
+    def test_figures_excludes_readme_md(self, tmp_path):
+        """figures/README.md is NOT counted as a figure."""
+        root = self._make_repo(tmp_path, n_figures=2)
+        # README says 2 (matching the 2 actual figures, NOT counting README.md)
+        issues = []
+        check_readme_counts(issues, repo_root=str(root))
+        assert issues == []
+
+    def test_wrong_findings_count(self, tmp_path):
+        """Stale FINDINGS count is flagged."""
+        root = self._make_repo(tmp_path, n_findings=7)
+        readme = root / "README.md"
+        readme.write_text(
+            "> **Results so far:** 2 CSVs from the device fleet, "
+            "1 provenance manifests, 1 generated figures/tables, 99 FINDINGS sections.\n"
+        )
+        issues = []
+        check_readme_counts(issues, repo_root=str(root))
+        msgs = [i.message for i in issues]
+        assert any("FINDINGS" in m for m in msgs)
+
+    def test_findings_counts_all_headers(self, tmp_path):
+        """FINDINGS count includes named (non-numbered) ## headers."""
+        root = self._make_repo(tmp_path, n_findings=0)
+        # Add named sections (not starting with a digit)
+        findings_path = root / "docs" / "FINDINGS.md"
+        findings_path.write_text(
+            "# FINDINGS\n"
+            "## 1. First finding\nbody\n"
+            "## Named section without number\nbody\n"
+            "## 2a. Sub-section\nbody\n"
+        )
+        # README should claim 3 (all ## headers), not 2 (only numbered)
+        readme = root / "README.md"
+        readme.write_text(
+            "> **Results so far:** 2 CSVs from the device fleet, "
+            "1 provenance manifests, 1 generated figures/tables, 3 FINDINGS sections.\n"
+        )
+        issues = []
+        check_readme_counts(issues, repo_root=str(root))
+        assert issues == []  # 3 == 3, correct
+
+    def test_no_readme_no_crash(self, tmp_path):
+        """Missing README.md does not crash."""
+        root = tmp_path / "norepo"
+        root.mkdir()
+        issues = []
+        check_readme_counts(issues, repo_root=str(root))
+        assert issues == []
