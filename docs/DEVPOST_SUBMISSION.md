@@ -103,12 +103,14 @@ On dotprod-capable cores (A76, A720), the Arm `vdotq_lane_s32` instruction compu
 |-------|--------|------:|-------:|-------------:|----------------:|
 | Qwen3.5-4B (A76) | NEON INT8 | 1.81 | 552 | 1.0× | 44% |
 | Qwen3.5-4B (A76) | **SDOT INT8** | **3.48** | **287** | **1.92×** | **83%** |
+| Qwen3.5-4B (A76) | **INT4+SDOT** | **4.43** | **226** | **2.45×** | — |
 | Qwen3.5-0.8B (A76) | NEON INT8 | 9.86 | 101 | 1.0× | — |
 | Qwen3.5-0.8B (A76) | **SDOT INT8** | **30.17** | **33** | **3.06×** | — |
+| Qwen3.5-0.8B (A76) | **INT4+SDOT** | **37.21** | **27** | **3.77×** | — |
 | Qwen3.5-4B (A55) | NEON INT8 | 0.49 | 2034 | 1.0× | — |
 | Qwen3.5-4B (A55) | **SDOT INT8** | **1.36** | **734** | **2.78×** | — |
 
-> SDOT nearly doubles 4B throughput (83% of the 4.5 tok/s theoretical ceiling) and triples 0.8B throughput. The speedup is larger for 0.8B because its smaller weight set (~0.41 GiB INT8) partially fits in the A76 cluster's shared L3, making it more compute-bound — where SDOT's 5× instruction reduction has the most leverage. Cross-validated on two independent RK3588 nodes (t3, t4): agreement within 5%. Full analysis: [FINDINGS §33](../docs/FINDINGS.md), data: `results/raw/rk3588-t4_sdot_*.csv`.
+> SDOT nearly doubles 4B throughput (83% of the 4.5 tok/s theoretical ceiling) and triples 0.8B throughput. The speedup is larger for 0.8B because its smaller weight set (~0.41 GiB INT8) partially fits in the A76 cluster's shared L3, making it more compute-bound — where SDOT's 5× instruction reduction has the most leverage. **INT4+SDOT** pushes further by halving weight memory traffic (4-bit packing with on-the-fly nibble unpack into SDOT's int8 pipeline), adding 1.27× on A76 big cores — but is slightly slower on A55 little cores where the unpack overhead exceeds the bandwidth savings. Cross-validated on two independent RK3588 nodes (t3, t4): agreement within 5%. Full analysis: [FINDINGS §33, §34](../docs/FINDINGS.md), data: `results/raw/rk3588-t4_sdot_*.csv`, `results/raw/rk3588-t4_int4sdot_*.csv`.
 
 ### Memory: the architectural advantage
 
