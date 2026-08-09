@@ -4542,11 +4542,15 @@ path uses the float activation directly). All 5 tests pass (test binary:
 | Qwen3.5-4B   | **SDOT INT8**    | **3.48** | **287** | **1.92×** | **83%** |
 | Qwen3.5-0.8B | NEON INT8 (§16)  | 9.86 | 101 | 1.0× | — |
 | Qwen3.5-0.8B | **SDOT INT8**    | **30.17** | **33** | **3.06×** | — |
+| Qwen3.5-4B (A55 little) | NEON INT8 (§16) | 0.49 | 2034 | 1.0× | — |
+| Qwen3.5-4B (A55 little) | **SDOT INT8**   | **1.36** | **734** | **2.78×** | — |
 
 Theoretical ceiling: 13.5 GiB/s ÷ 3.0 GiB INT8-weight/token ≈ 4.5 tok/s for 4B.
-All runs at commit on `bench/t4`, governor=performance, `taskset -c 4-7`,
-thermal 40→49 °C (no throttling). Manifests: `results/manifests/rk3588-t4_sdot_int8.json`.
-Raw CSVs: `results/raw/rk3588-t4_sdot_{4b,08b}_big.csv`, `results/raw/rk3588-t4_neon_{4b,08b}_big.csv`.
+All runs at commit on `bench/t4`, governor=performance, `taskset -c 4-7` (A76 big)
+or `taskset -c 0-3` (A55 little), thermal 40→49 °C (no throttling). Manifests:
+`results/manifests/rk3588-t4_sdot_int8.json`.
+Raw CSVs: `results/raw/rk3588-t4_sdot_{4b,08b}_big.csv`, `results/raw/rk3588-t4_neon_{4b,08b}_big.csv`,
+`results/raw/rk3588-t4_{sdot,neon}_4b_little.csv`.
 
 ### Why the speedup is larger for 0.8B (3.06×) than 4B (1.92×)
 
