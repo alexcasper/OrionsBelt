@@ -1057,11 +1057,11 @@ def check_readme_counts(issues, repo_root="."):
             # stdout=PIPE/universal_newlines (not capture_output=/text=, which
             # are Python 3.7+ only) -- this script must run on Python 3.6.9
             # (Jetson Nano fleet devices), per its own module docstring.
-            result = subprocess.run(
+            result = subprocess.run(  # noqa: UP022, UP021
                 ["git", "ls-files", "--", f"{dirpath}/"],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                universal_newlines=True,
+                universal_newlines=True,  # noqa: UP021
                 check=True,
                 cwd=repo_root,
             )

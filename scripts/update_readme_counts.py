@@ -26,15 +26,35 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 def _count_files(dirpath: str, suffix: str | None = None, exclude_name: str | None = None) -> int:
-    """Recursive file count — mirrors the logic in validate_results.check_readme_counts."""
+    """Count tracked files — mirrors the git ls-files logic in validate_results.
+
+    Uses ``git ls-files`` to count only git-tracked files (ignoring gitignored
+    artifacts like auto-generated ablation manifests). Falls back to os.walk
+    when git is unavailable (e.g. in unit tests with temp directories).
+    """
+    try:
+        import subprocess
+
+        result = subprocess.run(  # noqa: S603, S607
+            ["git", "ls-files", "--", f"{dirpath}/"],
+            capture_output=True,
+            text=True,
+            check=True,
+            cwd=REPO_ROOT,
+        )
+        files = [os.path.basename(f) for f in result.stdout.strip().splitlines() if f]
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        files = []
+        for _root, _dirs, dirfiles in os.walk(os.path.join(REPO_ROOT, dirpath)):
+            files.extend(dirfiles)
+
     total = 0
-    for _root, _dirs, files in os.walk(os.path.join(REPO_ROOT, dirpath)):
-        for fname in files:
-            if suffix and not fname.endswith(suffix):
-                continue
-            if exclude_name and fname == exclude_name:
-                continue
-            total += 1
+    for fname in files:
+        if suffix and not fname.endswith(suffix):
+            continue
+        if exclude_name and fname == exclude_name:
+            continue
+        total += 1
     return total
 
 
