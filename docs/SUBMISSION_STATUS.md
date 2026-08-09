@@ -94,6 +94,8 @@ cutoff has passed with no board; any future arrival is additive bonus per ADR 00
 | PR | Author | Scope | Status |
 |---|---|---|---|
 | #103 | t4 | O6 baseline script + onboarding docs | MERGED |
+| #101 | j1 | Close ob-8qt.10 KleidiAI packaging complete | MERGED |
+| #100 | t3 | Fix bandwidth ceiling label with measured DRAM probe data | MERGED |
 | #104 | t3 | GB/s→GiB/s in human-authored docs (7 files) | MERGED |
 | #102 | j1 | GB/s→GiB/s in generated tables (32 files) + KleidiAI README | MERGED |
 | #106 | j1 | Fix O6 spec unit mismatch in comparison_table.md | MERGED |
