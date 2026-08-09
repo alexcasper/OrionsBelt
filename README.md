@@ -196,6 +196,10 @@ All figures above are verified against primary sources (Radxa product page and d
 > `find results/figures -type f ! -name README.md | wc -l` before editing
 > this line.)
 >
+> **Updating counts:** run `python3 scripts/update_readme_counts.py` —
+> it auto-updates this line and the directory-layout count from real
+> file counts. Don't hand-edit.
+>
 > ```
 > results/
 >   raw/         <- 196 per-run CSVs across 5 devices (incl. ablation/, affinity/, kleidiai/ subdirs)
