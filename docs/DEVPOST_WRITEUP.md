@@ -388,7 +388,7 @@ ORIONS_FORCE_FP32=1 python3 bench/harness.py \
 |----------|-----------------|
 | [`README.md`](../README.md) | Project overview, claims, status table |
 | [`PLAN.md`](./archive/PLAN.md) | Implementation plan, rubric mapping, risk register |
-| [`docs/FINDINGS.md`](./FINDINGS.md) | All measured results with analysis (49 sections) |
+| [`docs/FINDINGS.md`](./FINDINGS.md) | All measured results with analysis (53 sections) |
 | [`docs/SETUP_PORTABLE.md`](./SETUP_PORTABLE.md) | Step-by-step device setup |
 | [`docs/adr/`](./adr/) | 8 architecture decision records |
 | [`docs/CLAIM_VERIFICATION.md`](./CLAIM_VERIFICATION.md) | Every quantitative claim traced to primary source |
