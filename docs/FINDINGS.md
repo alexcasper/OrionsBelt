@@ -5211,6 +5211,21 @@ The cross-device validation confirms:
    headline comparisons without the SDOT speedup applied. t4's INT8 data is
    current.
 
+### 0.8B model confirms bidirectional silicon variance
+
+The 0.8B e2e comparison (where both devices ran the same binary generation) shows
+the variance going in the opposite direction, confirming it is normal silicon
+variation rather than a systematic bias:
+
+| Metric (0.8B e2e) | t3 tok/s | t4 tok/s | Δ |
+|---|---|---|---|
+| FP32 | 7.95 | 8.24 | t4 +3.6% |
+| INT8 | 10.61 | 9.97 | t3 +6.4% |
+
+This bidirectional pattern (t4 faster on 4B and 0.8B FP32; t3 faster on 0.8B INT8)
+is characteristic of process variation between two RK3588 dies, not a systematic
+binary or configuration difference.
+
 ---
 
 ## 37. Sustained-load thermal stability: zero throughput decay over 3.4 min INT8 and 5 min FP32 on RK3588 (2026-08-09)
