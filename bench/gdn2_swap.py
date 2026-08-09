@@ -47,7 +47,7 @@ def gdn2_recurrent(
     w_gate,  # [B, H, T, V_dim]  write gate (already sigmoid'd, in [0,1])
     use_qk_l2norm=True,
 ):
-    """Token-by-token GDN-2 recurrence. Returns [B, T, H, V_dim]."""
+    """Token-by-token GDN-2 recurrence. Returns [B, H, T, V_dim]."""
     initial_dtype = query.dtype
     if use_qk_l2norm:
         query = F.normalize(query, dim=-1, eps=1e-6)
