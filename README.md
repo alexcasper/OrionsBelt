@@ -168,7 +168,7 @@ All figures above are verified against primary sources (Radxa product page and d
 | KleidiAI matmul evaluation | Done — [FINDINGS.md](./docs/FINDINGS.md) §8 |
 | big.LITTLE affinity policy | Done — [FINDINGS.md](./docs/FINDINGS.md) §9 |
 | GDN-2 vs GDN-1 microbenchmark | Done — [FINDINGS.md](./docs/FINDINGS.md) §10, clean-tree re-run |
-| E2E model decode (tokens/sec, TTFT) | FP32 + INT8 + Q8_0 measured — 0.8B: 5.12 tok/s (A57 Q8_0, 2.97× over FP32), 28.9 tok/s (A76 INT8+SDOT). [e2e comparison](./results/figures/e2e_fleet_comparison.md), [§29, §33, §38](./docs/FINDINGS.md) |
+| E2E model decode (tokens/sec, TTFT) | FP32 + INT8 + Q8_0 measured — 0.8B: 5.12 tok/s (A57 Q8_0, 2.97× over FP32), 30.2 tok/s (A76 INT8+SDOT, t4). [e2e comparison](./results/figures/e2e_fleet_comparison.md), [§29, §33, §38](./docs/FINDINGS.md) |
 | Q8_0 block-quantized GEMV | Done — 2.97× decode speedup, cos_sim=1.000000 vs FP32. [§29, §30](./docs/FINDINGS.md) |
 | Cache-blocked GEMM for prefill | Done — 49–78× prefill speedup for M>1. [§25](./docs/FINDINGS.md) |
 | INT4 weight-only quantization | Done — core-type-dependent trade-off, no speed gain on A57. [§26](./docs/FINDINGS.md) |
