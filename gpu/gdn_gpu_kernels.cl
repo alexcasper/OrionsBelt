@@ -124,7 +124,7 @@ __kernel void gdn_causal_dwconv1d(
  *   kv  = S_h^T · k_h                             // retrieve (mat-vec, dim_v)
  *   delta = (v_h - kv) * beta_h                   // correction (elementwise)
  *   S_h += k_h ⊗ delta                            // write (rank-1 update)
- *   out_h = S_h · q_h                             // read (mat-vec, dim_v)
+ *   out_h = S_h^T · q_h                           // read (mat-vec, dim_v)
  *
  * State S_h is a (head_k_dim × head_v_dim) matrix, row-major.
  * Each work-group processes one head for one token; work-items tile the
