@@ -313,6 +313,41 @@ class TestExpectedColumns:
         assert "gib_per_s_p50" in expected_columns("kleidiai_gdn_kernel")
         assert "kernel" in expected_columns("kleidiai_gdn_kernel")
 
+    def test_ctx_sweep_columns(self):
+        assert "ctx_len" in expected_columns("ctx_sweep")
+        assert "gdn_layer_us" in expected_columns("ctx_sweep")
+
+    def test_delta_matmul_columns(self):
+        assert "M" in expected_columns("delta_matmul")
+        assert "p50_us" in expected_columns("delta_matmul")
+
+    def test_e2e_decode_columns(self):
+        assert "tok_per_sec_mean" in expected_columns("e2e_decode")
+
+    def test_thermal_stress_columns(self):
+        assert "thermal_zone1_C" in expected_columns("thermal_stress")
+        assert "elapsed_s" in expected_columns("thermal_stress")
+
+    def test_prefill_gemm_columns(self):
+        assert "prefill_M" in expected_columns("prefill_gemm")
+        assert "ttft_ms" in expected_columns("prefill_gemm")
+
+    def test_prefill_ab_columns(self):
+        assert "variant" in expected_columns("prefill_ab")
+        assert "prefill_tps" in expected_columns("prefill_ab")
+
+    def test_quant_comparison_columns(self):
+        assert "variant" in expected_columns("quant_comparison")
+        assert "tok_per_sec" in expected_columns("quant_comparison")
+
+    def test_quant_accuracy_columns(self):
+        assert "cos_sim" in expected_columns("quant_accuracy")
+        assert "rel_err_pct" in expected_columns("quant_accuracy")
+
+    def test_cross_tool_comparison_columns(self):
+        assert "engine" in expected_columns("cross_tool_comparison")
+        assert "avg_ts" in expected_columns("cross_tool_comparison")
+
 
 # ---------------------------------------------------------------------------
 # find_device_spec
