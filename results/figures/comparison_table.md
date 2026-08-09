@@ -241,7 +241,7 @@ t4 = 8 tokens (re-run, see per-row manifest for details).
 
 > INT4+SDOT combines K-grouped nibble repack with `vdotq_lane_s32` integer
 > dot-product, achieving 2× memory advantage of INT4 with the compute efficiency
-> of SDOT. vs INT8+SDOT: **1.31×** (4B) and **1.27×** (0.8B) on A76. The A55
+> of SDOT. vs INT8+SDOT: **1.27×** (4B) and **1.23×** (0.8B) on A76. The A55
 > little cluster does NOT benefit (0.96× — compute-bound, nibble-unpack overhead
 > dominates). t3 INT4+SDOT data not yet captured. See FINDINGS §34.
 >
