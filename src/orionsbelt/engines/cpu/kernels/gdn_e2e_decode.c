@@ -629,6 +629,7 @@ static void matmul_int8(const float *A, const QW *qw,
     if (g_use_naive_matmul) {
         /* Old behavior: full dequant + naive scalar matmul (for A/B comparison) */
         float *Bf = malloc(K * N * sizeof(float));
+        if (!Bf) { fprintf(stderr, "OOM in INT8 dequant\n"); exit(1); }
         for (size_t k = 0; k < K; ++k)
             for (size_t n = 0; n < N; ++n)
                 Bf[k * N + n] = (float)qw->q[k * N + n] * qw->s[n];
@@ -1002,6 +1003,7 @@ static void gemv_q8_0_neon(const float *a, const Q8Block *Bblk,
     /* Quantize activation vector once — amortized over all N output columns */
     int8_t  *a_q = malloc(nblk * 32);      /* int8 quantized activations */
     float   *a_d = malloc(nblk * sizeof(float));  /* per-block activation scales */
+    if (!a_q || !a_d) { fprintf(stderr, "OOM in gemv_q8_0_neon\n"); exit(1); }
     for (size_t b = 0; b < nblk; ++b) {
         size_t k0 = b * 32;
         size_t klen = (k0 + 32 <= K) ? 32 : (K - k0);
@@ -1051,6 +1053,7 @@ static void matmul_q8_0(const float *A, const QW *qw,
     }
     /* Prefill: dequant to FP32 and use FP32 GEMM */
     float *Bf = malloc((size_t)K * N * sizeof(float));
+    if (!Bf) { fprintf(stderr, "OOM in Q8_0 dequant\n"); exit(1); }
     size_t nblk = (K + 31) / 32;
     for (size_t j = 0; j < N; ++j)
         for (size_t b = 0; b < nblk; ++b) {

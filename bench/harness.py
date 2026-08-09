@@ -877,7 +877,12 @@ def main(argv: list[str] | None = None) -> int:
             f"'never report N < 5'), got {args.repeats}"
         )
 
-    context_lengths = [int(x) for x in args.context_lengths.split(",")]
+    try:
+        context_lengths = [int(x.strip()) for x in args.context_lengths.split(",")]
+    except ValueError:
+        parser.error(
+            f"--context-lengths must be comma-separated integers, got: {args.context_lengths!r}"
+        )
     model_cfg = _MODEL_PRESETS[args.model]
 
     # Build backend

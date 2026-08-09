@@ -54,30 +54,33 @@ def load_and_summarize(csv_paths: Sequence[str]) -> list[dict]:
     required_cols = {"context_length", "phase", "metric_name", "value"}
 
     for csv_path in csv_paths:
-        with open(csv_path, newline="", encoding="utf-8") as f:
-            reader = csv.DictReader(f)
-            if not reader.fieldnames or not required_cols.issubset(reader.fieldnames):
-                continue  # non-schema CSV — skip
-            for row in reader:
-                # Skip rows from non-sweep CSVs (standard benchmark CSVs use a
-                # different schema without context_length/engine_gdn/value).
-                if "context_length" not in row or "value" not in row:
-                    continue
-                try:
-                    ctx = int(row["context_length"])
-                    val = float(row["value"])
-                except (ValueError, KeyError):
-                    continue
-                key = (
-                    row.get("engine_gdn", "?"),
-                    row.get("engine_full_attention", "?"),
-                    row.get("quantization", "?"),
-                    ctx,
-                    row.get("phase", "?"),
-                    row.get("metric_name", "?"),
-                    row.get("metric_component") or "",
-                )
-                groups[key].append(val)
+        try:
+            with open(csv_path, newline="", encoding="utf-8") as f:
+                reader = csv.DictReader(f)
+                if not reader.fieldnames or not required_cols.issubset(reader.fieldnames):
+                    continue  # non-schema CSV — skip
+                for row in reader:
+                    # Skip rows from non-sweep CSVs (standard benchmark CSVs use a
+                    # different schema without context_length/engine_gdn/value).
+                    if "context_length" not in row or "value" not in row:
+                        continue
+                    try:
+                        ctx = int(row["context_length"])
+                        val = float(row["value"])
+                    except (ValueError, KeyError):
+                        continue
+                    key = (
+                        row.get("engine_gdn", "?"),
+                        row.get("engine_full_attention", "?"),
+                        row.get("quantization", "?"),
+                        ctx,
+                        row.get("phase", "?"),
+                        row.get("metric_name", "?"),
+                        row.get("metric_component") or "",
+                    )
+                    groups[key].append(val)
+        except OSError:
+            continue  # unreadable file — skip
 
     results = []
     for key, values in sorted(groups.items()):
