@@ -1036,19 +1036,19 @@ def check_readme_counts(issues, repo_root="."):
     with open(readme_path) as f:
         readme_text = f.read()
 
-    # FINDINGS section count deliberately not cross-checked here: the
-    # counting convention behind that number has never been fully pinned
-    # down (a plain `grep -c "^## [0-9]"` disagrees with it by a wide,
-    # inconsistent margin), unlike CSVs/manifests/figures which reliably
-    # match a plain recursive file count every time.
     m = re.search(
         r"Results so far:\*\*\s*(\d+)\s*CSVs.*?,\s*(\d+)\s*provenance manifests,\s*"
-        r"(\d+)\s*generated figures/tables",
+        r"(\d+)\s*generated figures/tables,\s*(\d+)\s*FINDINGS sections",
         readme_text,
     )
     if not m:
         return
-    claimed_csvs, claimed_manifests, claimed_figures = (int(x) for x in m.groups())
+    (
+        claimed_csvs,
+        claimed_manifests,
+        claimed_figures,
+        claimed_findings,
+    ) = (int(x) for x in m.groups())
 
     def _count_files(dirpath, suffix=None, exclude_name=None):
         # Prefer git-tracked files to avoid counting gitignored artifacts
@@ -1080,6 +1080,15 @@ def check_readme_counts(issues, repo_root="."):
     actual_manifests = _count_files("results/manifests", suffix=".json")
     actual_figures = _count_files("results/figures", exclude_name="README.md")
 
+    # FINDINGS sections: count ALL ## headers (numbered + named), matching
+    # the README convention.  Not just ^## [0-9] which misses sub-sections
+    # like "## 2a." and named sections like "## Sustained-load thermal ...".
+    findings_path = os.path.join(repo_root, "docs", "FINDINGS.md")
+    actual_findings = 0
+    if os.path.isfile(findings_path):
+        with open(findings_path) as f:
+            actual_findings = sum(1 for line in f if line.startswith("## "))
+
     mismatches = []
     if claimed_csvs != actual_csvs:
         mismatches.append(f"CSVs: README says {claimed_csvs}, actual is {actual_csvs}")
@@ -1091,6 +1100,11 @@ def check_readme_counts(issues, repo_root="."):
         mismatches.append(
             f"figures: README says {claimed_figures}, actual is {actual_figures} "
             f"(excludes results/figures/README.md)"
+        )
+    if claimed_findings != actual_findings:
+        mismatches.append(
+            f"FINDINGS: README says {claimed_findings}, actual is {actual_findings} "
+            f"(all ## headers in docs/FINDINGS.md)"
         )
 
     for mismatch in mismatches:
