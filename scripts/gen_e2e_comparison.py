@@ -309,7 +309,9 @@ def generate_table(data, base_commit=None, commit_info=None):
         if any_dirty:
             lines.append("> ⚠️ **Multiple commits with some dirty manifests.** Some runs had")
             lines.append("> uncommitted changes (marked ⚠ dirty per-row below) — typically result")
-            lines.append("> files written before commit, not kernel code changes. Verify per-entry.")
+            lines.append(
+                "> files written before commit, not kernel code changes. Verify per-entry."
+            )
         elif all_checked:
             lines.append("> ℹ️ **Multiple commits in play**, but all manifests show `dirty=false`.")
             lines.append("> SHAs differ only due to result-file commits between runs — the")
