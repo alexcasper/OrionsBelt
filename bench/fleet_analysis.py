@@ -747,7 +747,9 @@ def generate_report(output_path):
     if j2_speedups:
         sp_lo = min(j2_speedups)
         sp_hi = max(j2_speedups)
-        lines.append(f"The {sp_lo:.1f}-{sp_hi:.1f}x speedup from 4 cores (not the theoretical 4x) confirms the")
+        lines.append(
+            f"The {sp_lo:.1f}-{sp_hi:.1f}x speedup from 4 cores (not the theoretical 4x) confirms the"
+        )
     else:
         lines.append("The speedup from 4 cores (not the theoretical 4x) confirms the")
     lines.append("kernels are partially bandwidth-limited even at seq=64 — the instruction-bound")
@@ -772,10 +774,12 @@ def generate_report(output_path):
     lines.append(
         "**Optimization impact on A76.** The multi-threaded optimized run (4-core OpenMP + "
         "NEON unrolling + bf16) on t4"
-        + (f" reads {rk_t4_opt:.2f} GiB/s scan vs {rk_scan:.2f} single-threaded — "
-           f"a **{rk_t4_opt / rk_scan:.1f}x speedup** from parallelization alone"
-           if rk_t4_opt and rk_scan
-           else " achieves a ~2x speedup from parallelization alone")
+        + (
+            f" reads {rk_t4_opt:.2f} GiB/s scan vs {rk_scan:.2f} single-threaded — "
+            f"a **{rk_t4_opt / rk_scan:.1f}x speedup** from parallelization alone"
+            if rk_t4_opt and rk_scan
+            else " achieves a ~2x speedup from parallelization alone"
+        )
         + ". See the optimization-impact table below."
     )
     lines.append("")
