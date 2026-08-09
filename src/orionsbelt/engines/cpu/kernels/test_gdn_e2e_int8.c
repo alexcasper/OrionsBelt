@@ -28,6 +28,13 @@
 
 #include <math.h>
 
+static void *xmalloc(size_t n) {
+    void *p = malloc(n);
+    if (!p) { fprintf(stderr, "out of memory\n"); exit(1); }
+    return p;
+}
+
+
 int main(void) {
     int failures = 0;
     size_t K = 128, N = 256;
@@ -36,7 +43,7 @@ int main(void) {
     printf("  K=%zu (head_dim), N=%zu (output dim)\n\n", K, N);
 
     /* Generate test weight matrix */
-    float *W = malloc(K * N * sizeof(float));
+    float *W = xmalloc(K * N * sizeof(float));
     unsigned seed = 42;
     for (size_t i = 0; i < K * N; ++i)
         W[i] = ((float)(rand_r(&seed) % 2000) - 1000) / 1000.0f;
@@ -70,12 +77,12 @@ int main(void) {
     /* ---- Test 2: INT8 GEMV within theoretical error bound ---- */
     printf("--- Test 2: INT8 GEMV vs FP32 GEMV (theoretical bound) ---\n");
     {
-        float *a = malloc(K * sizeof(float));
+        float *a = xmalloc(K * sizeof(float));
         for (size_t k = 0; k < K; ++k)
             a[k] = ((float)(rand_r(&seed) % 2000) - 1000) / 1000.0f;
 
-        float *c_fp32 = malloc(N * sizeof(float));
-        float *c_int8 = malloc(N * sizeof(float));
+        float *c_fp32 = xmalloc(N * sizeof(float));
+        float *c_int8 = xmalloc(N * sizeof(float));
 
         gemv_neon(a, W, c_fp32, K, N);
         gemv_int8_neon(a, q, s, c_int8, K, N);
@@ -135,8 +142,8 @@ int main(void) {
     printf("--- Test 4: non-multiple-of-8 N (tail handling) ---\n");
     {
         size_t K2 = 64, N2 = 130;  /* 130 = 16*8 + 2 */
-        float *W2 = malloc(K2 * N2 * sizeof(float));
-        float *a2 = malloc(K2 * sizeof(float));
+        float *W2 = xmalloc(K2 * N2 * sizeof(float));
+        float *a2 = xmalloc(K2 * sizeof(float));
         unsigned s2 = 77;
         for (size_t i = 0; i < K2 * N2; ++i)
             W2[i] = ((float)(rand_r(&s2) % 2000) - 1000) / 1000.0f;
@@ -145,8 +152,8 @@ int main(void) {
 
         int8_t *q2; float *sc2;
         quantize_weight(W2, &q2, &sc2, K2, N2);
-        float *cf2 = malloc(N2 * sizeof(float));
-        float *ci2 = malloc(N2 * sizeof(float));
+        float *cf2 = xmalloc(N2 * sizeof(float));
+        float *ci2 = xmalloc(N2 * sizeof(float));
         gemv_neon(a2, W2, cf2, K2, N2);
         gemv_int8_neon(a2, q2, sc2, ci2, K2, N2);
 
