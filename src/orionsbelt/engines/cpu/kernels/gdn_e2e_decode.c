@@ -1674,6 +1674,10 @@ int main(int argc, char **argv) {
             float *B  = malloc(K * N * sizeof(float));
             float *C1 = malloc(M * N * sizeof(float));
             float *C2 = malloc(M * N * sizeof(float));
+            if (!A || !B || !C1 || !C2) {
+                fprintf(stderr, "OOM in verify-gemm (M=%zu K=%zu N=%zu)\n", M, K, N);
+                return 1;
+            }
 
             for (size_t i = 0; i < M * K; ++i) A[i] = ((float)(vseed = (vseed * 1103515245 + 12345)) / 2147483647.0f - 0.5f) * 2.0f;
             for (size_t i = 0; i < K * N; ++i) B[i] = ((float)(vseed = (vseed * 1103515245 + 12345)) / 2147483647.0f - 0.5f) * 2.0f;
@@ -1733,6 +1737,10 @@ int main(int argc, char **argv) {
             float *a = malloc(K * sizeof(float));
             float *c_fp32 = malloc(N * sizeof(float));
             float *c_int4 = malloc(N * sizeof(float));
+            if (!B || !a || !c_fp32 || !c_int4) {
+                fprintf(stderr, "OOM in verify-int4 (K=%zu N=%zu)\n", K, N);
+                return 1;
+            }
 
             for (size_t i = 0; i < K * N; ++i)
                 B[i] = ((float)(vseed = (vseed * 1103515245 + 12345)) / 2147483647.0f - 0.5f) * 2.0f;
@@ -1818,6 +1826,10 @@ int main(int argc, char **argv) {
             float *a = malloc(K * sizeof(float));
             float *c_fp32 = malloc(N * sizeof(float));
             float *c_quant = malloc(N * sizeof(float));
+            if (!B || !a || !c_fp32 || !c_quant) {
+                fprintf(stderr, "OOM in verify-quant (K=%zu N=%zu)\n", K, N);
+                return 1;
+            }
 
             /* Random weights & activation (fixed seed, reproducible) */
             for (size_t i = 0; i < K * N; ++i)
