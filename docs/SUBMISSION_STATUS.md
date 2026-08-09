@@ -160,6 +160,8 @@ cutoff has passed with no board; any future arrival is additive bonus per ADR 00
 | #167 | t3 | CRITICAL FIX — remove leftover git conflict markers in gdn_e2e_decode.c breaking build on main | MERGED |
 | #168 | t3 | Fix 5 missed bare malloc calls in test_gdn_e2e_int8.c SDOT block + SPDX self-header on add_spdx_headers.py | MERGED |
 | #169 | t3 | Fix stale counts after t4 merge + add 6 missing manifests for t4 SDOT/INT4+SDOT/NEON CSVs | MERGED |
+| #170 | t4 | NEON+SDOT full-attention scoring — 33% faster attn at ctx=4096 (ob-8qt.21) + session max-age policy for goose-loop.sh (ob-462) | MERGED |
+| #171 | t3 | Fix stale manifest count in README (270→150 tracked) + manifest naming convention note in DEVICE_RUNBOOK | MERGED |
 
 ---
 
