@@ -256,7 +256,7 @@ RK3588, Graviton, or any 64-bit Arm board. See
 
 ### Stretch target: Orion O6 + NPU (if hardware arrives)
 
-- `docs/SETUP_O6.md` (Orion O6 bring-up, NPU SDK, CIX NOE Compiler) — **pending hardware**
+- `docs/O6_ONBOARDING.md` (Orion O6 bring-up, NPU SDK, CIX NOE Compiler) — **pending hardware**
 
 ## License
 
