@@ -91,7 +91,9 @@ def test_csv_header_from_existing_results():
     cross_tool_marker = "llamacpp_commit"  # cross-tool comparison (ob-mrd.15, validate_results.py "cross_tool_comparison")
     quant_accuracy_marker = "cos_sim"  # per-matmul quant accuracy validation (ob-8qt.18, validate_results.py "quant_accuracy")
     thermal_stress_marker = "thermal_zone1_C"  # sustained-load thermal stress test (§37)
-    retrieval_marker = "num_keys"  # GDN-2 retrieval capacity study (bench/gdn2_retrieval.py, ob-zak)
+    retrieval_marker = (
+        "num_keys"  # GDN-2 retrieval capacity study (bench/gdn2_retrieval.py, ob-zak)
+    )
     result_row_columns = set(RESULT_ROW_COLUMNS)
 
     checked = 0
