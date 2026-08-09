@@ -66,7 +66,7 @@ ADR 0007 — the submission framing is locked to Edge AI.
 All manifests: governor=performance, 30 repeats (kernel) / 1–3 runs (e2e),
 git_sha recorded. t3 manifests are dirty=false; t4 SDOT manifests are
 dirty=true (binary built and run before source commit — result files
-written first, then committed together with the source). (t3: sync SUBMISSION_STATUS.md with DEVPOST t4 SDOT numbers (3.34→3.48, 28.9→30.2, ~48×→~50×) + add PRs #183/#184 + fix dirty manifest claim)
+written first, then committed together with the source).
 
 ---
 
@@ -184,7 +184,7 @@ cutoff has passed with no board; any future arrival is additive bonus per ADR 00
 | #181 | t4 | Device bench + submission readiness fixes + GDN-2 unit tests | MERGED |
 | #182 | t3 | Fix ruff format + keep branch current with main | MERGED |
 | #183 | t3 | Regenerated fleet_cross_device.png after t4 PR merge | MERGED |
-| #184 | t4 | Doc consistency fixes — stale counts + PR table backfill | MERGED | (t3: sync SUBMISSION_STATUS.md with DEVPOST t4 SDOT numbers (3.34→3.48, 28.9→30.2, ~48×→~50×) + add PRs #183/#184 + fix dirty manifest claim)
+| #184 | t4 | Doc consistency fixes — stale counts + PR table backfill | MERGED |
 
 ---
 
