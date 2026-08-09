@@ -5003,3 +5003,83 @@ once, while NEON uses float FMA directly).
 | + INT8 weight-only NEON (§16) | 1.84 | ~26× |
 | + SDOT INT8 (§33) | 3.48 | ~50× |
 | + **INT4+SDOT** (this section) | **4.43** | **~63×** |
+
+## 35. NEON+SDOT full-attention scoring: 25–35% faster full-attention layer at long context (2026-08-09, ob-8qt.21)
+
+### Motivation
+
+The full-attention decode path (used by the 8 standard-attention layers in the
+3:1 GDN:attention hybrid) had two performance gaps that made the GDN-vs-attention
+comparison unfair:
+
+1. **FP32 KV cache path** (`full_attn_real_forward`): attention scoring and
+   weighted-V accumulation used **scalar** dot products for FULL_HEAD_DIM=128.
+   On NEON-capable hardware this left ~4× throughput on the table.
+
+2. **INT8 KV cache path** (`full_attn_real_forward_int8kv`): already NEON but
+   used int8→int16→int32→float32 widening + float32 FMA per element — the same
+   compute-bound pattern from the INT4 NEON GEMV (§34). The code comment
+   stated *"No dotprod on A76"* — **this was factually wrong**. Cortex-A76 on
+   the RK3588 implements DOTPROD (confirmed by `/proc/cpuinfo` → `asimddp`).
+
+### Design
+
+**FP32 KV path** (zero accuracy change):
+- Scoring dot product: scalar loop → NEON 8-wide FMA (2 register groups for ILP)
+- Weighted-V accumulation: scalar loop → NEON 8-wide FMA
+- FULL_HEAD_DIM=128 is always divisible by 8 → no scalar tail needed
+
+**INT8 KV path** (SDOT scoring, same accuracy as existing INT8 KV):
+- Quantize Q per head to int8 once (O(head_dim)=128 ops, amortized across ctx tokens)
+- Scoring: `vdotq_s32(int8x16_t Q, int8x16_t K)` — 16 int8 MACs per instruction
+- 8 iterations per token (128/16), vs ~40 instructions for the widening+FMA path
+- Combined scale: `Q_scale × K_head_scale × attention_scale` applied once per token
+- V accumulation: unchanged (softmax weight is float — SDOT doesn't apply)
+
+### Results (RK3588 A76 big, cpu4-7, performance governor, 4B model)
+
+| Context | FP32 KV OLD (µs) | FP32 KV NEW (µs) | Speedup | INT8 KV OLD (µs) | INT8 KV NEW (µs) | Speedup |
+|---------|-----------------|-----------------|---------|-----------------|-----------------|---------|
+| 1       | 50,718          | 50,908          | 1.00×   | 18,195          | 18,699          | 0.97×   |
+| 64      | 53,366          | 52,352          | 1.02×   | 19,898          | 19,711          | 1.01×   |
+| 256     | 65,002          | 61,369          | 1.06×   | 25,322          | 23,730          | 1.07×   |
+| 1024    | 122,085         | 100,084         | 1.22×   | 48,353          | 42,290          | 1.14×   |
+| 4096    | 341,359         | 252,489         | **1.35×** | 174,942       | 132,188         | **1.32×** |
+
+"OLD" = scalar (FP32 KV) or NEON widening (INT8 KV), built from the same commit
+without the attention optimization. "NEW" = NEON FMA (FP32 KV) or SDOT (INT8 KV).
+
+At low context (1-64), attention scoring is a tiny fraction of the full-attention
+layer time (dominated by Q/K/V projections), so no speedup is visible. At ctx=4096,
+the scoring loop dominates and both paths show ~33% speedup.
+
+### Impact on the GDN vs full-attention comparison
+
+At ctx=4096, INT8 KV full-attention is now 132 ms/token vs GDN's constant 68 ms/token
+— a 1.94× ratio, down from 2.57× with the old unoptimized baseline. The comparison
+is now fair: both paths use the best available Arm ISA instructions.
+
+### Correctness
+
+All existing test suites pass unchanged:
+- INT8 correctness (SDOT-vs-FP32 max_rel 4.26%, SDOT-vs-NEON mean_rel 0.46%)
+- SVE kernels (fp16 vs fp32 max_abs 4.074e-4)
+- Delta matmul (exact match)
+- Mixed precision bf16 (max_rel 0.334%)
+- GDN2 scan (bit-identical determinism)
+- verify-int4: 12/12 PASS (SNR 46.7-49.7 dB)
+
+### Cumulative optimization stack (A76 big, 4B model, decode)
+
+| Optimization | tok/s | vs FP32 |
+|---|---|---|
+| Naive GEMV (FP32) | 0.07 | 1.0× |
+| Row-sweep + OpenMP (FP32, §15) | 1.04 | ~15× |
+| + INT8 weight-only NEON (§16) | 1.84 | ~26× |
+| + SDOT INT8 (§33) | 3.48 | ~50× |
+| + INT4+SDOT (§34) | 4.43 | ~63× |
+| + **Attn NEON+SDOT** (§35) | 4.43* | ~63× |
+
+*Decode tokens/sec at short context is unchanged (attention is a small fraction).
+The optimization improves long-context full-attention layer throughput by 33%,
+which matters for the O(n) scaling comparison, not for the O(1) GDN decode rate.

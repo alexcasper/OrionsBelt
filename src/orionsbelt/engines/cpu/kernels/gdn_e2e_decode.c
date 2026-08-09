@@ -1552,14 +1552,27 @@ static void full_attn_real_forward(const Weights *w, LayerState *st,
         size_t kh = h / groups;
         const float *qh = q + h * FULL_HEAD_DIM;
 
-        /* Score = Q[h] . K_cache[t, kh] * scale */
+        /* Score = Q[h] . K_cache[t, kh] * scale
+         * NEON-vectorized dot product: 8-wide FMA for ILP (ob-8qt.21).
+         * FULL_HEAD_DIM=128 is always divisible by 8. */
         float max_s = -INFINITY;
         for (size_t t = 0; t < ctx; ++t) {
             const float *kt = st->kv_k_grow + t * kv_dim + kh * FULL_HEAD_DIM;
-            float s = 0.0f;
+            float s;
+#ifdef __ARM_NEON
+            float32x4_t acc0 = vdupq_n_f32(0.0f);
+            float32x4_t acc1 = vdupq_n_f32(0.0f);
+            for (size_t d = 0; d + 8 <= FULL_HEAD_DIM; d += 8) {
+                acc0 = vfmaq_f32(acc0, vld1q_f32(qh + d),     vld1q_f32(kt + d));
+                acc1 = vfmaq_f32(acc1, vld1q_f32(qh + d + 4), vld1q_f32(kt + d + 4));
+            }
+            s = (vaddvq_f32(acc0) + vaddvq_f32(acc1)) * scale;
+#else
+            s = 0.0f;
             for (size_t d = 0; d < FULL_HEAD_DIM; ++d)
                 s += qh[d] * kt[d];
             s *= scale;
+#endif
             scores[t] = s;
             if (s > max_s) max_s = s;
         }
@@ -1571,14 +1584,26 @@ static void full_attn_real_forward(const Weights *w, LayerState *st,
             sum_exp += scores[t];
         }
 
-        /* Weighted sum of V */
+        /* Weighted sum of V — NEON-vectorized FMA (ob-8qt.21) */
         float *out_h = attn_out + h * FULL_HEAD_DIM;
         memset(out_h, 0, FULL_HEAD_DIM * sizeof(float));
         for (size_t t = 0; t < ctx; ++t) {
             const float *vt = st->kv_v_grow + t * kv_dim + kh * FULL_HEAD_DIM;
             float weight = scores[t] / sum_exp;
+#ifdef __ARM_NEON
+            float32x4_t wv = vdupq_n_f32(weight);
+            for (size_t d = 0; d + 8 <= FULL_HEAD_DIM; d += 8) {
+                float32x4_t o0 = vld1q_f32(out_h + d);
+                float32x4_t o1 = vld1q_f32(out_h + d + 4);
+                o0 = vfmaq_f32(o0, wv, vld1q_f32(vt + d));
+                o1 = vfmaq_f32(o1, wv, vld1q_f32(vt + d + 4));
+                vst1q_f32(out_h + d, o0);
+                vst1q_f32(out_h + d + 4, o1);
+            }
+#else
             for (size_t d = 0; d < FULL_HEAD_DIM; ++d)
                 out_h[d] += weight * vt[d];
+#endif
         }
     }
 
@@ -1655,6 +1680,41 @@ static void full_attn_real_forward_int8kv(const Weights *w, LayerState *st,
         const float *qh = q + h * FULL_HEAD_DIM;
         const float sk = st->kv_k_scale[kh];  /* per-head K scale */
 
+#if defined(__ARM_FEATURE_DOTPROD)
+        /* SDOT scoring: quantize Q per head to int8, then vdotq_s32 (ob-8qt.21).
+         * A76 DOES have DOTPROD — the old "No dotprod on A76" comment was wrong.
+         * Quantize Q once per head; the cost is O(head_dim) amortized across
+         * ctx tokens. vdotq_s32 does 16 int8 MACs per instruction (4×4 groups).
+         * FULL_HEAD_DIM=128 → 8 vdotq instructions per token. */
+        int8_t q_q[FULL_HEAD_DIM];
+        float q_scale;
+        {
+            float max_abs = 0;
+            for (size_t d = 0; d < FULL_HEAD_DIM; ++d) {
+                float a = fabsf(qh[d]);
+                if (a > max_abs) max_abs = a;
+            }
+            q_scale = max_abs / 127.0f;
+            float inv_qs = (q_scale > 0) ? 1.0f / q_scale : 0.0f;
+            for (size_t d = 0; d < FULL_HEAD_DIM; ++d) {
+                int qi = (int)lroundf(qh[d] * inv_qs);
+                if (qi > 127) qi = 127;
+                if (qi < -128) qi = -128;
+                q_q[d] = (int8_t)qi;
+            }
+        }
+
+        float max_s = -INFINITY;
+        for (size_t t = 0; t < ctx; ++t) {
+            const int8_t *kt = st->kv_k_grow_q + t * kv_dim + kh * FULL_HEAD_DIM;
+            int32x4_t acc = vdupq_n_s32(0);
+            for (size_t d = 0; d + 16 <= FULL_HEAD_DIM; d += 16)
+                acc = vdotq_s32(acc, vld1q_s8(q_q + d), vld1q_s8(kt + d));
+            float s = (float)vaddvq_s32(acc) * q_scale * sk * scale;
+            scores[t] = s;
+            if (s > max_s) max_s = s;
+        }
+#else
         /* Score = scale_k[kh] * sum_d(Q[d] * (float)Kq[t,d]) * attention_scale
          * Factor sk out of the inner sum, multiply once per token. */
         float max_s = -INFINITY;
@@ -1663,9 +1723,7 @@ static void full_attn_real_forward_int8kv(const Weights *w, LayerState *st,
             float s = 0.0f;
             size_t d = 0;
 #ifdef __ARM_NEON
-            /* Dequantize K to float on-the-fly, dot with Q via FMA.
-             * No dotprod on A76 — same int8→int16→int32→float chain
-             * as the INT8 GEMV weight path. */
+            /* Dequantize K to float on-the-fly, dot with Q via FMA. */
             float32x4_t acc4 = vdupq_n_f32(0.0f);
             for (; d + 8 <= FULL_HEAD_DIM; d += 8) {
                 int8x8_t   i8  = vld1_s8((const int8_t*)(kt + d));
@@ -1698,6 +1756,7 @@ static void full_attn_real_forward_int8kv(const Weights *w, LayerState *st,
             scores[t] = s;
             if (s > max_s) max_s = s;
         }
+#endif
 
         /* Softmax */
         float sum_exp = 0.0f;
