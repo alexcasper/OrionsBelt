@@ -342,7 +342,8 @@ def compare_logits(
         argmax_acc = float(np.mean(ref_argmax == cand_argmax))
     else:
         matches = sum(
-            1 for r, c in zip(ref, cand, strict=True) if r.index(max(r)) == c.index(max(c))
+            1 for r, c in zip(ref, cand, strict=True)
+            if r and c and r.index(max(r)) == c.index(max(c))
         )
         argmax_acc = matches / len(ref) if ref else 0.0
 
@@ -651,10 +652,21 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     # Load reference and candidate
-    with open(args.reference) as f:
-        ref_data = json.load(f)
-    with open(args.candidate) as f:
-        cand_data = json.load(f)
+    try:
+        with open(args.reference) as f:
+            ref_data = json.load(f)
+    except FileNotFoundError:
+        parser.error(f"reference file not found: {args.reference}")
+    except (OSError, json.JSONDecodeError) as exc:
+        parser.error(f"cannot read reference file {args.reference}: {exc}")
+
+    try:
+        with open(args.candidate) as f:
+            cand_data = json.load(f)
+    except FileNotFoundError:
+        parser.error(f"candidate file not found: {args.candidate}")
+    except (OSError, json.JSONDecodeError) as exc:
+        parser.error(f"cannot read candidate file {args.candidate}: {exc}")
 
     reports = []
 
