@@ -1620,6 +1620,8 @@ int main(int argc, char **argv) {
             printf("  --naive           Force naive scalar matmul for M>1 (A/B comparison)\n");
             return 0;
         }
+        else
+            fprintf(stderr, "Warning: unrecognized argument '%s' (ignored)\n", argv[i]);
     }
 
     /* Validate token count — 0 or negative causes division by zero in
@@ -2331,8 +2333,17 @@ int main(int argc, char **argv) {
     g_t_gdn_proj = g_t_gdn_conv = g_t_gdn_decay = g_t_gdn_scan = g_t_gdn_oproj = 0;
     g_t_full = g_t_ffn = 0;
 
-    /* Measured decode loop */
+    /* Measured decode loop.
+     * num_tokens >= 1 is guaranteed: prefill_M > 0 returns early above,
+     * and the validation at line ~1631 rejects num_tokens < 1 when
+     * prefill_M == 0. This explicit guard documents the invariant and
+     * helps gcc's flow analysis avoid a false -Wmaybe-uninitialized. */
+    if (num_tokens < 1) {
+        fprintf(stderr, "Internal error: decode loop reached with num_tokens=%d\n", num_tokens);
+        return 1;
+    }
     double *tok_times = malloc(num_tokens * sizeof(double));
+    if (!tok_times) { fprintf(stderr, "OOM allocating tok_times\n"); return 1; }
     double t_start_all = now_us();
 
     for (int t = 0; t < num_tokens; ++t) {
