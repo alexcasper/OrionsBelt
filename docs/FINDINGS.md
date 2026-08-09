@@ -5278,3 +5278,68 @@ AI framing: the GDN O(1) decode rate is a real sustained throughput, not a one-s
 
 Idle temperature: ~39°C. Load temperature: ~52°C. ΔT = 13°C — the stock heatsink has
 substantial thermal headroom even under continuous load.
+
+---
+
+## 38. SDOT INT8 re-run on t3 confirms cross-device gap closes to 3–5% (2026-08-09, ob-jai)
+
+### Motivation
+
+FINDINGS §36 identified that t3's INT8 context sweep was captured at commit
+`c4cc9be` (2026-08-07), which predates the SDOT INT8 GEMV kernel (`dccee52`,
+§33). The 1.83× gap between t3 and t4 was attributed to the binary version, not
+hardware. This section confirms that hypothesis by re-running t3's INT8 sweeps
+with the current SDOT-enabled binary (`96f8984`).
+
+### Pure-GDN INT8: gap closes to 3.0% (4B) and 5.1% (0.8B)
+
+| Model | Device | Binary | tok/s (ctx=1024) | Total µs | SDOT speedup |
+|---|---|---|---|---|---|
+| 4B | t3 (pre-SDOT) | `c4cc9be` | 1.84 | 543,697 | — |
+| 4B | t3 (SDOT) | `96f8984` | 3.28 | 304,570 | **1.78×** |
+| 4B | t4 (SDOT) | `be4d3ca` | 3.37 | 296,415 | — |
+| 0.8B | t3 (pre-SDOT) | `c4cc9be` | 10.46 | 95,707 | — |
+| 0.8B | t3 (SDOT) | `96f8984` | 27.70 | 36,106 | **2.65×** |
+| 0.8B | t4 (SDOT) | `be4d3ca` | 29.25 | 34,192 | — |
+
+Cross-device agreement with SDOT on both devices: **3.0% (4B)** and **5.1% (0.8B)** —
+within the expected variance band established by the FP32 comparison (4.8%, §36).
+
+### Component breakdown (4B, pure-GDN, ctx=1024)
+
+| Component | t3 SDOT (µs) | t3 pre-SDOT (µs) | t4 SDOT (µs) | t3 SDOT speedup | t3/t4 gap |
+|---|---|---|---|---|---|
+| GDN layers (24) | 93,812 | 153,310 | 92,090 | 1.63× | 1.9% |
+| FFN layers | 210,758 | 390,387 | 204,325 | 1.85× | 3.2% |
+| Total | 304,570 | 543,697 | 296,415 | 1.78× | 2.9% |
+
+The FFN benefits more from SDOT (1.85×) than GDN layers (1.63×) because the FFN
+matrices are larger (9216×2560 vs 2048×2560), giving the dot-product kernel more
+amortisation headroom over the dequant overhead.
+
+### Non-pure-GDN INT8: attention gap grows with context — memory bandwidth
+
+When 8 full-attention layers are included, the t3/t4 gap grows with context length:
+
+| ctx | t3 SDOT tok/s | t4 tok/s | Gap |
+|---|---|---|---|
+| 512 | 3.09 | 3.37 | 8.3% |
+| 1024 | 2.85 | 3.25 | 12.3% |
+| 2048 | 2.48 | 3.05 | 18.7% |
+| 4096 | 1.97 | 2.68 | 26.5% |
+
+The gap is concentrated entirely in the `full_attn_us` component (t3: 69 ms vs
+t4: 36 ms at ctx=1024 — 1.92× gap). GDN and FFN components agree within 3%.
+The growing gap scales with KV cache size (O(n) memory), which points to a
+memory-bandwidth difference between the two RAM SKUs (t3: 32 GB, t4: 8 GB —
+different modules, same SoC). This is consistent with the GDN architecture's
+key advantage: **O(1) recurrent state access is hardware-reproducible, while
+O(n) KV cache reads expose silicon-level memory-bandwidth variation.**
+
+### Conclusion
+
+The §36 hypothesis is confirmed: the 1.83× INT8 gap was binary version (SDOT
+absent), not hardware. With SDOT enabled on both devices, the pure-GDN
+cross-device agreement is 3–5%, matching the FP32 baseline. The headline
+comparison table and cross-device figures should use the SDOT INT8 data
+(`rk3588-t3_big_int8_sdot_*` CSVs) for t3.
