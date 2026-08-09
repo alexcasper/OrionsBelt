@@ -148,7 +148,7 @@ MG MS-R1, BeiQi AI PC) and is fully public — so BSP-level work is ungated too.
 | Claim | Status |
 |---|---|
 | 3:1 hybrid: three Gated DeltaNet layers per one Gated Attention layer | ✅ **Confirmed by primary source** — the load-bearing claim holds |
-| Small dense variants exist at 0.8B, 2B, 4B, 9B | ✅ Confirmed — PLAN.md's 0.8B–4B target range is viable |
+| Small dense variants exist at 0.8B, 2B, 4B, 9B | ✅ Confirmed — docs/archive/PLAN.md's 0.8B–4B target range is viable |
 | 262K native context | ✅ Confirmed: "Native context is 262,144 tokens." ~1M requires **YaRN rope scaling** via `rope_scaling`; plain loading gives the native window only |
 
 Concretely useful details found:
@@ -165,6 +165,29 @@ Concretely useful details found:
   linear-attention decoder, so Qwen3-Next tooling is likely to transfer.
 - Dense and MoE checkpoints share the same GDN core (`Qwen3_5MoeGatedDeltaNet` ≡
   `Qwen3_5GatedDeltaNet`) but have very different shapes; weights are not interchangeable.
+
+### 2.4 Q8_0 block-quantized GEMV results (verified 2026-08-08)
+
+Source: our own measurements on Jetson Nano A57 (Cortex-A57, 4×1.48 GHz, governor=performance).
+
+| Claim | Status |
+|---|---|
+| Q8_0 decode: 5.12 tok/s on 0.8B model (A57) | ✅ Confirmed — FINDINGS §29, CSV `jetson-j1_q80_vs_int8_vs_fp32_08b.csv`, manifest `jetson-j1_q80_a57.json` (sha `d223c19`) |
+| 2.97× speedup over FP32 decode (1.72 tok/s → 5.12 tok/s) | ✅ Confirmed — same CSV, same commit, A/B comparison |
+| 94% of llama.cpp Q8_0 throughput on the same hardware | ✅ Confirmed — llama.cpp Q8_0 baseline: 5.40 tok/s (FINDINGS §28, CSV `jetson-j1_llamacpp_vs_orionsbelt_08b.csv`) |
+| Q8_0 cosine similarity 1.000000 vs FP32 across all 11 weight matrices | ✅ Confirmed — FINDINGS §30, CSV `jetson-j1_quant_accuracy_08b_4b.csv` (66 rows), manifest sha `c643e34`. Method: per-matmul GEMV with fixed-seed random weights, `--verify-quant` mode |
+| INT8 also achieves cos_sim 1.000000 but no speed gain on A57 | ✅ Confirmed — same accuracy CSV; INT8 decode throughput 1.72 tok/s (§29 CSV) |
+| INT4 degrades to cos_sim ≈ 0.99998, no speed advantage | ✅ Confirmed — same accuracy CSV; INT4 throughput 1.64 tok/s (§29 CSV) |
+| Cache-blocked GEMM: 49–78× prefill speedup | ✅ Confirmed — FINDINGS §25 (ob-8qt.15) |
+| llama.cpp Q8_0/Q4_0 is 3.1× faster decode, 2.3× faster prefill than our C loop | ✅ Confirmed — FINDINGS §28 (ob-mrd.15), measured on same A57 device |
+| Q8_0 GDN layer cost flat at 73–80 ms (aggregated) across ctx 1–4096 | ✅ Confirmed — FINDINGS §31, CSV `jetson-j1_08b_q80_ctxsweep_e2e_raw.csv`, manifest sha `d63e64a` |
+| Q8_0 retains 1.85–2.46× advantage over FP32 across all context lengths | ✅ Confirmed — FINDINGS §31, same CSV. Ratio peaks at ctx=1024, narrows at ctx=4096 where attention dominates |
+| Q8_0 pure-GDN throughput ±3% across ctx 1–4096 (O(1) confirmation) | ✅ Confirmed — FINDINGS §31, CSV `jetson-j1_08b_q80_puregdn_ctxsweep_e2e_raw.csv`, manifest sha `72bafcc` |
+| INT4 is 16% slower than FP32 at short context on A57 (dequant overhead) | ✅ Confirmed — FINDINGS §32, CSV `jetson-j1_08b_int4_ctxsweep_e2e_raw.csv`, manifest sha `00fe9f1` |
+
+All Q8_0 measurements use `gcc -O3 -fopenmp -mcpu=cortex-a57` (matching
+`scripts/build_device_bench.sh`). Thermals ≤53°C throughout; governor
+`performance` confirmed in every manifest.
 
 ---
 

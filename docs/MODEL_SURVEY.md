@@ -3,7 +3,7 @@
 Bead `ob-7fv` (child of `ob-xh3`, blocks `ob-eae`). Hardware-independent — every figure below is
 derived from HuggingFace Hub API responses, raw `config.json` / `LICENSE` files fetched directly
 from the `Qwen` org, and the [transformers `Qwen3.5` docs](https://huggingface.co/docs/transformers/model_doc/qwen3_5).
-This file does not contradict [`PLAN.md`](./archive/PLAN.md) or [`CLAIM_VERIFICATION.md`](./CLAIM_VERIFICATION.md);
+This file does not contradict [`docs/archive/PLAN.md`](./archive/PLAN.md) or [`CLAIM_VERIFICATION.md`](./CLAIM_VERIFICATION.md);
 it adds per-checkpoint detail underneath their verified facts. Surveyed 2026-08-02.
 
 **Scope note:** the family also ships 27B / 35B‑A3B / 122B‑A10B(-FP8) MoE and dense checkpoints
@@ -49,7 +49,7 @@ all four sizes. This is the ground truth `t-arch-audit` will also read.
 
 All four confirm the 3:1 ratio exactly (`linear_attention` count / `full_attention` count = 3.0).
 0.8B and 2B share the smaller 24-layer / 18-GDN-6-full shape; 4B and 9B share the 32-layer /
-24-GDN-8-full shape that PLAN.md and CLAIM_VERIFICATION.md already cite as the dense default.
+24-GDN-8-full shape that docs/archive/PLAN.md and CLAIM_VERIFICATION.md already cite as the dense default.
 `layer_types[:8]` is identical across all four
 (`linear, linear, linear, full, linear, linear, linear, full, ...`), confirming the pattern starts
 the same way at every scale.
@@ -97,7 +97,7 @@ explicitly via `rope_scaling`, it is not baked into the shipped config).
 Fetched the actual `LICENSE` file (not a summary) from all eight repos (base + instruct-ready ×
 four sizes): every one opens with `Apache License / Version 2.0, January 2004`. No custom Qwen
 license, no field-of-use or scale-gated restriction (unlike Llama's community license). This
-satisfies R10 in PLAN.md's risk register (checkpoint license restricting redistribution) — **not
+satisfies R10 in docs/archive/PLAN.md's risk register (checkpoint license restricting redistribution) — **not
 a risk for any candidate in this range.** Also satisfies the competition's MIT-or-Apache-2.0
 requirement independent of our own repo license.
 
@@ -230,7 +230,7 @@ narrative clarity, not by squeezing under a memory ceiling.
 - **The 64GB/precision fit is a non-issue at every size in this range** (§5) — so the choice
   should not be driven by "which one barely fits," it should be driven by what best demonstrates
   the O(1)-recurrent-state-vs-linear-KV-cache thesis, fast, within a 12-day sprint.
-- **4B keeps the 32-layer / 24-GDN-8-full-attention split** that PLAN.md and
+- **4B keeps the 32-layer / 24-GDN-8-full-attention split** that docs/archive/PLAN.md and
   CLAIM_VERIFICATION.md already treat as the canonical dense-checkpoint shape throughout the
   write-up narrative (§3 architecture background, the "24 GDN + 8 full attention" figure quoted
   repeatedly). Picking a 24-layer/18-GDN-6-full model (0.8B or 2B) as *primary* would mean
@@ -271,7 +271,7 @@ narrative clarity, not by squeezing under a memory ceiling.
   weights that ship bundled in every checkpoint, or the text backbone alone. Not stated in any
   Radxa/CIX source found. Flagged as ambiguous in §4/§7, not resolved.
 - Real on-device tokens/sec, TTFT, or thermal behavior for any of these checkpoints on the Orion
-  O6 — no hardware access at time of writing (per PLAN.md §2.1, board not yet in hand). Everything
+  O6 — no hardware access at time of writing (per docs/archive/PLAN.md §2.1, board not yet in hand). Everything
   in this survey is config/weights-file-derived, not measured.
 - Whether `causal_conv1d` / `fla` (or the `Atlas-Inference/gdn` Hub kernel) have any aarch64 build
   — explicitly out of scope for this survey and already tracked separately in
@@ -292,4 +292,4 @@ narrative clarity, not by squeezing under a memory ceiling.
 - [Qwen3.5 — transformers docs](https://huggingface.co/docs/transformers/model_doc/qwen3_5) (`Qwen3_5TextConfig`, `Qwen3_5Config`, `Qwen3_5ForCausalLM` vs `Qwen3_5ForConditionalGeneration`)
 - HuggingFace Hub API, `GET /api/models/<repo>` (`safetensors` dtype/parameter totals, `siblings` file listings) — queried directly for all eight repos above
 - Raw `model.safetensors(.index).json` headers, fetched via HTTP range request — used to compute the `language_model` / `visual` / `mtp` parameter split in §4
-- [`PLAN.md`](./archive/PLAN.md) and [`CLAIM_VERIFICATION.md`](./CLAIM_VERIFICATION.md) (ground truth this survey does not contradict)
+- [`docs/archive/PLAN.md`](./archive/PLAN.md) and [`CLAIM_VERIFICATION.md`](./CLAIM_VERIFICATION.md) (ground truth this survey does not contradict)

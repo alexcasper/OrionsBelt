@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """Generate memory scaling figures from the analytical model.
 
 The central thesis of OrionsBelt is that GDN's recurrent state is O(1) in

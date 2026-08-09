@@ -5,7 +5,7 @@
 
 This analysis fills gaps not covered by [ADR 0001](./adr/0001-gdn2-decoupled-gating-hypothesis.md)
 or [FINDINGS.md §1](./FINDINGS.md). It documents the GDN-2 paper's key claims and assesses
-their relevance to this project's edge-scale comparison plan (PLAN.md §4/E8).
+their relevance to this project's edge-scale comparison plan (docs/archive/PLAN.md §4/E8).
 
 ---
 
@@ -89,14 +89,14 @@ information — preserving retrieval accuracy under interference.
 ### Scale of the improvement
 
 The paper does **not quantify** the RULER improvement in the abstract ("improves the
-evaluated multi-key retrieval setting" is qualitative). This aligns with PLAN.md §2.3's
+evaluated multi-key retrieval setting" is qualitative). This aligns with docs/archive/PLAN.md §2.3's
 note that "GDN-2's RULER gains are real but not quantified in the abstract, so they must
 be described qualitatively until the full paper is read."
 
 **Implication for this project:** the GDN-2 comparison (E8, option a: microbenchmark
 GDN-2 vs GDN gating on-device) can test this claim using our committed RULER prompt corpus.
 A negative result ("GDN-2's multi-key advantage does not hold at edge scale") is publishable
-per PLAN.md §4/E8: "Negative results are publishable here."
+per docs/archive/PLAN.md §4/E8: "Negative results are publishable here."
 
 ---
 
@@ -134,7 +134,7 @@ determined, not the training-scale properties.
 
 ## 4. Implications for the project's GDN-2 comparison plan
 
-### Option (a): Microbenchmark GDN-2 vs GDN gating (recommended, PLAN.md §4/E8)
+### Option (a): Microbenchmark GDN-2 vs GDN gating (recommended, docs/archive/PLAN.md §4/E8)
 
 This is now well-supported by the paper analysis:
 - The GDN-2 update is a **strict generalization** of GDN — a GDN-2 implementation can
@@ -159,7 +159,7 @@ If we complete the comparison: "We tested whether GDN-2's decoupled-gating retri
 advantage holds at edge scale, using the same device fleet and prompt corpus as our GDN
 benchmarks."
 
-If we don't complete it (descope under PLAN.md §7): "GDN-2's decoupled gating is a strict
+If we don't complete it (descope under docs/archive/PLAN.md §7): "GDN-2's decoupled gating is a strict
 generalization of GDN, with identical memory access patterns and bandwidth characteristics.
 The multi-key retrieval advantage claimed at 1.3B scale is architecturally motivated but
 not independently verified at edge scale in this submission."

@@ -135,19 +135,20 @@ All figures above are verified against primary sources (Radxa product page and d
 
 ## Status
 
-**This is an in-progress research repository as of 2026-08-07.** The project has committed to the **Edge AI track** ([ADR 0007](./docs/adr/0007-commit-to-edge-ai-track.md)) after the Orion O6 board did not arrive by its last-useful-arrival date. All work continues on the portable aarch64 device fleet.
+**This is an in-progress research repository as of 2026-08-08.** The project has committed to the **Edge AI track** ([ADR 0007](./docs/adr/0007-commit-to-edge-ai-track.md)) after the Orion O6 board did not arrive by its last-useful-arrival date. All work continues on the portable aarch64 device fleet.
 
 **Device-fleet microbenchmarks are complete across five Arm devices.** Three GDN CPU kernels (gated cumulative decay, gated delta-rule scan, causal depthwise Conv1D) have been measured at verified Qwen3.5-4B and 0.8B shapes on the full fleet: Jetson Nano (Cortex-A57, NEON), Raspberry Pi 5 (Cortex-A76), and RK3588 (Cortex-A76 big + Cortex-A55 little clusters). The optimization stack (OpenMP parallelization + NEON unrolling + fp16 state) delivers 2.6–5.1× on A76 silicon and 2.6–3.1× on A57. The key cross-device finding — that these kernels are **instruction-overhead-bound, not DRAM-bandwidth-bound** at seq=64 working-set sizes — is documented in the [fleet bandwidth-scaling analysis](./results/figures/fleet_bandwidth_scaling.md).
 
-**End-to-end model decode** runs the full Qwen3.5 forward pass in C with optimized NEON GEMV kernels. With the full optimization stack (row-sweep GEMV + INT8 weight-only quantization), the 0.8B model achieves **2.45 tok/s on the Jetson Nano (Cortex-A57)** and **10.6 tok/s on RK3588 (Cortex-A76)** — practical for real-time edge deployment. The 4B model achieves 0.51 tok/s (A57 INT8) and 1.84 tok/s (A76 INT8). INT8 weight quantization adds 1.1–1.8× on top of the GEMV optimization, for a cumulative 26–30× over the naive baseline. Bottleneck analysis confirms the model is **matmul-bound** (FFN 54–72%), not recurrence-bound — GDN's novel kernels account for <1% of total time. See the [e2e fleet comparison](./results/figures/e2e_fleet_comparison.md) and [FINDINGS.md §16](./docs/FINDINGS.md).
+**End-to-end model decode** runs the full Qwen3.5 forward pass in C with optimized NEON GEMV kernels. With the full optimization stack (row-sweep GEMV + **Q8_0 block-quantized weights**), the 0.8B model achieves **5.12 tok/s on the Jetson Nano (Cortex-A57)** — a 2.97× speedup over FP32 and 94% of llama.cpp's Q8_0 throughput on the same hardware. Q8_0 quantization preserves output fidelity: cosine similarity 1.000000 vs FP32 across all 11 weight matrices (§30). INT8 weight quantization adds 1.1–1.8× on top of the GEMV optimization, for a cumulative 26–30× over the naive baseline. Cache-blocked GEMM delivers 49–78× prefill speedup (§25). Bottleneck analysis confirms the model is **matmul-bound** (FFN 54–72%), not recurrence-bound — GDN's novel kernels account for <1% of total time. See the [e2e fleet comparison](./results/figures/e2e_fleet_comparison.md) and [FINDINGS.md §16, §29](./docs/FINDINGS.md).
 
 **Context-length scaling proves GDN's core value proposition on silicon (§17).** Sweeping context length from 1 to 4096 tokens with real grouped-query attention: **pure-GDN throughput is flat to within 0.3%** while the hybrid model degrades 1.55× (4B) to 2.14× (0.8B) — entirely from the full-attention layers whose KV cache reads grow linearly. INT8 KV cache quantization (§20) cuts KV memory 4× and delivers 1.7–2.6× full-attention speedup at long context, but full-attention's cost still scales O(n). Sustained-load tests confirm 0.3% throughput decay over 94s — burst numbers are steady-state sustainable (§18). Cross-validated on both A57 and A76. See [FINDINGS.md §17–20](./docs/FINDINGS.md).
 
-**Operator analysis findings** ([`docs/FINDINGS.md`](./docs/FINDINGS.md), 41 sections):
+**Operator analysis findings** ([`docs/FINDINGS.md`](./docs/FINDINGS.md), 46 sections):
 - CIX NOE and Rockchip RKNN toolchains both reject GDN's runtime-length recurrence — the limitation generalises beyond one vendor (§1, §7)
 - KleidiAI packed GEMM wins 1.7–3.6× on matmul but packing cost dominates at decode; dual-path strategy recommended (§8)
 - big.LITTLE affinity: pinning to A76 big cores is 2–3× faster than default scheduler placement (§9)
 - GDN-2 vs GDN-1: decoupled gating costs 2.2–2.7× at prefill (bandwidth-bound), 1.2–1.5× at decode on big cores but 2.2–2.4× on A55 little cores (compute-bound); clean-tree re-run, single-thread (§10)
+- INA3221 power/energy: all three GDN kernels draw ~900–925 mW over idle on the Jetson A57 — power is constant, energy-per-GiB tracks 1/throughput (874–1250 mJ/GiB board-wide). `performance` governor is both faster and 28% more energy-efficient than `ondemand` (ob-agf.1)
 
 | Item | Status |
 |---|---|
@@ -156,7 +157,7 @@ All figures above are verified against primary sources (Radxa product page and d
 | Repository skeleton, Apache-2.0 license | Done |
 | Results schema (`docs/RESULTS_SCHEMA.md`) | Done |
 | Benchmark harness (`bench/`) + device microbenchmark (`bench_gdn.c`) | Producing data |
-| CI: lint + unit tests (1788 tests, 99% coverage) | Done — `.github/workflows/ci.yaml` |
+| CI: lint + unit tests (1799 tests, 99% coverage) | Done — `.github/workflows/ci.yaml` |
 | Device-fleet microbenchmarks (5 devices) | Done — [fleet analysis](./results/figures/fleet_bandwidth_scaling.md) |
 | Ablation matrix (6 configs, synthetic) | Done — [comparison table](./results/figures/ablation_comparison.md) |
 | Memory decomposition (analytical) | Done — [figures](./results/figures/) |
@@ -167,27 +168,38 @@ All figures above are verified against primary sources (Radxa product page and d
 | KleidiAI matmul evaluation | Done — [FINDINGS.md](./docs/FINDINGS.md) §8 |
 | big.LITTLE affinity policy | Done — [FINDINGS.md](./docs/FINDINGS.md) §9 |
 | GDN-2 vs GDN-1 microbenchmark | Done — [FINDINGS.md](./docs/FINDINGS.md) §10, clean-tree re-run |
-| E2E model decode (tokens/sec, TTFT) | FP32 + INT8 measured across fleet — 0.8B: 2.45 tok/s (A57 INT8), 10.6 tok/s (A76 INT8). [e2e comparison](./results/figures/e2e_fleet_comparison.md) |
+| E2E model decode (tokens/sec, TTFT) | FP32 + INT8 + Q8_0 measured — 0.8B: 5.12 tok/s (A57 Q8_0, 2.97× over FP32), 10.6 tok/s (A76 INT8). [e2e comparison](./results/figures/e2e_fleet_comparison.md), [§29](./docs/FINDINGS.md) |
+| Q8_0 block-quantized GEMV | Done — 2.97× decode speedup, cos_sim=1.000000 vs FP32. [§29, §30](./docs/FINDINGS.md) |
+| Cache-blocked GEMM for prefill | Done — 49–78× prefill speedup for M>1. [§25](./docs/FINDINGS.md) |
+| INT4 weight-only quantization | Done — core-type-dependent trade-off, no speed gain on A57. [§26](./docs/FINDINGS.md) |
+| llama.cpp baseline comparison | Done — mature Q8_0/Q4_0 inference 3.1× faster decode, 2.3× faster prefill on A57. [§28](./docs/FINDINGS.md) |
 | Context-length scaling (GDN O(1) vs full-attn O(n)) | Done — pure-GDN flat to 0.3% across ctx=1–4096, cross-validated A57+A76. [§17](./docs/FINDINGS.md) |
 | INT8 KV cache quantization | Done — 1.7–2.6× full-attn speedup at long context, 4× KV memory reduction. [§20](./docs/FINDINGS.md) |
 | Sustained-load thermal characterization | Done — 0.3% throughput decay over 94s on RK3588 (§18) |
+| INA3221 power/energy profiling | Done — 874–1250 mJ/GiB board-wide on Jetson A57; power constant across kernels, energy tracks 1/throughput (ob-agf.1) |
 | Track decision: Edge AI | Done — [ADR 0007](./docs/adr/0007-commit-to-edge-ai-track.md) |
 | Model survey / selection (`docs/MODEL_SURVEY.md`) | Done |
 | Orion O6 board bring-up | **Pending** — board not yet in hand |
 | CIX Early Bird SDK / NPU toolchain access | **Pending** — not yet approved |
 | Per-layer engine mapping (NPU/GPU/CPU) | Hypothesis only — pending measurements |
-| Full inference results (tokens/sec, TTFT, memory) | Done — C decode loop (FP32+INT8), ctx-length scaling (§17–20), cross-device (A57+A76), sustained-load thermal stability (§18). [e2e comparison](./results/figures/e2e_fleet_comparison.md) |
+| Full inference results (tokens/sec, TTFT, memory) | Done — C decode loop (FP32+INT8+Q8_0), ctx-length scaling (§17–20), quantization accuracy (§30), cross-device (A57+A76), sustained-load thermal stability (§18). [e2e comparison](./results/figures/e2e_fleet_comparison.md) |
 
-> **Results so far:** 148 CSVs from the device fleet, 118 provenance manifests, 88 generated figures/tables, 41 FINDINGS sections.
+> **Results so far:** 156 CSVs from the device fleet, 142 provenance manifests, 88 generated figures/tables, 46 FINDINGS sections.
 > (Counted recursively — `results/raw/` and `results/manifests/` include
 > subdirectories `ablation/`, `affinity/`, and `kleidiai/`, which hold real
 > fleet benchmark data, not scratch files. A non-recursive `ls *.csv` count
-> will undercount by the contents of those subdirectories.)
+> will undercount by the contents of those subdirectories. The figures
+> count EXCLUDES `results/figures/README.md` itself — that's an index
+> file, not a generated figure; `find results/figures -type f | wc -l`
+> overcounts by one for this reason. This off-by-one has regressed twice
+> already — recount with
+> `find results/figures -type f ! -name README.md | wc -l` before editing
+> this line.)
 >
 > ```
 > results/
->   raw/         <- 148 per-run CSVs across 5 devices (incl. ablation/, affinity/, kleidiai/ subdirs)
->   manifests/   <- 118 provenance manifests (git SHA, governor, thermals)
+>   raw/         <- 156 per-run CSVs across 5 devices (incl. ablation/, affinity/, kleidiai/ subdirs)
+>   manifests/   <- 142 provenance manifests (git SHA, governor, thermals)
 >   figures/     <- fleet analysis, comparison table, kernel/memory plots> ```
 >
 > See [`results/README.md`](./results/README.md) for the layout, [`docs/FINDINGS.md`](./docs/FINDINGS.md) for findings, and [`results/figures/fleet_bandwidth_scaling.md`](./results/figures/fleet_bandwidth_scaling.md) for the headline cross-device analysis.
@@ -244,7 +256,7 @@ RK3588, Graviton, or any 64-bit Arm board. See
 
 ### Stretch target: Orion O6 + NPU (if hardware arrives)
 
-- `docs/SETUP_O6.md` (Orion O6 bring-up, NPU SDK, CIX NOE Compiler) — **pending hardware**
+- `docs/O6_ONBOARDING.md` (Orion O6 bring-up, NPU SDK, CIX NOE Compiler) — **pending hardware**
 
 ## License
 

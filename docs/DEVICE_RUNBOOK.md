@@ -8,6 +8,51 @@ libraries — just `scp` and run.
 
 ---
 
+## Start here: drive the whole fleet from one orchestrator
+
+`scripts/fleet.sh` does the per-device steps below across every node in one matched
+configuration. Prefer it over the manual procedure — the manual route is what produced
+the mixed-commit, mixed-thread-count results that made no cross-device comparison
+trustworthy (`ob-bf7`, `ob-mrd.12`/`ob-mrd.14`, `ob-dpl`).
+
+It does not replace [`scripts/fleet_sweep.sh`](../scripts/fleet_sweep.sh). That script is
+the **on-device** protocol and still is: run it when you are sitting on a node. `fleet.sh`
+runs **from a dev box** and enforces the same matched configuration *between* nodes —
+one local build, one SHA, one thread count, shipped everywhere.
+
+```bash
+scripts/fleet.sh status                 # which nodes answer
+scripts/fleet.sh inventory              # capability sweep -> results/fleet/
+scripts/fleet.sh run --threads 1        # the cross-device baseline
+scripts/fleet.sh run --threads 4        # multi-core, as a SEPARATE set
+scripts/fleet.sh run --threads 1 --only j2 --dry-run
+```
+
+Run it from a dev box, **not from a fleet node**. Nodes are listed in
+`fleet-nodes.conf`, which holds ssh *aliases* only — hostnames, users and keys stay in
+your `~/.ssh/config`, so no credential is ever committed (`ob-3i5`).
+
+Three things it enforces, each because they went wrong once:
+
+- **`--threads` is mandatory and lands in the filename**, not just the manifest
+  (`jetson-j2_st.csv` vs `jetson-j2_omp4.csv`). A 1-thread and a 4-thread run of the
+  same commit differ 3–4×, and `results/raw/jetson-j1_clean.csv` was captured as a
+  clean-tree baseline while actually being a 4-core run. Read as the single-threaded
+  row it would put the A57 above the Pi 5 and invert this project's central result.
+- **It refuses to run from a tree with modified tracked sources**, because then the
+  manifest's git SHA does not identify the binary that produced the numbers — which is
+  true of every manifest captured before 2026-08-05. `--allow-dirty` overrides and warns.
+- **It flags any row with `spread_pct` above ~10%** so a noisy row cannot quietly reach
+  a table. The O6 extrapolation was anchored on a row with 153% spread.
+
+Cluster pinning is resolved **on the node** from `cpufreq/cpuinfo_max_freq`, never
+assumed — see §6, the mapping is board-dependent.
+
+Everything below remains valid as the manual fallback, and as the explanation of what
+`fleet.sh` is doing.
+
+---
+
 ## 0. Build on the x86 host
 
 ```bash
@@ -89,7 +134,7 @@ sudo bash scripts/o6_system_baseline.sh --json      # machine-readable
 
 Tested on RK3588 (2-cluster), works unchanged on the O6 (3-cluster).
 
-A number without a manifest is not a result (`PLAN.md` §9). If the device has Python 3.10+:
+A number without a manifest is not a result (`docs/archive/PLAN.md` §9). If the device has Python 3.10+:
 
 ```bash
 scp bench/manifest.py <device>:/tmp/
@@ -150,7 +195,7 @@ The discriminating case is that the ordering is inverted:
 **If the Jetson beats the Pi 5 on the scan kernel** despite three ISA generations less capability,
 that is real evidence for bandwidth-boundedness rather than a confirmation-biased result.
 **If the Pi 5 wins comfortably**, the thesis is wrong or incomplete, and we need to know that —
-several downstream decisions (the CPU-first mapping in `PLAN.md` §3.1, deprioritising the bf16
+several downstream decisions (the CPU-first mapping in `docs/archive/PLAN.md` §3.1, deprioritising the bf16
 state variant, prioritising weight quantization) rest on it.
 
 Either outcome is publishable. Report whichever happens.

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 /* Correctness oracle for gdn2_gated_scan_f32 (bead ob-y3f / ob-82b).
  *
  * The GDN-2 decoupled-gating scan kernel is implemented in gdn_sve.c and
@@ -40,6 +43,13 @@
 #include <string.h>
 
 #include "gdn_sve.h"
+
+static void *xmalloc(size_t n) {
+    void *p = malloc(n);
+    if (!p) { fprintf(stderr, "out of memory\n"); exit(1); }
+    return p;
+}
+
 
 /* GDN-1 kernel for the reduction test — already declared in gdn_sve.h */
 
@@ -118,16 +128,16 @@ int main(void) {
     size_t T = 64, C = 2051, N = T * C;  /* 2051 exercises the predicated tail */
     int failures = 0;
 
-    float *g   = malloc(N * sizeof(float));
-    float *b   = malloc(N * sizeof(float));
-    float *w   = malloc(N * sizeof(float));
-    float *x   = malloc(N * sizeof(float));
-    float *sK  = malloc(N * sizeof(float));  /* kernel output */
-    float *sR  = malloc(N * sizeof(float));  /* float reference */
-    float *sD  = malloc(N * sizeof(float));  /* double reference */
-    float *stK = malloc(C * sizeof(float));
-    float *stR = malloc(C * sizeof(float));
-    float *stD = malloc(C * sizeof(float));
+    float *g   = xmalloc(N * sizeof(float));
+    float *b   = xmalloc(N * sizeof(float));
+    float *w   = xmalloc(N * sizeof(float));
+    float *x   = xmalloc(N * sizeof(float));
+    float *sK  = xmalloc(N * sizeof(float));  /* kernel output */
+    float *sR  = xmalloc(N * sizeof(float));  /* float reference */
+    float *sD  = xmalloc(N * sizeof(float));  /* double reference */
+    float *stK = xmalloc(C * sizeof(float));
+    float *stR = xmalloc(C * sizeof(float));
+    float *stD = xmalloc(C * sizeof(float));
 
     if (!g || !b || !w || !x || !sK || !sR || !sD || !stK || !stR || !stD) {
         fprintf(stderr, "allocation failed\n");
@@ -186,12 +196,12 @@ int main(void) {
      * ================================================================ */
     printf("\nGDN-2->GDN-1 reduction (b_gate=1, w_gate=1):\n");
 
-    float *ones_b = malloc(N * sizeof(float));
-    float *ones_w = malloc(N * sizeof(float));
-    float *sGdn1 = malloc(N * sizeof(float));
-    float *sGdn2_red = malloc(N * sizeof(float));
-    float *st1 = malloc(C * sizeof(float));
-    float *st2 = malloc(C * sizeof(float));
+    float *ones_b = xmalloc(N * sizeof(float));
+    float *ones_w = xmalloc(N * sizeof(float));
+    float *sGdn1 = xmalloc(N * sizeof(float));
+    float *sGdn2_red = xmalloc(N * sizeof(float));
+    float *st1 = xmalloc(C * sizeof(float));
+    float *st2 = xmalloc(C * sizeof(float));
 
     for (size_t i = 0; i < N; i++) { ones_b[i] = 1.0f; ones_w[i] = 1.0f; }
     for (size_t i = 0; i < C; i++) {
@@ -219,14 +229,14 @@ int main(void) {
 
     srand(99);
     size_t T2 = 32, C2 = 128, N2 = T2 * C2;
-    float *g2  = malloc(N2 * sizeof(float));
-    float *b2  = malloc(N2 * sizeof(float));
-    float *w2  = malloc(N2 * sizeof(float));
-    float *x2  = malloc(N2 * sizeof(float));
-    float *sK2 = malloc(N2 * sizeof(float));
-    float *sR2 = malloc(N2 * sizeof(float));
-    float *stK2 = malloc(C2 * sizeof(float));
-    float *stR2 = malloc(C2 * sizeof(float));
+    float *g2  = xmalloc(N2 * sizeof(float));
+    float *b2  = xmalloc(N2 * sizeof(float));
+    float *w2  = xmalloc(N2 * sizeof(float));
+    float *x2  = xmalloc(N2 * sizeof(float));
+    float *sK2 = xmalloc(N2 * sizeof(float));
+    float *sR2 = xmalloc(N2 * sizeof(float));
+    float *stK2 = xmalloc(C2 * sizeof(float));
+    float *stR2 = xmalloc(C2 * sizeof(float));
 
     for (size_t i = 0; i < N2; i++) {
         g2[i] = 0.50f + 0.40f * (rand() / (float)RAND_MAX);
@@ -246,12 +256,12 @@ int main(void) {
     failures += check_rel("chunk 1 tolerance check", sK2, sR2, N2, GDN2_REL_TOL);
 
     /* Chunk 2: carry state forward */
-    float *g2b  = malloc(N2 * sizeof(float));
-    float *b2b  = malloc(N2 * sizeof(float));
-    float *w2b  = malloc(N2 * sizeof(float));
-    float *x2b  = malloc(N2 * sizeof(float));
-    float *sK2b = malloc(N2 * sizeof(float));
-    float *sR2b = malloc(N2 * sizeof(float));
+    float *g2b  = xmalloc(N2 * sizeof(float));
+    float *b2b  = xmalloc(N2 * sizeof(float));
+    float *w2b  = xmalloc(N2 * sizeof(float));
+    float *x2b  = xmalloc(N2 * sizeof(float));
+    float *sK2b = xmalloc(N2 * sizeof(float));
+    float *sR2b = xmalloc(N2 * sizeof(float));
     for (size_t i = 0; i < N2; i++) {
         g2b[i] = 0.50f + 0.40f * (rand() / (float)RAND_MAX);
         b2b[i] = 0.80f + 0.19f * (rand() / (float)RAND_MAX);
@@ -314,13 +324,13 @@ int main(void) {
         float v = (rand() / (float)RAND_MAX) - 0.5f;
         stK[i] = v;
     }
-    float *stK_save = malloc(C * sizeof(float));
+    float *stK_save = xmalloc(C * sizeof(float));
     memcpy(stK_save, stK, C * sizeof(float));
 
     gdn2_gated_scan_f32(g, b, w, x, sK, stK, T, C);
     /* Save outputs */
-    float *run1_s = malloc(N * sizeof(float));
-    float *run1_st = malloc(C * sizeof(float));
+    float *run1_s = xmalloc(N * sizeof(float));
+    float *run1_st = xmalloc(C * sizeof(float));
     memcpy(run1_s, sK, N * sizeof(float));
     memcpy(run1_st, stK, C * sizeof(float));
 

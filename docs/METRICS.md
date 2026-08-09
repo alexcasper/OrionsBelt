@@ -51,7 +51,7 @@ below is defined relative to `t_submit` or to another named event, never to an
 independent zero.
 
 **Batch size is 1.** Every formula and every timer below assumes single-request,
-non-batched inference, matching this project's benchmark scope (PLAN.md §2.4, §3.1: the
+non-batched inference, matching this project's benchmark scope (docs/archive/PLAN.md §2.4, §3.1: the
 recurrent state and KV cache figures the project reports are per-request). If batched
 serving is ever benchmarked, every per-token byte/FLOP formula in §5 and §9 needs a
 batch-size factor reintroduced — flag this explicitly rather than silently assuming it
@@ -127,7 +127,7 @@ after sampling (argmax or whatever sampler is configured) is applied to the pref
 pass's last-position logits. **Excludes detokenization** (converting the token id back
 to display text) and any output streaming/transport — those are downstream of "the model
 produced a token" and are not part of this project's benchmark scope (there is no
-network hop in this harness; PLAN.md's targets are all local inference).
+network hop in this harness; docs/archive/PLAN.md's targets are all local inference).
 
 **Value:** `t_first_token - t_submit`.
 
@@ -170,7 +170,7 @@ pre-declared number of generated tokens per run, independent of context length, 
 — differ only in *rate*, not in how much work each repeat happened to do. **Default:
 `N = 257`** (1 prefill-produced token + 256 decode-phase tokens), chosen because it is
 long enough to amortize any residual per-call dispatch jitter (16 engine-boundary
-crossings per token per PLAN.md §3.1, if a heterogeneous mapping is in effect) into a
+crossings per token per docs/archive/PLAN.md §3.1, if a heterogeneous mapping is in effect) into a
 stable steady-state rate, while remaining cheap enough to run at every sweep point
 including 262K, where prefill alone already dominates wall time. **EOS must not stop
 generation early:** the decode loop runs to exactly `N` tokens regardless of any sampled
@@ -276,7 +276,7 @@ kv_cache_bytes = num_full_attention_layers × 2 (K and V)
 `num_full_attention_layers` is read from the checkpoint's `layer_types` (the count of
 `"full_attention"` entries) — 8 for the verified 32-layer dense config
 (`docs/CLAIM_VERIFICATION.md` §2.3), but must be read per-checkpoint, never hardcoded,
-since MoE variants differ (40 layers total, per PLAN.md §2.2/§1.2). `n_kv_heads` and
+since MoE variants differ (40 layers total, per docs/archive/PLAN.md §2.2/§1.2). `n_kv_heads` and
 `head_dim` are the **full-attention** layers' own attention config fields (e.g.
 `num_key_value_heads`, `head_dim` in the checkpoint's `config.json`) — these are a
 different set of shapes from the GDN linear-layer dimensions
@@ -349,7 +349,7 @@ that phase — prompt-token count for `prefill`, `N-1` for `decode` (§4; token 
 excluded from decode energy accounting for the same architectural reason it is excluded
 from decode throughput).
 
-**Instrumentation, ranked, and what must go in the manifest.** Neither `PLAN.md` nor
+**Instrumentation, ranked, and what must go in the manifest.** Neither `docs/archive/PLAN.md` nor
 `docs/CLAIM_VERIFICATION.md` specifies which power-sampling capability the target
 hardware actually exposes (a separate bead, `ob-agf`, owns integrating whatever is
 available) — this document therefore does not invent a specific sensor. In descending
@@ -364,7 +364,7 @@ order of preference:
 3. **OS-level energy-counter API** (an Arm-SoC equivalent of x86 RAPL), if one exists for
    this platform — currently unverified; do not assume it is present.
 
-Whichever is used, the manifest (per PLAN.md §9 — "every run emits a manifest") must
+Whichever is used, the manifest (per docs/archive/PLAN.md §9 — "every run emits a manifest") must
 record: which of the three, the sample rate (Hz), and the instrument's stated
 accuracy/resolution, since that resolution is the practical precision floor for this
 metric — reporting more significant figures than the instrument resolves would be false
@@ -387,7 +387,7 @@ downstream tables.
 
 ## 7. Statistical protocol
 
-This section answers the two questions `ob-q35` flagged as unresolved by `PLAN.md`:
+This section answers the two questions `ob-q35` flagged as unresolved by `docs/archive/PLAN.md`:
 minimum repeat count, and which percentiles are mandatory.
 
 **Warmup: 3 repeats, discarded, never written to `results/raw/`.** Each warmup repeat
@@ -411,17 +411,17 @@ is observed to still be warming up after 3 repeats (check: is `repeat_index=0`'s
 an outlier relative to the rest of the run?), raise the warmup count for that
 engine/config and note it.
 
-**Measured repeats — two tiers, both reporting `repeat_count` per PLAN.md §9:**
+**Measured repeats — two tiers, both reporting `repeat_count` per docs/archive/PLAN.md §9:**
 
 | Tier | Context lengths | `N` (repeat_count) | When to use |
 |---|---|---:|---|
 | **Exploratory / dev-loop** | any | **10** | Iterating on a change, sanity-checking a mapping decision, CI smoke runs |
 | **Headline (write-up table)** | 4K, 32K | **30** | Any number that lands in the final comparison table or the README |
-| **Headline (write-up table)** | 128K, 262K | **10** (minimum) | Same, but wall-clock cost per repeat is large enough that 30 is not practical within the schedule; PLAN.md's own descope ladder (§7) already accepts dropping the 262K point entirely under schedule pressure before it would accept an unrepeatable number — reducing repeats at these two points, with the reduction itself recorded in `notes`, is the smaller compromise |
+| **Headline (write-up table)** | 128K, 262K | **10** (minimum) | Same, but wall-clock cost per repeat is large enough that 30 is not practical within the schedule; docs/archive/PLAN.md's own descope ladder (§7) already accepts dropping the 262K point entirely under schedule pressure before it would accept an unrepeatable number — reducing repeats at these two points, with the reduction itself recorded in `notes`, is the smaller compromise |
 
 **Never report `N < 5`, for any metric, under any schedule pressure.** Below 5, a
 "percentile" is indistinguishable from "the observed min/max," which defeats the purpose
-of the whole percentile-reporting convention (PLAN.md §9); at that point the honest
+of the whole percentile-reporting convention (docs/archive/PLAN.md §9); at that point the honest
 thing to report is exactly what it is — an unrepeated single measurement or a tiny
 sample — not a percentile that implies more statistical grounding than 5 points provide.
 
@@ -431,7 +431,7 @@ extrapolating/interpolating between the two most extreme observed samples) needs
 order of `1/(1-0.95) = 20` samples for there to typically be at least one observation
 beyond it; p99 needs on the order of 100. At this project's repeat counts (10–30), a
 reported "p99" would in practice be nearly indistinguishable from "the max observed
-sample," which is exactly the single-best/single-worst-run reporting PLAN.md §9
+sample," which is exactly the single-best/single-worst-run reporting docs/archive/PLAN.md §9
 prohibits — just at the other tail. Reporting p50/p95 at N=10–30 is honest about what the
 sample size can support; reporting p99 at the same N would not be. If a future run ever
 uses N≥100 specifically to resolve tail behavior (e.g. investigating a specific
@@ -442,7 +442,7 @@ default expectation.
 indicator), report the **spread** `p95 - p50` and, for cross-metric/cross-context
 comparison, the **normalized spread** `(p95 - p50) / p50`. The normalized form is what
 makes "how noisy was 4K decode" comparable to "how noisy was 262K prefill" despite very
-different absolute magnitudes — directly relevant given PLAN.md §7 (R7) names thermal
+different absolute magnitudes — directly relevant given docs/archive/PLAN.md §7 (R7) names thermal
 variance on passively-cooled edge hardware as a specific, named risk, not a generic
 disclaimer.
 
@@ -470,7 +470,7 @@ valid, honest finding (per `CONTRIBUTING.md`'s honest-reporting section) — not
 ## 8. What invalidates a measurement
 
 Any of the following, if present, means the affected row(s) must be flagged (`notes`
-column; the underlying cause belongs in the manifest per PLAN.md §9) and must not be
+column; the underlying cause belongs in the manifest per docs/archive/PLAN.md §9) and must not be
 reported as a clean headline number without that caveat:
 
 - **Thermal throttle mid-run.** Compare the manifest-recorded core/GPU clock at the end
@@ -507,7 +507,7 @@ reported as a clean headline number without that caveat:
 
 ## 9. Arithmetic intensity: why GDN decode is bandwidth-bound
 
-This is the quantitative justification for the project's central claim (PLAN.md §2.4):
+This is the quantitative justification for the project's central claim (docs/archive/PLAN.md §2.4):
 that optimizing GDN kernels can move prefill (1.38–1.49× measured upstream) but cannot
 move decode, because the single-token recurrence has nowhere near enough arithmetic per
 byte moved for any amount of compute cleverness to matter. All figures below are a
@@ -518,7 +518,7 @@ stated so the calculation can be checked and does not need to be taken on faith.
 - Recurrent state per GDN layer: `n_value_heads × d_k × d_v` elements. **For the selected primary
   checkpoint Qwen3.5-4B that is `32 × 128 × 128 = 524,288`** (ADR 0003, read from `config.json`).
   The fallback 0.8B has 16 value heads → 262,144. (Superseded figure
-  for the checkpoint configuration this project targets — PLAN.md's verified facts,
+  for the checkpoint configuration this project targets — docs/archive/PLAN.md's verified facts,
   corroborated independently in `docs/FINDINGS.md` §3 / ADR 0001, `H·d_k·d_v =
   16·128·128 = 262,144`, which matches the 0.8B and the GDN-2 paper's 1.3B config, **not** the 4B.)
 - State stored in fp32 (4 bytes/element) → `524,288 × 4 = 2,097,152` bytes = 2 MiB per
@@ -570,7 +570,7 @@ rewrite changes which side of the roofline the operation sits on**, because the
 operation's shape — one FMA per state element, one state-sized read, one state-sized
 write — is fixed by the recurrence's definition, not by how well it's implemented.
 
-**What this bounds, concretely.** At the O6's verified 100GB/s LPDDR5 (PLAN.md's
+**What this bounds, concretely.** At the O6's verified 100GB/s LPDDR5 (docs/archive/PLAN.md's
 verified facts; `docs/CLAIM_VERIFICATION.md` §2.2), GDN state traffic alone imposes a
 per-token time floor:
 

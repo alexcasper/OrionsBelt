@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 /* Standalone microbenchmark for the Gated DeltaNet CPU kernels.
  *
  * Bead ob-8ms.2. Turns "verified correct" into "measured" on real Arm silicon.
@@ -30,6 +33,13 @@
 #include <unistd.h>
 
 #include "gdn_sve.h"
+
+/* Safe malloc wrapper — exits on OOM instead of dereferencing NULL. */
+static void *xmalloc(size_t n) {
+    void *p = malloc(n);
+    if (!p) { fprintf(stderr, "out of memory (%zu bytes)\n", n); exit(1); }
+    return p;
+}
 
 /* ----------------------------------------------------------------------- */
 /* CPU affinity check (big.LITTLE safety)                                  */
@@ -244,18 +254,18 @@ static void run_sustained(int seconds, int csv_mode,
 
     /* Allocate all buffers (some kernels don't use all of them, but the
      * allocation is tiny relative to the run time and keeps the code simple). */
-    float *a   = malloc(n * sizeof(float));
-    float *o   = malloc(n * sizeof(float));
-    float *g   = malloc(n * sizeof(float));
-    float *x   = malloc(n * sizeof(float));
-    float *wg  = malloc(n * sizeof(float));  /* GDN-2 write gate (separate from x) */
-    float *st  = malloc(ch * sizeof(float));
-    float *w   = malloc(4 * ch * sizeof(float));
-    float *hist = malloc(3 * ch * sizeof(float));
-    __fp16 *decay_f16  = malloc(n * sizeof(__fp16));
-    __fp16 *state_f16  = malloc(ch * sizeof(__fp16));
-    uint16_t *decay_bf16 = malloc(n * sizeof(uint16_t));
-    uint16_t *state_bf16 = malloc(ch * sizeof(uint16_t));
+    float *a   = xmalloc(n * sizeof(float));
+    float *o   = xmalloc(n * sizeof(float));
+    float *g   = xmalloc(n * sizeof(float));
+    float *x   = xmalloc(n * sizeof(float));
+    float *wg  = xmalloc(n * sizeof(float));  /* GDN-2 write gate (separate from x) */
+    float *st  = xmalloc(ch * sizeof(float));
+    float *w   = xmalloc(4 * ch * sizeof(float));
+    float *hist = xmalloc(3 * ch * sizeof(float));
+    __fp16 *decay_f16  = xmalloc(n * sizeof(__fp16));
+    __fp16 *state_f16  = xmalloc(ch * sizeof(__fp16));
+    uint16_t *decay_bf16 = xmalloc(n * sizeof(uint16_t));
+    uint16_t *state_bf16 = xmalloc(ch * sizeof(uint16_t));
     if (!a || !o || !g || !x || !wg || !st || !w || !hist ||
         !decay_f16 || !state_f16 || !decay_bf16 || !state_bf16) {
         fprintf(stderr, "sustained: allocation failed\n");
@@ -361,7 +371,7 @@ int main(int argc, char **argv) {
             sus_kernel = parse_kernel(argv[++i]);
             if (sus_kernel == K_LAST) {
                 fprintf(stderr, "unknown kernel: %s\n  valid: cumdecay gated_scan dwconv1d "
-                        "cumdecay_f16 gated_scan_f16 cumdecay_bf16 gated_scan_bf16\n", argv[i]);
+                        "cumdecay_f16 gated_scan_f16 cumdecay_bf16 gated_scan_bf16 gdn2_gated_scan\n", argv[i]);
                 return 1;
             }
         }
@@ -382,7 +392,7 @@ int main(int argc, char **argv) {
             printf("  --sustained-kernel  Kernel for sustained mode (default: gated_scan)\n");
             printf("                      Valid: cumdecay gated_scan dwconv1d\n");
             printf("                             cumdecay_f16 gated_scan_f16\n");
-            printf("                             cumdecay_bf16 gated_scan_bf16\n");
+            printf("                             cumdecay_bf16 gated_scan_bf16 gdn2_gated_scan\n");
             printf("  --sustained-model   Model config: 4B or 0.8B (default: 4B)\n");
             printf("  --sustained-seq     Sequence length: 64=prefill, 1=decode (default: 64)\n");
             return 0;
@@ -427,18 +437,18 @@ int main(int argc, char **argv) {
         size_t seq = cfgs[c].seq, ch = cfgs[c].ch;
         size_t n = seq * ch;
 
-        float *a = malloc(n * sizeof(float));
-        float *out = malloc(n * sizeof(float));
-        float *g = malloc(n * sizeof(float));
-        float *x = malloc(n * sizeof(float));
-        float *wg = malloc(n * sizeof(float));  /* GDN-2 write gate (separate from x) */
-        float *state = malloc(ch * sizeof(float));
-        float *w = malloc(4 * ch * sizeof(float));
-        float *hist = malloc(3 * ch * sizeof(float));
-        __fp16 *state_f16 = malloc(ch * sizeof(__fp16));
-        uint16_t *state_bf16 = malloc(ch * sizeof(uint16_t));
-        __fp16 *decay_f16 = malloc(n * sizeof(__fp16));
-        uint16_t *decay_bf16 = malloc(n * sizeof(uint16_t));
+        float *a = xmalloc(n * sizeof(float));
+        float *out = xmalloc(n * sizeof(float));
+        float *g = xmalloc(n * sizeof(float));
+        float *x = xmalloc(n * sizeof(float));
+        float *wg = xmalloc(n * sizeof(float));  /* GDN-2 write gate (separate from x) */
+        float *state = xmalloc(ch * sizeof(float));
+        float *w = xmalloc(4 * ch * sizeof(float));
+        float *hist = xmalloc(3 * ch * sizeof(float));
+        __fp16 *state_f16 = xmalloc(ch * sizeof(__fp16));
+        uint16_t *state_bf16 = xmalloc(ch * sizeof(uint16_t));
+        __fp16 *decay_f16 = xmalloc(n * sizeof(__fp16));
+        uint16_t *decay_bf16 = xmalloc(n * sizeof(uint16_t));
         if (!a || !out || !g || !x || !wg || !state || !w || !hist ||
             !state_f16 || !state_bf16 || !decay_f16 || !decay_bf16) {
             fprintf(stderr, "allocation failed for %s (needs ~%.0f MiB)\n", cfgs[c].model,

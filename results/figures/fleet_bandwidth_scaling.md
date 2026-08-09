@@ -31,7 +31,7 @@ See the optimization-impact section below for multi-threaded results.
 | Pi 5 | 15.8 | 3.74 | 1.20 | 3.23 | 7.6% | 7.4% |
 | RK3588 big | 31.7 | 7.40 | 5.67 | 7.04 | 17.9% | 7.4% |
 | RK3588 little | 31.7 | 1.45 | 0.82 | 1.20 | 2.6% | 7.2% |
-| Jetson j1 | 23.8 | 1.59 | 1.18 | 1.41 | 5.0% | 2.8% |
+| Jetson j1 | 23.8 | 1.68 | 1.14 | 1.32 | 4.8% | 4.2% |
 | Jetson j2 | 23.8 | 1.50 | 1.09 | 0.93 | 4.6% | **16.7%** ⚠ |
 
 ⚠ 1 of 5 scan rows exceed the DEVICE_RUNBOOK's ~10% cleanliness threshold, worst Jetson j2 at 16.7%. The runbook says to suspect thermal throttling first. Treat flagged rows as indicative only.
@@ -43,7 +43,7 @@ See the optimization-impact section below for multi-threaded results.
 | Pi 5 | 15.8 | 4.47 | 4.43 | 4.55 | 28.0% | 6.5% |
 | RK3588 big | 31.7 | 8.15 | 6.93 | 6.82 | 21.9% | 5.7% |
 | RK3588 little | 31.7 | 1.65 | 1.48 | 1.54 | 4.7% | 2.4% |
-| Jetson j1 | 23.8 | 3.59 | 2.73 | 2.88 | 11.5% | **27.2%** ⚠ |
+| Jetson j1 | 23.8 | 3.49 | 2.32 | 2.68 | 9.7% | **25.5%** ⚠ |
 | Jetson j2 | 23.8 | 3.24 | 1.65 | 2.43 | 6.9% | **40.8%** ⚠ |
 
 ⚠ 2 of 5 scan rows exceed the DEVICE_RUNBOOK's ~10% cleanliness threshold, worst Jetson j2 at 40.8%. The runbook says to suspect thermal throttling first. Treat flagged rows as indicative only.
@@ -57,9 +57,9 @@ wins comfortably, the bandwidth-bound thesis is wrong or incomplete.**
 
 | Kernel (4B) | Pi 5 (15.8) | Jetson j1 (23.8) | Jetson j2 (23.8) | Winner | Pi5/J1 ratio |
 |-------------|-------------|------------------|------------------|--------|-------------|
-| Cumulative Decay | 3.74 | 1.59 | 1.50 | **Pi 5** | 2.35x |
-| Gated Delta-Rule Scan | 1.20 | 1.18 | 1.09 | **Pi 5** | 1.02x |
-| Causal DWConv1D | 3.23 | 1.41 | 0.93 | **Pi 5** | 2.29x |
+| Cumulative Decay | 3.74 | 1.68 | 1.50 | **Pi 5** | 2.23x |
+| Gated Delta-Rule Scan | 1.20 | 1.14 | 1.09 | **Pi 5** | 1.05x |
+| Causal DWConv1D | 3.23 | 1.32 | 0.93 | **Pi 5** | 2.45x |
 
 **Result: the Pi 5 wins on ALL three kernels despite having 33% LESS
 spec bandwidth.** The bandwidth-bound hypothesis does NOT hold at
@@ -82,13 +82,13 @@ cross-device effects being interpreted (bead `ob-bf7`):
 |---|---|---:|---|
 | RK3588 big | t3 10.62 vs t4 5.67 | **1.87x** | **different commits** — t3 `f015982271a1`, t4 `1ca4d6dfb00c`; not an environmental comparison |
 | RK3588 little | t3 0.55 vs t4 0.82 | **1.49x** | **different commits** — t3 `234807d46c95`, t4 `f2658cc98138`; not an environmental comparison |
-| Jetson | j1 1.18 vs j2 1.09 | **1.08x** | same source commit `234807d46c95`, same core class |
+| Jetson | j1 1.14 vs j2 1.09 | **1.05x** | **different commits** — j1 `5ea3d24b81a9` (dirty), j2 `234807d46c95`; not an environmental comparison |
 
 ⚠ **Thread-count confound (ob-mrd.12/14):** the RK3588 replicates were **not** all single-threaded. t3-clean ran at **8 threads** while t4-clean ran at **1 thread**. The 1.87x spread is dominated by this thread-count difference, not by a hardware effect. The like-for-like comparison (both at 8 threads) shows the boards agree within ~7%. See FINDINGS.md §ob-mrd.12 correction.
 
 ### Provenance audit: were these runs captured from a clean tree?
 
-All replicate runs are from the fleet sweep (ob-bf7/ob-aw9): post-optimization, clean tree, governor=performance. Of 6 runs with manifests, **6 recorded `dirty: false`** and 0 recorded dirty.
+All replicate runs are from the fleet sweep (ob-bf7/ob-aw9): post-optimization, clean tree, governor=performance. Of 6 runs with manifests, **5 recorded `dirty: false`** and 1 recorded dirty.
 
 Since all runs are post-optimization and clean-tree, the RK3588 inter-board gap **would** reflect hardware heterogeneity — **but see the thread-count confound warning above (ob-mrd.12/14)**: t3-clean ran 8-thread while t4-clean ran 1-thread, so the raw gap overstates any real difference.
 
@@ -107,7 +107,7 @@ linearly with spec bandwidth. Extrapolating the scan kernel from each device:
 | Pi 5 | 1.20 | 5.9x | 7.07 |
 | RK3588 big | 5.67 | 2.9x | 16.65 |
 | RK3588 little | 0.82 | 2.9x | 2.41 |
-| Jetson j1 | 1.18 | 3.9x | 4.62 |
+| Jetson j1 | 1.14 | 3.9x | 4.46 |
 | Jetson j2 | 1.09 | 3.9x | 4.26 |
 
 **⚠ However, this linear extrapolation is almost certainly WRONG.**

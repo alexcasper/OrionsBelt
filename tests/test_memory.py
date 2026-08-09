@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """Tests for memory instrumentation (ob-vfp).
 
 Verifies the three-way split: weights flat, KV cache linear, state flat.

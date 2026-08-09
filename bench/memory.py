@@ -1,9 +1,12 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """Three-component memory accounting for GDN hybrid models — the single source
 of truth for the predicted ``peak_memory_bytes`` columns (ob-7m6).
 
 Computes the three-way memory decomposition — **weights**, **KV cache**,
 **recurrent state** — analytically from a checkpoint's config dimensions. This
-is the load-bearing measurement of the project (PLAN.md §2.4): one component
+is the load-bearing measurement of the project (docs/archive/PLAN.md §2.4): one component
 grows linearly with context while another stays O(1) flat, and the contrast
 *is* the architectural advantage GDN provides on memory-constrained edge
 silicon.

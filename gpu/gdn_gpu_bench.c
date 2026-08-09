@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 /*
  * OpenCL host harness for GDN GPU kernels (bead ob-q44).
  *
@@ -149,6 +152,7 @@ static char *load_file(const char *path, size_t *len_out) {
     long len = ftell(f);
     fseek(f, 0, SEEK_SET);
     char *buf = (char *)malloc(len + 1);
+    if (!buf) { fprintf(stderr, "OOM in load_file\n"); fclose(f); exit(1); }
     fread(buf, 1, len, f);
     buf[len] = '\0';
     fclose(f);
@@ -225,6 +229,7 @@ static void init_opencl(const char *kernel_path) {
         clGetProgramBuildInfo(g_program, g_device, CL_PROGRAM_BUILD_LOG,
                               0, NULL, &log_sz);
         char *log = (char *)malloc(log_sz + 1);
+        if (!log) { fprintf(stderr, "Build failed (OOM allocating log)\n"); exit(1); }
         clGetProgramBuildInfo(g_program, g_device, CL_PROGRAM_BUILD_LOG,
                               log_sz, log, NULL);
         log[log_sz] = '\0';
@@ -365,6 +370,9 @@ int main(int argc, char **argv) {
         float *g_h = malloc(N * 4), *x_h = malloc(N * 4);
         float *s_gpu = malloc(N * 4), *s_ref = malloc(N * 4);
         float *st_gpu = malloc(C * 4), *st_ref = malloc(C * 4);
+        if (!g_h || !x_h || !s_gpu || !s_ref || !st_gpu || !st_ref) {
+            fprintf(stderr, "OOM in test 1 (gated scan)\n"); exit(1);
+        }
 
         fill_random(g_h, N, 0.5f, 0.9f, 7);
         fill_random(x_h, N, -0.5f, 0.5f, 8);
@@ -424,6 +432,9 @@ int main(int argc, char **argv) {
         size_t T = 64, C = 2048, N = T * C;
         float *a_h = malloc(N * 4);
         float *d_gpu = malloc(N * 4), *d_ref = malloc(N * 4);
+        if (!a_h || !d_gpu || !d_ref) {
+            fprintf(stderr, "OOM in test 2 (cumdecay)\n"); exit(1);
+        }
 
         fill_random(a_h, N, 0.5f, 0.9f, 11);
 
@@ -469,6 +480,9 @@ int main(int argc, char **argv) {
         float *in_h = malloc(N * 4), *w_h = malloc(4 * C * 4);
         float *o_gpu = malloc(N * 4), *o_ref = malloc(N * 4);
         float *h_gpu = malloc(3 * C * 4), *h_ref = malloc(3 * C * 4);
+        if (!in_h || !w_h || !o_gpu || !o_ref || !h_gpu || !h_ref) {
+            fprintf(stderr, "OOM in test 3 (dwconv1d)\n"); exit(1);
+        }
 
         fill_random(in_h, N, -0.5f, 0.5f, 13);
         fill_random(w_h, 4 * C, -0.5f, 0.5f, 14);
@@ -532,6 +546,9 @@ int main(int argc, char **argv) {
         float *S_gpu = malloc(S_sz * 4), *S_ref = malloc(S_sz * 4);
         float *k_h = malloc(kv_sz * 4), *v_h = malloc(vv_sz * 4), *q_h = malloc(kv_sz * 4);
         float *out_gpu = malloc(vv_sz * 4), *out_ref = malloc(vv_sz * 4);
+        if (!S_gpu || !S_ref || !k_h || !v_h || !q_h || !out_gpu || !out_ref) {
+            fprintf(stderr, "OOM in test 4 (delta rule)\n"); exit(1);
+        }
 
         /* Initialize state to small random values; k, q normalised to unit length per head */
         fill_random(S_gpu, S_sz, -0.01f, 0.01f, 21);

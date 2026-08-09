@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "orionsbelt"
 version = "0.1.0"
-description = "Optimizing a Qwen3.5 Gated DeltaNet hybrid model for Arm silicon (CIX P1 / Orion O6)."
+description = "Optimizing Qwen3.5 Gated DeltaNet for Arm edge silicon — CPU kernels, KleidiAI contribution, multi-device fleet benchmarks."
 readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.10"
@@ -26,7 +26,6 @@ classifiers = [
 # must install inside the CIX NOE Compiler toolchain environment (see
 # docs/CLAIM_VERIFICATION.md section 2.2a: the NOE Compiler requires Python 3.10
 # (VERIFIED against Radxa docs — the "Python 3.8" figure in brief.md was wrong).
-# unverified, so we design for it rather than assert it as confirmed).
 # Heavy ML deps (torch, transformers, weights) are deliberately NOT pinned
 # here; they land with bead t-weights-fetch.
 dependencies = [
@@ -55,7 +54,7 @@ bench = [
 npu = []
 
 [project.urls]
-Repository = "https://github.com/OrionsBelt/OrionsBelt"
+Repository = "https://github.com/alexcasper/OrionsBelt"
 
 [tool.setuptools.packages.find]
 where = ["src"]

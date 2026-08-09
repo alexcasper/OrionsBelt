@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """Metric computation helpers for the benchmark harness.
 
 Implements the statistical protocol from docs/METRICS.md section 7 (nearest-rank
@@ -40,7 +43,7 @@ class Summary:
 
     Per METRICS.md section 7: p50 and p95 are mandatory; ``spread`` and
     ``normalized_spread`` make cross-context noise comparable despite very
-    different absolute magnitudes (PLAN.md R7: thermal variance on
+    different absolute magnitudes (docs/archive/PLAN.md R7: thermal variance on
     passively-cooled edge hardware).
     """
 

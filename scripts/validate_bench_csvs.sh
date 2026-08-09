@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 # Validate device benchmark CSVs for data completeness and staleness.
 #
 # Catches the kind of issue found 2026-08-03: jetson-j2.csv had only 6 rows
@@ -43,6 +46,8 @@ for csv in "$RAW"/*.csv; do
         *_gdn2_vs_gdn1_*) continue ;;
         # GPU microbenchmarks (OpenCL Mali, different schema — validated by validate_results.py)
         *_gpu_*) continue ;;
+        # Cross-quant comparison tables (aggregate multiple commits, no single-run manifest)
+        *_vs_*) continue ;;
     esac
 
     rows=$(($(wc -l < "$csv") - 1))  # subtract header

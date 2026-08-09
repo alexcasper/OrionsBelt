@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 /* Gated DeltaNet CPU micro-kernels for AArch64 SVE (baseline SVE1) with scalar fallback.
  *
  * Bead ob-8qt.1. Three primitives that exist nowhere today for a non-SME Armv9.2 core

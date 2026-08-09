@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """Tests for scripts/smoke_test_gdn2.py — helper functions.
 
 Tests the portable logic of the GDN-2 smoke test (bead ob-y3f):

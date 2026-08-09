@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """Fleet bandwidth-scaling analysis for the device-fleet study (bead ob-8ms.3).
 
 Reads all device microbenchmark CSVs from results/raw/, compares achieved GiB/s
@@ -129,7 +132,7 @@ SPREAD_WARN_PCT = 10.0
 def get_spread(rows, model, kernel):
     """Return spread_pct for a specific model+kernel, or None."""
     for r in rows:
-        if r["model"] == model and r["kernel"] == kernel:
+        if r.get("model") == model and r.get("kernel") == kernel:
             try:
                 return float(r["spread_pct"])
             except (KeyError, ValueError):
@@ -191,25 +194,31 @@ def load_device_csv(path):
     rows = []
     if not os.path.exists(path):
         return rows
-    with open(path, newline="") as f:
-        for row in csv.DictReader(f):
-            # Only fp32 baseline kernels, seq=64 (prefill chunk)
-            kern = row["kernel"]
-            if "_bf16" in kern or "_f16" in kern:
-                continue
-            if row.get("seq", "64") != "64":
-                continue
-            if "_decode" in row.get("model", ""):
-                continue
-            rows.append(row)
+    try:
+        with open(path, newline="") as f:
+            for row in csv.DictReader(f):
+                # Only fp32 baseline kernels, seq=64 (prefill chunk)
+                kern = row.get("kernel", "")
+                if not kern or "_bf16" in kern or "_f16" in kern:
+                    continue
+                if row.get("seq", "64") != "64":
+                    continue
+                if "_decode" in row.get("model", ""):
+                    continue
+                rows.append(row)
+    except OSError:
+        pass
     return rows
 
 
 def get_gibs(rows, model, kernel):
     """Extract achieved GiB/s for a specific model+kernel."""
     for r in rows:
-        if r["model"] == model and r["kernel"] == kernel:
-            return float(r["gib_per_s_p50"])
+        if r.get("model") == model and r.get("kernel") == kernel:
+            try:
+                return float(r["gib_per_s_p50"])
+            except (KeyError, ValueError):
+                return None
     return None
 
 
@@ -704,7 +713,7 @@ def generate_report(output_path):
     lines.append("the real-world impact of the optimization track (beads ob-8qt.5/6/7):")
     lines.append("")
     # Flag it rather than quietly publishing it: the OpenMP CSV has no manifest on any
-    # branch, so under PLAN.md section 9 these speedups are indicative, not results.
+    # branch, so under docs/archive/PLAN.md section 9 these speedups are indicative, not results.
     opt_manifest = os.path.join(
         MANIFEST_DIR, os.path.basename(J2_OPTIMIZED_CSV).replace(".csv", ".json")
     )
@@ -712,7 +721,7 @@ def generate_report(output_path):
         lines.append(
             f"> ⚠ **No provenance.** `{os.path.basename(J2_OPTIMIZED_CSV)}` has no manifest on "
             "any branch, so the speedups below cannot be tied to a specific build or device "
-            "state. PLAN.md section 9: a number without a manifest is not a result. Treat these "
+            "state. docs/archive/PLAN.md section 9: a number without a manifest is not a result. Treat these "
             "as indicative and re-capture with `bench/manifest.py` alongside the run."
         )
         lines.append("")

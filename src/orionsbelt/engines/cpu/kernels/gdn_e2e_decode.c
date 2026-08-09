@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 /* End-to-end CPU decode loop for Qwen3.5 (bead ob-8qt.9).
  *
  * Wires the optimized GDN kernels (gdn_sve.c, gdn_delta_matmul.c) into a
@@ -38,6 +41,18 @@
 #include <stdint.h>
 
 #include "gdn_delta_matmul.h"
+
+/* Safe malloc/calloc wrappers — exit on OOM instead of dereferencing NULL. */
+static void *xmalloc(size_t n) {
+    void *p = malloc(n);
+    if (!p) { fprintf(stderr, "out of memory (%zu bytes)\n", n); exit(1); }
+    return p;
+}
+static void *xcalloc(size_t nmemb, size_t size) {
+    void *p = calloc(nmemb, size);
+    if (!p) { fprintf(stderr, "out of memory (%zu * %zu bytes)\n", nmemb, size); exit(1); }
+    return p;
+}
 
 /* Global flag: when set (--naive), M>1 matmul uses the old naive scalar loop
  * instead of gemm_neon, for before/after performance comparison (ob-8qt.15). */
@@ -99,12 +114,25 @@ extern void gdn_causal_dwconv1d_f32(const float *in, const float *w, float *out,
  *
  * Compiled in with -DINT8_WEIGHTS. The FP32 path is unchanged for comparison.
  */
+
+/* Q8_0 block layout (forward decl — used by QW struct when Q80_WEIGHTS is active) */
+#if defined(Q80_WEIGHTS)
+#include <arm_fp16.h>
+typedef struct {
+    __fp16 d;       /* per-block scale */
+    int8_t  qs[32]; /* 32 quantized values */
+} Q8Block;
+#endif
+
 typedef struct {
     int8_t *q;   /* quantized weights [K×N] row-major int8 */
     float  *s;   /* per-column (output) scale [N] */
 #if defined(INT8_WEIGHTS) && defined(__ARM_FEATURE_DOTPROD)
     int8_t *q_sdot; /* K-interleaved repack for SDOT GEMV (NULL if not DOTPROD) */
     size_t  K, N;   /* dimensions at quantize time (for SDOT dispatch) */
+#endif
+#if defined(Q80_WEIGHTS)
+    Q8Block *qb; /* block-quantized weights (per-block fp16 scale + 32 int8) */
 #endif
 } QW;
 
@@ -122,9 +150,8 @@ typedef struct {
 #ifdef INT8_WEIGHTS
 static void quantize_weight(const float *B_in, int8_t **q_out, float **s_out,
                             size_t K, size_t N) {
-    int8_t *q = malloc(K * N);
-    float  *s = malloc(N * sizeof(float));
-    if (!q || !s) { fprintf(stderr, "OOM in quantize\n"); exit(1); }
+    int8_t *q = xmalloc(K * N);
+    float  *s = xmalloc(N * sizeof(float));
 
     for (size_t n = 0; n < N; ++n) {
         /* Find max abs in column n */
@@ -342,8 +369,7 @@ static void gemv_int8_neon(const float *a, const int8_t *Bq, const float *Bs,
  */
 static int8_t *repack_int8_k_interleaved(const int8_t *Bq, size_t K, size_t N) {
     size_t K_pad = (K + 3) & ~(size_t)3;
-    int8_t *out = calloc(K_pad * N, 1);  /* zero-padded */
-    if (!out) { fprintf(stderr, "OOM in repack_int8\n"); exit(1); }
+    int8_t *out = xcalloc(K_pad * N, 1);  /* zero-padded */
 
     for (size_t g = 0; g < K_pad / 4; ++g) {
         for (size_t j = 0; j < N; ++j) {
@@ -643,7 +669,8 @@ static void matmul_int8(const float *A, const QW *qw,
     /* Prefill path */
     if (g_use_naive_matmul) {
         /* Old behavior: full dequant + naive scalar matmul (for A/B comparison) */
-        float *Bf = malloc(K * N * sizeof(float));
+        float *Bf = xmalloc(K * N * sizeof(float));
+        if (!Bf) { fprintf(stderr, "OOM in INT8 dequant\n"); exit(1); }
         for (size_t k = 0; k < K; ++k)
             for (size_t n = 0; n < N; ++n)
                 Bf[k * N + n] = (float)qw->q[k * N + n] * qw->s[n];
@@ -682,9 +709,8 @@ static void matmul_int8(const float *A, const QW *qw,
 static void quantize_weight_int4(const float *B_in, uint8_t **q_out, float **s_out,
                                  size_t K, size_t N) {
     size_t q_cols = (N + 1) / 2;
-    uint8_t *q = calloc(K * q_cols, 1);  /* zero-init (we OR nibbles in) */
-    float  *s = malloc(N * sizeof(float));
-    if (!q || !s) { fprintf(stderr, "OOM in quantize_weight_int4\n"); exit(1); }
+    uint8_t *q = xcalloc(K * q_cols, 1);  /* zero-init (we OR nibbles in) */
+    float  *s = xmalloc(N * sizeof(float));
 
     for (size_t n = 0; n < N; ++n) {
         float max_abs = 0.0f;
@@ -955,8 +981,135 @@ static void matmul_int4(const float *A, const QW4 *qw,
 
 #endif /* INT4_WEIGHTS */
 
-/* Dispatch macro: INT4 > INT8 > FP32 (mutually exclusive). */
-#if defined(INT4_WEIGHTS)
+/* ---- Q8_0 block-quantized GEMV (ob-8qt.17) ----
+ *
+ * FINDINGS §27 showed llama.cpp Q8_0 is 3.14× faster than our FP32 C loop
+ * on A57. Our existing INT8 (per-column scale, dequant-to-float-per-element)
+ * shows NO speedup because the int8→float32 widening eats the bandwidth win.
+ *
+ * Q8_0 layout: per-block fp16 scale + 32 int8 values along K dimension.
+ * The GEMV quantizes the activation vector to int8 ONCE (amortized over all
+ * N output columns), then computes int8×int8 dot products that stay in the
+ * integer domain — no per-element float conversion.
+ */
+#ifdef Q80_WEIGHTS
+
+static void quantize_weight_q8_0(const float *B_in, Q8Block **blk_out,
+                                 size_t K, size_t N) {
+    size_t nblk = (K + 31) / 32;
+    Q8Block *blk = xcalloc(N * nblk, sizeof(Q8Block));
+    for (size_t j = 0; j < N; ++j) {
+        for (size_t b = 0; b < nblk; ++b) {
+            size_t k0 = b * 32;
+            size_t klen = (k0 + 32 <= K) ? 32 : (K - k0);
+            float max_abs = 0.0f;
+            for (size_t i = 0; i < klen; ++i) {
+                float v = fabsf(B_in[(k0 + i) * N + j]);
+                if (v > max_abs) max_abs = v;
+            }
+            float scale = (max_abs > 0.0f) ? max_abs / 127.0f : 1.0f;
+            float inv = 1.0f / scale;
+            blk[j * nblk + b].d = (__fp16)scale;
+            for (size_t i = 0; i < klen; ++i) {
+                int vi = (int)lroundf(B_in[(k0 + i) * N + j] * inv);
+                if (vi > 127) vi = 127;
+                if (vi < -128) vi = -128;
+                blk[j * nblk + b].qs[i] = (int8_t)vi;
+            }
+        }
+    }
+    *blk_out = blk;
+}
+
+/* int8×int8 dot product for 32 elements using NEON (no SDOT needed).
+ * Returns scalar int32 sum of products. */
+static inline int32_t dot_i8x32_neon(const int8_t *a, const int8_t *b) {
+    int32x4_t acc = vdupq_n_s32(0);
+    /* Process 8 elements at a time: vmull_s8 → int16x8, vpadalq_s16 → accumulate */
+    acc = vpadalq_s16(acc, vmull_s8(vld1_s8(a +  0), vld1_s8(b +  0)));
+    acc = vpadalq_s16(acc, vmull_s8(vld1_s8(a +  8), vld1_s8(b +  8)));
+    acc = vpadalq_s16(acc, vmull_s8(vld1_s8(a + 16), vld1_s8(b + 16)));
+    acc = vpadalq_s16(acc, vmull_s8(vld1_s8(a + 24), vld1_s8(b + 24)));
+    /* Horizontal sum */
+    int32x2_t s2 = vpadd_s32(vget_low_s32(acc), vget_high_s32(acc));
+    return vget_lane_s32(vpadd_s32(s2, s2), 0);
+}
+
+static void gemv_q8_0_neon(const float *a, const Q8Block *Bblk,
+                           float *c, size_t K, size_t N) {
+    size_t nblk = (K + 31) / 32;
+
+    /* Quantize activation vector once — amortized over all N output columns */
+    int8_t  *a_q = xmalloc(nblk * 32);      /* int8 quantized activations */
+    float   *a_d = xmalloc(nblk * sizeof(float));  /* per-block activation scales */
+    for (size_t b = 0; b < nblk; ++b) {
+        size_t k0 = b * 32;
+        size_t klen = (k0 + 32 <= K) ? 32 : (K - k0);
+        float max_abs = 0.0f;
+        for (size_t i = 0; i < klen; ++i) {
+            float v = fabsf(a[k0 + i]);
+            if (v > max_abs) max_abs = v;
+        }
+        a_d[b] = (max_abs > 0.0f) ? max_abs / 127.0f : 1.0f;
+        float inv = 1.0f / a_d[b];
+        for (size_t i = 0; i < klen; ++i) {
+            int vi = (int)lroundf(a[k0 + i] * inv);
+            if (vi > 127) vi = 127;
+            if (vi < -128) vi = -128;
+            a_q[b * 32 + i] = (int8_t)vi;
+        }
+        /* Zero-fill remaining if K not multiple of 32 */
+        for (size_t i = klen; i < 32; ++i)
+            a_q[b * 32 + i] = 0;
+    }
+
+    const size_t TILE = 1024;
+#ifdef _OPENMP
+#pragma omp parallel for schedule(static)
+#endif
+    for (size_t jt = 0; jt < N; jt += TILE) {
+        size_t tn = (N - jt >= TILE) ? TILE : (N - jt);
+        for (size_t j = 0; j < tn; ++j) {
+            const Q8Block *col = Bblk + (jt + j) * nblk;
+            float sum = 0.0f;
+            for (size_t b = 0; b < nblk; ++b) {
+                int32_t dot = dot_i8x32_neon(a_q + b * 32, col[b].qs);
+                sum += (float)dot * a_d[b] * (float)col[b].d;
+            }
+            c[jt + j] = sum;
+        }
+    }
+    free(a_q);
+    free(a_d);
+}
+
+static void matmul_q8_0(const float *A, const QW *qw,
+                        float *C, size_t M, size_t K, size_t N) {
+    if (M == 1) {
+        gemv_q8_0_neon(A, qw->qb, C, K, N);
+        return;
+    }
+    /* Prefill: dequant to FP32 and use FP32 GEMM */
+    float *Bf = xmalloc((size_t)K * N * sizeof(float));
+    if (!Bf) { fprintf(stderr, "OOM in Q8_0 dequant\n"); exit(1); }
+    size_t nblk = (K + 31) / 32;
+    for (size_t j = 0; j < N; ++j)
+        for (size_t b = 0; b < nblk; ++b) {
+            float d = (float)qw->qb[j * nblk + b].d;
+            size_t k0 = b * 32;
+            size_t klen = (k0 + 32 <= K) ? 32 : (K - k0);
+            for (size_t i = 0; i < klen; ++i)
+                Bf[(k0 + i) * N + j] = (float)qw->qb[j * nblk + b].qs[i] * d;
+        }
+    matmul(A, Bf, C, M, K, N);
+    free(Bf);
+}
+#endif /* Q80_WEIGHTS */
+
+/* Dispatch macro: Q8_0 > INT4 > INT8 > FP32 (mutually exclusive). */
+#if defined(Q80_WEIGHTS)
+#define MM(A, Bf, Bq, C, M, K, N) matmul_q8_0(A, &(Bq), C, M, K, N)
+#elif defined(INT4_WEIGHTS)
 #define MM(A, Bf, Bq, C, M, K, N) matmul_int4(A, &(Bq), C, M, K, N)
 #elif defined(INT8_WEIGHTS)
 #define MM(A, Bf, Bq, C, M, K, N) matmul_int8(A, &(Bq), C, M, K, N)
@@ -1022,15 +1175,15 @@ typedef struct {
     float *down_proj;  /* INTER x HIDDEN */
     /* Embedding / LM head */
     float *embed;      /* VOCAB x HIDDEN (tied) */
-    /* Quantized weight versions: QW4 under INT4_WEIGHTS, QW under INT8_WEIGHTS */
-#if defined(INT4_WEIGHTS)
-    QW4 g_q_proj_q, g_k_proj_q, g_v_proj_q, g_o_proj_q;
-    QW4 f_q_proj_q, f_k_proj_q, f_v_proj_q, f_o_proj_q;
-    QW4 gate_proj_q, up_proj_q, down_proj_q;
-#elif defined(INT8_WEIGHTS)
+    /* Quantized weight versions: QW under Q80_WEIGHTS/INT8_WEIGHTS, QW4 under INT4_WEIGHTS */
+#if defined(Q80_WEIGHTS) || defined(INT8_WEIGHTS)
     QW g_q_proj_q, g_k_proj_q, g_v_proj_q, g_o_proj_q;
     QW f_q_proj_q, f_k_proj_q, f_v_proj_q, f_o_proj_q;
     QW gate_proj_q, up_proj_q, down_proj_q;
+#elif defined(INT4_WEIGHTS)
+    QW4 g_q_proj_q, g_k_proj_q, g_v_proj_q, g_o_proj_q;
+    QW4 f_q_proj_q, f_k_proj_q, f_v_proj_q, f_o_proj_q;
+    QW4 gate_proj_q, up_proj_q, down_proj_q;
 #endif
 } Weights;
 
@@ -1416,6 +1569,19 @@ static void free_weights(Weights *w) {
     FREE_QW(w->gate_proj_q);
     FREE_QW(w->up_proj_q);
     FREE_QW(w->down_proj_q);
+#elif defined(Q80_WEIGHTS)
+#define FREE_QW(qw) do { free((qw).qb); } while(0)
+    FREE_QW(w->g_q_proj_q);
+    FREE_QW(w->g_k_proj_q);
+    FREE_QW(w->g_v_proj_q);
+    FREE_QW(w->g_o_proj_q);
+    FREE_QW(w->f_q_proj_q);
+    FREE_QW(w->f_k_proj_q);
+    FREE_QW(w->f_v_proj_q);
+    FREE_QW(w->f_o_proj_q);
+    FREE_QW(w->gate_proj_q);
+    FREE_QW(w->up_proj_q);
+    FREE_QW(w->down_proj_q);
 #elif defined(INT8_WEIGHTS)
 #if defined(__ARM_FEATURE_DOTPROD)
 #define FREE_QW(qw) do { free((qw).q); free((qw).s); free((qw).q_sdot); } while(0)
@@ -1452,6 +1618,7 @@ int main(int argc, char **argv) {
     int prefill_M = 0;
     int verify_matmul = 0;
     int verify_int4 = 0;
+    int verify_quant = 0;
     int use_naive = 0;
     const char *ctx_lens_str = NULL;
     for (int i = 1; i < argc; ++i) {
@@ -1472,6 +1639,8 @@ int main(int argc, char **argv) {
             verify_matmul = 1;
         else if (strcmp(argv[i], "--verify-int4") == 0)
             verify_int4 = 1;
+        else if (strcmp(argv[i], "--verify-quant") == 0)
+            verify_quant = 1;
         else if (strcmp(argv[i], "--naive") == 0)
             use_naive = 1;
         else if (strcmp(argv[i], "--help") == 0) {
@@ -1486,9 +1655,14 @@ int main(int argc, char **argv) {
 #ifdef INT4_WEIGHTS
             printf("  --verify-int4     Verify INT4 GEMV accuracy vs FP32 oracle, then exit\n");
 #endif
+#if defined(Q80_WEIGHTS) || defined(INT8_WEIGHTS) || defined(INT4_WEIGHTS)
+            printf("  --verify-quant    Verify quantized GEMV accuracy vs FP32 at real model shapes, then exit\n");
+#endif
             printf("  --naive           Force naive scalar matmul for M>1 (A/B comparison)\n");
             return 0;
         }
+        else
+            fprintf(stderr, "Warning: unrecognized argument '%s' (ignored)\n", argv[i]);
     }
 
     /* Validate token count — 0 or negative causes division by zero in
@@ -1498,6 +1672,13 @@ int main(int argc, char **argv) {
         fprintf(stderr, "Error: --tokens must be >= 1 (got %d)\n", num_tokens);
         return 1;
     }
+
+#ifndef INT4_WEIGHTS
+    (void)verify_int4;
+#endif
+#if !defined(Q80_WEIGHTS) && !defined(INT8_WEIGHTS) && !defined(INT4_WEIGHTS)
+    (void)verify_quant;
+#endif
 
     /* ---- --verify-matmul: correctness check of gemm_neon vs naive (ob-8qt.15) ----
      *
@@ -1524,10 +1705,10 @@ int main(int argc, char **argv) {
 
         for (int t = 0; t < n_tests; ++t) {
             size_t M = tests[t].M, K = tests[t].K, N = tests[t].N;
-            float *A  = malloc(M * K * sizeof(float));
-            float *B  = malloc(K * N * sizeof(float));
-            float *C1 = malloc(M * N * sizeof(float));
-            float *C2 = malloc(M * N * sizeof(float));
+            float *A  = xmalloc(M * K * sizeof(float));
+            float *B  = xmalloc(K * N * sizeof(float));
+            float *C1 = xmalloc(M * N * sizeof(float));
+            float *C2 = xmalloc(M * N * sizeof(float));
 
             for (size_t i = 0; i < M * K; ++i) A[i] = ((float)(vseed = (vseed * 1103515245 + 12345)) / 2147483647.0f - 0.5f) * 2.0f;
             for (size_t i = 0; i < K * N; ++i) B[i] = ((float)(vseed = (vseed * 1103515245 + 12345)) / 2147483647.0f - 0.5f) * 2.0f;
@@ -1583,10 +1764,10 @@ int main(int argc, char **argv) {
 
         for (int t = 0; t < n_tests; ++t) {
             size_t K = tests[t].K, N = tests[t].N;
-            float *B = malloc(K * N * sizeof(float));
-            float *a = malloc(K * sizeof(float));
-            float *c_fp32 = malloc(N * sizeof(float));
-            float *c_int4 = malloc(N * sizeof(float));
+            float *B = xmalloc(K * N * sizeof(float));
+            float *a = xmalloc(K * sizeof(float));
+            float *c_fp32 = xmalloc(N * sizeof(float));
+            float *c_int4 = xmalloc(N * sizeof(float));
 
             for (size_t i = 0; i < K * N; ++i)
                 B[i] = ((float)(vseed = (vseed * 1103515245 + 12345)) / 2147483647.0f - 0.5f) * 2.0f;
@@ -1626,6 +1807,111 @@ int main(int argc, char **argv) {
         printf("\n%s: %d/%d passed (SNR > 20 dB threshold)\n",
                failures ? "FAILED" : "ALL PASS", n_tests - failures, n_tests);
         return failures ? 1 : 0;
+    }
+#endif
+
+    /* ---- --verify-quant: quantized GEMV accuracy vs FP32 at real model shapes (ob-8qt.18) ----
+     *
+     * For each of the 11 weight matrices in the model at their actual shapes,
+     * generates random FP32 weights with a fixed seed, computes the FP32 GEMV
+     * reference output, then quantizes and computes the quantized GEMV output.
+     * Reports max_abs, mean_abs, rel_err, and cosine similarity.
+     * Outputs CSV rows for fleet comparison.
+     * Available under Q80_WEIGHTS, INT8_WEIGHTS, or INT4_WEIGHTS. */
+#if defined(Q80_WEIGHTS) || defined(INT8_WEIGHTS) || defined(INT4_WEIGHTS)
+    if (verify_quant) {
+        struct { size_t K, N; const char *name; } tests[] = {
+            { HIDDEN, KEY_DIM,                     "g_q_proj" },
+            { HIDDEN, KEY_DIM,                     "g_k_proj" },
+            { HIDDEN, VALUE_DIM,                   "g_v_proj" },
+            { VALUE_DIM, HIDDEN,                   "g_o_proj" },
+            { HIDDEN, FULL_HEADS * FULL_HEAD_DIM,  "f_q_proj" },
+            { HIDDEN, FULL_KV_HEADS * FULL_HEAD_DIM, "f_k_proj" },
+            { HIDDEN, FULL_KV_HEADS * FULL_HEAD_DIM, "f_v_proj" },
+            { FULL_HEADS * FULL_HEAD_DIM, HIDDEN,  "f_o_proj" },
+            { HIDDEN, INTER,                       "gate_proj" },
+            { HIDDEN, INTER,                       "up_proj" },
+            { INTER, HIDDEN,                       "down_proj" },
+        };
+        int n_tests = sizeof(tests) / sizeof(tests[0]);
+        unsigned vseed = 42;
+
+#if defined(Q80_WEIGHTS)
+        const char *variant = "Q8_0";
+#elif defined(INT4_WEIGHTS)
+        const char *variant = "INT4";
+#else
+        const char *variant = "INT8";
+#endif
+
+        /* CSV header */
+        printf("model,quant_variant,matrix,K,N,max_abs,mean_abs,rel_err_pct,cos_sim\n");
+
+        for (int t = 0; t < n_tests; ++t) {
+            size_t K = tests[t].K, N = tests[t].N;
+            float *B = xmalloc(K * N * sizeof(float));
+            float *a = xmalloc(K * sizeof(float));
+            float *c_fp32 = xmalloc(N * sizeof(float));
+            float *c_quant = xmalloc(N * sizeof(float));
+
+            /* Random weights & activation (fixed seed, reproducible) */
+            for (size_t i = 0; i < K * N; ++i)
+                B[i] = ((float)(vseed = (vseed * 1103515245 + 12345)) / 2147483647.0f - 0.5f) * 2.0f;
+            for (size_t i = 0; i < K; ++i)
+                a[i] = ((float)(vseed = (vseed * 1103515245 + 12345)) / 2147483647.0f - 0.5f) * 2.0f;
+
+            /* FP32 reference GEMV */
+            matmul(a, B, c_fp32, 1, K, N);
+
+            /* Quantized GEMV */
+#if defined(Q80_WEIGHTS)
+            {
+                Q8Block *qb;
+                quantize_weight_q8_0(B, &qb, K, N);
+                gemv_q8_0_neon(a, qb, c_quant, K, N);
+                free(qb);
+            }
+#elif defined(INT4_WEIGHTS)
+            {
+                uint8_t *q4; float *s4;
+                quantize_weight_int4(B, &q4, &s4, K, N);
+                gemv_int4_neon(a, q4, s4, c_quant, K, N);
+                free(q4); free(s4);
+            }
+#else /* INT8_WEIGHTS */
+            {
+                QW qw; memset(&qw, 0, sizeof(qw));
+                quantize_weight(B, &qw.q, &qw.s, K, N);
+                gemv_int8_neon(a, qw.q, qw.s, c_quant, K, N);
+                free(qw.q); free(qw.s);
+            }
+#endif
+
+            /* Compare: max_abs, mean_abs, rel_err, cos_sim */
+            float max_abs = 0.0f, max_ref = 0.0f;
+            double sum_abs = 0.0, dot = 0.0, nrm_a = 0.0, nrm_b = 0.0;
+            for (size_t i = 0; i < N; ++i) {
+                float diff = fabsf(c_fp32[i] - c_quant[i]);
+                if (diff > max_abs) max_abs = diff;
+                float ar = fabsf(c_fp32[i]);
+                if (ar > max_ref) max_ref = ar;
+                sum_abs += diff;
+                dot  += (double)c_fp32[i] * c_quant[i];
+                nrm_a += (double)c_fp32[i] * c_fp32[i];
+                nrm_b += (double)c_quant[i] * c_quant[i];
+            }
+            float mean_abs = (float)(sum_abs / N);
+            float rel_err = (max_ref > 0) ? (max_abs / max_ref) * 100.0f : 0.0f;
+            double cos_sim = (nrm_a > 0.0 && nrm_b > 0.0)
+                ? dot / (sqrt(nrm_a) * sqrt(nrm_b)) : 0.0;
+
+            printf("%s,%s,%s,%zu,%zu,%.4f,%.4f,%.2f,%f\n",
+                   MODEL_NAME, variant, tests[t].name, K, N,
+                   max_abs, mean_abs, rel_err, cos_sim);
+
+            free(B); free(a); free(c_fp32); free(c_quant);
+        }
+        return 0;
     }
 #endif
 
@@ -1727,6 +2013,22 @@ int main(int argc, char **argv) {
     quantize_weight_int4(w.down_proj, &w.down_proj_q.q, &w.down_proj_q.s, INTER, HIDDEN);
     if (!csv)
         printf("  Weight quantization: INT4 (weight-only, packed nibbles, per-column symmetric scale)\n\n");
+#endif
+
+#ifdef Q80_WEIGHTS
+    quantize_weight_q8_0(w.g_q_proj,  &w.g_q_proj_q.qb,  HIDDEN, KEY_DIM);
+    quantize_weight_q8_0(w.g_k_proj,  &w.g_k_proj_q.qb,  HIDDEN, KEY_DIM);
+    quantize_weight_q8_0(w.g_v_proj,  &w.g_v_proj_q.qb,  HIDDEN, VALUE_DIM);
+    quantize_weight_q8_0(w.g_o_proj,  &w.g_o_proj_q.qb,  VALUE_DIM, HIDDEN);
+    quantize_weight_q8_0(w.f_q_proj,  &w.f_q_proj_q.qb,  HIDDEN, FULL_HEADS * FULL_HEAD_DIM);
+    quantize_weight_q8_0(w.f_k_proj,  &w.f_k_proj_q.qb,  HIDDEN, FULL_KV_HEADS * FULL_HEAD_DIM);
+    quantize_weight_q8_0(w.f_v_proj,  &w.f_v_proj_q.qb,  HIDDEN, FULL_KV_HEADS * FULL_HEAD_DIM);
+    quantize_weight_q8_0(w.f_o_proj,  &w.f_o_proj_q.qb,  FULL_HEADS * FULL_HEAD_DIM, HIDDEN);
+    quantize_weight_q8_0(w.gate_proj, &w.gate_proj_q.qb, HIDDEN, INTER);
+    quantize_weight_q8_0(w.up_proj,   &w.up_proj_q.qb,   HIDDEN, INTER);
+    quantize_weight_q8_0(w.down_proj, &w.down_proj_q.qb, INTER, HIDDEN);
+    if (!csv)
+        printf("  Weight quantization: Q8_0 (block-quantized, per-block fp16 scale + 32 int8)\n\n");
 #endif
 
     /* Per-layer state */
@@ -2093,8 +2395,17 @@ int main(int argc, char **argv) {
     g_t_gdn_proj = g_t_gdn_conv = g_t_gdn_decay = g_t_gdn_scan = g_t_gdn_oproj = 0;
     g_t_full = g_t_ffn = 0;
 
-    /* Measured decode loop */
-    double *tok_times = malloc(num_tokens * sizeof(double));
+    /* Measured decode loop.
+     * num_tokens >= 1 is guaranteed: prefill_M > 0 returns early above,
+     * and the validation at line ~1631 rejects num_tokens < 1 when
+     * prefill_M == 0. This explicit guard documents the invariant and
+     * helps gcc's flow analysis avoid a false -Wmaybe-uninitialized. */
+    if (num_tokens < 1) {
+        fprintf(stderr, "Internal error: decode loop reached with num_tokens=%d\n", num_tokens);
+        return 1;
+    }
+    double *tok_times = xmalloc(num_tokens * sizeof(double));
+    if (!tok_times) { fprintf(stderr, "OOM allocating tok_times\n"); return 1; }
     double t_start_all = now_us();
 
     for (int t = 0; t < num_tokens; ++t) {

@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """Validate benchmark result CSVs and their provenance manifests.
 
 Recursively scans results/raw/**/*.csv (including subdirectories like affinity/
@@ -219,6 +222,31 @@ QUANT_COMPARISON_COLS = [
     "gdn_proj_pct",
 ]
 
+# Cross-tool comparison against an external CPU inference engine (ob-mrd.15,
+# FINDINGS §28, jetson-j1_llamacpp_vs_orionsbelt_08b.csv style).
+CROSS_TOOL_COMPARISON_COLS = [
+    "engine",
+    "quant",
+    "test",
+    "n_tokens",
+    "avg_ts",
+    "device",
+]
+
+# Per-matmul quantization accuracy validation (ob-8qt.18, FINDINGS §30):
+# --verify-quant mode's CSV output, comparing quantized GEMV vs FP32 oracle.
+QUANT_ACCURACY_COLS = [
+    "model",
+    "quant_variant",
+    "matrix",
+    "K",
+    "N",
+    "max_abs",
+    "mean_abs",
+    "rel_err_pct",
+    "cos_sim",
+]
+
 # Device spec bandwidth (GiB/s) for sanity-check upper bounds.
 # Vendor datasheets quote GB/s; converted to GiB/s for unit-consistency
 # with the bench binary (÷2^30).  See ADR 0005 for GB/s originals.
@@ -234,7 +262,7 @@ ABSURD_THROUGHPUT = 200.0  # GiB/s
 
 
 def detect_csv_type(header):
-    """Return CSV type: standard, sustained, power, layer_profile, delta_matmul, e2e_decode, ctx_sweep, e2e_sweep, e2e_ctxsweep, gpu_micro, kleidiai_matmul, kleidiai_gdn, prefill_gemm, prefill_ab, quant_comparison, or None."""
+    """Return CSV type: standard, sustained, power, layer_profile, delta_matmul, e2e_decode, ctx_sweep, e2e_sweep, e2e_ctxsweep, gpu_micro, kleidiai_matmul, kleidiai_gdn, prefill_gemm, prefill_ab, quant_comparison, cross_tool_comparison, quant_accuracy, or None."""
     cols = set(header)
     if cols >= set(STANDARD_COLS):
         return "standard"
@@ -266,6 +294,10 @@ def detect_csv_type(header):
         return "prefill_ab"
     if cols >= {"variant", "tok_per_sec", "ffn_pct", "gdn_proj_pct"}:
         return "quant_comparison"
+    if cols >= {"engine", "quant", "test", "n_tokens", "avg_ts"}:
+        return "cross_tool_comparison"
+    if cols >= {"quant_variant", "matrix", "cos_sim", "rel_err_pct"}:
+        return "quant_accuracy"
     return None
 
 
@@ -300,6 +332,10 @@ def expected_columns(csv_type):
         return PREFILL_AB_COLS
     if csv_type == "quant_comparison":
         return QUANT_COMPARISON_COLS
+    if csv_type == "cross_tool_comparison":
+        return CROSS_TOOL_COMPARISON_COLS
+    if csv_type == "quant_accuracy":
+        return QUANT_ACCURACY_COLS
     return []
 
 
@@ -853,6 +889,28 @@ def validate_csv(path, csv_name, issues):
                         if tps <= 0 or tps > 1000:
                             issues.append(
                                 Issue("WARNING", csv_name, f"row {i}: implausible tok/s {tps}")
+                            )
+                    except ValueError:
+                        pass
+                elif csv_type == "cross_tool_comparison":
+                    try:
+                        ts = float(row.get("avg_ts", 0))
+                        if ts <= 0 or ts > 1000:
+                            issues.append(
+                                Issue("WARNING", csv_name, f"row {i}: implausible tok/s {ts}")
+                            )
+                    except ValueError:
+                        pass
+                elif csv_type == "quant_accuracy":
+                    try:
+                        cos_sim = float(row.get("cos_sim", 0))
+                        if cos_sim < 0.9 or cos_sim > 1.0001:
+                            issues.append(
+                                Issue(
+                                    "WARNING",
+                                    csv_name,
+                                    f"row {i}: implausible cosine similarity {cos_sim}",
+                                )
                             )
                     except ValueError:
                         pass

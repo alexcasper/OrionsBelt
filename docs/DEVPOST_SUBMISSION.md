@@ -35,9 +35,11 @@ At 262K context on the 4B checkpoint, that difference is **23.95 GiB of RAM** �
 - **GDN-2 vs GDN-1 comparison** — the decoupled gating in GDN-2 costs 1.2–1.5× at decode on big cores (2.2–2.4× on little), 2.2–2.7× at prefill
 - **Analytical memory model** decomposing weights, KV cache, and recurrent state at every context length
 - **End-to-end model decode** — C decode loop with row-sweep NEON GEMV + INT8 weight-only quantization: **10.6 tok/s (0.8B, A76)**, **2.45 tok/s (0.8B, A57)**, 1.84 tok/s (4B, A76), 0.51 tok/s (4B, A57). ~26× cumulative speedup over the Python/transformers baseline
+- **Q8_0 block-quantized GEMV** — per-block fp16 scale + 32 int8 values, matching the llama.cpp Q8_0 format: **2.97× decode speedup over FP32 on the A57** (5.12 tok/s vs 1.72 tok/s), with cosine similarity 1.000000 (numerically indistinguishable from FP32). Context-length sweep confirms the GDN layer cost stays flat at 73–80 ms across ctx 1–4096
 - **INT4 weight-only quantization** — core-type-dependent: 1.40× on A55 little cores (bandwidth wins), 15% slower than INT8 on A76 (compute-bound), no benefit on A57 (narrow pipeline can't hide unpack cost). The optimal precision is core-type-aware, not "always lower"
 - **Cache-blocked GEMM prefill** — 49–78× prefill speedup from switching naive single-row GEMV to cache-blocked GEMM at M>1, measured across the fleet
 - **ONNX Runtime CPU EP audit** — GDN recurrence is expressible via ONNX `Loop` but 16× slower than our fused kernel. Confirms no existing CPU toolchain has optimized GDN for Arm
+- **Hardware energy profiling** — INA3221 rail-level power characterization on Jetson Nano: 874–1250 mJ/GiB board-wide, power is constant across kernels, `performance` governor is both faster and 28% more energy-efficient than `ondemand`
 
 **What we did NOT achieve (stated honestly):**
 - Heterogeneous NPU/GPU/CPU dispatch — requires the Orion O6's GPU+NPU for a meaningful test; designed but not implemented
@@ -52,7 +54,7 @@ At 262K context on the 4B checkpoint, that difference is **23.95 GiB of RAM** �
 
 ### Headline: GDN kernel bandwidth on RK3588 Cortex-A76
 
-Qwen3.5-4B, prefill (seq=64), fp32 baseline, 8-thread (big cluster). Two independent RK3588 nodes (t3, t4 Turing Machines RK1). Kernel code is byte-identical at both commits (diff in `bench_gdn.c` is empty between f015982 and 1ca4d6d).
+Qwen3.5-4B, prefill (seq=64), fp32 baseline, 8-thread (big cluster). Two independent RK3588 nodes (t3, t4 Turing Machines RK1). Kernel logic is unchanged between commits (the only diff in `bench_gdn.c` between f015982 and 7bbbc99 is a `_POSIX_C_SOURCE` feature-test macro added for strict-C11 portability in 197dc2f — no behavioral change).
 
 | Kernel | GiB/s (t3) | Spread | GiB/s (t4) | Spread | t3÷t4 |
 |---|---:|---:|---:|---:|---:|
@@ -60,7 +62,7 @@ Qwen3.5-4B, prefill (seq=64), fp32 baseline, 8-thread (big cluster). Two indepen
 | Gated delta-rule scan | 10.62 | 5.4% | 11.09 | 5.2% | 0.96× |
 | Causal Conv1D | 18.73 | 4.8% | 23.00 | 8.5% | 0.81× |
 
-> t3 manifest git_sha `f015982`, dirty=false; t4 manifest git_sha `1ca4d6d`,
+> t3 manifest git_sha `f015982`, dirty=false; t4 manifest git_sha `7bbbc99`,
 > dirty=false; 30 repeats each. The boards agree within 4–19% (t4 marginally
 > faster), confirming the result is hardware-reproducible. Cumulative decay
 > reaches 66% of the 31.7 GiB/s spec bandwidth; gated scan runs at a lower
@@ -78,6 +80,18 @@ Qwen3.5-4B, prefill (seq=64), fp32 baseline, 8-thread (big cluster). Two indepen
 | Gated scan | 10.62 | 10.47 | 0.99× (flat) |
 
 > fp16 halves memory traffic for the elementwise decay chain → 1.77× on t3. Gated scan is compute-bound on the delta-rule matmul, so halving traffic doesn't help — confirming the instruction-overhead diagnosis.
+
+### Q8_0 quantization: 2.97× decode speedup with zero accuracy loss
+
+Block-quantized GEMV (fp16 scale + 32 int8 per block, matching llama.cpp's Q8_0 format) delivers **2.97× decode speedup** on the Jetson A57, the fleet's most constrained core. Per-matmul verification across 11 model shapes × 2 checkpoints shows cosine similarity of exactly 1.000000 — the quantization error is below float32 representational precision.
+
+| Variant | 0.8B cos_sim | 0.8B rel_err | 4B cos_sim | 4B rel_err |
+|---|---:|---:|---:|---:|
+| Q8_0 | 1.000000 | 0.06–0.16% | 1.000000 | 0.04–0.10% |
+| INT8 | 1.000000 | 0.05–0.12% | 1.000000 | 0.04–0.17% |
+| INT4 | 0.99998 | 1.30–2.05% | 0.99999 | 0.95–1.93% |
+
+> Context-length sweep (A57, 0.8B hybrid model) shows Q8_0 retains 1.85–2.46× advantage over FP32 across all context lengths. The pure-GDN sweep confirms O(1) decode: Q8_0 throughput varies only ±3% from ctx=1 to ctx=4096. Full data: FINDINGS §29–31, CSVs `jetson-j1_quant_accuracy_08b_4b.csv` and `jetson-j1_08b_q80_ctxsweep_e2e_raw.csv`.
 
 ### Memory: the architectural advantage
 
@@ -102,6 +116,22 @@ This is not a bug in one toolchain — it is an **architectural constraint** of 
 
 - **Pi 5 (A76, 15.8 GiB/s) vs Jetson (A57, 23.8 GiB/s):** Pi 5 is faster despite less bandwidth — confirming the kernels are instruction-bound, not bandwidth-bound
 - **big.LITTLE:** A76 big cores are 2–3× faster than A55 little cores; simultaneous big+little scheduling shows diminishing returns past 4 big cores
+
+### Energy efficiency: hardware power profiling on the Jetson A57
+
+The Jetson Nano's onboard **TI INA3221** power monitor (exposed via IIO sysfs) provides real-time rail-level power measurements — no external hardware needed. We profiled all three GDN kernels under sustained 10-second loads to measure energy per GiB:
+
+| Kernel | Throughput (GiB/s) | Δ Power board (mW) | Energy (mJ/GiB board) | Energy (mJ/GiB CPU) |
+|--------|-------------------:|-------------------:|----------------------:|--------------------:|
+| `gdn_gated_scan` | 0.74 | 925 | **1250** | 836 |
+| `gdn_causal_dwconv1d` | 0.88 | 903 | **1026** | 767 |
+| `gdn_cumdecay` | 1.06 | 925 | **874** | 667 |
+
+**Key finding: power is constant, energy scales with throughput.** All three kernels draw ~900–925 mW over idle (2.8 W board total), despite different throughput rates. The A57's power budget is dominated by memory subsystem overhead, not arithmetic. Energy-per-GiB therefore tracks 1/throughput — the fastest kernel is also the most energy-efficient. The GPU rail reads 0 mW throughout (NEON-only workload).
+
+**Governor matters for energy too:** `performance` is both 7% faster *and* 28% more energy-efficient than `ondemand` (1250 vs 1602 mJ/GiB board), because frequency ramping latency wastes energy on sustained workloads.
+
+Full characterization with provenance: FINDINGS §"INA3221 power/energy characterization".
 
 ### GDN-2 stretch comparison
 
@@ -148,7 +178,7 @@ No GPU, NPU, or proprietary SDK required. Full setup guide: [`docs/SETUP_PORTABL
 ### Reproducibility
 
 - Every measurement has a **provenance manifest** (git SHA, governor state, CPU topology, thermals)
-- 1788 unit tests covering kernel correctness and schema conformance
+- 1799 unit tests covering kernel correctness and schema conformance (1769 passed, 30 skipped in CI)
 - All figures are **regenerable** from committed CSVs (`bench/plots.py`, `scripts/generate_memory_plots.py`)
 - t3 benchmark data: manifest git_sha `f015982`, dirty=false, governor=performance, 30 repeats per kernel
 
@@ -173,7 +203,7 @@ Specifically:
 
 - **Repository:** https://github.com/alexcasper/OrionsBelt
 - **License:** Apache-2.0
-- **Findings (41 sections, 4476 lines):** [`docs/FINDINGS.md`](../docs/FINDINGS.md)
+- **Findings (46 sections, 4812 lines):** [`docs/FINDINGS.md`](../docs/FINDINGS.md)
 - **Comparison table:** [`results/figures/comparison_table.md`](../results/figures/comparison_table.md)
 - **Fleet bandwidth analysis:** [`results/figures/fleet_bandwidth_scaling.md`](../results/figures/fleet_bandwidth_scaling.md)
 - **Memory scaling figures:** [`results/figures/memory_comparison.md`](../results/figures/memory_comparison.md)

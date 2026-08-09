@@ -120,7 +120,7 @@ mkdir -p results/raw results/manifests
 python3 bench/manifest.py > results/manifests/pi5-r5.json
 ```
 
-A number without a manifest is not a result (PLAN.md §9).
+A number without a manifest is not a result (docs/archive/PLAN.md §9).
 
 ### Read thermals after the run
 
@@ -202,15 +202,20 @@ git push origin bench/r5
 ## What the device benchmark tells us
 
 The devices span ~15.8 GiB/s (Pi 5) → ~23.8 GiB/s (Jetson) → ~31.7 GiB/s (RK3588) of
-spec memory bandwidth. The hypothesis is that GDN kernels are
+spec memory bandwidth. The initial hypothesis was that GDN kernels are
 memory-bandwidth-bound at ~0.25 FLOP/byte — if so, achieved throughput should
 track bandwidth roughly linearly and **independently of core generation**.
 
 The discriminating case: the Pi 5 has the **newest cores** (A76) but the
 **lowest bandwidth**, while the Jetson Nano has the **oldest cores** (A57) and
 **more bandwidth**. If the Nano beats the Pi 5 on the scan kernel, that is strong
-evidence for bandwidth-boundedness. See [`docs/DEVICE_RUNBOOK.md`](./DEVICE_RUNBOOK.md)
-§"What we are actually testing" for the full analysis.
+evidence for bandwidth-boundedness.
+
+**The result:** the Pi 5 wins on ALL three kernels despite having 33% LESS spec
+bandwidth. The bandwidth-bound hypothesis does **not** hold at seq=64 working-set
+sizes — these kernels are **instruction-overhead-bound, not DRAM-bandwidth-bound**.
+See [`docs/DEVICE_RUNBOOK.md`](./DEVICE_RUNBOOK.md) §"What we are actually testing"
+and [`FINDINGS.md`](./FINDINGS.md) §5b for the full analysis.
 
 ### Reading the CSV columns
 
@@ -221,20 +226,22 @@ evidence for bandwidth-boundedness. See [`docs/DEVICE_RUNBOOK.md`](./DEVICE_RUNB
 | `spread_pct` | `(p95 - p50) / p50 × 100` — should be under ~10% for a clean run |
 | `dispatch_path` | `neon`, `sve` or `scalar` — which compiled path actually ran |
 
-### What the fleet measured (2026-08-03)
+### What the fleet measured (fleet sweep ob-bf7, post-optimization)
 
 Sanity-check your own numbers against these, all `gdn_gated_scan`, 4B, seq=64,
-NEON path (see [`FINDINGS.md`](./FINDINGS.md) for the full analysis):
+NEON path (see [`FINDINGS.md`](./FINDINGS.md) §5b for the full analysis):
 
 | Device | Spec BW | Achieved | % of spec |
 |---|---:|---:|---:|
-| Jetson Nano (A57) | 23.8 GiB/s | 0.72 GiB/s | **3.0%** |
-| Raspberry Pi 5 (A76) | 15.8 GiB/s | 1.84 GiB/s | 11.6% |
-| RK3588 big (A76) | 31.7 GiB/s | 3.29 GiB/s | 10.4% |
+| Jetson Nano j1 (A57) | 23.8 GiB/s | 1.14 GiB/s | **4.8%** |
+| Raspberry Pi 5 (A76) | 15.8 GiB/s | 1.20 GiB/s | 7.6% |
+| RK3588 big (A76) | 31.7 GiB/s | 5.67 GiB/s | 17.9% |
 
-The answer to the discriminating question above turned out to be **split**, so
-do not read a low Jetson number as a broken setup — it is real. Within the A76
-class the kernel does track bandwidth (2.00× the spec gives 1.79× the
-throughput). The A57 does not: it has 1.5× the Pi 5's spec bandwidth and reaches
-0.39× its throughput, sitting at 3% of spec where both A76 parts reach ~11%. On
-that core the bottleneck is the core, not the memory system.
+The Pi 5 wins despite having 33% less spec bandwidth than the Jetson and ~50%
+less than the RK3588. This is **not** a broken setup — the Jetson's low scan
+number is real. The bottleneck is the core microarchitecture (IPC, OoO depth,
+clock frequency), not the memory system. The A76's ~1.6× higher clock and
+substantially better IPC than the A57 explains the win despite less bandwidth.
+Multi-threaded scaling (OpenMP) reveals a bandwidth component that the
+single-thread comparison cannot expose — see the optimization-impact section in
+[`fleet_bandwidth_scaling.md`](../results/figures/fleet_bandwidth_scaling.md).

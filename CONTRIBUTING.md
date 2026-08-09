@@ -1,7 +1,9 @@
 # Contributing to OrionsBelt
 
-OrionsBelt optimizes a Qwen3.5-family Gated DeltaNet (GDN) hybrid model for Arm silicon,
-primarily the Radxa Orion O6 (CIX P1 SoC). This document is for anyone — human or agent —
+OrionsBelt optimizes a Qwen3.5-family Gated DeltaNet (GDN) hybrid model for Arm edge silicon.
+The project committed to the **Edge AI track** ([ADR 0007](./docs/adr/0007-commit-to-edge-ai-track.md))
+after the Orion O6 board did not arrive; current work targets the portable aarch64 device fleet
+and KleidiAI kernel contribution. This document is for anyone — human or agent —
 picking up work on the project. It covers how the repo is set up, how work is tracked, and,
 most importantly, the conventions that make our benchmark numbers trustworthy. If you only
 read one section, read "The reproducibility conventions" below: it's the difference between
@@ -88,7 +90,7 @@ non-win and hide the actual result. Report them as two numbers, always.
 **Memory is attributed three ways: model weights, full-attention KV cache, and GDN recurrent
 state.** These are tracked separately because they behave differently — KV cache grows
 linearly with context length, while GDN recurrent state is O(1) per token regardless of
-context. That asymmetry *is* the project's central claim (see `PLAN.md` §2.4 and
+context. That asymmetry *is* the project's central claim (see `docs/archive/PLAN.md` §2.4 and
 `bench/README.md`). Collapsing the three into one "peak memory" number would erase the exact
 evidence the project exists to produce.
 

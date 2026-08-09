@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """Tests for scripts/partial_comparison_table.py helper functions (ob-9t0.2).
 
 Tests the module-level utility functions that were previously untestable

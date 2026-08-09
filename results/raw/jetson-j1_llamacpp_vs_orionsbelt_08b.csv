@@ -1,0 +1,15 @@
+engine,quant,test,n_tokens,avg_ts,stddev_ts,model_size_bytes,n_threads,device,governor,thermal_start_c,thermal_end_c,git_sha_orionsbelt,llamacpp_commit
+llama.cpp,Q8_0,pp,16,10.42,0.17,822629632,4,jetson-a57,performance,64,69,d223c19,69bf643
+llama.cpp,Q8_0,pp,32,10.82,0.07,822629632,4,jetson-a57,performance,64,69,d223c19,69bf643
+llama.cpp,Q8_0,pp,64,10.80,0.19,822629632,4,jetson-a57,performance,64,69,d223c19,69bf643
+llama.cpp,Q8_0,tg,32,5.40,0.05,822629632,4,jetson-a57,performance,64,69,d223c19,69bf643
+llama.cpp,Q4_0,pp,16,9.84,0.10,552074496,4,jetson-a57,performance,64,69,d223c19,69bf643
+llama.cpp,Q4_0,pp,32,10.10,0.09,552074496,4,jetson-a57,performance,64,69,d223c19,69bf643
+llama.cpp,Q4_0,pp,64,10.22,0.02,552074496,4,jetson-a57,performance,64,69,d223c19,69bf643
+llama.cpp,Q4_0,tg,32,5.64,0.02,552074496,4,jetson-a57,performance,64,69,d223c19,69bf643
+orionsbelt,fp32,pp,16,4.73,-,-,4,jetson-a57,performance,50,71,a722289,-
+orionsbelt,fp32,pp,32,4.65,-,-,4,jetson-a57,performance,50,71,a722289,-
+orionsbelt,fp32,pp,64,4.43,-,-,4,jetson-a57,performance,50,71,a722289,-
+orionsbelt,fp32,tg,32,1.72,-,-,4,jetson-a57,performance,52,70,5e16e96,-
+orionsbelt,int8,tg,32,1.64,-,-,4,jetson-a57,performance,52,70,5e16e96,-
+orionsbelt,int4,tg,32,1.62,-,-,4,jetson-a57,performance,52,70,5e16e96,-

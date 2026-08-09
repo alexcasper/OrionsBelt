@@ -8,8 +8,10 @@
 
 ### Summary
 
-The sudo password for Arm test devices (`cell`, used in a `sudo -S` pipeline to
-set CPU governors) was committed to git in `.goose-task.md` and `.goose-loop.log`.
+The sudo password for Arm test devices (value deliberately not repeated
+here or in bead `ob-3i5` — see the remediation runbook below for how to
+obtain it out-of-band if needed; used in a `sudo -S` pipeline to set CPU
+governors) was committed to git in `.goose-task.md` and `.goose-loop.log`.
 Both files are now gitignored and untracked (since commit `e2d1c7e`), but the
 blobs remain reachable in history across all branches.
 
@@ -45,6 +47,24 @@ Two actions are needed:
    the password string across all branches. This requires force-pushing all
    branches — coordinate with the team first, as it invalidates open PRs.
 
+### Stale Branch: bench/r5
+
+Branch `bench/r5` (413 commits diverged from `main`, work fully superseded)
+exposes the rotated password at its **tip** in `.goose-task.md` (lines 7-8).
+Because the password was already rotated (see §Remediation #1 above), this is
+**acceptable historical exposure**:
+
+- The credential is no longer valid on any device.
+- The same string also exists in `main`'s history (commit `f9ff0c9`) — purging
+  `bench/r5` alone would not remove the exposure.
+- Truly purging requires `git-filter-repo` + force-push of all branches
+  (owner-level action); this is tracked but not urgent given rotation.
+- **Recommendation:** delete `bench/r5` (it is superseded work) once the
+  team confirms no unique changes are needed. This requires a push the
+  agent constraint prohibits, so it remains an owner action.
+
+Tracked as bead `ob-0vu`.
+
 ### What Has Been Done
 
 - `.goose-task.md` and `.goose-loop.log` are untracked and gitignored
@@ -52,3 +72,5 @@ Two actions are needed:
 - This document (`SECURITY.md`) records the exposure
 - Remediation script `scripts/purge_sudo_password.sh` is ready to execute
 - The repo is private, limiting exposure to collaborators only
+- **bench/r5 documented as acceptable historical exposure** of rotated
+  credential (bead `ob-0vu`)

@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """Tests for scripts/gen_e2e_comparison.py — dedup logic and table generation.
 
 Covers the device-name normalization and stale-entry dedup that prevents

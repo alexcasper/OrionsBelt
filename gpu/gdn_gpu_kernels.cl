@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 /*
  * OpenCL compute kernels for the Gated DeltaNet (GDN) operators.
  *
@@ -105,8 +108,6 @@ __kernel void gdn_causal_dwconv1d(
     for (uint t = 0; t < seq; t++) {
         uint off = t * channels + c;
         float cur = in[off];
-        float acc = fma(fma(fma(h0, w0, h1 * w1), 1.0f, h2 * w2), 1.0f, cur * w3);
-        /* Expand: h0*w0 + h1*w1 + h2*w2 + cur*w3 */
         out[off] = h0 * w0 + h1 * w1 + h2 * w2 + cur * w3;
         h0 = h1;
         h1 = h2;
@@ -123,10 +124,10 @@ __kernel void gdn_causal_dwconv1d(
  * For each token t, per value-head h:
  *
  *   S_h *= exp(g_h)                              // decay  (scalar × matrix)
- *   kv  = S_h · k_h^T                             // retrieve (mat-vec, dim_v)
+ *   kv  = S_h^T · k_h                             // retrieve (mat-vec, dim_v)
  *   delta = (v_h - kv) * beta_h                   // correction (elementwise)
  *   S_h += k_h ⊗ delta                            // write (rank-1 update)
- *   out_h = S_h · q_h                             // read (mat-vec, dim_v)
+ *   out_h = S_h^T · q_h                           // read (mat-vec, dim_v)
  *
  * State S_h is a (head_k_dim × head_v_dim) matrix, row-major.
  * Each work-group processes one head for one token; work-items tile the

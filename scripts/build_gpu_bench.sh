@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 # Build the GDN GPU compute kernel benchmark and validation suite.
 #
 # Bead ob-q44 / ob-gzk. Produces two binaries:

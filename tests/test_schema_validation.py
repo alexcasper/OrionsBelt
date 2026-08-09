@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """Comprehensive tests for bench/schema.py — validation, serialization, and round-trip.
 
 Covers the core data-integrity layer: validate_row, validate_rows, write_csv,

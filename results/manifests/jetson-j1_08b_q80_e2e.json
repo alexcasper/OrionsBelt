@@ -1,0 +1,35 @@
+{
+  "manifest_version": 1,
+  "run_id": "jetson-j1_08b_q80_e2e_dd77a26",
+  "timestamp_utc": "2026-08-08T07:34:10Z",
+  "source": "scripts/capture_manifest.sh",
+  "git": {
+    "sha": "dd77a26c3494a79d244f9777e376e483c560e786",
+    "dirty": false
+  },
+  "host": {
+    "hostname": "j1",
+    "machine": "aarch64",
+    "kernel": "4.9.337-tegra",
+    "os": "Linux #1 SMP PREEMPT Mon Nov 4 23:41:41 PST 2024",
+    "cpu_model": "ARMv8 Processor rev 1 (v8l)",
+    "core_count": 4,
+    "cpu_topology": [{"cpu":0,"max_freq_khz":1479000,"min_freq_khz":102000,"governor":"performance","cpu_capacity":null},{"cpu":1,"max_freq_khz":1479000,"min_freq_khz":102000,"governor":"performance","cpu_capacity":null},{"cpu":2,"max_freq_khz":1479000,"min_freq_khz":102000,"governor":"performance","cpu_capacity":null},{"cpu":3,"max_freq_khz":1479000,"min_freq_khz":102000,"governor":"performance","cpu_capacity":null}]
+  },
+  "isa_features": {"sve":false,"sve2":false,"i8mm":false,"bf16":false,"asimddp":false,"sme":false},
+  "parallelism": {
+    "omp_num_threads": null,
+    "omp_proc_bind": null,
+    "omp_places": null,
+    "effective_threads": 4,
+    "threads_source": "core_count_default"
+  },
+  "thermal_zones": [{"zone":"thermal_zone0","type":"AO-therm","temp_millicelsius":53000},{"zone":"thermal_zone1","type":"CPU-therm","temp_millicelsius":47500},{"zone":"thermal_zone2","type":"GPU-therm","temp_millicelsius":46500},{"zone":"thermal_zone3","type":"PLL-therm","temp_millicelsius":45000},{"zone":"thermal_zone4","type":"PMIC-Die","temp_millicelsius":50000},{"zone":"thermal_zone5","type":"thermal-fan-est","temp_millicelsius":47500}],
+  "memory": {
+    "mem_total_kb": 4059020,
+    "mem_available_kb": 2242120
+  },
+  "software": {
+    "python_version": "Python 3.6.9"
+  }
+}

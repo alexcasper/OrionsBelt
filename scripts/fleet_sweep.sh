@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 # Fleet sweep — clean-tree, commit-matched benchmark run for ob-bf7.
 #
 # The fleet comparison is currently broken by cross-commit and dirty-tree

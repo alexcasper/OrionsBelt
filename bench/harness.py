@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """Benchmark runner CLI: context sweep with warmup, repeats, and percentiles.
 
 Bead ``ob-ljh``. Protocol: ``docs/METRICS.md``. Schema: ``docs/RESULTS_SCHEMA.md``
@@ -6,7 +9,7 @@ Bead ``ob-ljh``. Protocol: ``docs/METRICS.md``. Schema: ``docs/RESULTS_SCHEMA.md
 Sweeps context lengths (4K / 32K / 128K / 262K by default) with configurable
 warmup and repeat counts, emitting per-repeat rows in the frozen tidy/long
 schema. Each context point is independently useful -- a truncated sweep still
-yields publishable data (METRICS.md section 7; PLAN.md section 5/R4).
+yields publishable data (METRICS.md section 7; docs/archive/PLAN.md section 5/R4).
 
 The harness is **backend-agnostic**: any class implementing the ``Backend``
 protocol can be plugged in. A ``SyntheticBackend`` is provided for testing, CI
@@ -579,7 +582,7 @@ def _git_short_sha() -> str | None:
     Returns ``None`` rather than a placeholder on purpose. The frozen schema
     validates ``git_sha`` as 7–40 lowercase hex, so any stand-in value that
     parses (``"0000000"``) would let a CSV with no real provenance validate
-    clean and look publishable — defeating the rule in PLAN.md §9 that a number
+    clean and look publishable — defeating the rule in docs/archive/PLAN.md §9 that a number
     without a manifest is not a result. Callers must decide explicitly.
     """
     try:
@@ -600,7 +603,7 @@ def run_sweep(backend: Backend, config: SweepConfig) -> list[ResultRow]:
 
     Each context length is independent: if one fails (OOM, timeout), its error
     is reported on stderr and the sweep continues to the next point, so a
-    truncated sweep still yields publishable data (PLAN.md section 5/R4).
+    truncated sweep still yields publishable data (docs/archive/PLAN.md section 5/R4).
     """
     backend.load()
 
@@ -877,7 +880,12 @@ def main(argv: list[str] | None = None) -> int:
             f"'never report N < 5'), got {args.repeats}"
         )
 
-    context_lengths = [int(x) for x in args.context_lengths.split(",")]
+    try:
+        context_lengths = [int(x.strip()) for x in args.context_lengths.split(",")]
+    except ValueError:
+        parser.error(
+            f"--context-lengths must be comma-separated integers, got: {args.context_lengths!r}"
+        )
     model_cfg = _MODEL_PRESETS[args.model]
 
     # Build backend

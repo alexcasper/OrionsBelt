@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """Run the CIX NOE frontend against each operator probe and record coverage.
 
 Bead ``ob-t3b.1``. Consumes the graphs emitted by ``scripts/npu_op_probe.py``.

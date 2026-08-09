@@ -8,6 +8,6 @@ Two distinct jobs, and conflating them is a mistake:
    reference with explicit, justified tolerances, including long-context prompts where
    recurrent-state drift compounds (`t-oracle`).
 
-The oracle is what makes PLAN.md section 9's rule enforceable: *speed that changes
+The oracle is what makes docs/archive/PLAN.md section 9's rule enforceable: *speed that changes
 outputs is not speed*. Every optimization bead — NPU quantization, the GPU scan kernel,
 the dispatcher — is gated on it.

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 /* Gated DeltaNet delta-rule matmul: beta = alpha . S
  *
  * Bead ob-8qt.1. The one piece of the delta-rule update the other three GDN
@@ -49,6 +52,7 @@
 #include "gdn_delta_matmul.h"
 
 #include <math.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -129,6 +133,10 @@ static void gdn_delta_matmul_kleidiai(const float *restrict A, const float *rest
 
     void *packed = aligned_alloc(64, packed_size);
     float *zero_bias = calloc(N, sizeof(float)); /* delta-rule matmul has no bias */
+    if (!packed || !zero_bias) {
+        fprintf(stderr, "OOM in gdn_delta_matmul_kleidiai\n");
+        exit(1);
+    }
 
     kai_run_rhs_pack_kxn_f32p8x1biasf32_f32_f32_neon(
         /*num_groups=*/1, N, K, nr, kr, sr, N * sizeof(float), B, zero_bias,

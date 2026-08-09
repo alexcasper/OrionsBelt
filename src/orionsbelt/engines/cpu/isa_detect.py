@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """Runtime ISA feature detection for aarch64 devices.
 
 Per bead ob-ng6: confirm the feature flags are actually active at runtime
@@ -15,8 +18,9 @@ Usage (library)::
     fs = detect_features()
     print(fs.summary())
 
-The module is pure-stdlib so it runs on any Python 3.8+, including the
-Jetson Nano's Python 3.6.9 (no f-strings needed for core logic).
+The module is pure-stdlib (no third-party dependencies). CI runs it on
+Python 3.10+; the Jetson Nano (Python 3.6.9) uses the bash ISA detection
+in run_e2e_decode.sh instead, since this module requires Python 3.7+.
 """
 
 from __future__ import annotations

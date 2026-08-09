@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """Quantization policies and precision carve-outs.
 
 Owned by bead ``t-quant-plan``. The central concern is that GDN recurrent

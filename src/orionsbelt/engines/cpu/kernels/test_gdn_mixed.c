@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 /* Correctness test for mixed-precision GDN kernel variants (bead ob-8qt.4).
  *
  * Strategy: run each fp32 kernel on identical inputs, then run the bf16/fp16
@@ -27,6 +30,13 @@
 #include <string.h>
 
 #include "gdn_sve.h"
+
+static void *xmalloc(size_t n) {
+    void *p = malloc(n);
+    if (!p) { fprintf(stderr, "out of memory\n"); exit(1); }
+    return p;
+}
+
 
 /* bf16 conversion helpers (standalone; fp16 uses __fp16 casts directly) */
 static uint16_t f32_to_bf16(float f) {
@@ -89,18 +99,18 @@ int main(void) {
     printf("  seq=%zu  channels=%zu  (tail=%zu exercises scalar epilogue)\n\n", T, C, C % 4);
 
     /* Allocate buffers */
-    float *a = malloc(N * sizeof(float));
-    float *g = malloc(N * sizeof(float));
-    float *x = malloc(N * sizeof(float));
-    float *s_ref = malloc(N * sizeof(float));
-    float *s_narrow = malloc(N * sizeof(float));
-    float *decay_ref = malloc(N * sizeof(float));
-    uint16_t *decay_bf16 = malloc(N * sizeof(uint16_t));
-    __fp16 *decay_f16 = malloc(N * sizeof(__fp16));
-    float *state_ref = malloc(C * sizeof(float));
-    float *state_narrow_f = malloc(C * sizeof(float));
-    uint16_t *state_bf16 = malloc(C * sizeof(uint16_t));
-    __fp16 *state_f16 = malloc(C * sizeof(__fp16));
+    float *a = xmalloc(N * sizeof(float));
+    float *g = xmalloc(N * sizeof(float));
+    float *x = xmalloc(N * sizeof(float));
+    float *s_ref = xmalloc(N * sizeof(float));
+    float *s_narrow = xmalloc(N * sizeof(float));
+    float *decay_ref = xmalloc(N * sizeof(float));
+    uint16_t *decay_bf16 = xmalloc(N * sizeof(uint16_t));
+    __fp16 *decay_f16 = xmalloc(N * sizeof(__fp16));
+    float *state_ref = xmalloc(C * sizeof(float));
+    float *state_narrow_f = xmalloc(C * sizeof(float));
+    uint16_t *state_bf16 = xmalloc(C * sizeof(uint16_t));
+    __fp16 *state_f16 = xmalloc(C * sizeof(__fp16));
 
     if (!a || !g || !x || !s_ref || !s_narrow || !decay_ref ||
         !decay_bf16 || !decay_f16 || !state_ref || !state_narrow_f ||
@@ -128,8 +138,8 @@ int main(void) {
     gdn_cumdecay_f16(a, decay_f16, T, C);
 
     /* Convert narrow outputs back to fp32 for comparison */
-    float *decay_bf16_f = malloc(N * sizeof(float));
-    float *decay_f16_f = malloc(N * sizeof(float));
+    float *decay_bf16_f = xmalloc(N * sizeof(float));
+    float *decay_f16_f = xmalloc(N * sizeof(float));
     for (size_t i = 0; i < N; i++) {
         decay_bf16_f[i] = bf16_to_f32(decay_bf16[i]);
         decay_f16_f[i] = (float)decay_f16[i];
@@ -144,7 +154,7 @@ int main(void) {
 
     /* --- gated scan --- */
     /* Save state for each variant */
-    float *state_init = malloc(C * sizeof(float));
+    float *state_init = xmalloc(C * sizeof(float));
     memcpy(state_init, state_ref, C * sizeof(float));
 
     /* fp32 reference */
@@ -246,8 +256,8 @@ int main(void) {
     for (size_t i = 0; i < C; i++) state_bf16[i] = f32_to_bf16(state_init[i]);
     gdn_gated_scan_bf16(g, x, s_ref, state_bf16, T, C);
     /* Save copies */
-    float *s_run1 = malloc(N * sizeof(float));
-    uint16_t *st_run1 = malloc(C * sizeof(uint16_t));
+    float *s_run1 = xmalloc(N * sizeof(float));
+    uint16_t *st_run1 = xmalloc(C * sizeof(uint16_t));
     memcpy(s_run1, s_ref, N * sizeof(float));
     memcpy(st_run1, state_bf16, C * sizeof(uint16_t));
 
@@ -272,15 +282,15 @@ int main(void) {
     /* Regenerate warm scenario data for a clean test */
     srand(99);
     T = 64; C = 128; N = T * C;
-    float *a2 = malloc(N * sizeof(float));
-    float *g2 = malloc(N * sizeof(float));
-    float *x2 = malloc(N * sizeof(float));
-    float *s2_ref = malloc(N * sizeof(float));
-    float *s2_narrow = malloc(N * sizeof(float));
-    float *st2_ref = malloc(C * sizeof(float));
-    float *st2_narrow_f = malloc(C * sizeof(float));
-    uint16_t *st2_bf16 = malloc(C * sizeof(uint16_t));
-    __fp16 *st2_f16 = malloc(C * sizeof(__fp16));
+    float *a2 = xmalloc(N * sizeof(float));
+    float *g2 = xmalloc(N * sizeof(float));
+    float *x2 = xmalloc(N * sizeof(float));
+    float *s2_ref = xmalloc(N * sizeof(float));
+    float *s2_narrow = xmalloc(N * sizeof(float));
+    float *st2_ref = xmalloc(C * sizeof(float));
+    float *st2_narrow_f = xmalloc(C * sizeof(float));
+    uint16_t *st2_bf16 = xmalloc(C * sizeof(uint16_t));
+    __fp16 *st2_f16 = xmalloc(C * sizeof(__fp16));
 
     for (size_t i = 0; i < N; i++) {
         g2[i] = 0.50f + 0.40f * (rand() / (float)RAND_MAX);
@@ -300,10 +310,10 @@ int main(void) {
     gdn_gated_scan_bf16(g2, x2, s2_narrow, st2_bf16, T, C);
 
     /* Chunk 2: carry state forward (this is the real test — error compounds) */
-    float *g2b = malloc(N * sizeof(float));
-    float *x2b = malloc(N * sizeof(float));
-    float *s2b_ref = malloc(N * sizeof(float));
-    float *s2b_narrow = malloc(N * sizeof(float));
+    float *g2b = xmalloc(N * sizeof(float));
+    float *x2b = xmalloc(N * sizeof(float));
+    float *s2b_ref = xmalloc(N * sizeof(float));
+    float *s2b_narrow = xmalloc(N * sizeof(float));
     for (size_t i = 0; i < N; i++) {
         g2b[i] = 0.50f + 0.40f * (rand() / (float)RAND_MAX);
         x2b[i] = (rand() / (float)RAND_MAX) - 0.5f;

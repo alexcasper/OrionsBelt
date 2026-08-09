@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """Comprehensive tests for bench/schema.py — the frozen results schema contract.
 
 This module is imported by the benchmark harness, plotting code, validation scripts,

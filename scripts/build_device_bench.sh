@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 # Build the standalone GDN kernel microbenchmark for a real aarch64 device.
 #
 # Produces STATIC binaries with no runtime dependencies — copy one to the device and run it.
@@ -224,6 +227,45 @@ build_e2e_08b_int4 jetson_a57  "-mcpu=cortex-a57"
 build_e2e_08b_int4 pi5_a76     "-mcpu=cortex-a76"
 build_e2e_08b_int4 rk3588_a76  "-mcpu=cortex-a76"
 build_e2e_08b_int4 orion_a720  "-mcpu=cortex-a720"
+
+echo ""
+echo "E2E decode benchmarks (Q8_0 block-quantized GEMV, ob-8qt.17):"
+build_e2e_q80() {
+    local name="$1" flags="$2"
+    if $CC -O3 -fopenmp $flags -static -DQ80_WEIGHTS \
+        "$K/gdn_sve.c" "$K/gdn_delta_matmul.c" "$K/gdn_e2e_decode.c" \
+        -I"$K" -o "$OUT/bench_gdn_e2e_decode_${name}_q80" -lm 2>/dev/null; then
+        printf "  %-14s %-40s %s bytes\n" "e2e_${name}_q80" "$flags" \
+            "$(stat -c%s "$OUT/bench_gdn_e2e_decode_${name}_q80")"
+    else
+        printf "  %-14s %-40s SKIPPED\n" "e2e_${name}_q80" "$flags"
+    fi
+}
+build_e2e_08b_q80() {
+    local name="$1" flags="$2"
+    if $CC -O3 -fopenmp $flags -static -DMODEL_08B -DQ80_WEIGHTS \
+        "$K/gdn_sve.c" "$K/gdn_delta_matmul.c" "$K/gdn_e2e_decode.c" \
+        -I"$K" -o "$OUT/bench_gdn_e2e_decode_08b_${name}_q80" -lm 2>/dev/null; then
+        printf "  %-14s %-40s %s bytes\n" "e2e_08b_${name}_q80" "$flags" \
+            "$(stat -c%s "$OUT/bench_gdn_e2e_decode_08b_${name}_q80")"
+    else
+        printf "  %-14s %-40s SKIPPED\n" "e2e_08b_${name}_q80" "$flags"
+    fi
+}
+
+build_e2e_q80 armv8a      "-march=armv8-a"
+build_e2e_q80 jetson_a57  "-mcpu=cortex-a57"
+build_e2e_q80 pi5_a76     "-mcpu=cortex-a76"
+build_e2e_q80 rk3588_a76  "-mcpu=cortex-a76"
+build_e2e_q80 orion_a720  "-mcpu=cortex-a720"
+
+echo ""
+echo "E2E decode benchmarks (0.8B + Q8_0):"
+build_e2e_08b_q80 armv8a      "-march=armv8-a"
+build_e2e_08b_q80 jetson_a57  "-mcpu=cortex-a57"
+build_e2e_08b_q80 pi5_a76     "-mcpu=cortex-a76"
+build_e2e_08b_q80 rk3588_a76  "-mcpu=cortex-a76"
+build_e2e_08b_q80 orion_a720  "-mcpu=cortex-a720"
 
 cat <<'NOTE'
 

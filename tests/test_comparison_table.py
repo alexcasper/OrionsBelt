@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """Tests for bench/comparison_table.py — comparison-table generation from CSVs.
 
 Covers the full pipeline: CSV loading → group-by summarization → markdown pivot.

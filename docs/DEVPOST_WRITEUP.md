@@ -223,7 +223,7 @@ advantage *grows* with context length.
 Two back-to-back 500-token sustained bursts (94s total) on the 0.8B INT8 model
 showed **0.3% throughput decay** and p99/p50 latency spread of 0.4%
 (FINDINGS.md §18). The burst benchmark numbers are steady-state sustainable,
-not peak-only artifacts — critical for an honest Physical AI submission.
+not peak-only artifacts — critical for an honest Edge AI submission.
 
 **Three-component memory decomposition, confirmed on real model weights:**
 
@@ -366,7 +366,7 @@ ORIONS_FORCE_FP32=1 python3 bench/harness.py \
 |----------|-----------------|
 | [`README.md`](../README.md) | Project overview, claims, status table |
 | [`PLAN.md`](./archive/PLAN.md) | Implementation plan, rubric mapping, risk register |
-| [`docs/FINDINGS.md`](./FINDINGS.md) | All measured results with analysis (38 sections) |
+| [`docs/FINDINGS.md`](./FINDINGS.md) | All measured results with analysis (46 sections) |
 | [`docs/SETUP_PORTABLE.md`](./SETUP_PORTABLE.md) | Step-by-step device setup |
 | [`docs/adr/`](./adr/) | 8 architecture decision records |
 | [`docs/CLAIM_VERIFICATION.md`](./CLAIM_VERIFICATION.md) | Every quantitative claim traced to primary source |

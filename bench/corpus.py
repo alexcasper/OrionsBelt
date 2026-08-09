@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """Long-context prompt corpus — needle-in-a-haystack and RULER multi-key tasks.
 
 Bead ``ob-del``.  Generates reproducible evaluation prompts across the canonical
@@ -45,7 +48,7 @@ from dataclasses import dataclass, field
 # Constants
 # ---------------------------------------------------------------------------
 
-# Canonical context-length sweep points (PLAN.md §5, METRICS.md §7).
+# Canonical context-length sweep points (docs/archive/PLAN.md §5, METRICS.md §7).
 CANONICAL_LENGTHS = [4096, 32768, 131072, 262144]
 
 # Approximate chars-per-token for English text (GPT-style BPE average).

@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """Run the ablation matrix: sweep engine configs across context lengths (ob-8qt.5).
 
 Executes the harness across the ablation grid — different engine assignments

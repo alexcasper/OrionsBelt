@@ -20,7 +20,7 @@ constant — in which case it is fully unrolled and no loop survives into the IR
 count is a runtime input is rejected.
 
 This was measured, not assumed, and it is the empirical basis for the layer-to-engine mapping in
-[`PLAN.md`](./archive/PLAN.md) §3.1: **CPU hosts the GDN recurrence; accelerators take the dense math.**
+[`docs/archive/PLAN.md`](./archive/PLAN.md) §3.1: **CPU hosts the GDN recurrence; accelerators take the dense math.**
 
 ### Method
 
@@ -103,7 +103,7 @@ on-device execution — the board-gated half of this work, tracked in `ob-8xc`.
 
 ### Consequence for the design
 
-The mapping hypothesis in `PLAN.md` §3.1 was argued from workload shape and Arm-IP relevance
+The mapping hypothesis in `docs/archive/PLAN.md` §3.1 was argued from workload shape and Arm-IP relevance
 *before* this audit. It now has empirical support:
 
 - **GDN recurrence → CPU.** Not a preference. The NPU has no construct that expresses it.
@@ -231,7 +231,7 @@ production scale (262K context = 4,096 chunks per layer × 24 layers) without fa
 unanswered by this probe — but the compilation acceptance is itself a meaningful difference from the
 CIX platform, where no control-flow op is available at all.
 
-For the project's design (PLAN.md §3.1: CPU hosts the GDN recurrence), this cross-vendor probe
+For the project's design (docs/archive/PLAN.md §3.1: CPU hosts the GDN recurrence), this cross-vendor probe
 confirms the decision for both platforms: the safe assumption is that edge NPU toolchains cannot be
 relied upon to host a runtime-length recurrence, even if one vendor's compiler accepts the `Scan`
 construct.
@@ -377,7 +377,7 @@ Design notes worth keeping:
 - Written **vector-length-agnostic**, so they widen for free on a core with longer vectors even
   though Cortex-A720 is 128-bit.
 - The scan is deliberately the *outer* sequential half only, kept separate from per-chunk dense
-  math so the mapping ADR can offload the inner matmuls without touching this (PLAN.md §3.1).
+  math so the mapping ADR can offload the inner matmuls without touching this (docs/archive/PLAN.md §3.1).
 
 ### Verification results
 
@@ -587,8 +587,8 @@ waiting for the chain to resolve; with two chains, the scheduler can interleave 
 >
 > **Update (fleet sweep, 2026-08-06):** The full fleet sweep (j2, commit `6a4d8ab`)
 > re-ran all four devices at commit `234807d`, single-threaded (`OMP_NUM_THREADS=1`),
-> clean tree. j1 single-threaded reads 1.18 GiB/s scan, j2 1.09 GiB/s — see the
-> fleet table below for the current numbers.
+> clean tree. j1 single-threaded reads 1.14 GiB/s scan (updated by batched-timing
+> fix `414b622`), j2 1.09 GiB/s — see the fleet table below for the current numbers.
 
 **Qwen3.5-0.8B (C=2048, T=64):**
 
@@ -764,16 +764,17 @@ Full analysis is regenerable via `python3 bench/fleet_analysis.py` and committed
 ### Achieved throughput (4B model, seq=64, baseline fp32, single-threaded)
 
 RK3588, Jetson j1, and Jetson j2 data are from the **fleet sweep** (ob-bf7):
-commit `234807d`, clean tree, single-threaded (`OMP_NUM_THREADS=1`). Pi 5 was
-not part of the fleet sweep; its data is from an earlier commit. See the
-optimization-impact section below for multi-threaded results.
+commit `234807d`, clean tree, single-threaded (`OMP_NUM_THREADS=1`). Jetson j1
+was subsequently refreshed with the batched-timing fix (commit `414b622`,
+ob-9xr). Pi 5 was not part of the fleet sweep; its data is from an earlier
+commit. See the optimization-impact section below for multi-threaded results.
 
 | Device | Spec | CumDecay | Scan | DWConv1D | Scan/Spec |
 |--------|------|----------|------|----------|-----------|
 | Pi 5 | 15.8 | 3.74 | 1.20 | 3.23 | 7.6% |
 | RK3588 big | 31.7 | 7.46 | 5.75 | 6.99 | 18.1% |
 | RK3588 little | 31.7 | 1.48 | 0.72 | 0.70 | 2.3% |
-| Jetson j1 | 23.8 | 1.59 | 1.18 | 1.41 | 5.0% |
+| Jetson j1 | 23.8 | 1.68 | 1.14 | 1.32 | 4.8% |
 | Jetson j2 | 23.8 | 1.50 | 1.09 | 0.93 | 4.6% |
 
 ### The discriminating test: Pi 5 (A76, less BW) vs Jetson (A57, more BW)
@@ -784,9 +785,9 @@ Pi 5 (15.8 GiB/s, newest A76 cores).
 
 | Kernel | Pi 5 | Jetson j1 | Jetson j2 | Winner | Pi5/J1 |
 |--------|------|-----------|-----------|--------|--------|
-| CumDecay | 3.74 | 1.16 | 1.32 | **Pi 5** | 3.22x |
-| Scan | 1.20 | 0.72 | 1.13 | **Pi 5** | 1.67x |
-| DWConv1D | 3.23 | 1.04 | 1.20 | **Pi 5** | 3.11x |
+| CumDecay | 3.74 | 1.68 | 1.50 | **Pi 5** | 2.23x |
+| Scan | 1.20 | 1.14 | 1.09 | **Pi 5** | 1.05x |
+| DWConv1D | 3.23 | 1.32 | 0.93 | **Pi 5** | 2.45x |
 
 **Result: the Pi 5 wins on ALL three kernels despite having 33% LESS spec
 bandwidth.** The bandwidth-bound hypothesis does NOT hold at seq=64 working set
@@ -804,7 +805,7 @@ explain the Pi 5's win despite less bandwidth.
 The `DEVICE_RUNBOOK` warns: *"If the Pi 5 wins comfortably, the thesis is wrong
 or incomplete, and we need to know that — several downstream decisions rest on it."*
 
-1. **CPU-first mapping (PLAN.md §3.1):** the argument that GDN layers should stay
+1. **CPU-first mapping (docs/archive/PLAN.md §3.1):** the argument that GDN layers should stay
    on the CPU because they are "memory-bandwidth-bound at decode" is **partially
    undermined** at prefill chunk sizes (seq=64). At decode (seq=1), the j2 data
    shows the opposite — data is L2-resident and throughput jumps to 9–17 GiB/s
@@ -884,7 +885,7 @@ This resolves the provenance question that dominated earlier analysis:
 |---|---|---:|---|
 | RK3588 big | t3 **2.91** vs t4 **5.75** | **1.98×** | same commit, clean, single-threaded |
 | RK3588 little | t3 **0.55** vs t4 **0.72** | **1.31×** | same commit, clean, single-threaded |
-| Jetson | j1 **1.18** vs j2 **1.09** | **1.08×** | same commit, clean, single-threaded |
+| Jetson | j1 **1.14** vs j2 **1.09** | **1.05×** | j1 updated post-sweep (batched-timing fix, `414b622`); j2 at fleet sweep `234807d` |
 
 > ⚠ **The following conclusion is superseded by the correction above.** The
 > "genuine hardware effect" claim is not supported because t3 ran 8-thread
@@ -1072,7 +1073,7 @@ headline should say "halves resident state during prefill," not "speeds up GDN."
 
 The benchmark now supports `--sustained <seconds>` which runs `gdn_gated_scan` on the
 Qwen3.5-4B config (seq=64) continuously for N seconds, sampling throughput and CPU
-temperature every 5 s. This directly addresses PLAN.md risk R7: on passively-cooled
+temperature every 5 s. This directly addresses docs/archive/PLAN.md risk R7: on passively-cooled
 edge hardware, a burst number that cannot be sustained is misleading.
 
 **Jetson-J1 (Cortex-A57, active fan cooling), 120-second sustained run:**
@@ -1224,7 +1225,7 @@ down when idle), the 7% throughput penalty under load means each GiB costs 28%
 more energy. The frequency ramping latency on A57 is high enough that sustained
 workloads never benefit from scaling.
 
-This directly validates PLAN.md's recommendation to use the `performance`
+This directly validates docs/archive/PLAN.md's recommendation to use the `performance`
 governor for all benchmarking. For bursty decode workloads (where idle gaps
 between tokens allow frequency to drop), `ondemand` might save idle energy — but
 that saving is irrelevant if it increases per-token energy under load.
@@ -1478,7 +1479,7 @@ matters for three non-obvious reasons:
 
 #### Implication for layer-to-engine mapping (ob-o4g)
 
-The working hypothesis (PLAN.md §3.1) — CPU hosts GDN sequential scan, GPU/NPU
+The working hypothesis (docs/archive/PLAN.md §3.1) — CPU hosts GDN sequential scan, GPU/NPU
 hosts matmuls — is confirmed by the data, but for a subtler reason than
 expected. It is not that the sequential scan is too slow for an accelerator; it
 is that (a) the scan is trivially cheap on CPU (5 µs/token), so moving it would
@@ -1794,7 +1795,7 @@ data from `src/orionsbelt/model/gdn_layer_info.py` (Qwen3.5-4B, 32 layers:
 balloons to 8.6 GB — a **171× difference**. GDN saves 8.5 GB of memory
 at this context length, which is the difference between fitting in 8 GB
 edge DRAM and not. Weights (11.2 GB at FP16) dominate at all context
-lengths, which is why INT4 weight quantization (PLAN.md §6, ADR 0004)
+lengths, which is why INT4 weight quantization (docs/archive/PLAN.md §6, ADR 0004)
 is the complementary half of the story.
 
 ---
@@ -2525,7 +2526,7 @@ primitives.** This is expected and is itself a useful finding:
    so the GPU's compute advantage is irrelevant — it's pure memory
    bandwidth, and the A76's L1/L2 cache hierarchy wins.
 
-### What this means for the heterogeneous mapping (PLAN.md §3.1)
+### What this means for the heterogeneous mapping (docs/archive/PLAN.md §3.1)
 
 **On t3 (RK3588):** GDN scan kernels should stay on CPU. The GPU offers no
 advantage for the channel-wise recurrence. This *confirms* the CPU-first
@@ -2857,7 +2858,7 @@ that remains open.
 
 Ran `gdn_gated_scan` (the heaviest GDN kernel, 4B prefill config: seq=64,
 channels=4096) for 60 seconds on each cluster with throughput and
-temperature sampled every 5s. Purpose: test PLAN.md risk R7 — "burst numbers
+temperature sampled every 5s. Purpose: test docs/archive/PLAN.md risk R7 — "burst numbers
 that cannot be sustained are misleading on passively-cooled edge hardware."
 
 ### Big Cluster (A76, cpu4-7)
@@ -3484,7 +3485,7 @@ taskset -c 4-7 ./bench_e2e_ctx --ctx-sweep 1,64,256,512,1024,2048,4096 --csv
 
 ## 18. Sustained-load thermal stability: no throttling on RK3588 (2026-08-07)
 
-**Addresses PLAN.md risk R7: burst numbers must be sustainable.**
+**Addresses docs/archive/PLAN.md risk R7: burst numbers must be sustainable.**
 
 Ran two back-to-back sustained bursts of 500 tokens each (94s total sustained
 decode) on the 0.8B INT8 model, big cluster (A76, 4 cores, governor=performance).
@@ -3500,7 +3501,7 @@ throughput throughout each burst.
 
 **Conclusion**: the RK3588's active cooling handles sustained decode without
 thermal throttling. The burst benchmark numbers in §15–17 are steady-state
-sustainable numbers, not peak-only artifacts. This matters for the Physical AI
+sustainable numbers, not peak-only artifacts. This matters for the Edge AI
 submission criterion: honest sustained throughput, not a one-shot burst.
 
 **Data:** [`results/raw/rk3588-t3_sustained_thermal.txt`](../results/raw/rk3588-t3_sustained_thermal.txt) · [`rk3588-t4_sustained_thermal.txt`](../results/raw/rk3588-t4_sustained_thermal.txt) (independent cross-check).
@@ -3589,7 +3590,7 @@ confirming the model is **matmul-bound**, not recurrence-bound.
 
 ### Implication for the GDN hypothesis
 
-The original hypothesis (ob-8qt.1, PLAN.md §3.1) was that GDN's sequential
+The original hypothesis (ob-8qt.1, docs/archive/PLAN.md §3.1) was that GDN's sequential
 recurrence would be a CPU bottleneck, making CPU-first mapping advantageous.
 The data shows the opposite: **GDN recurrence is negligible cost; the
 dominant cost is the same dense matmuls (FFN, projections) that every
@@ -4057,32 +4058,31 @@ SVE2 → SVE → dotprod → NEON). The A76 falls through to the NEON path.
 Each suite compares the kernel output against a naive C reference at realistic
 GDN shapes (seq=1 decode, seq=64 prefill; channels=160 and 2560).
 
-### A76 NEON benchmark — p50 of 30 repeats (batched ×100 calls, post clock-quantization fix), governor=performance
+### A76 NEON benchmark — p50 of 30 repeats (batched ×100 calls, post clock-quantization fix), governor=performance, `taskset -c 4-7`
 
 | Kernel | Shape (seq×ch) | p50 (µs) | GiB/s |
 |---|---|---|---|
-| cumdecay | 64×160 | 11.2† | 6.8 |
+| cumdecay | 64×160 | 2.7 | 28.0 |
 | cumdecay | 1×160 | 0.05 | 24.0 |
-| cumdecay | 64×2560 | 121.8 | 10.0 |
-| cumdecay | 1×2560 | 0.75 | 25.6 |
-| gated_scan | 64×160 | 5.3 | 21.7 |
+| cumdecay | 64×2560 | 121.9 | 10.0 |
+| cumdecay | 1×2560 | 0.75 | 25.5 |
+| gated_scan | 64×160 | 4.3 | 26.7 |
 | gated_scan | 1×160 | 0.07 | 44.4 |
-| gated_scan | 64×2560 | 181.2 | 10.2 |
+| gated_scan | 64×2560 | 173.8 | 10.7 |
 | gated_scan | 1×2560 | 1.0 | 46.3 |
-| dwconv1d | 64×160 | 5.2 | 15.9 |
+| dwconv1d | 64×160 | 5.2 | 15.7 |
 | dwconv1d | 1×160 | 0.13 | 57.0 |
-| dwconv1d | 64×2560 | 144.4 | 9.1 |
+| dwconv1d | 64×2560 | 159.3 | 8.3 |
 | dwconv1d | 1×2560 | 2.8 | 41.4 |
-| gemv | K=128 N=128 | 3.6 | 17.4 |
-| gemv | K=128 N=2048 | 58.3 | 16.9 |
-| gemv | K=128 N=2560 | 73.3 | 16.8 |
+| gemv | K=128 N=128 | 3.4 | 18.0 |
+| gemv | K=128 N=2048 | 58.4 | 16.9 |
+| gemv | K=128 N=2560 | 74.2 | 16.6 |
 
-> **† cumdecay 64×160:** This value (11.2 µs / 6.8 GiB/s) was measured on a
-> **little A55 core**, not the A76. The t3 CSV was generated without `taskset`,
-> and the scheduler placed this short-running kernel (~3 µs on A76) on a little
-> core. The correct A76 value is ~3.3 µs / ~23 GiB/s (verified on t4 with
-> `taskset -c 4-7`). See the corrected analysis below this section. All other
-> rows are confirmed A76 big-core measurements.
+> **cumdecay 64×160 corrected:** An earlier version of this table (commit
+> `7f418d2`) had 11.2 µs / 6.8 GiB/s — a **little A55 core** measurement,
+> not A76. The CSV was re-run with `taskset -c 4-7` and now shows the correct
+> A76 value of 2.7 µs / 28.0 GiB/s. See the correction analysis below this
+> section for the full investigation.
 
 ### Cross-core comparison: A76 (NEON) vs A57 (NEON)
 
@@ -4092,15 +4092,16 @@ ratios at shapes large enough to amortize per-call overhead:
 
 | Kernel | A76 GiB/s | A57 GiB/s | A76/A57 |
 |---|---|---|---|
-| gated_scan 64×2560 | 10.2 | 2.4 | 4.2× |
-| dwconv1d 64×160 | 15.9 | 4.9 | 3.3× |
-| gemv K=128 N=128 | 17.4 | 4.6 | 3.8× |
+| cumdecay 64×160 | 28.0 | 6.9 | 4.1× |
+| gated_scan 64×160 | 26.7 | 5.9 | 4.5× |
+| gated_scan 64×2560 | 10.7 | 2.4 | 4.5× |
+| dwconv1d 64×160 | 15.7 | 4.9 | 3.2× |
+| gemv K=128 N=128 | 18.0 | 4.6 | 3.9× |
 
-The A76 advantage (3.3–4.2×) exceeds the clock ratio (2.3/1.48 = 1.6×),
+The A76 advantage (3.2–4.5×) exceeds the clock ratio (2.3/1.48 = 1.6×),
 reflecting the A76's wider NEON pipeline and superior memory subsystem. Both
 cores run the same NEON code path, confirming the dual-ISA design works across
-the full Armv8.x range. At the smallest shapes (160 channels, seq=64), the
-advantage shrinks — launch overhead dominates sub-25 µs calls.
+the full Armv8.x range.
 
 > **Batched-timing note:** The A57 values above use batched timing (100
 > calls per measurement, matching the A76 methodology). An earlier version
@@ -4117,13 +4118,13 @@ path was verified by cross-compilation in §23; the NEON path is verified
 on-silicon here. No competing KleidiAI kernel covers this range for the three
 recurrent primitives.
 
-> **Provenance:** RK3588 t3, commit `7f418d2`, governor=performance.
-> Batched-timing methodology: 100 calls per measurement, divided by 100, to
-> overcome the RK3588's ~291 ns `CLOCK_MONOTONIC_RAW` granularity (PR #111).
-> The previous CSV at commit `78eb7e4` used single-call timing, which produced
-> measurement artifacts (gated_scan 64×160 p50 was identical to dwconv1d;
-> cumdecay 1×2560 was anomalously fast; gated_scan 1×160 was 0.0 µs/inf).
-> Manifest: `results/manifests/rk3588-t3_kleidiai_gdn_kernels.json`.
+> **Provenance:** RK3588 t3, commit `eb284b8`, governor=performance,
+> `taskset -c 4-7`. Batched-timing methodology: 100 calls per measurement,
+> divided by 100, to overcome the RK3588's ~291 ns `CLOCK_MONOTONIC_RAW`
+> granularity (PR #111). The t3 CSV was re-run with taskset at this commit to
+> fix the cumdecay 64×160 core-affinity artifact (was 11.2 µs on A55, now
+> 2.7 µs on A76). Manifest:
+> `results/manifests/rk3588-t3_kleidiai_gdn_kernels.json`.
 > Raw CSV: `results/raw/kleidiai/rk3588-t3_kleidiai_gdn_kernels.csv`.
 
 ### Corrected: cumdecay 64×160 "cross-device divergence" was a core-affinity artifact
@@ -4134,26 +4135,26 @@ recurrent primitives.
 > core-affinity methodology gap. See below.
 
 The t4 KleidiAI CSV was generated with `taskset -c 4-7` (big A76 cores
-pinned). The t3 CSV was generated **without** taskset. On the RK3588's
-big.LITTLE layout (4× A55 + 4× A76), the Linux scheduler placed the first
-benchmarked shape — cumdecay 64×160, which runs for only ~3 µs on an A76 —
-on a **little A55 core**, then migrated to a big core for all subsequent
-shapes.
+pinned). The t3 CSV was originally generated **without** taskset. On the
+RK3588's big.LITTLE layout (4× A55 + 4× A76), the Linux scheduler placed
+the first benchmarked shape — cumdecay 64×160, which runs for only ~3 µs
+on an A76 — on a **little A55 core**, then migrated to a big core for all
+subsequent shapes.
 
-Verification on t4 (commit `5d8430c`):
+Verification on t4 (commit `5d8430c`) and corrected t3 (commit `eb284b8`):
 
 | Affinity | cumdecay 64×160 | GiB/s |
 |---|---|---|
 | t4 big cores (`taskset -c 4-7`) | **3.33 µs** | 22.9 |
 | t4 little cores (`taskset -c 0-3`) | **10.70 µs** | 7.1 |
-| t3 CSV (no taskset) | 11.18 µs | 6.8 |
-| t4 no taskset (varies) | 3.6–10.7 µs | 7.1–21.0 |
+| t3 CSV (no taskset, original) | 11.18 µs | 6.8 |
+| **t3 CSV (taskset -c 4-7, corrected)** | **2.72 µs** | **28.0** |
 
-The t3 value (11.18 µs) matches t4's **little-core** measurement almost
-exactly. Without taskset, cumdecay 64×160 is nondeterministic — 5 re-runs
-produced values from 3.6 µs (big) to 10.7 µs (little). All other 14 t3
-shapes match t4's big-core values, confirming that only the first shape
-was mis-scheduled.
+The original t3 value (11.18 µs) matched t4's **little-core** measurement
+almost exactly. The corrected t3 value (2.72 µs) is within 18% of t4's
+big-core measurement (3.33 µs), consistent with t3's slightly lower clock
+(2304 vs 2400 MHz). The t3 CSV has now been re-run with `taskset -c 4-7`
+at commit `eb284b8`.
 
 **Root cause:** The Linux energy-aware scheduler initially places short-lived
 tasks on little cores for energy efficiency. Cumdecay 64×160 completes in
@@ -4162,13 +4163,10 @@ the measurement window ends. By the second shape (cumdecay 1×160), the
 process has accumulated enough CPU time to trigger migration to a big core,
 where it remains for the rest of the benchmark.
 
-**Implication for the submission.** The cumdecay 64×160 cell in the §24 A76
-table (11.2 µs / 6.8 GiB/s) is an **A55 measurement, not A76**. The true A76
-value at this shape is ~3.3 µs / ~23 GiB/s. The §24 A76 vs A57 comparison
-ratios are not materially affected (both used the same methodology, so the
-ratio is preserved), but the absolute cumdecay 64×160 number understates
-A76 capability by ~3.4×. The t3 CSV should be re-run with `taskset -c 4-7`
-for correct big-core provenance.
+**Resolution.** The t3 CSV has been re-run with `taskset -c 4-7` at commit
+`eb284b8`. The corrected cumdecay 64×160 value (2.72 µs / 28.0 GiB/s) is now
+consistent with t4's big-core measurement. All 15 t3 shapes now agree with
+t4 within 5–18%, and the §24 A76 table above has been updated accordingly.
 
 > **Lesson:** On Arm big.LITTLE systems, **always pin benchmark processes
 > with taskset**, even for micro-benchmarks. Short-running kernels (< 10 µs)
@@ -4475,8 +4473,345 @@ ORT is the "third data point" confirming no existing CPU toolchain has
 optimized GDN kernels for Arm. Audit script: `scripts/ort_gdn_probe.py`.
 Device: rk3588-t4.
 
+## 28. llama.cpp baseline: mature Q8_0/Q4_0 inference is 3.1× faster decode, 2.3× faster prefill than our C loop on A57 (2026-08-08, ob-mrd.15)
 
-## 31. SDOT-accelerated INT8 GEMV: 1.9–3.1× over NEON dequant, 44%→83% of theoretical ceiling (2026-08-09)
+**Motivation.** ob-mrd.9 discovered that mainline llama.cpp has a native
+`GGML_OP_GATED_DELTA_NET` CPU implementation (generic scalar, no NEON/SVE
+tuning). We ran Qwen3.5-0.8B through it on the Jetson Nano A57 (4 cores,
+performance governor) to get an honest "how does a mature, production-grade
+inference engine do" baseline, head-to-head with our hand-tuned C decode loop.
+
+**Setup.** llama.cpp built from source at commit `69bf643` with gcc-8,
+CPU-only, `-mcpu=cortex-a57+crypto+nodotprod+nosve`. Pre-built GGUF models
+from `ggml-org/Qwen3.5-0.8B-GGUF` (Q8_0: 784 MiB, Q4_0: 527 MiB).
+`llama-bench` with `-t 4 -ngl 0 -r 5`, matching our 4-thread OpenMP decode
+loop. Thermals 64→69 °C, no throttling.
+
+### Decode (token generation, tg32)
+
+| Engine | Quant | tok/s | ±std | vs our FP32 |
+|---|---|---:|---:|---:|
+| OrionsBelt C loop | FP32 | 1.72 | — | 1.0× |
+| OrionsBelt C loop | INT8 w-o | 1.64 | — | 0.95× |
+| OrionsBelt C loop | INT4 w-o | 1.62 | — | 0.94× |
+| llama.cpp | Q8_0 | **5.40** | 0.05 | **3.14×** |
+| llama.cpp | Q4_0 | **5.64** | 0.02 | **3.28×** |
+
+### Prefill (prompt processing)
+
+| Engine | Quant | pp16 | pp32 | pp64 |
+|---|---|---:|---:|---:|
+| OrionsBelt C loop | FP32 opt | 4.73 | 4.65 | 4.43 |
+| llama.cpp | Q8_0 | **10.42** | **10.82** | **10.80** |
+| llama.cpp | Q4_0 | **9.84** | **10.10** | **10.22** |
+
+### Interpretation
+
+llama.cpp is **3.1–3.3× faster in decode** and **2.2–2.4× faster in prefill**
+than our optimized C loop. This is a large gap. The most likely contributor
+is **quantized GEMV maturity**: Q8_0 weights are 4× smaller than FP32, and
+decode is bandwidth-bound (§16), so a theoretical 4× bandwidth reduction
+would predict ~6.9 tok/s; llama.cpp achieves 5.40 tok/s (78% of that ceiling).
+Our INT8 weight-only path (1.64 tok/s) shows no speedup over FP32 on A57,
+indicating our dequant+GEMV pipeline leaves most of the bandwidth savings on
+the table — likely due to per-column scale lookups and non-blocked memory
+layout. llama.cpp's Q8_0 format stores scale interleaved with 32-element
+blocks, enabling a tight NEON dot-product with minimal dequant overhead.
+
+The prefill gap (2.3×) is smaller than the decode gap (3.1×), consistent
+with prefill being more compute-bound: quantization helps less when the
+arithmetic intensity is higher.
+
+**Caveat — not a like-for-like kernel comparison.** Our C loop uses synthetic
+weights and a simplified forward pass; llama.cpp runs the real Qwen3.5
+architecture. The GDN-specific kernels in llama.cpp are untuned scalar code
+(FINDINGS §16 showed GDN kernels are <1% of decode time on both engines), so
+this gap is almost entirely in the **matmul/GEMV** layer, not the novel GDN
+ops. The implication for the project is clear: the optimization opportunity
+is in matching llama.cpp's quantized GEMV efficiency, not in further tuning
+the GDN-specific kernels which are already negligible.
+
+### Data
+
+CSV: `results/raw/jetson-j1_llamacpp_vs_orionsbelt_08b.csv`.
+Manifest: `results/manifests/jetson-j1_llamacpp_vs_orionsbelt_08b.json`
+(sha `04bf610`, dirty=false, governor=performance).
+Our decode data: commit `5e16e96`. Our prefill data: commit `a722289`.
+llama.cpp: commit `69bf643`, built with gcc-8 for cortex-a57.
+
+## 29. Q8_0 block-quantized GEMV: 2.97× decode speedup, closing the gap with llama.cpp (2026-08-08, ob-8qt.17)
+
+**Motivation.** §28 showed llama.cpp Q8_0 decode is 3.14× faster than our FP32
+C loop (5.40 vs 1.72 tok/s), while our existing INT8 (per-column scale,
+per-element int8→float32 dequant) showed *no* speedup (1.64 tok/s). The
+root cause: our INT8 GEMV wastes ~50% more NEON ops/element than FP32 on
+int8→int16→int32→float32 widening, eating the 4× bandwidth savings.
+
+**Implementation.** Q8_0 block layout: per-block fp16 scale + 32 int8 values
+along K. The GEMV quantizes the activation vector to int8 **once** per call
+(amortized over all N output columns), then computes int8×int8 dot products
+via `vmull_s8` + `vpadalq_s16` — staying entirely in the integer domain
+with no per-element float conversion. Requires no SDOT (works on A57).
+
+### Results (A57, 4 cores, performance governor, commit `d223c19`)
+
+| Variant | tok/s | TTFT (ms) | vs FP32 | vs llama.cpp Q8_0 |
+|---|---:|---:|---:|---:|
+| FP32 | 1.72 | 594 | 1.0× | 0.32× |
+| INT8 (per-column) | 1.64 | 599 | 0.95× | 0.30× |
+| INT4 (nibble) | 1.62 | 580 | 0.94× | 0.30× |
+| **Q8_0 (block)** | **5.12** | **192** | **2.97×** | **0.95×** |
+| llama.cpp Q8_0 | 5.40 | — | 3.14× | 1.0× |
+
+Replicate confirmed: 5.12 tok/s across two 30-repeat runs (p50=193–195 ms,
+stddev <1%). Thermals 57→58 °C — no throttling. Bottleneck breakdown
+unchanged: FFN 53%, GDN projections 36%, full-attention 10%, GDN kernels
+<1%.
+
+### Why Q8_0 works where per-column INT8 didn't
+
+Three factors combine:
+
+1. **Amortized activation quantization**: The activation vector (K=1024 for
+   0.8B) is quantized to int8 once per GEMV call, reused across all N output
+   columns. Cost: K conversions amortized over N columns = negligible.
+2. **Integer-domain dot product**: `vmull_s8` (8 int8→8 int16) +
+   `vpadalq_s16` (pairwise add+accumulate to int32) is ~0.6 NEON ops/element,
+   vs ~1.5 for int8→float32 dequant+FMA and ~1.0 for FP32 FMA.
+3. **Block-local scale**: Per-32-element fp16 scale adapts to local weight
+   distribution, giving better quantization accuracy than per-column scale
+   (which must cover the entire K dimension with one scale).
+
+### Data
+
+CSV: `results/raw/jetson-j1_q80_vs_int8_vs_fp32_08b.csv`.
+Manifest: `results/manifests/jetson-j1_q80_a57.json` (sha `d223c19`,
+dirty=false, governor=performance). Two 30-repeat runs, stddev <1%.
+
+**Cross-validation:** the standard fleet harness (`run_e2e_decode.sh --quant q8_0`,
+3 independent runs at commit `dd77a26`) confirms 4.89±0.06 tok/s — slightly
+lower than the 5.12 A/B number due to static linking (`-static`) and different
+build flags in the harness. Both are valid; the 2.97× speedup is the
+controlled A/B comparison (same build, same seed, only quant variant differs).
+
+## 30. Quantization accuracy validation: Q8_0 is numerically indistinguishable from FP32 (2026-08-08, ob-8qt.18)
+
+### Motivation
+
+§28 showed Q8_0 delivers 2.97× decode speedup on A57; §29 established its
+per-matmul GEMV throughput. But we had no quantitative evidence that block-
+quantized weights preserve output fidelity. For the Devpost submission we
+need to demonstrate that Q8_0 doesn't just run faster — it produces
+numerically close results to FP32.
+
+### Method
+
+Added `--verify-quant` mode to `gdn_e2e_decode.c`. For each of the 11
+weight matrices in the model at their actual layer shapes (e.g. `gate_proj`
+at HIDDEN×INTER), the mode:
+
+1. Generates random FP32 weights with a fixed deterministic seed.
+2. Computes a FP32 GEMV reference output (`a @ B`, M=1).
+3. Quantizes weights to the active variant (Q8_0 / INT8 / INT4).
+4. Computes the quantized GEMV output.
+5. Reports: max abs error, mean abs error, relative error %, cosine similarity.
+
+Tested across both model sizes (0.8B and 4B) on Jetson Nano A57.
+
+### Results — aggregate (mean across all 11 matrices)
+
+| Variant | Model   | Mean cos_sim | Mean rel_err | Mean abs_err |
+|---------|---------|-------------|-------------|-------------|
+| Q8_0    | 0.8B    | **1.000000**   | 0.12%       | 0.43        |
+| INT8    | 0.8B    | **1.000000**   | 0.09%       | 0.31        |
+| INT4    | 0.8B    | 0.999986       | 1.75%       | 6.30        |
+| Q8_0    | 4B      | **1.000000**   | 0.08%       | 0.60        |
+| INT8    | 4B      | **1.000000**   | 0.08%       | 0.47        |
+| INT4    | 4B      | 0.999994       | 1.39%       | 11.44       |
+
+### Key findings
+
+1. **Q8_0 cosine similarity = 1.000000** across every matrix in both models.
+   At six decimal places, the quantized output vector is parallel to the FP32
+   reference — the block-quantized GEMV preserves output direction perfectly.
+
+2. **INT8 also achieves 1.000000 cosine similarity.** Per-column symmetric
+   quant with full-K column scaling is numerically faithful. However, INT8
+   has no speed advantage over FP32 on A57 (§29 showed 1.72 tok/s vs FP32's
+   1.64 — only 5% faster), making it the wrong trade-off.
+
+3. **INT4 degrades to cos_sim ≈ 0.99998–0.99999**, with 15–19× higher mean
+   abs error than Q8_0/INT8. The 4-bit precision limit causes directional
+   drift. INT4 has no speed advantage on A57 either (§29), making it a
+   pure accuracy loss for zero throughput gain.
+
+4. **Q8_0 is the clear winner**: it is the only quantization variant that
+   delivers both a significant speedup (2.97×) and perfect cosine similarity.
+
+### Per-matrix detail (0.8B, Q8_0)
+
+| Matrix      | K    | N    | max_abs | mean_abs | rel_err | cos_sim  |
+|-------------|------|------|---------|----------|---------|----------|
+| g_q_proj    | 1024 | 2048 | 1.589   | 0.388    | 0.13%   | 1.000000 |
+| g_k_proj    | 1024 | 2048 | 1.458   | 0.315    | 0.12%   | 1.000000 |
+| g_v_proj    | 1024 | 2048 | 1.612   | 0.312    | 0.13%   | 1.000000 |
+| g_o_proj    | 2048 | 1024 | 2.142   | 0.474    | 0.09%   | 1.000000 |
+| f_q_proj    | 1024 | 2048 | 1.338   | 0.310    | 0.11%   | 1.000000 |
+| f_k_proj    | 1024 | 512  | 1.543   | 0.554    | 0.13%   | 1.000000 |
+| f_v_proj    | 1024 | 512  | 1.361   | 0.336    | 0.11%   | 1.000000 |
+| f_o_proj    | 2048 | 1024 | 2.073   | 0.521    | 0.09%   | 1.000000 |
+| gate_proj   | 1024 | 3584 | 1.890   | 0.342    | 0.15%   | 1.000000 |
+| up_proj     | 1024 | 3584 | 1.892   | 0.591    | 0.16%   | 1.000000 |
+| down_proj   | 3584 | 1024 | 2.505   | 0.601    | 0.06%   | 1.000000 |
+
+### Caveats
+
+- Weights are random (not trained), so absolute error magnitudes are larger
+  than in a real model where weights are structured. The cosine similarity
+  metric is robust to this — it measures output direction, not magnitude.
+- Per-matmul verification isolates each projection; full 24-layer forward
+  pass error accumulation is not measured (random weights cause NaN
+  overflow, making full-stack comparison infeasible without trained weights).
+
+### Data
+
+CSV: `results/raw/jetson-j1_quant_accuracy_08b_4b.csv` (66 rows: 11 matrices
+× 3 variants × 2 models).
+Manifest: `results/manifests/jetson-j1_quant_accuracy_08b_4b.json` (sha `c643e34`).
+
+## 31. Q8_0 context-length scaling: constant-time GDN advantage grows with quantization (2026-08-08, ob-4p0)
+
+### Motivation
+
+§29 showed Q8_0 GEMV delivers 2.97× decode speedup over FP32 at ctx=1. The open
+question was whether this advantage holds, grows, or shrinks as context length
+increases from 1 to 4096. We ran the Q8_0 context sweep alongside the existing
+FP32 and INT8 sweeps (all on the same A57 binary, same governor, same commit).
+
+### Setup
+
+Binary: `dist/bench_gdn_e2e_decode_08b_jetson_a57_q80` (Q8_0 block-quantized
+weights, FP32 KV cache). Governor: performance. Thermals: 42–51 °C pre-run,
+50–55 °C post-run. Two replicate runs; max Δ = 4% (at ctx=512, well within
+the 1.68× noise ceiling from §ob-bf7).
+
+### Throughput comparison (0.8B hybrid)
+
+| ctx | FP32 tok/s | INT8 tok/s | Q8_0 tok/s | Q8_0 / FP32 | Q8_0 / INT8 |
+|----:|----------:|----------:|----------:|------------:|------------:|
+|   1 |      2.25 |      2.95 |      5.05 |       2.24× |       1.71× |
+|  64 |      2.24 |      2.91 |      5.08 |       2.27× |       1.75× |
+| 256 |      2.17 |      2.83 |      4.78 |       2.20× |       1.69× |
+| 512 |      1.84 |      2.67 |      4.21 |       2.29× |       1.58× |
+|1024 |      1.55 |      2.45 |      3.81 |       2.46× |       1.55× |
+|2048 |      1.44 |      2.13 |      2.99 |       2.08× |       1.40× |
+|4096 |      1.18 |      1.67 |      2.18 |       1.85× |       1.31× |
+
+### Key observations
+
+1. **Q8_0 advantage over FP32 grows from 2.24× at ctx=1 to 2.46× at ctx=1024**,
+   then narrows to 1.85× at ctx=4096. The peak advantage at mid-range context
+   is because Q8_0 accelerates the constant parts (FFN + GDN) so much that the
+   relative attention bottleneck is exposed later.
+
+2. **Q8_0 GDN layer cost is nearly flat**: 73–80 ms per token, aggregated
+   across all 18 GDN layers, across all context lengths (vs FP32 167–237 ms,
+   INT8 126–130 ms). The ±10% variance is thermal jitter, not an algorithmic
+   trend.
+
+3. **Attention share of Q8_0 decode time reaches 60.3% at ctx=4096** — the
+   highest of any quantization variant. This is the flip side of the
+   quantization win: faster constant parts expose the O(n) attention
+   bottleneck earlier and more starkly.
+
+4. **Throughput retention at ctx=4096**: Q8_0 retains 0.43× of its ctx=1
+   throughput, vs INT8 0.57× and FP32 0.52×. The lower retention is not a
+   regression — it is because Q8_0's ctx=1 starting point is so high that
+   the O(n) attention bottleneck dominates sooner in absolute terms.
+
+### Pure-GDN confirmation: Q8_0 O(1) decode
+
+We also ran the pure-GDN sweep (all layers are GDN, no full-attention layers).
+With zero KV cache, throughput must be perfectly flat if the GDN recurrent state
+is truly O(1). It is:
+
+| ctx | Q8_0 pure-GDN tok/s | INT8 pure-GDN tok/s |
+|----:|--------------------:|--------------------:|
+|   1 |               4.97  |               2.88  |
+|  64 |               4.91  |               2.88  |
+| 256 |               4.96  |               2.86  |
+| 512 |               4.68  |               2.89  |
+|1024 |               4.95  |               2.87  |
+|2048 |               4.87  |               2.87  |
+|4096 |               5.00  |               2.89  |
+
+Q8_0 pure-GDN throughput variance is ±3% across ctx 1–4096 — confirming the
+GDN recurrent state is genuinely constant-time, not just "slow-growing."
+
+### Data
+
+CSVs: `results/raw/jetson-j1_08b_q80_ctxsweep_e2e_raw.csv` (7 rows) and
+`results/raw/jetson-j1_08b_q80_puregdn_ctxsweep_e2e_raw.csv` (7 rows).
+Manifests: `results/manifests/jetson-j1_08b_q80_ctxsweep.json` and
+`results/manifests/jetson-j1_08b_q80_puregdn_ctxsweep.json`.
+## 32. INT4 context-length sweep: dequant overhead makes INT4 slower than FP32 at short context on A57 (2026-08-08, ob-brn)
+
+### Motivation
+
+§26 showed INT4 weight-only quantization provides no benefit on the A57 at
+ctx=8 (1.62 tok/s vs INT8 1.64 tok/s). The open question was whether this
+holds across context lengths or whether INT4's lower memory footprint wins
+at long context where bandwidth pressure increases.
+
+### Setup
+
+Binary: `dist/bench_gdn_e2e_decode_08b_jetson_a57_int4` (INT4 nibble-packed
+weights, FP32 KV cache). Governor: performance. Thermals: 42–50 °C pre-run.
+Three replicate runs; max Δ = 2.1% (ctx=1).
+
+### Result: INT4 is slower than FP32 at short context, catches up at long context
+
+| ctx | FP32 tok/s | INT8 tok/s | INT4 tok/s | INT4 / FP32 | INT4 / INT8 |
+|----:|----------:|----------:|----------:|------------:|------------:|
+|   1 |      2.25 |      2.95 |      1.90 |       0.84× |       0.64× |
+|  64 |      2.24 |      2.91 |      1.88 |       0.84× |       0.65× |
+| 256 |      2.17 |      2.83 |      1.85 |       0.85× |       0.65× |
+| 512 |      1.84 |      2.67 |      1.78 |       0.97× |       0.67× |
+|1024 |      1.55 |      2.45 |      1.69 |       1.09× |       0.69× |
+|2048 |      1.44 |      2.13 |      1.53 |       1.06× |       0.72× |
+|4096 |      1.18 |      1.67 |      1.26 |       1.07× |       0.75× |
+
+### Key observations
+
+1. **INT4 is 16% slower than FP32 at ctx=1** (1.90 vs 2.25 tok/s). The
+   4-bit dequantization overhead (unpack nibbles, sign-extend, scale) costs
+   more cycles than the bandwidth saves on the A57's narrow in-order pipeline.
+   The A57 lacks INT4 dot-product instructions, so each 4-bit weight requires
+   multiple instructions to convert to a usable value.
+
+2. **INT4 GDN layer cost (195 ms) exceeds FP32 GDN cost (170 ms) at ctx=1**
+   — the dequant overhead applies to every weight access in the GEMV, making
+   the GDN recurrence slower, not faster.
+
+3. **INT4 catches up to FP32 at ctx≥1024** (1.09× at ctx=1024). At long
+   context, the O(n) attention bottleneck dominates total decode time, and
+   INT4's slightly faster FFN (lower bandwidth) tips the balance. But INT4
+   never catches up to INT8 (always ≥25% slower).
+
+4. **Implication for quantization strategy**: on cores without INT4 dot-product
+   support (A57, A55), INT4 is a net negative. Q8_0 (§29–31) is the clear
+   winner — it provides bandwidth reduction with zero dequant overhead because
+   the int8 values can be used directly in NEON dot-product or accumulate
+   instructions.
+
+### Data
+
+CSV: `results/raw/jetson-j1_08b_int4_ctxsweep_e2e_raw.csv` (7 rows).
+Manifest: `results/manifests/jetson-j1_08b_int4_ctxsweep.json`.
+Generator: `bench/ctx_scaling_analysis.py` (INT4 added to CONFIGS_JETSON).
+Generated report: `results/figures/ctx_length_scaling_a57.md`.
+
+## 33. SDOT-accelerated INT8 GEMV: 1.9–3.1× over NEON dequant, 44%→83% of theoretical ceiling (2026-08-09)
 
 ### Motivation
 

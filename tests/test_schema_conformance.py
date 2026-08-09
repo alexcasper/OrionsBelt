@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """Tests for bench/schema.py — the frozen results schema contract (bead ob-1lm).
 
 Validates enum values, CSV header conformance, and round-trip serialization.
@@ -85,6 +88,8 @@ def test_csv_header_from_existing_results():
     kleidiai_marker = "shape"  # KleidiAI micro-kernel bench (bench_kai_gdn.c)
     prefill_gemm_marker = "prefill_M"  # prefill GEMM benchmark (gdn_e2e_decode.c --prefill)
     precision_cmp_marker = "variant"  # mixed-precision/prefill comparison CSVs (A/B variants)
+    cross_tool_marker = "llamacpp_commit"  # cross-tool comparison (ob-mrd.15, validate_results.py "cross_tool_comparison")
+    quant_accuracy_marker = "cos_sim"  # per-matmul quant accuracy validation (ob-8qt.18, validate_results.py "quant_accuracy")
     result_row_columns = set(RESULT_ROW_COLUMNS)
 
     checked = 0
@@ -104,6 +109,8 @@ def test_csv_header_from_existing_results():
             or kleidiai_marker in cols
             or prefill_gemm_marker in cols
             or precision_cmp_marker in cols
+            or cross_tool_marker in cols
+            or quant_accuracy_marker in cols
         ):
             continue  # different shape by design, not a conformance failure
         if e2e_decode_marker in cols:
