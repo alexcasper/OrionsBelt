@@ -108,8 +108,12 @@ model is too under-adapted to serve as a fair comparison. The
 hypothesis remains untested pending:
 
 1. **Full model fine-tuning** (not just 30 isolated steps on 1 layer)
-2. **Smart gate initialization** from GDN-1's β values to reduce the
-   initial loss gap
+2. ~~**Smart gate initialization** from GDN-1's β values~~ — **done**
+   (ob-t3b.9, commit `8faec1e`): smart init improved CE recovery from
+   17.1% to 19.9% (+2.8 pp) but both strategies converge to the same
+   isolated MSE. The improvement is well below the threshold that would
+   change the RULER outcome — CE loss remains ~10 vs 2.9 baseline, so
+   the model is still too degraded for a fair retrieval comparison.
 3. **GPU acceleration** to make full-model backprop feasible (436s/step
    on this CPU)
 
@@ -137,5 +141,8 @@ GDN-2 with 30-step isolated adaptation achieves 10% retrieval accuracy
 degradation is consistent across all prompts. This negative result
 reflects insufficient adaptation rather than a flaw in the GDN-2
 architecture: the partially trained model cannot be used to test the
-retrieval hypothesis. Full fine-tuning or smart initialization is needed
-for a meaningful architectural comparison.
+retrieval hypothesis. Smart gate initialization (ob-t3b.9) was completed
+after this evaluation — it improved CE recovery from 17.1% to 19.9%,
+insufficient to change the RULER outcome. Full end-to-end fine-tuning
+(436 s/step on this CPU) remains the only path to a meaningful
+architectural comparison.
