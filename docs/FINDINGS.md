@@ -2265,7 +2265,7 @@ memory is UB).
   GDN-1's 2.04µs (1.29×), not identical. The extra stream adds ~29% at decode.
   Still far below the 2.7× prefill penalty, confirming decode is overhead-dominated.
 - **The bandwidth ratio between GDN-1 and GDN-2 is now closer to the theoretical
-  5/3 = 1.67×** (6.84 vs 11.09 GiB/s = 1.62×), confirming the kernel is genuinely
+  5/3 = 1.67×** (7.14 vs 11.53 GiB/s = 1.61×), confirming the kernel is genuinely
   bandwidth-bound at prefill.
 
 **Fleet-wide note:** All existing fleet CSVs (t3, t4, jetson, pi5) contain
@@ -2934,9 +2934,9 @@ t4 is stable: ~4% coefficient of variation across runs.
 | Metric | t3 | t4 | Ratio |
 |--------|----|----|-------|
 | **Single-core clean** (gated_scan 4B) | 2.91 GiB/s (30% spread) | 5.27 GiB/s (6% spread) | **1.81×** |
-| **Multi-core big** (gated_scan 4B) | 10.33 GiB/s (8% spread) | 11.09 GiB/s (5% spread) | **1.07×** |
+| **Multi-core big** (gated_scan 4B) | 10.33 GiB/s (8% spread) | 11.53 GiB/s (9% spread) | **1.12×** |
 
-The multi-core numbers agree within 7%, consistent with same-silicon
+The multi-core numbers agree within 12%, consistent with same-silicon
 expectations. The single-core discrepancy is entirely due to t3's
 anomalous clean sweep (likely wrong governor or background load).
 
@@ -2987,7 +2987,7 @@ prior workloads), not a kernel or measurement methodology problem.
 >
 > The 8-thread vs 8-thread comparison (`rk3588-t3-clean.csv` vs
 > `rk3588-t4_big.csv`, both `effective_threads=8`) shows the boards agree within
-> ~7% (cumdecay 21.06 vs 22.47), consistent with t4's higher 2400 MHz clock.
+> ~6% (cumdecay 21.06 vs 22.25), consistent with t4's higher 2400 MHz clock.
 >
 > See `comparison_table.md` §1a for the corrected like-for-like analysis.
 
@@ -3082,11 +3082,11 @@ The **equal-thread-count** comparison removes the confound. Both boards at
 
 | Kernel (4B, seq=64) | t4 8-thread GiB/s | t3 8-thread GiB/s | t4÷t3 |
 |---|---:|---:|---:|
-| gdn_cumdecay | 22.47 | 21.06 | 1.07× |
-| gdn_gated_scan | 11.09 | 10.62 | 1.04× |
-| gdn_causal_dwconv1d | 23.00 | 18.73 | 1.23× |
+| gdn_cumdecay | 22.25 | 21.06 | 1.06× |
+| gdn_gated_scan | 11.53 | 10.62 | 1.09× |
+| gdn_causal_dwconv1d | 19.04 | 18.73 | 1.02× |
 
-At equal thread count the two boards agree to within ~7% (cumdecay/scan) and
+At equal thread count the two boards agree to within ~9% (cumdecay/scan) and
 **t4 is marginally faster**, consistent with its higher A76 clock (2400 vs
 2304 MHz). The "gap is REAL and hardware/environmental" conclusion above is
 **not supported** by these runs; it should be treated as unproven pending a
