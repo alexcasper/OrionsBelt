@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
 """Add SPDX license headers to Python and shell files that lack them.
 
 Handles shebang lines correctly: the shebang stays on line 1, SPDX comments
