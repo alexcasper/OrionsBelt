@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 /* Gated DeltaNet CPU micro-kernels: public API.
  *
  * See gdn_sve.c for the full implementation, ISA-floor rationale, and

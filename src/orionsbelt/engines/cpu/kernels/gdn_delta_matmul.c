@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 /* Gated DeltaNet delta-rule matmul: beta = alpha . S
  *
  * Bead ob-8qt.1. The one piece of the delta-rule update the other three GDN

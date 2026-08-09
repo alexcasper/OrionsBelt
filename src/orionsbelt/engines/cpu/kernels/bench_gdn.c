@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 /* Standalone microbenchmark for the Gated DeltaNet CPU kernels.
  *
  * Bead ob-8ms.2. Turns "verified correct" into "measured" on real Arm silicon.
