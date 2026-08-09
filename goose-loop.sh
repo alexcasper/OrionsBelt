@@ -8,6 +8,11 @@ cd "$HOME/OrionsBelt" || { echo "no ~/OrionsBelt"; exit 1; }
 HOST=$(hostname); BRANCH="bench/$HOST"
 LOG="$HOME/OrionsBelt/.goose-loop.log"; TASK="$HOME/OrionsBelt/.goose-task.md"; GOOSE="$HOME/.local/bin/goose"
 TEMPLATE="$HOME/OrionsBelt/docs/agent-task.template.md"
+# Max session age before forced fresh start. A resumed session can drift
+# arbitrarily far behind main if it never re-reads the task template's
+# sync step (bd dolt pull). 2h balances context-refresh cost against drift
+# risk (ob-462: a >24h resumed session re-attempted a closed task for hours).
+MAX_SESSION_AGE_SEC="${ORION_MAX_SESSION_AGE:-7200}"
 git checkout "$BRANCH" >/dev/null 2>&1
 echo "=== orion goose loop START host=$HOST branch=$BRANCH $(date) ===" | tee -a "$LOG"
 
@@ -39,6 +44,17 @@ while true; do
   # self-heal: if the last run tripped the bloat-stall signature, force a fresh session
   if tail -40 "$LOG" 2>/dev/null | grep -q "create a new session"; then
     rm -f "$HOME/OrionsBelt/.goose-session-created"; echo "[self-heal: fresh session]" >>"$LOG"
+  fi
+  # session aging: force a fresh session after MAX_SESSION_AGE_SEC so the
+  # agent periodically re-reads the task template and re-syncs beads/main.
+  # Without this, --resume can silently run a stale session for days (ob-462).
+  MARKER="$HOME/OrionsBelt/.goose-session-created"
+  if [ -f "$MARKER" ]; then
+    AGE=$(( $(date +%s) - $(date +%s -r "$MARKER") ))
+    if [ "$AGE" -gt "$MAX_SESSION_AGE_SEC" ]; then
+      rm -f "$MARKER"
+      echo "[session-age: $AGE sec > ${MAX_SESSION_AGE_SEC}s limit, forcing fresh session]" >>"$LOG"
+    fi
   fi
   if ! ensure_task; then sleep 60; continue; fi
   if [ -f "$HOME/OrionsBelt/.goose-session-created" ]; then
