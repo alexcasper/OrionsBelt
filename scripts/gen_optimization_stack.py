@@ -13,12 +13,6 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-import matplotlib
-
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
-
 # ── Data from comparison_table.md §7 (rk3588-t4, A76 big cluster) ──────────────
 
 STAGES = [
@@ -44,6 +38,12 @@ def generate_chart(output_path: str | Path) -> str:
 
     Returns the output path as a string.
     """
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    import matplotlib.ticker as ticker
+
     output = str(output_path)
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5.5))

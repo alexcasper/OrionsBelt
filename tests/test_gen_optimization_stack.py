@@ -8,6 +8,8 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 import gen_optimization_stack as gos  # noqa: E402
 
@@ -95,6 +97,8 @@ class TestStageLabels:
 
 
 # ─── Chart generation ──────────────────────────────────────────────────────────
+# These tests require matplotlib — skip the entire class if not installed.
+_mpl = pytest.importorskip("matplotlib")
 
 
 class TestGenerateChart:
