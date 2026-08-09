@@ -1003,10 +1003,14 @@ class TestMainCLIErrorPaths:
         cand_path = tmp_path / "cand.json"
         cand_path.write_text(json.dumps({"logits": [[1.0, 2.0]]}))
         with pytest.raises(SystemExit) as exc_info:
-            correctness_main([
-                "--reference", str(tmp_path / "nonexistent.json"),
-                "--candidate", str(cand_path),
-            ])
+            correctness_main(
+                [
+                    "--reference",
+                    str(tmp_path / "nonexistent.json"),
+                    "--candidate",
+                    str(cand_path),
+                ]
+            )
         assert exc_info.value.code == 2
 
     def test_reference_json_decode_error(self, tmp_path):
@@ -1016,10 +1020,14 @@ class TestMainCLIErrorPaths:
         cand_path = tmp_path / "cand.json"
         cand_path.write_text(json.dumps({"logits": [[1.0, 2.0]]}))
         with pytest.raises(SystemExit) as exc_info:
-            correctness_main([
-                "--reference", str(ref_path),
-                "--candidate", str(cand_path),
-            ])
+            correctness_main(
+                [
+                    "--reference",
+                    str(ref_path),
+                    "--candidate",
+                    str(cand_path),
+                ]
+            )
         assert exc_info.value.code == 2
 
     def test_candidate_file_not_found(self, tmp_path):
@@ -1027,10 +1035,14 @@ class TestMainCLIErrorPaths:
         ref_path = tmp_path / "ref.json"
         ref_path.write_text(json.dumps({"logits": [[1.0, 2.0]]}))
         with pytest.raises(SystemExit) as exc_info:
-            correctness_main([
-                "--reference", str(ref_path),
-                "--candidate", str(tmp_path / "nonexistent.json"),
-            ])
+            correctness_main(
+                [
+                    "--reference",
+                    str(ref_path),
+                    "--candidate",
+                    str(tmp_path / "nonexistent.json"),
+                ]
+            )
         assert exc_info.value.code == 2
 
     def test_candidate_json_decode_error(self, tmp_path):
@@ -1040,10 +1052,14 @@ class TestMainCLIErrorPaths:
         cand_path = tmp_path / "cand.json"
         cand_path.write_text("<<<broken>>>")
         with pytest.raises(SystemExit) as exc_info:
-            correctness_main([
-                "--reference", str(ref_path),
-                "--candidate", str(cand_path),
-            ])
+            correctness_main(
+                [
+                    "--reference",
+                    str(ref_path),
+                    "--candidate",
+                    str(cand_path),
+                ]
+            )
         assert exc_info.value.code == 2
 
 
@@ -1064,8 +1080,10 @@ class TestMainEntryRunpy:
             "sys.argv",
             [
                 "correctness.py",
-                "--reference", str(ref_path),
-                "--candidate", str(cand_path),
+                "--reference",
+                str(ref_path),
+                "--candidate",
+                str(cand_path),
             ],
         )
         script_path = str(Path(__file__).resolve().parent.parent / "bench" / "correctness.py")

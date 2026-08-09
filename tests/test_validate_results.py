@@ -1971,7 +1971,9 @@ class TestCheckAblationManifestsExceptions:
 
         issues = []
         check_ablation_manifests(str(ablation_dir), issues)
-        assert any("cannot read ablation CSV" in i.message and i.severity == "ERROR" for i in issues)
+        assert any(
+            "cannot read ablation CSV" in i.message and i.severity == "ERROR" for i in issues
+        )
 
 
 # ---------------------------------------------------------------------------

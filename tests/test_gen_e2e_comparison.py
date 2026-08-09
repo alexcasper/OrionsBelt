@@ -778,9 +778,7 @@ class TestMain:
         monkeypatch.setattr("gen_e2e_comparison.RAW_DIR", raw)
         monkeypatch.setattr("gen_e2e_comparison.REPO_ROOT", tmp_path)
         out = tmp_path / "output.md"
-        monkeypatch.setattr(
-            "sys.argv", ["gen_e2e_comparison.py", "--output", str(out)]
-        )
+        monkeypatch.setattr("sys.argv", ["gen_e2e_comparison.py", "--output", str(out)])
         main()
         assert out.exists()
         content = out.read_text()
@@ -793,9 +791,7 @@ class TestMain:
         monkeypatch.setattr("gen_e2e_comparison.RAW_DIR", raw)
         monkeypatch.setattr("gen_e2e_comparison.REPO_ROOT", tmp_path)
         out = tmp_path / "output.md"
-        monkeypatch.setattr(
-            "sys.argv", ["gen_e2e_comparison.py", "--output", str(out)]
-        )
+        monkeypatch.setattr("sys.argv", ["gen_e2e_comparison.py", "--output", str(out)])
         with pytest.raises(SystemExit) as exc_info:
             main()
         assert exc_info.value.code == 1
@@ -819,17 +815,11 @@ class TestMain:
         """main() with multiple SHAs and no --base-commit prints warning."""
         raw = tmp_path / "raw"
         raw.mkdir()
-        _write_e2e_csv(
-            raw / "dev1_e2e_schema.csv", [_row(git_sha="aaaa1111", device="dev1_big")]
-        )
-        _write_e2e_csv(
-            raw / "dev2_e2e_schema.csv", [_row(git_sha="bbbb2222", device="dev2_big")]
-        )
+        _write_e2e_csv(raw / "dev1_e2e_schema.csv", [_row(git_sha="aaaa1111", device="dev1_big")])
+        _write_e2e_csv(raw / "dev2_e2e_schema.csv", [_row(git_sha="bbbb2222", device="dev2_big")])
         monkeypatch.setattr("gen_e2e_comparison.RAW_DIR", raw)
         monkeypatch.setattr("gen_e2e_comparison.REPO_ROOT", tmp_path)
         out = tmp_path / "output.md"
-        monkeypatch.setattr(
-            "sys.argv", ["gen_e2e_comparison.py", "--output", str(out)]
-        )
+        monkeypatch.setattr("sys.argv", ["gen_e2e_comparison.py", "--output", str(out)])
         main()
         assert out.exists()

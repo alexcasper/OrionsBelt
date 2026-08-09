@@ -944,6 +944,8 @@ class TestMainEntryRunpy:
         import runpy
 
         monkeypatch.chdir(tmp_path)
-        monkeypatch.setattr("sys.argv", ["fleet_analysis.py", "--output-dir", str(tmp_path / "out")])
+        monkeypatch.setattr(
+            "sys.argv", ["fleet_analysis.py", "--output-dir", str(tmp_path / "out")]
+        )
         script_path = str(Path(__file__).resolve().parent.parent / "bench" / "fleet_analysis.py")
         runpy.run_path(script_path, run_name="__main__")

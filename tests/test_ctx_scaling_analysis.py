@@ -1118,9 +1118,7 @@ class TestMain:
         import bench.ctx_scaling_analysis as mod
 
         out_dir = str(tmp_path / "figures")
-        monkeypatch.setattr(
-            "sys.argv", ["ctx_scaling_analysis.py", "--output-dir", out_dir]
-        )
+        monkeypatch.setattr("sys.argv", ["ctx_scaling_analysis.py", "--output-dir", out_dir])
         monkeypatch.chdir(tmp_path)
         mod.main()
         # All three device reports should be written
@@ -1135,7 +1133,7 @@ class TestMain:
         results_raw = tmp_path / "results" / "raw"
         results_raw.mkdir(parents=True)
         # t3 and jetson share "4B FP32 hybrid" label
-        for device, stem, tok in [
+        for _device, stem, tok in [
             ("rk3588-t3", "rk3588-t3_big_ctxsweep", "10.0"),
             ("jetson-j1", "jetson-j1_4b_fp32_ctxsweep", "3.5"),
         ]:
@@ -1173,15 +1171,10 @@ class TestMain:
                 ],
             )
         out_dir = str(tmp_path / "figures")
-        monkeypatch.setattr(
-            "sys.argv", ["ctx_scaling_analysis.py", "--output-dir", out_dir]
-        )
+        monkeypatch.setattr("sys.argv", ["ctx_scaling_analysis.py", "--output-dir", out_dir])
         monkeypatch.chdir(tmp_path)
         mod.main()
         # Cross-device report
         assert os.path.exists(os.path.join(out_dir, "ctx_length_scaling_cross.md"))
         # Cross-validation report
         assert os.path.exists(os.path.join(out_dir, "ctx_length_scaling_t3vst4.md"))
-
-
-

@@ -100,13 +100,10 @@ class TestManifestShaProvenance:
 
             # Verify sha_resolved is itself valid
             if not _git_cat_file(resolved):
-                unresolved.append(
-                    f"{fn}: sha_resolved {resolved[:12]} is also unreachable"
-                )
+                unresolved.append(f"{fn}: sha_resolved {resolved[:12]} is also unreachable")
 
-        assert not unresolved, (
-            "Manifests with unresolvable SHA chains:\n  "
-            + "\n  ".join(unresolved)
+        assert not unresolved, "Manifests with unresolvable SHA chains:\n  " + "\n  ".join(
+            unresolved
         )
 
     def test_sha_note_documented_for_stale_shas(self, named_manifests):
@@ -125,9 +122,7 @@ class TestManifestShaProvenance:
             if not note:
                 missing_notes.append(fn)
 
-        assert not missing_notes, (
-            f"Stale SHA manifests missing sha_note: {missing_notes}"
-        )
+        assert not missing_notes, f"Stale SHA manifests missing sha_note: {missing_notes}"
 
     def test_all_resolved_shas_valid(self, named_manifests):
         """Every sha_resolved field must point to a valid git object."""

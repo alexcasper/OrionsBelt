@@ -887,27 +887,40 @@ class TestCLIBadArgs:
         """Non-integer context-lengths → parser.error → SystemExit(2)."""
         monkeypatch.chdir(tmp_path)
         with pytest.raises(SystemExit) as exc_info:
-            main([
-                "--backend", "synthetic",
-                "--model", "0.8b",
-                "--context-lengths", "64,abc",
-                "--warmup", "1",
-                "--repeats", "5",
-                "--allow-missing-sha",
-            ])
+            main(
+                [
+                    "--backend",
+                    "synthetic",
+                    "--model",
+                    "0.8b",
+                    "--context-lengths",
+                    "64,abc",
+                    "--warmup",
+                    "1",
+                    "--repeats",
+                    "5",
+                    "--allow-missing-sha",
+                ]
+            )
         assert exc_info.value.code == 2
 
     def test_unknown_backend(self, tmp_path, monkeypatch):
         """Unknown backend → parser.error → SystemExit(2)."""
         monkeypatch.chdir(tmp_path)
         with pytest.raises(SystemExit) as exc_info:
-            main([
-                "--backend", "quantum",
-                "--context-lengths", "64",
-                "--warmup", "1",
-                "--repeats", "5",
-                "--allow-missing-sha",
-            ])
+            main(
+                [
+                    "--backend",
+                    "quantum",
+                    "--context-lengths",
+                    "64",
+                    "--warmup",
+                    "1",
+                    "--repeats",
+                    "5",
+                    "--allow-missing-sha",
+                ]
+            )
         assert exc_info.value.code == 2
 
 
@@ -935,16 +948,25 @@ class TestMainEntryRunpy:
         import runpy
 
         monkeypatch.chdir(tmp_path)
-        monkeypatch.setattr("sys.argv", [
-            "harness.py",
-            "--backend", "synthetic",
-            "--model", "0.8b",
-            "--context-lengths", "64",
-            "--warmup", "1",
-            "--repeats", "5",
-            "--decode-length", "10",
-            "--allow-missing-sha",
-        ])
+        monkeypatch.setattr(
+            "sys.argv",
+            [
+                "harness.py",
+                "--backend",
+                "synthetic",
+                "--model",
+                "0.8b",
+                "--context-lengths",
+                "64",
+                "--warmup",
+                "1",
+                "--repeats",
+                "5",
+                "--decode-length",
+                "10",
+                "--allow-missing-sha",
+            ],
+        )
         script_path = str(Path(__file__).resolve().parent.parent / "bench" / "harness.py")
         with pytest.raises(SystemExit) as exc_info:
             runpy.run_path(script_path, run_name="__main__")

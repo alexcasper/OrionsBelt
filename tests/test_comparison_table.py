@@ -628,10 +628,14 @@ class TestMainCLIGuardCurated:
         old_cwd = os.getcwd()
         try:
             os.chdir(tmp_path)
-            rc = ct_main([
-                "--csv", str(good),
-                "--output", "results/figures/comparison_table.md",
-            ])
+            rc = ct_main(
+                [
+                    "--csv",
+                    str(good),
+                    "--output",
+                    "results/figures/comparison_table.md",
+                ]
+            )
         finally:
             os.chdir(old_cwd)
         assert rc == 1
@@ -654,6 +658,7 @@ class TestMainCLIGuardCurated:
         monkeypatch.setattr("sys.argv", ["comparison_table.py", "--csv", str(good)])
         script_path = str(Path(__file__).resolve().parent.parent / "bench" / "comparison_table.py")
         import pytest as _pt
+
         with _pt.raises(SystemExit) as exc_info:
             runpy.run_path(script_path, run_name="__main__")
         assert exc_info.value.code == 0

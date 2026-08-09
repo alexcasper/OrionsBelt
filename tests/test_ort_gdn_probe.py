@@ -420,7 +420,8 @@ class TestMainErrorPaths:
     def test_build_failure_returns_1(self, monkeypatch, capsys):
         """When build_gdn_loop_model raises, main() returns 1."""
         monkeypatch.setattr(
-            "sys.argv", ["ort_gdn_probe.py", "--tokens", "4", "--dim", "8"],
+            "sys.argv",
+            ["ort_gdn_probe.py", "--tokens", "4", "--dim", "8"],
         )
 
         def _boom(**kw):
@@ -435,7 +436,8 @@ class TestMainErrorPaths:
     def test_session_failure_returns_1(self, monkeypatch, capsys):
         """When ORT session creation fails, main() returns 1."""
         monkeypatch.setattr(
-            "sys.argv", ["ort_gdn_probe.py", "--tokens", "4", "--dim", "8"],
+            "sys.argv",
+            ["ort_gdn_probe.py", "--tokens", "4", "--dim", "8"],
         )
 
         import onnxruntime as ort
@@ -452,7 +454,8 @@ class TestMainErrorPaths:
     def test_inference_failure_returns_1(self, monkeypatch, capsys):
         """When sess.run raises, main() returns 1."""
         monkeypatch.setattr(
-            "sys.argv", ["ort_gdn_probe.py", "--tokens", "4", "--dim", "8"],
+            "sys.argv",
+            ["ort_gdn_probe.py", "--tokens", "4", "--dim", "8"],
         )
 
         import onnxruntime as ort

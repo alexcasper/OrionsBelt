@@ -21,10 +21,10 @@ from bench.memory import (  # noqa: E402
     MemoryBreakdown,
     ModelConfig,
     _fmt_bytes,
+    context_sweep,
     cross_check,
     decomposition,
     kv_cache_bytes,
-    context_sweep,
     memory_breakdown,
     print_decomposition,
     recurrent_state_bytes,
@@ -246,15 +246,19 @@ class TestFromHfConfig:
 
     def test_explicit_layer_types_derives_interval(self):
         """When layer_types is present, interval is derived from first FA index."""
-        cfg = ModelConfig.from_hf_config({
-            "hidden_size": 256,
-            "num_attention_heads": 8,
-            "layer_types": [
-                "linear_attention", "linear_attention", "linear_attention",
-                "full_attention",
-            ],
-            "vocab_size": 1000,
-        })
+        cfg = ModelConfig.from_hf_config(
+            {
+                "hidden_size": 256,
+                "num_attention_heads": 8,
+                "layer_types": [
+                    "linear_attention",
+                    "linear_attention",
+                    "linear_attention",
+                    "full_attention",
+                ],
+                "vocab_size": 1000,
+            }
+        )
         assert cfg.num_hidden_layers == 4
         assert cfg.full_attention_interval == 4
         assert cfg.layer_types.count("full_attention") == 1
@@ -262,85 +266,103 @@ class TestFromHfConfig:
 
     def test_implicit_interval_from_num_hidden_layers(self):
         """Without layer_types, reads num_hidden_layers + full_attention_interval."""
-        cfg = ModelConfig.from_hf_config({
-            "num_hidden_layers": 32,
-            "full_attention_interval": 4,
-            "hidden_size": 2560,
-            "num_attention_heads": 32,
-        })
+        cfg = ModelConfig.from_hf_config(
+            {
+                "num_hidden_layers": 32,
+                "full_attention_interval": 4,
+                "hidden_size": 2560,
+                "num_attention_heads": 32,
+            }
+        )
         assert cfg.num_hidden_layers == 32
         assert cfg.full_attention_interval == 4
 
     def test_head_dim_explicit(self):
         """When head_dim is in config, it's used directly."""
-        cfg = ModelConfig.from_hf_config({
-            "num_hidden_layers": 4,
-            "hidden_size": 256,
-            "num_attention_heads": 8,
-            "head_dim": 128,
-        })
+        cfg = ModelConfig.from_hf_config(
+            {
+                "num_hidden_layers": 4,
+                "hidden_size": 256,
+                "num_attention_heads": 8,
+                "head_dim": 128,
+            }
+        )
         assert cfg.full_attn_head_dim == 128
 
     def test_head_dim_derived(self):
         """When head_dim is absent, derived from hidden_size // num_attention_heads."""
-        cfg = ModelConfig.from_hf_config({
-            "num_hidden_layers": 4,
-            "hidden_size": 256,
-            "num_attention_heads": 8,
-        })
+        cfg = ModelConfig.from_hf_config(
+            {
+                "num_hidden_layers": 4,
+                "hidden_size": 256,
+                "num_attention_heads": 8,
+            }
+        )
         assert cfg.full_attn_head_dim == 32  # 256 // 8
 
     def test_head_dim_zero_when_no_heads(self):
         """Division guarded when num_attention_heads is 0."""
-        cfg = ModelConfig.from_hf_config({
-            "num_hidden_layers": 4,
-            "hidden_size": 256,
-            "num_attention_heads": 0,
-        })
+        cfg = ModelConfig.from_hf_config(
+            {
+                "num_hidden_layers": 4,
+                "hidden_size": 256,
+                "num_attention_heads": 0,
+            }
+        )
         assert cfg.full_attn_head_dim == 0
 
     def test_text_config_nesting(self):
         """Config nested under 'text_config' is read correctly."""
-        cfg = ModelConfig.from_hf_config({
-            "text_config": {
-                "num_hidden_layers": 16,
-                "hidden_size": 512,
-                "num_attention_heads": 8,
-                "model_type": "qwen3",
-            },
-        })
+        cfg = ModelConfig.from_hf_config(
+            {
+                "text_config": {
+                    "num_hidden_layers": 16,
+                    "hidden_size": 512,
+                    "num_attention_heads": 8,
+                    "model_type": "qwen3",
+                },
+            }
+        )
         assert cfg.num_hidden_layers == 16
         assert cfg.hidden_size == 512
 
     def test_state_dtype_mapping(self):
         """mamba_ssm_dtype maps to state_dtype_bytes."""
-        cfg = ModelConfig.from_hf_config({
-            "num_hidden_layers": 4,
-            "mamba_ssm_dtype": "bfloat16",
-        })
+        cfg = ModelConfig.from_hf_config(
+            {
+                "num_hidden_layers": 4,
+                "mamba_ssm_dtype": "bfloat16",
+            }
+        )
         assert cfg.state_dtype_bytes == 2
 
     def test_untied_embeddings(self):
         """tie_word_embeddings=False is read from config."""
-        cfg = ModelConfig.from_hf_config({
-            "num_hidden_layers": 4,
-            "tie_word_embeddings": False,
-        })
+        cfg = ModelConfig.from_hf_config(
+            {
+                "num_hidden_layers": 4,
+                "tie_word_embeddings": False,
+            }
+        )
         assert cfg.tie_word_embeddings is False
 
     def test_name_from_model_type(self):
         """Name defaults to model_type when not provided."""
-        cfg = ModelConfig.from_hf_config({
-            "model_type": "qwen3",
-            "num_hidden_layers": 4,
-        })
+        cfg = ModelConfig.from_hf_config(
+            {
+                "model_type": "qwen3",
+                "num_hidden_layers": 4,
+            }
+        )
         assert cfg.name == "qwen3"
 
     def test_no_fa_layers_in_explicit_list(self):
         """When layer_types has no full_attention, interval is large (all GDN)."""
-        cfg = ModelConfig.from_hf_config({
-            "layer_types": ["linear_attention"] * 4,
-        })
+        cfg = ModelConfig.from_hf_config(
+            {
+                "layer_types": ["linear_attention"] * 4,
+            }
+        )
         assert cfg.full_attention_interval == 5  # num_hidden_layers + 1
         assert cfg.layer_types.count("linear_attention") == 4
 
