@@ -1,0 +1,251 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
+"""Tests for scripts/update_readme_counts.py — README auto-count repair.
+
+Covers file counting, headline repair, directory-layout repair, dry-run,
+and graceful handling of README files that lack the expected patterns.
+"""
+
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+import pytest
+
+_ROOT = str(Path(__file__).resolve().parent.parent)
+if _ROOT not in sys.path:
+    sys.path.insert(0, _ROOT)
+
+import scripts.update_readme_counts as urc  # noqa: E402
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+def _make_repo(tmp_path: Path, csvs: int = 3, manifests: int = 5, figures: int = 2):
+    """Create a minimal repo structure under *tmp_path*."""
+    (tmp_path / "results" / "raw").mkdir(parents=True)
+    (tmp_path / "results" / "manifests").mkdir(parents=True)
+    (tmp_path / "results" / "figures").mkdir(parents=True)
+
+    for i in range(csvs):
+        (tmp_path / "results" / "raw" / f"device-{i}.csv").write_text("data\n")
+    for i in range(manifests):
+        (tmp_path / "results" / "manifests" / f"device-{i}.json").write_text("{}")
+    for i in range(figures):
+        (tmp_path / "results" / "figures" / f"fig-{i}.md").write_text("# fig\n")
+
+    # figures/README.md should NOT be counted as a figure
+    (tmp_path / "results" / "figures" / "README.md").write_text("# index\n")
+
+
+README_TEMPLATE = """\
+# Test Repo
+
+> **Results so far:** {csvs} CSVs from the device fleet, {manifests} provenance manifests, {figs} generated figures/tables, 1 FINDINGS section.
+
+> ```
+> results/
+>   raw/         <- {csvs} per-run CSVs
+>   manifests/   <- {manifests} provenance manifests (git SHA, governor, thermals)
+>   figures/     <- fleet analysis, comparison table
+> ```
+"""
+
+
+def _write_readme(
+    tmp_path: Path,
+    csvs: int,
+    manifests: int,
+    figs: int,
+):
+    (tmp_path / "README.md").write_text(
+        README_TEMPLATE.format(csvs=csvs, manifests=manifests, figs=figs)
+    )
+
+
+# ---------------------------------------------------------------------------
+# _count_files
+# ---------------------------------------------------------------------------
+
+
+class TestCountFiles:
+    def test_count_csvs(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(urc, "REPO_ROOT", str(tmp_path))
+        _make_repo(tmp_path, csvs=5, manifests=0, figures=0)
+        assert urc._count_files("results/raw", suffix=".csv") == 5
+
+    def test_count_manifests(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(urc, "REPO_ROOT", str(tmp_path))
+        _make_repo(tmp_path, csvs=0, manifests=7, figures=0)
+        assert urc._count_files("results/manifests", suffix=".json") == 7
+
+    def test_count_figures_excludes_readme(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(urc, "REPO_ROOT", str(tmp_path))
+        _make_repo(tmp_path, csvs=0, manifests=0, figures=3)
+        # 3 figure files + 1 README.md (excluded)
+        assert urc._count_files("results/figures", exclude_name="README.md") == 3
+
+    def test_count_recursive(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(urc, "REPO_ROOT", str(tmp_path))
+        _make_repo(tmp_path, csvs=2, manifests=0, figures=0)
+        # Add files in a subdirectory
+        sub = tmp_path / "results" / "raw" / "ablation"
+        sub.mkdir()
+        (sub / "extra.csv").write_text("data\n")
+        assert urc._count_files("results/raw", suffix=".csv") == 3
+
+    def test_count_empty_dir(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(urc, "REPO_ROOT", str(tmp_path))
+        (tmp_path / "results" / "raw").mkdir(parents=True)
+        assert urc._count_files("results/raw", suffix=".csv") == 0
+
+
+# ---------------------------------------------------------------------------
+# update_readme — repair scenarios
+# ---------------------------------------------------------------------------
+
+
+class TestUpdateReadmeRepair:
+    def test_already_correct(self, tmp_path, monkeypatch):
+        """When counts match, no changes are made."""
+        monkeypatch.setattr(urc, "REPO_ROOT", str(tmp_path))
+        _make_repo(tmp_path, csvs=5, manifests=10, figures=3)
+        _write_readme(tmp_path, csvs=5, manifests=10, figs=3)
+
+        n = urc.update_readme()
+        assert n == 0
+
+    def test_fix_manifest_drift_headline(self, tmp_path, monkeypatch):
+        """Stale manifest count in headline is repaired."""
+        monkeypatch.setattr(urc, "REPO_ROOT", str(tmp_path))
+        _make_repo(tmp_path, csvs=5, manifests=20, figures=3)
+        # README claims only 10 manifests
+        _write_readme(tmp_path, csvs=5, manifests=10, figs=3)
+
+        n = urc.update_readme()
+        assert n == 2  # headline + dir-layout
+        text = (tmp_path / "README.md").read_text()
+        assert "20 provenance manifests" in text
+
+    def test_fix_csv_drift_headline(self, tmp_path, monkeypatch):
+        """Stale CSV count in headline is repaired."""
+        monkeypatch.setattr(urc, "REPO_ROOT", str(tmp_path))
+        _make_repo(tmp_path, csvs=8, manifests=10, figures=3)
+        _write_readme(tmp_path, csvs=5, manifests=10, figs=3)
+
+        n = urc.update_readme()
+        assert n == 1  # headline only (manifests match in dir-layout too)
+        text = (tmp_path / "README.md").read_text()
+        assert "8 CSVs" in text
+
+    def test_fix_figures_drift_headline(self, tmp_path, monkeypatch):
+        """Stale figures count in headline is repaired."""
+        monkeypatch.setattr(urc, "REPO_ROOT", str(tmp_path))
+        _make_repo(tmp_path, csvs=5, manifests=10, figures=6)
+        _write_readme(tmp_path, csvs=5, manifests=10, figs=3)
+
+        n = urc.update_readme()
+        assert n == 1  # headline only
+        text = (tmp_path / "README.md").read_text()
+        assert "6 generated figures/tables" in text
+
+    def test_fix_all_three_drift(self, tmp_path, monkeypatch):
+        """All counts drift at once — headline repaired, dir-layout manifest too."""
+        monkeypatch.setattr(urc, "REPO_ROOT", str(tmp_path))
+        _make_repo(tmp_path, csvs=10, manifests=15, figures=7)
+        _write_readme(tmp_path, csvs=3, manifests=5, figs=2)
+
+        n = urc.update_readme()
+        assert n == 2  # headline + dir-layout
+        text = (tmp_path / "README.md").read_text()
+        assert "10 CSVs" in text
+        assert "15 provenance manifests" in text
+        assert "7 generated figures/tables" in text
+
+    def test_dir_layout_independent(self, tmp_path, monkeypatch):
+        """When only the dir-layout manifest count is wrong, it gets fixed."""
+        monkeypatch.setattr(urc, "REPO_ROOT", str(tmp_path))
+        _make_repo(tmp_path, csvs=5, manifests=10, figures=3)
+        # Write README with correct headline but stale dir-layout
+        (tmp_path / "README.md").write_text(
+            README_TEMPLATE.format(csvs=5, manifests=10, figs=3).replace(
+                "10 provenance manifests (git SHA", "5 provenance manifests (git SHA"
+            )
+        )
+
+        n = urc.update_readme()
+        assert n == 1  # dir-layout only
+        text = (tmp_path / "README.md").read_text()
+        # headline unchanged (still 10)
+        assert text.count("10 provenance manifests") == 2  # headline + dir-layout
+
+
+# ---------------------------------------------------------------------------
+# update_readme — dry-run
+# ---------------------------------------------------------------------------
+
+
+class TestUpdateReadmeDryRun:
+    def test_dry_run_no_write(self, tmp_path, monkeypatch):
+        """Dry-run reports changes but does not modify README."""
+        monkeypatch.setattr(urc, "REPO_ROOT", str(tmp_path))
+        _make_repo(tmp_path, csvs=5, manifests=20, figures=3)
+        _write_readme(tmp_path, csvs=5, manifests=10, figs=3)
+
+        original = (tmp_path / "README.md").read_text()
+        n = urc.update_readme(dry_run=True)
+        assert n == 2  # changes detected
+        # File unchanged
+        assert (tmp_path / "README.md").read_text() == original
+
+
+# ---------------------------------------------------------------------------
+# update_readme — edge cases
+# ---------------------------------------------------------------------------
+
+
+class TestUpdateReadmeEdgeCases:
+    def test_no_readme(self, tmp_path, monkeypatch):
+        """Missing README.md raises FileNotFoundError (fail-fast)."""
+        monkeypatch.setattr(urc, "REPO_ROOT", str(tmp_path))
+        _make_repo(tmp_path)
+        with pytest.raises(FileNotFoundError):
+            urc.update_readme()
+
+    def test_readme_without_pattern(self, tmp_path, monkeypatch):
+        """README without the expected patterns results in no changes."""
+        monkeypatch.setattr(urc, "REPO_ROOT", str(tmp_path))
+        _make_repo(tmp_path, csvs=5, manifests=10, figures=3)
+        (tmp_path / "README.md").write_text("# Minimal README\nNo counts here.\n")
+
+        # Should not crash, should report 0 changes
+        n = urc.update_readme()
+        assert n == 0
+
+    def test_subdirectory_manifests_counted(self, tmp_path, monkeypatch):
+        """Manifests in subdirectories are counted recursively."""
+        monkeypatch.setattr(urc, "REPO_ROOT", str(tmp_path))
+        _make_repo(tmp_path, csvs=3, manifests=5, figures=2)
+        # Add manifests in a subdirectory (like the real repo's structure)
+        sub = tmp_path / "results" / "manifests" / "ablation"
+        sub.mkdir()
+        for i in range(4):
+            (sub / f"extra-{i}.json").write_text("{}")
+
+        _write_readme(tmp_path, csvs=3, manifests=5, figs=2)
+        n = urc.update_readme()
+        assert n == 2  # headline + dir-layout
+        text = (tmp_path / "README.md").read_text()
+        assert "9 provenance manifests" in text
+
+    def test_figures_readme_not_counted(self, tmp_path, monkeypatch):
+        """results/figures/README.md is excluded from figure count."""
+        monkeypatch.setattr(urc, "REPO_ROOT", str(tmp_path))
+        _make_repo(tmp_path, csvs=3, manifests=5, figures=4)
+        _write_readme(tmp_path, csvs=3, manifests=5, figs=4)
+        n = urc.update_readme()
+        assert n == 0  # already correct, README.md excluded
