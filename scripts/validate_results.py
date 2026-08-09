@@ -389,6 +389,16 @@ def check_manifest_exists(csv_name, manifest_dir):
         base + ".json",
         base.replace("_", "-") + ".json",
     ]
+    # Strip only the documented cluster suffix (DEVICE_RUNBOOK.md's naming
+    # convention) before falling back to the crude device-name-only match
+    # below -- otherwise a per-variant manifest (e.g. rk3588-t4_sdot_08b.json)
+    # is skipped in favor of an unrelated shared device manifest that happens
+    # to match on the first underscore-segment alone. Discovered while
+    # reviewing PR #175: refreshing the shared rk3588-t4.json manifest
+    # retroactively flagged ~15 unrelated dedicated-manifest CSVs as dirty.
+    for suffix in ("_big", "_little", "_singlethread"):
+        if base.endswith(suffix):
+            candidates.append(base[: -len(suffix)] + ".json")
     # Also try without suffixes like _big, _little, _sustained_*, etc.
     parts = base.split("_")
     if len(parts) > 1:
