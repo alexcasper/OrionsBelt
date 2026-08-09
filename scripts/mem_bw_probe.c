@@ -23,6 +23,24 @@
 #include <time.h>
 #include <omp.h>
 
+
+/* Safe alloc wrappers — exit on OOM instead of dereferencing NULL. */
+static void *xmalloc(size_t n) {
+    void *p = malloc(n);
+    if (!p) { fprintf(stderr, "out of memory (%zu bytes)\n", n); exit(1); }
+    return p;
+}
+static void *xcalloc(size_t nmemb, size_t size) {
+    void *p = calloc(nmemb, size);
+    if (!p) { fprintf(stderr, "out of memory (%zu * %zu bytes)\n", nmemb, size); exit(1); }
+    return p;
+}
+static void *xaligned_alloc(size_t alignment, size_t size) {
+    void *p = aligned_alloc(alignment, size);
+    if (!p) { fprintf(stderr, "out of memory (aligned %zu, %zu bytes)\n", alignment, size); exit(1); }
+    return p;
+}
+
 #define REPEATS 20
 #define ARRAY_MB 256
 
@@ -35,8 +53,7 @@ static double now_sec(void) {
 int main(void) {
     size_t bytes = (size_t)ARRAY_MB * 1024 * 1024;
     size_t count = bytes / sizeof(float);
-    float *buf = aligned_alloc(64, bytes);
-    if (!buf) { perror("alloc"); return 1; }
+    float *buf = xaligned_alloc(64, bytes);
     memset(buf, 1, bytes);
 
     printf("=== Memory Bandwidth Probe (%d MB array) ===\n", ARRAY_MB);

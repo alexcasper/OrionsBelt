@@ -120,6 +120,18 @@ static void gdn_delta_matmul_neon(const float *restrict A, const float *restrict
 }
 
 #ifdef ORIONSBELT_WITH_KLEIDIAI
+/* Safe alloc wrappers — exit on OOM instead of dereferencing NULL. */
+static void *xaligned_alloc(size_t alignment, size_t size) {
+    void *p = aligned_alloc(alignment, size);
+    if (!p) { fprintf(stderr, "out of memory (aligned %zu, %zu)\n", alignment, size); exit(1); }
+    return p;
+}
+static void *xcalloc(size_t nmemb, size_t size) {
+    void *p = calloc(nmemb, size);
+    if (!p) { fprintf(stderr, "out of memory (%zu * %zu)\n", nmemb, size); exit(1); }
+    return p;
+}
+
 /* KleidiAI path: repack B every call (S changes every chunk -- see the file
  * header, this cost is exactly what FINDINGS section 8 measured and it is
  * why this path is only worth it at M>=GDN_DELTA_MATMUL_KLEIDIAI_MIN_M). */
@@ -131,12 +143,8 @@ static void gdn_delta_matmul_kleidiai(const float *restrict A, const float *rest
     const size_t packed_size =
         kai_get_rhs_packed_size_rhs_pack_kxn_f32p8x1biasf32_f32_f32_neon(N, K);
 
-    void *packed = aligned_alloc(64, packed_size);
-    float *zero_bias = calloc(N, sizeof(float)); /* delta-rule matmul has no bias */
-    if (!packed || !zero_bias) {
-        fprintf(stderr, "OOM in gdn_delta_matmul_kleidiai\n");
-        exit(1);
-    }
+    void *packed = xaligned_alloc(64, packed_size);
+    float *zero_bias = xcalloc(N, sizeof(float)); /* delta-rule matmul has no bias */
 
     kai_run_rhs_pack_kxn_f32p8x1biasf32_f32_f32_neon(
         /*num_groups=*/1, N, K, nr, kr, sr, N * sizeof(float), B, zero_bias,

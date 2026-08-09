@@ -27,6 +27,24 @@
 #include <string.h>
 #include <time.h>
 
+
+/* Safe alloc wrappers — exit on OOM instead of dereferencing NULL. */
+static void *xmalloc(size_t n) {
+    void *p = malloc(n);
+    if (!p) { fprintf(stderr, "out of memory (%zu bytes)\n", n); exit(1); }
+    return p;
+}
+static void *xcalloc(size_t nmemb, size_t size) {
+    void *p = calloc(nmemb, size);
+    if (!p) { fprintf(stderr, "out of memory (%zu * %zu bytes)\n", nmemb, size); exit(1); }
+    return p;
+}
+static void *xaligned_alloc(size_t alignment, size_t size) {
+    void *p = aligned_alloc(alignment, size);
+    if (!p) { fprintf(stderr, "out of memory (aligned %zu, %zu bytes)\n", alignment, size); exit(1); }
+    return p;
+}
+
 /* ------------------------------------------------------------------ */
 /* Timing                                                              */
 /* ------------------------------------------------------------------ */
@@ -151,7 +169,7 @@ static char *load_file(const char *path, size_t *len_out) {
     fseek(f, 0, SEEK_END);
     long len = ftell(f);
     fseek(f, 0, SEEK_SET);
-    char *buf = (char *)malloc(len + 1);
+    char *buf = (char *)xmalloc(len + 1);
     if (!buf) { fprintf(stderr, "OOM in load_file\n"); fclose(f); exit(1); }
     fread(buf, 1, len, f);
     buf[len] = '\0';
@@ -228,7 +246,7 @@ static void init_opencl(const char *kernel_path) {
         size_t log_sz = 0;
         clGetProgramBuildInfo(g_program, g_device, CL_PROGRAM_BUILD_LOG,
                               0, NULL, &log_sz);
-        char *log = (char *)malloc(log_sz + 1);
+        char *log = (char *)xmalloc(log_sz + 1);
         if (!log) { fprintf(stderr, "Build failed (OOM allocating log)\n"); exit(1); }
         clGetProgramBuildInfo(g_program, g_device, CL_PROGRAM_BUILD_LOG,
                               log_sz, log, NULL);
@@ -367,9 +385,9 @@ int main(int argc, char **argv) {
     printf("=== Validation ===\n");
     {
         size_t T = 64, C = 2048, N = T * C;
-        float *g_h = malloc(N * 4), *x_h = malloc(N * 4);
-        float *s_gpu = malloc(N * 4), *s_ref = malloc(N * 4);
-        float *st_gpu = malloc(C * 4), *st_ref = malloc(C * 4);
+        float *g_h = xmalloc(N * 4), *x_h = xmalloc(N * 4);
+        float *s_gpu = xmalloc(N * 4), *s_ref = xmalloc(N * 4);
+        float *st_gpu = xmalloc(C * 4), *st_ref = xmalloc(C * 4);
         if (!g_h || !x_h || !s_gpu || !s_ref || !st_gpu || !st_ref) {
             fprintf(stderr, "OOM in test 1 (gated scan)\n"); exit(1);
         }
@@ -430,8 +448,8 @@ int main(int argc, char **argv) {
      * ================================================================ */
     {
         size_t T = 64, C = 2048, N = T * C;
-        float *a_h = malloc(N * 4);
-        float *d_gpu = malloc(N * 4), *d_ref = malloc(N * 4);
+        float *a_h = xmalloc(N * 4);
+        float *d_gpu = xmalloc(N * 4), *d_ref = xmalloc(N * 4);
         if (!a_h || !d_gpu || !d_ref) {
             fprintf(stderr, "OOM in test 2 (cumdecay)\n"); exit(1);
         }
@@ -477,9 +495,9 @@ int main(int argc, char **argv) {
      * ================================================================ */
     {
         size_t T = 64, C = 2048, N = T * C;
-        float *in_h = malloc(N * 4), *w_h = malloc(4 * C * 4);
-        float *o_gpu = malloc(N * 4), *o_ref = malloc(N * 4);
-        float *h_gpu = malloc(3 * C * 4), *h_ref = malloc(3 * C * 4);
+        float *in_h = xmalloc(N * 4), *w_h = xmalloc(4 * C * 4);
+        float *o_gpu = xmalloc(N * 4), *o_ref = xmalloc(N * 4);
+        float *h_gpu = xmalloc(3 * C * 4), *h_ref = xmalloc(3 * C * 4);
         if (!in_h || !w_h || !o_gpu || !o_ref || !h_gpu || !h_ref) {
             fprintf(stderr, "OOM in test 3 (dwconv1d)\n"); exit(1);
         }
@@ -543,9 +561,9 @@ int main(int argc, char **argv) {
         size_t kv_sz = num_heads * hkd;
         size_t vv_sz = num_heads * hvd;
 
-        float *S_gpu = malloc(S_sz * 4), *S_ref = malloc(S_sz * 4);
-        float *k_h = malloc(kv_sz * 4), *v_h = malloc(vv_sz * 4), *q_h = malloc(kv_sz * 4);
-        float *out_gpu = malloc(vv_sz * 4), *out_ref = malloc(vv_sz * 4);
+        float *S_gpu = xmalloc(S_sz * 4), *S_ref = xmalloc(S_sz * 4);
+        float *k_h = xmalloc(kv_sz * 4), *v_h = xmalloc(vv_sz * 4), *q_h = xmalloc(kv_sz * 4);
+        float *out_gpu = xmalloc(vv_sz * 4), *out_ref = xmalloc(vv_sz * 4);
         if (!S_gpu || !S_ref || !k_h || !v_h || !q_h || !out_gpu || !out_ref) {
             fprintf(stderr, "OOM in test 4 (delta rule)\n"); exit(1);
         }
