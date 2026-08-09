@@ -23,8 +23,8 @@ See per-device tables (`*_table.md`) for full kernel-level detail._
 > §1a below.
 >
 > The equal-thread-count 8v8 comparison (`rk3588-t3-clean.csv` vs
-> `rk3588-t4_big.csv`, both `effective_threads=8`) gives cumdecay 21.06 vs 22.47,
-> gated scan 10.62 vs 11.09, Conv1D 18.73 vs 23.00 — boards agree within ~7%,
+> `rk3588-t4_big.csv`, both `effective_threads=8`) gives cumdecay 21.06 vs 22.25,
+> gated scan 10.62 vs 11.53, Conv1D 18.73 vs 19.04 — boards agree within ~9%,
 > consistent with t4's higher 2400 MHz clock.
 >
 > t3 is an unknown RK3588 board (kernel 5.10, CFS, 32 GB); t4 is a Turing
@@ -65,7 +65,7 @@ Qwen3.5-4B, prefill (seq=64), fp32. ⚠ t3 was 8-thread (threads_source=core_cou
 
 > The 8-thread t3 numbers reflect OpenMP scaling across 4 big cores. The
 > 8-thread vs 8-thread comparison (`rk3588-t3-clean.csv` vs `rk3588-t4_big.csv`,
-> both effective_threads=8) gives cumdecay 21.06 vs 22.47 — t4 is ~7% faster,
+> both effective_threads=8) gives cumdecay 21.06 vs 22.25 — t4 is ~6% faster,
 > consistent with its 2400 MHz clock. See §8 for OpenMP scaling analysis.
 
 ### 1c. 0.8B model (t3 8-thread, t4 1-thread — also confounded)
