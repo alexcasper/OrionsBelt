@@ -125,7 +125,7 @@ to its 4-5x bandwidth advantage**.
 - **Predicted O6 scan throughput: 17.0-28.4 GiB/s**
 - This is ~18-30% of spec bandwidth (93.1 GiB/s)
 
-**Optimized A76 reference.** t4 with 4-core OpenMP + NEON unrolling reads **11.77 GiB/s** — 2.1x the single-threaded baseline. The O6's A720 cores will benefit from both IPC gains AND the optimization stack, so the prediction above is conservative.
+**Optimized A76 reference.** t4 with 4-core OpenMP + NEON unrolling reads **11.53 GiB/s** — 2.0x the single-threaded baseline. The O6's A720 cores will benefit from both IPC gains AND the optimization stack, so the prediction above is conservative.
 
 ⚠ The fleet sweep (ob-bf7) inter-board gap is confounded by a thread-count mismatch (t3=8, t4=1; ob-mrd.12/14). This prediction uses t4 single-thread data and does not depend on resolving that gap.
 
@@ -144,7 +144,7 @@ the real-world impact of the optimization track (beads ob-8qt.5/6/7):
 | Gated Delta-Rule Scan | 1.13 | 2.96 | 2.6x |
 | Causal DWConv1D | 1.20 | 3.66 | 3.1x |
 
-The 2.5-2.8x speedup from 4 cores (not the theoretical 4x) confirms the
+The 2.6-3.1x speedup from 4 cores (not the theoretical 4x) confirms the
 kernels are partially bandwidth-limited even at seq=64 — the instruction-bound
 finding means single-thread performance is IPC-limited, but multi-threaded
 scaling reveals a bandwidth component that the single-thread comparison
@@ -155,7 +155,7 @@ cannot expose. This has implications for the O6: its 4x more cores and
 
 The historical provenance issue is resolved: the fleet sweep re-ran all devices at post-optimization commits with clean trees, governor=performance. RK3588 is now **included** in the cross-device table above using the clean sweep data. ⚠ However, t3-clean ran **8-thread** (OMP_NUM_THREADS unset) while t4-clean ran **1-thread** (OMP_NUM_THREADS=1) — see ob-mrd.12/14. The cross-device table uses t4-clean (1-thread); the replicate comparison is flagged accordingly.
 
-**Optimization impact on A76.** The multi-threaded optimized run (4-core OpenMP + NEON unrolling + bf16) on t4 reads 11.56 GiB/s scan vs 5.75 single-threaded — a **2.0x speedup** from parallelization alone. See the optimization-impact table below.
+**Optimization impact on A76.** The multi-threaded optimized run (4-core OpenMP + NEON unrolling + bf16) on t4 reads 11.53 GiB/s scan vs 5.67 single-threaded — a **2.0x speedup** from parallelization alone. See the optimization-impact table below.
 
 ### Mixed-precision at decode (seq=1)
 
