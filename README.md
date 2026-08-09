@@ -151,6 +151,7 @@ All figures above are verified against primary sources (Radxa product page and d
 - big.LITTLE affinity: pinning to A76 big cores is 2–3× faster than default scheduler placement (§9)
 - GDN-2 vs GDN-1: decoupled gating costs 2.2–2.7× at prefill (bandwidth-bound), 1.2–1.5× at decode on big cores but 2.2–2.4× on A55 little cores (compute-bound); clean-tree re-run, single-thread (§10)
 - INA3221 power/energy: all three GDN kernels draw ~900–925 mW over idle on the Jetson A57 — power is constant, energy-per-GiB tracks 1/throughput (874–1250 mJ/GiB board-wide). `performance` governor is both faster and 28% more energy-efficient than `ondemand` (ob-agf.1)
+- Engine boundary-crossing cost: portable OpenCL proxy on Mali-G610 measures 16 crossings/token at **3.36 ms (~10% of 30 t/s decode budget)**, latency-dominated (~0.1 ms dispatch floor regardless of payload size). Heterogeneous offload must deliver >11% speedup to break even (§39)
 
 | Item | Status |
 |---|---|
@@ -187,7 +188,7 @@ All figures above are verified against primary sources (Radxa product page and d
 | Per-layer engine mapping (NPU/GPU/CPU) | Hypothesis only — pending measurements |
 | Full inference results (tokens/sec, TTFT, memory) | Done — C decode loop (FP32+INT8+Q8_0), ctx-length scaling (§17–20), quantization accuracy (§30), cross-device (A57+A76), sustained-load thermal stability (§18). [e2e comparison](./results/figures/e2e_fleet_comparison.md) |
 
-> **Results so far:** 198 CSVs from the device fleet, 182 provenance manifests, 89 generated figures/tables, 52 FINDINGS sections.
+> **Results so far:** 198 CSVs from the device fleet, 182 provenance manifests, 89 generated figures/tables, 53 FINDINGS sections.
 > (Counted recursively — `results/raw/` and `results/manifests/` include
 > subdirectories `ablation/`, `affinity/`, and `kleidiai/`, which hold real
 > fleet benchmark data, not scratch files. A non-recursive `ls *.csv` count
