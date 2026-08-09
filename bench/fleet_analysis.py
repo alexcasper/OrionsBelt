@@ -129,7 +129,7 @@ SPREAD_WARN_PCT = 10.0
 def get_spread(rows, model, kernel):
     """Return spread_pct for a specific model+kernel, or None."""
     for r in rows:
-        if r["model"] == model and r["kernel"] == kernel:
+        if r.get("model") == model and r.get("kernel") == kernel:
             try:
                 return float(r["spread_pct"])
             except (KeyError, ValueError):
@@ -191,25 +191,31 @@ def load_device_csv(path):
     rows = []
     if not os.path.exists(path):
         return rows
-    with open(path, newline="") as f:
-        for row in csv.DictReader(f):
-            # Only fp32 baseline kernels, seq=64 (prefill chunk)
-            kern = row["kernel"]
-            if "_bf16" in kern or "_f16" in kern:
-                continue
-            if row.get("seq", "64") != "64":
-                continue
-            if "_decode" in row.get("model", ""):
-                continue
-            rows.append(row)
+    try:
+        with open(path, newline="") as f:
+            for row in csv.DictReader(f):
+                # Only fp32 baseline kernels, seq=64 (prefill chunk)
+                kern = row.get("kernel", "")
+                if not kern or "_bf16" in kern or "_f16" in kern:
+                    continue
+                if row.get("seq", "64") != "64":
+                    continue
+                if "_decode" in row.get("model", ""):
+                    continue
+                rows.append(row)
+    except OSError:
+        pass
     return rows
 
 
 def get_gibs(rows, model, kernel):
     """Extract achieved GiB/s for a specific model+kernel."""
     for r in rows:
-        if r["model"] == model and r["kernel"] == kernel:
-            return float(r["gib_per_s_p50"])
+        if r.get("model") == model and r.get("kernel") == kernel:
+            try:
+                return float(r["gib_per_s_p50"])
+            except (KeyError, ValueError):
+                return None
     return None
 
 
