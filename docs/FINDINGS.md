@@ -5147,3 +5147,66 @@ All existing test suites pass unchanged:
 *Decode tokens/sec at short context is unchanged (attention is a small fraction).
 The optimization improves long-context full-attention layer throughput by 33%,
 which matters for the O(n) scaling comparison, not for the O(1) GDN decode rate.
+
+---
+
+## 36. Cross-device validation: two independent RK3588 units agree within 5% on FP32 (2026-08-09, ob-8ms.3)
+
+### Motivation
+
+Two RK3588 units (t3: 32 GB, t4: 8 GB — different RAM SKUs, same SoC) independently
+ran the context-length scaling sweep. This validates hardware reproducibility and
+provides the cross-check that the headline O(1) vs O(n) scaling result is not an
+artifact of a single device.
+
+### FP32: two devices agree within 5%
+
+Pure-GDN mode (4-thread, both devices, performance governor):
+
+| ctx | t3 tok/s | t4 tok/s | Δ |
+|---|---|---|---|
+| 1–64 | 1.02 | — | — |
+| 512 | — | 1.07 | — |
+| 1024 | 1.02 | 1.07 | 4.9% |
+| 4096 | 1.02 | 1.07 | 4.9% |
+
+Per-layer decomposition at ctx=1024:
+
+| Component | t3 (µs) | t4 (µs) | Δ |
+|---|---|---|---|
+| GDN layers (24) | 284,369 | 271,369 | 4.6% |
+| FFN layers | 699,213 | 665,176 | 4.9% |
+| Total per token | 983,582 | 936,546 | 4.8% |
+
+Both devices show **<0.2% variance across the context sweep** (ctx=1 to 8192),
+confirming the flat O(1) GDN profile is a reproducible architectural property,
+not a measurement artifact.
+
+### INT8: 1.8× gap is explained by binary version, not hardware
+
+| Metric (ctx=1024, pure-GDN) | t3 | t4 | Ratio |
+|---|---|---|---|
+| GDN layer time (µs) | 153,310 | 92,090 | 1.66× |
+| FFN time (µs) | 390,387 | 204,325 | 1.91× |
+| Total (µs) | 543,697 | 296,415 | 1.83× |
+| tok/s | 1.84 | 3.37 | 1.83× |
+
+**Root cause**: t3's INT8 sweep was captured at commit `13df7a6` (2026-08-08), which
+predates the SDOT INT8 GEMV kernel (`dccee52`, §33). At that commit, the INT8 decode
+path used NEON dequant→float32 FMA, which is ~2× slower than the `vdotq_s32`
+int8×int8→int32 dot-product kernel. The ~1.8× gap matches the expected SDOT speedup.
+
+**This is not a hardware discrepancy** — both devices report `asimddp: true` (DOTPROD
+available on A76). When both devices run the same binary, the gap should close to
+the same ~5% FP32 variance. t3 should re-run INT8 sweeps with the current binary
+to confirm.
+
+### Conclusion
+
+The cross-device validation confirms:
+1. **FP32 performance is reproducible** across independent RK3588 silicon (4.8% agreement).
+2. **The O(1) GDN scaling pattern is confirmed on both devices** — neither shows
+   context-dependent throughput change for pure-GDN decode.
+3. **INT8 data from t3 reflects a pre-SDOT binary** and should not be used in
+   headline comparisons without the SDOT speedup applied. t4's INT8 data is
+   current.
