@@ -44,6 +44,27 @@
 
 #include "gdn_delta_matmul.h"
 
+
+/* Safe alloc wrappers — exit on OOM instead of dereferencing NULL. */
+__attribute__((unused))
+static void *xmalloc(size_t n) {
+    void *p = malloc(n);
+    if (!p) { fprintf(stderr, "out of memory (%zu bytes)\n", n); exit(1); }
+    return p;
+}
+__attribute__((unused))
+static void *xcalloc(size_t nmemb, size_t size) {
+    void *p = calloc(nmemb, size);
+    if (!p) { fprintf(stderr, "out of memory (%zu * %zu bytes)\n", nmemb, size); exit(1); }
+    return p;
+}
+__attribute__((unused))
+static void *xaligned_alloc(size_t alignment, size_t size) {
+    void *p = aligned_alloc(alignment, size);
+    if (!p) { fprintf(stderr, "out of memory (aligned %zu, %zu bytes)\n", alignment, size); exit(1); }
+    return p;
+}
+
 /* ----------------------------------------------------------------------- */
 /* Timing utilities (identical methodology to bench_gdn.c)                 */
 /* ----------------------------------------------------------------------- */
@@ -150,9 +171,9 @@ int main(int argc, char **argv) {
         size_t K = SHAPES[si].K;
         size_t N = SHAPES[si].N;
 
-        float *A = malloc(M * K * sizeof(float));
-        float *B = malloc(K * N * sizeof(float));
-        float *C = malloc(M * N * sizeof(float));
+        float *A = xmalloc(M * K * sizeof(float));
+        float *B = xmalloc(K * N * sizeof(float));
+        float *C = xmalloc(M * N * sizeof(float));
         if (!A || !B || !C) {
             fprintf(stderr, "alloc failure for %s\n", SHAPES[si].label);
             return 1;
