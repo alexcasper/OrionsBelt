@@ -151,6 +151,7 @@ cutoff has passed with no board; any future arrival is additive bonus per ADR 00
 | #158 | t3 | Re-run KleidiAI bench with taskset -c 4-7 — fix cumdecay 64×160 A55 mis-measurement + suppress -Wunused-but-set-variable + improve big.LITTLE affinity warning | MERGED |
 | #159 | t3 | Fix GPU kernel read-step matrix notation (S_h^T) + add PRs #156–#158 to table + stale FINDINGS line count + warn on unrecognized CLI args + fix -Wmaybe-uninitialized in e2e_decode | MERGED |
 | #160 | t3 | Add missing PRs #100–#101 to merged PRs table (gap before #102) + beads sync after ob-502 note | MERGED |
+| #161 | t3 | Defensive hardening — malloc NULL checks in e2e_decode.c (INT8/Q8_0 quantized paths) + delta_matmul.c KleidiAI path + CSV/CLI input validation in fleet_analysis.py, harness.py, correctness.py, comparison_table.py | MERGED |
 
 ---
 
