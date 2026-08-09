@@ -147,6 +147,7 @@ static char *load_file(const char *path) {
     long len = ftell(f);
     fseek(f, 0, SEEK_SET);
     char *buf = (char *)malloc(len + 1);
+    if (!buf) { fprintf(stderr, "OOM in load_file\n"); fclose(f); exit(1); }
     size_t nread = fread(buf, 1, len, f);
     buf[nread] = '\0';
     fclose(f);
@@ -177,6 +178,7 @@ static void init_opencl(void) {
         clGetProgramBuildInfo(g_program, g_device, CL_PROGRAM_BUILD_LOG,
                               0, NULL, &lsz);
         char *log = malloc(lsz + 1);
+        if (!log) { fprintf(stderr, "Build error (OOM allocating log)\n"); exit(1); }
         clGetProgramBuildInfo(g_program, g_device, CL_PROGRAM_BUILD_LOG,
                               lsz, log, NULL);
         log[lsz] = '\0';
@@ -229,6 +231,9 @@ static void test_scan(const char *label, size_t T, size_t C,
     float *g_h = malloc(N * 4), *x_h = malloc(N * 4);
     float *s_gpu = malloc(N * 4), *s_ref = malloc(N * 4);
     float *st_gpu = malloc(C * 4), *st_ref = malloc(C * 4);
+    if (!g_h || !x_h || !s_gpu || !s_ref || !st_gpu || !st_ref) {
+        fprintf(stderr, "OOM in test_scan\n"); exit(1);
+    }
 
     fill_rand(g_h, N, gate_lo, gate_hi, seed);
     fill_rand(x_h, N, -0.5f, 0.5f, seed + 1);
@@ -277,6 +282,9 @@ static void test_decay(const char *label, size_t T, size_t C,
     size_t N = T * C;
     float *a_h = malloc(N * 4);
     float *d_gpu = malloc(N * 4), *d_ref = malloc(N * 4);
+    if (!a_h || !d_gpu || !d_ref) {
+        fprintf(stderr, "OOM in test_decay\n"); exit(1);
+    }
 
     fill_rand(a_h, N, gate_lo, gate_hi, seed);
 
@@ -311,6 +319,9 @@ static void test_conv(const char *label, size_t T, size_t C, int seed) {
     float *in_h = malloc(N * 4), *w_h = malloc(4 * C * 4);
     float *o_gpu = malloc(N * 4), *o_ref = malloc(N * 4);
     float *h_gpu = malloc(3 * C * 4), *h_ref = malloc(3 * C * 4);
+    if (!in_h || !w_h || !o_gpu || !o_ref || !h_gpu || !h_ref) {
+        fprintf(stderr, "OOM in test_conv\n"); exit(1);
+    }
 
     fill_rand(in_h, N, -0.5f, 0.5f, seed);
     fill_rand(w_h, 4 * C, -0.5f, 0.5f, seed + 1);
@@ -358,6 +369,9 @@ static void test_delta(const char *label, size_t num_heads, size_t hkd, size_t h
     float *S_gpu = malloc(S_sz * 4), *S_ref = malloc(S_sz * 4);
     float *k_h = malloc(kv_sz * 4), *v_h = malloc(vv_sz * 4), *q_h = malloc(kv_sz * 4);
     float *out_gpu = malloc(vv_sz * 4), *out_ref = malloc(vv_sz * 4);
+    if (!S_gpu || !S_ref || !k_h || !v_h || !q_h || !out_gpu || !out_ref) {
+        fprintf(stderr, "OOM in test_delta\n"); exit(1);
+    }
 
     fill_rand(S_gpu, S_sz, -0.01f, 0.01f, seed);
     memcpy(S_ref, S_gpu, S_sz * 4);
@@ -432,6 +446,9 @@ static void test_scan_state_carry(const char *label, size_t T1, size_t T2, size_
     float *s1_gpu = malloc(N1 * 4), *s2_gpu = malloc(N2 * 4);
     float *s1_ref = malloc(N1 * 4), *s2_ref = malloc(N2 * 4);
     float *st_gpu = malloc(C * 4), *st_ref = malloc(C * 4);
+    if (!g1 || !x1 || !g2 || !x2 || !s1_gpu || !s2_gpu || !s1_ref || !s2_ref || !st_gpu || !st_ref) {
+        fprintf(stderr, "OOM in test_scan_state_carry\n"); exit(1);
+    }
 
     fill_rand(g1, N1, 0.5f, 0.9f, 100);
     fill_rand(x1, N1, -0.5f, 0.5f, 101);

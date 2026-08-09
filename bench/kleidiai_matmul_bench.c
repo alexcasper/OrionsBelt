@@ -123,6 +123,7 @@ static void kleidiai_init(kleidiai_state *st, const float *B, const float *bias,
 
     st->rhs_packed_size = kai_get_rhs_packed_size_rhs_pack_kxn_f32p8x1biasf32_f32_f32_neon(N, K);
     st->rhs_packed = aligned_alloc(64, st->rhs_packed_size);
+    if (!st->rhs_packed) { fprintf(stderr, "OOM in kleidiai_init\n"); exit(1); }
 
     /* Pack RHS (B is [K×N] row-major, same as KleidiAI expects) */
     kai_run_rhs_pack_kxn_f32p8x1biasf32_f32_f32_neon(
@@ -194,6 +195,7 @@ static void bench_kleidiai(
 {
     /* Pack RHS once */
     float *bias = calloc(N, sizeof(float));  /* zero bias */
+    if (!bias) { fprintf(stderr, "OOM in bench_kleidiai\n"); exit(1); }
     kleidiai_state st;
     kleidiai_init(&st, B, bias, K, N);
 
@@ -267,6 +269,10 @@ int main(int argc, char **argv) {
         float *B = malloc(K * N * sizeof(float));
         float *C_ref = malloc(M * N * sizeof(float));
         float *C_test = malloc(M * N * sizeof(float));
+        if (!A || !B || !C_ref || !C_test) {
+            fprintf(stderr, "OOM in main allocation\n");
+            exit(1);
+        }
 
         /* Deterministic pseudo-random data in [-1, 1] */
         unsigned int seed = 42;
@@ -286,6 +292,7 @@ int main(int argc, char **argv) {
 
         /* Correctness: KleidiAI vs naive */
         float *bias = calloc(N, sizeof(float));
+        if (!bias) { fprintf(stderr, "OOM in KleidiAI correctness bias\n"); exit(1); }
         kleidiai_state st;
         kleidiai_init(&st, B, bias, K, N);
         kleidiai_matmul(&st, A, C_test, M, K, N);
@@ -327,6 +334,7 @@ int main(int argc, char **argv) {
 
             /* KleidiAI */
             bias = calloc(N, sizeof(float));
+            if (!bias) { fprintf(stderr, "OOM in CSV KleidiAI bias\n"); exit(1); }
             kleidiai_init(&st, B, bias, K, N);
             kleidiai_matmul(&st, A, C_test, M, K, N);
             t0 = now_us();

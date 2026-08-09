@@ -34,6 +34,13 @@
 static int g_tests_run = 0;
 static int g_tests_failed = 0;
 
+/* Safe malloc wrapper — exits on OOM instead of dereferencing NULL. */
+static void *xmalloc(size_t n) {
+    void *p = malloc(n);
+    if (!p) { fprintf(stderr, "out of memory\n"); exit(1); }
+    return p;
+}
+
 /* Deterministic PRNG (so results are reproducible across runs/platforms). */
 static unsigned int g_rng_state = 0x5EED1234u;
 
@@ -171,9 +178,9 @@ static void test_cumdecay(void) {
             size_t ch = TEST_CHANNELS[ci];
             size_t total = seq * ch;
 
-            float *a = malloc(total * sizeof(float));
-            float *got = malloc(total * sizeof(float));
-            float *ref = malloc(total * sizeof(float));
+            float *a = xmalloc(total * sizeof(float));
+            float *got = xmalloc(total * sizeof(float));
+            float *ref = xmalloc(total * sizeof(float));
 
             fill_random(a, total, 0.5f, 1.5f); /* keep products in range */
 
@@ -197,12 +204,12 @@ static void test_gated_scan(void) {
             size_t ch = TEST_CHANNELS[ci];
             size_t total = seq * ch;
 
-            float *g = malloc(total * sizeof(float));
-            float *x = malloc(total * sizeof(float));
-            float *got_s = malloc(total * sizeof(float));
-            float *got_state = malloc(ch * sizeof(float));
-            float *ref_s = malloc(total * sizeof(float));
-            float *ref_state = malloc(ch * sizeof(float));
+            float *g = xmalloc(total * sizeof(float));
+            float *x = xmalloc(total * sizeof(float));
+            float *got_s = xmalloc(total * sizeof(float));
+            float *got_state = xmalloc(ch * sizeof(float));
+            float *ref_s = xmalloc(total * sizeof(float));
+            float *ref_state = xmalloc(ch * sizeof(float));
 
             fill_random(g, total, -0.99f, 0.99f);
             fill_random(x, total, -2.0f, 2.0f);
@@ -233,12 +240,12 @@ static void test_causal_dwconv1d(void) {
             size_t ch = TEST_CHANNELS[ci];
             size_t total = seq * ch;
 
-            float *in = malloc(total * sizeof(float));
-            float *w = malloc((size_t)REF_CONV_K * ch * sizeof(float));
-            float *got_out = malloc(total * sizeof(float));
-            float *got_hist = malloc((size_t)(REF_CONV_K - 1) * ch * sizeof(float));
-            float *ref_out = malloc(total * sizeof(float));
-            float *ref_hist = malloc((size_t)(REF_CONV_K - 1) * ch * sizeof(float));
+            float *in = xmalloc(total * sizeof(float));
+            float *w = xmalloc((size_t)REF_CONV_K * ch * sizeof(float));
+            float *got_out = xmalloc(total * sizeof(float));
+            float *got_hist = xmalloc((size_t)(REF_CONV_K - 1) * ch * sizeof(float));
+            float *ref_out = xmalloc(total * sizeof(float));
+            float *ref_hist = xmalloc((size_t)(REF_CONV_K - 1) * ch * sizeof(float));
 
             fill_random(in, total, -1.0f, 1.0f);
             fill_random(w, (size_t)REF_CONV_K * ch, -1.0f, 1.0f);
@@ -276,10 +283,10 @@ static void test_gemv(void) {
             size_t k = TEST_K[ki];
             size_t n = TEST_N[ni];
 
-            float *a = malloc(k * sizeof(float));
-            float *b = malloc(k * n * sizeof(float));
-            float *got_c = malloc(n * sizeof(float));
-            float *ref_c = malloc(n * sizeof(float));
+            float *a = xmalloc(k * sizeof(float));
+            float *b = xmalloc(k * n * sizeof(float));
+            float *got_c = xmalloc(n * sizeof(float));
+            float *ref_c = xmalloc(n * sizeof(float));
 
             fill_random(a, k, -1.0f, 1.0f);
             fill_random(b, k * n, -1.0f, 1.0f);
@@ -304,12 +311,12 @@ static void test_gated_scan_continuity(void) {
     size_t seq2 = 8;
     size_t seq_full = seq1 + seq2;
 
-    float *g = malloc(seq_full * ch * sizeof(float));
-    float *x = malloc(seq_full * ch * sizeof(float));
-    float *ref_s = malloc(seq_full * ch * sizeof(float));
-    float *ref_state = malloc(ch * sizeof(float));
-    float *got_s = malloc(seq_full * ch * sizeof(float));
-    float *got_state = malloc(ch * sizeof(float));
+    float *g = xmalloc(seq_full * ch * sizeof(float));
+    float *x = xmalloc(seq_full * ch * sizeof(float));
+    float *ref_s = xmalloc(seq_full * ch * sizeof(float));
+    float *ref_state = xmalloc(ch * sizeof(float));
+    float *got_s = xmalloc(seq_full * ch * sizeof(float));
+    float *got_state = xmalloc(ch * sizeof(float));
 
     fill_random(g, seq_full * ch, -0.99f, 0.99f);
     fill_random(x, seq_full * ch, -2.0f, 2.0f);
@@ -342,12 +349,12 @@ static void test_dwconv1d_continuity(void) {
     size_t seq2 = 8;
     size_t seq_full = seq1 + seq2;
 
-    float *in = malloc(seq_full * ch * sizeof(float));
-    float *w = malloc((size_t)REF_CONV_K * ch * sizeof(float));
-    float *ref_out = malloc(seq_full * ch * sizeof(float));
-    float *ref_hist = malloc((size_t)(REF_CONV_K - 1) * ch * sizeof(float));
-    float *got_out = malloc(seq_full * ch * sizeof(float));
-    float *got_hist = malloc((size_t)(REF_CONV_K - 1) * ch * sizeof(float));
+    float *in = xmalloc(seq_full * ch * sizeof(float));
+    float *w = xmalloc((size_t)REF_CONV_K * ch * sizeof(float));
+    float *ref_out = xmalloc(seq_full * ch * sizeof(float));
+    float *ref_hist = xmalloc((size_t)(REF_CONV_K - 1) * ch * sizeof(float));
+    float *got_out = xmalloc(seq_full * ch * sizeof(float));
+    float *got_hist = xmalloc((size_t)(REF_CONV_K - 1) * ch * sizeof(float));
 
     fill_random(in, seq_full * ch, -1.0f, 1.0f);
     fill_random(w, (size_t)REF_CONV_K * ch, -1.0f, 1.0f);
@@ -386,10 +393,10 @@ static void test_gemv_tail(void) {
     for (size_t ki = 0; ki < sizeof(ks)/sizeof(ks[0]); ++ki) {
         for (size_t ni = 0; ni < sizeof(ns)/sizeof(ns[0]); ++ni) {
             size_t k = ks[ki], n = ns[ni];
-            float *a = malloc(k * sizeof(float));
-            float *b = malloc(k * n * sizeof(float));
-            float *got_c = malloc(n * sizeof(float));
-            float *ref_c = malloc(n * sizeof(float));
+            float *a = xmalloc(k * sizeof(float));
+            float *b = xmalloc(k * n * sizeof(float));
+            float *got_c = xmalloc(n * sizeof(float));
+            float *ref_c = xmalloc(n * sizeof(float));
 
             fill_random(a, k, -1.0f, 1.0f);
             fill_random(b, k * n, -1.0f, 1.0f);
@@ -415,9 +422,9 @@ static void test_cumdecay_tail(void) {
     for (size_t si = 0; si < sizeof(seqs)/sizeof(seqs[0]); ++si) {
         for (size_t ci = 0; ci < sizeof(chs)/sizeof(chs[0]); ++ci) {
             size_t seq = seqs[si], ch = chs[ci];
-            float *a = malloc(seq * ch * sizeof(float));
-            float *got = malloc(seq * ch * sizeof(float));
-            float *ref = malloc(seq * ch * sizeof(float));
+            float *a = xmalloc(seq * ch * sizeof(float));
+            float *got = xmalloc(seq * ch * sizeof(float));
+            float *ref = xmalloc(seq * ch * sizeof(float));
 
             fill_random(a, seq * ch, 0.1f, 0.99f);
 
@@ -441,12 +448,12 @@ static void test_gated_scan_tail(void) {
 
     for (size_t ci = 0; ci < sizeof(chs)/sizeof(chs[0]); ++ci) {
         size_t ch = chs[ci];
-        float *g = malloc(seq * ch * sizeof(float));
-        float *x = malloc(seq * ch * sizeof(float));
-        float *got_s = malloc(seq * ch * sizeof(float));
-        float *ref_s = malloc(seq * ch * sizeof(float));
-        float *got_state = malloc(ch * sizeof(float));
-        float *ref_state = malloc(ch * sizeof(float));
+        float *g = xmalloc(seq * ch * sizeof(float));
+        float *x = xmalloc(seq * ch * sizeof(float));
+        float *got_s = xmalloc(seq * ch * sizeof(float));
+        float *ref_s = xmalloc(seq * ch * sizeof(float));
+        float *got_state = xmalloc(ch * sizeof(float));
+        float *ref_state = xmalloc(ch * sizeof(float));
 
         fill_random(g, seq * ch, -0.99f, 0.99f);
         fill_random(x, seq * ch, -2.0f, 2.0f);
@@ -475,12 +482,12 @@ static void test_dwconv1d_tail(void) {
 
     for (size_t ci = 0; ci < sizeof(chs)/sizeof(chs[0]); ++ci) {
         size_t ch = chs[ci];
-        float *in = malloc(seq * ch * sizeof(float));
-        float *w = malloc((size_t)REF_CONV_K * ch * sizeof(float));
-        float *got_out = malloc(seq * ch * sizeof(float));
-        float *ref_out = malloc(seq * ch * sizeof(float));
-        float *got_hist = malloc((size_t)(REF_CONV_K - 1) * ch * sizeof(float));
-        float *ref_hist = malloc((size_t)(REF_CONV_K - 1) * ch * sizeof(float));
+        float *in = xmalloc(seq * ch * sizeof(float));
+        float *w = xmalloc((size_t)REF_CONV_K * ch * sizeof(float));
+        float *got_out = xmalloc(seq * ch * sizeof(float));
+        float *ref_out = xmalloc(seq * ch * sizeof(float));
+        float *got_hist = xmalloc((size_t)(REF_CONV_K - 1) * ch * sizeof(float));
+        float *ref_hist = xmalloc((size_t)(REF_CONV_K - 1) * ch * sizeof(float));
 
         fill_random(in, seq * ch, -1.0f, 1.0f);
         fill_random(w, (size_t)REF_CONV_K * ch, -1.0f, 1.0f);
