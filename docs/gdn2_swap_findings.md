@@ -58,7 +58,11 @@ through the ~4.2 M new gate parameters, not the full model.
 - Sequence length: 64 tokens
 - Isolated step time: ~6.6 s (vs 436 s for full-model backprop)
 
-## Results
+## Results (initial run, seq_len=64, lr=1e-3, commit `06f3a9f`)
+
+> **Note:** These numbers are from the initial run with different
+> hyperparameters (seq_len=64, lr=1e-3). The matched comparison below
+> (ob-t3b.9) uses seq_len=128, lr=3e-4 for both random and smart init.
 
 | Metric | Value |
 |--------|-------|
@@ -104,12 +108,14 @@ the gates are clearly converging toward the GDN-1 reference behavior.
 
 ### What doesn't fully recover
 
-CE loss recovers only 1.57 points out of the 8.58-point increase
-(18.3%). Three factors explain the remaining gap:
+CE loss recovers only 1.54 points out of the 9.01-point increase
+(17.1%) at matched hyperparameters (seq_len=128, lr=3e-4, commit
+`8faec1e`). Three factors explain the remaining gap:
 
-1. **Random gate initialization:** Gates start at sigmoid ≈ 0.5, far from
-   GDN-1's learned per-head β values. The MSE needs to go much lower to
-   achieve CE-level recovery.
+1. **Gate initialization is not the bottleneck:** Smart init from GDN-1 β
+   values lowers initial MSE by 20.6% but both strategies converge to
+   the same MSE by step 30 — initialization affects the start point, not
+   the 30-step destination (see ob-t3b.9 section below).
 
 2. **Only 30 steps:** The MSE is still decreasing at step 30. More
    steps (100–500) would push MSE lower and recover more CE loss.
@@ -123,9 +129,10 @@ CE loss recovers only 1.57 points out of the 8.58-point increase
 - **On-device training is feasible** for gate-only adaptation using the
   isolated distillation approach. The 66× speedup makes this practical
   on edge CPUs.
-- **Smart initialization matters:** Initializing gates from GDN-1's β
-  values (e.g., broadcasting per-head β to per-channel b and w) would
-  dramatically reduce the initial loss and required adaptation steps.
+- **Smart initialization helps modestly:** Broadcasting GDN-1's β values
+  to GDN-2's per-channel gates lowers initial MSE by 20.6% and improves
+  CE recovery by 2.8 pp, but both strategies converge to the same MSE by
+  step 30 (see ob-t3b.9 section below).
 - **Full model retraining is needed for production:** The 30-step
   distillation shows the gates can learn, but real deployment would need
   end-to-end fine-tuning to let downstream layers co-adapt.
@@ -147,13 +154,95 @@ CE loss recovers only 1.57 points out of the 8.58-point increase
 | `results/raw/gdn2_swap_t3.csv` | MSE convergence curve (30 steps) |
 | `results/manifests/gdn2_swap_t3.json` | Provenance manifest |
 
+## Smart Gate Initialization Experiment (ob-t3b.9)
+
+**Hypothesis:** Initializing GDN-2's per-channel gate projections from
+GDN-1's learned per-head β values would dramatically reduce the initial
+loss gap and improve CE recovery, since random Xavier init (gain=0.1)
+starts gates at sigmoid ≈ 0.5, far from GDN-1's learned β.
+
+### Method
+
+The `_init_gates_from_gdn1` method broadcasts GDN-1's `in_proj_b` weights
+(shape `[num_v_heads, hidden_size]`) to GDN-2's per-channel gate
+projections:
+- Erase gate: broadcast β to each key channel (handles key grouping by
+  averaging when `num_v_heads > num_k_heads`)
+- Write gate: direct 1:1 mapping for value heads
+
+Both runs used identical hyperparameters: seq_len=128, lr=3e-4, 30 steps,
+commit `8faec1e`.
+
+### Matched comparison
+
+| Metric | Random Init | Smart Init | Δ |
+|--------|------------|------------|---|
+| Baseline CE (GDN-1) | 2.9085 | 2.9085 | — |
+| Post-swap CE (unadapted) | 11.9145 | 11.7594 | −0.155 |
+| Final CE (after 30 steps) | 10.3729 | 9.9992 | −0.374 |
+| CE recovery % | 17.1% | 19.9% | +2.8 pp |
+| MSE step 1 | 0.0228 | 0.0181 | −20.6% |
+| MSE step 30 | 0.0036 | 0.0036 | ~same |
+| Post-swap loss increase | +9.006 | +8.851 | −0.155 |
+
+### MSE convergence comparison
+
+```
+           Random     Smart
+Step  1:   0.0228     0.0181
+Step  5:   0.0163     0.0128
+Step 10:   0.0109     0.0087
+Step 15:   0.0077     0.0064
+Step 20:   0.0057     0.0050
+Step 25:   0.0045     0.0042
+Step 30:   0.0036     0.0036
+```
+
+### Analysis
+
+Smart init provides a **measurable but modest** improvement:
+
+1. **Lower starting MSE (−20.6%):** Smart init starts closer to the
+   GDN-1 reference, confirming the β-broadcast initialization works
+   correctly. The initial gap is smaller.
+
+2. **Lower post-swap CE (−0.155):** The unadapted model starts 1.3%
+   closer to baseline, confirming gates approximate β at initialization.
+
+3. **Convergence converges to same MSE:** By step 30, both runs reach
+   ~0.0036 MSE. The random init "catches up" — the optimization
+   landscape is smooth enough that initialization doesn't change the
+   30-step destination, only the starting point.
+
+4. **Net CE improvement (+2.8 pp):** Smart init recovers 19.9% of the CE
+   gap vs 17.1% for random. The improvement is real but well below the
+   50% threshold that would justify re-running RULER evaluation.
+
+5. **Bottleneck is adaptation depth, not initialization:** Since both
+   runs converge to the same MSE, the remaining 80% CE gap is not
+   explained by initialization. It comes from: (a) only 30 adaptation
+   steps, (b) downstream layer amplification of small per-layer
+   mismatches, and (c) the structural difference between GDN-1 and
+   GDN-2 recurrences even when gates match β.
+
+### Conclusion for ob-t3b.9
+
+Smart gate initialization is a correct and useful technique — it reduces
+the initial loss gap and improves final CE recovery — but it does not
+solve the fundamental problem. The CE recovery ceiling for 30-step
+isolated distillation is ~20% regardless of initialization strategy.
+Full recovery would require either many more adaptation steps (100–500)
+or end-to-end fine-tuning to let downstream layers co-adapt.
+
 ## Conclusion
 
 GDN-2 can architecturally replace GDN-1 in a Qwen3.5 checkpoint. The new
 gate parameters learn to approximate GDN-1's behavior via isolated MSE
 distillation, with smooth monotonic convergence (94% MSE reduction in 30
-steps). Full CE loss recovery requires either more adaptation steps or
-smarter gate initialization from GDN-1's existing β parameters. The
-isolated training approach makes on-device adaptation practical (66×
-faster than full-model backprop), demonstrating a viable path for GDN-2
-upgrades on edge silicon.
+steps). Smart initialization from GDN-1's β values provides a modest
+improvement (+2.8 pp CE recovery) but both strategies converge to the
+same MSE — the bottleneck is adaptation depth and downstream
+amplification, not initialization. Full CE recovery requires many more
+steps or end-to-end fine-tuning. The isolated training approach makes
+on-device adaptation practical (66× faster than full-model backprop),
+demonstrating a viable path for GDN-2 upgrades on edge silicon.

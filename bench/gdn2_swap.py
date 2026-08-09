@@ -359,8 +359,10 @@ def capture_manifest():
         sha, dirty = "unknown", False
 
     return {
-        "git_sha": sha,
-        "git_dirty": dirty,
+        "git": {
+            "sha": sha,
+            "dirty": dirty,
+        },
         "device": platform.node(),
         "machine": platform.machine(),
         "processor": platform.processor() or "unknown",

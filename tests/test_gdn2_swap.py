@@ -179,16 +179,19 @@ class TestCaptureManifest:
     def test_returns_dict_with_required_fields(self):
         m = capture_manifest()
         assert isinstance(m, dict)
-        for field in ("git_sha", "git_dirty", "device", "machine", "python"):
+        assert "git" in m
+        for field in ("sha", "dirty"):
+            assert field in m["git"], f"missing git.{field}"
+        for field in ("device", "machine", "python"):
             assert field in m, f"missing field: {field}"
 
     def test_git_sha_is_string(self):
         m = capture_manifest()
-        assert isinstance(m["git_sha"], str)
+        assert isinstance(m["git"]["sha"], str)
 
     def test_git_dirty_is_bool(self):
         m = capture_manifest()
-        assert isinstance(m["git_dirty"], bool)
+        assert isinstance(m["git"]["dirty"], bool)
 
     def test_python_version_present(self):
         import platform
