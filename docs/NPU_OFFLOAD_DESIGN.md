@@ -38,7 +38,7 @@ optimization" rubric line would have been addressed with the NPU leg.
 | NPU subgraph export via `cixbuild` | ❌ **Not executed** | Requires O6 board |
 | On-device NPU latency measurement | ❌ **Not executed** | Requires O6 board |
 | INT8/INT4 accuracy regression on NPU | ❌ **Not executed** | Requires O6 board |
-| Engine-boundary crossing cost | ❌ **Not executed** | Requires O6 board (`ob-t3b.3`) |
+| Engine-boundary crossing cost | ⚠️ **Proxy measured** | Mali-G610 proxy: 16 crossings = 3.36 ms (~10% of 30 t/s budget). O6 re-run needed for final numbers ([FINDINGS §39](./FINDINGS.md#39-engine-boundary-crossing-cost-portable-proxy-measurement-on-mali-g610-2026-08-09-ob-t3b6)) |
 | Immortalis-G720 Vulkan/OpenCL validation | ❌ **Not executed** | Requires O6 board (`ob-88p`) |
 
 ---
@@ -127,9 +127,18 @@ crossings per token** (8 out: GDN→attention, 8 back: attention→GDN). The
 payload per crossing is small (~5 KB in FP16 at hidden_size=2560), so the cost
 is **invocation latency**, not bandwidth.
 
-This is the key open question that on-device measurement would have answered
-(bead `ob-t3b.3`): at 16 crossings/token, is the per-dispatch latency low
-enough that NPU offload of the dense math actually helps decode throughput?
+**Portable proxy measurement (Mali-G610, ADR 0005):** the open-source RustiCL/
+Panfrost OpenCL stack on RK3588 was used to measure host↔device transfer latency
+(bead `ob-t3b.6`, [FINDINGS §39](./FINDINGS.md)). The key result: each crossing
+costs **~0.1 ms regardless of payload size** (1 KB–100 KB) — a dispatch-overhead
+floor, not a data-transfer cost. At 16 crossings/token, this sums to **3.36 ms**,
+roughly **10% of the 33.3 ms budget** at 30 tokens/s. The cost is significant but
+not prohibitive: heterogeneous offload must deliver >11% speedup to break even.
+
+This proxy confirms the cost structure (latency-dominated) and quantifies the
+budget impact. The O6 re-run (`ob-t3b.3`) will measure the Immortalis-G720's
+specific dispatch latency — expected to differ in absolute terms but not in the
+latency-dominated cost structure.
 
 ### 4.4 Phase-dependent routing (designed, not measured)
 
@@ -226,9 +235,14 @@ the G720 flips the GPU/CPU ratio.
 The design above is complete at the operator and subgraph level. What hardware
 would have provided:
 
-1. **NPU dispatch latency** — the single most important missing number. At 16
-   crossings/token, the per-dispatch cost determines whether NPU offload helps
-   or hurts decode throughput (bead `ob-t3b.3`).
+1. **NPU dispatch latency** — the single most important partially-resolved
+   number. A portable proxy measurement on Mali-G610
+   ([FINDINGS §39](./FINDINGS.md), bead `ob-t3b.6`) found ~0.1 ms dispatch
+   overhead per crossing, totaling **3.36 ms for 16 crossings (~10% of the
+   30 t/s decode budget)**. The cost structure is latency-dominated, not
+   bandwidth-dominated — this is expected to hold on the O6. What remains
+   O6-gated is the absolute latency on the Immortalis-G720 and the CIX NPU's
+   own dispatch path (bead `ob-t3b.3`).
 
 2. **NPU vs. CPU matmul throughput** — the `ArmMatMul` nodes exist in the IR,
    but parsing to IR does not prove they execute on the NPU rather than falling
