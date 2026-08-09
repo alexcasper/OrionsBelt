@@ -9,7 +9,9 @@ evaluate_retrieval pipeline using mock model/tokenizer objects.
 import os
 import sys
 
-import torch
+import pytest
+
+torch = pytest.importorskip("torch")
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "bench"))
 

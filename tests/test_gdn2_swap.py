@@ -10,8 +10,10 @@ downloaded weights and is exercised end-to-end on-device, not here.
 import os
 import sys
 
-import torch
-import torch.nn as nn
+import pytest
+
+torch = pytest.importorskip("torch")
+nn = torch.nn
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "bench"))
 
