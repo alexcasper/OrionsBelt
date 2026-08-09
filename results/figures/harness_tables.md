@@ -17,6 +17,12 @@ _Source: committed CSVs from bench/harness.py_
 |---:|---:|---:|---:|---:|
 | 8 | 2.5 | 2.5 | 0.0 | 3 |
 
+**Qwen/Qwen3.5-0.8B — jetson-j1_08b_q80 — Decode**
+
+| Context | p50 (tok/s) | p95 (tok/s) | Spread | Repeats |
+|---:|---:|---:|---:|---:|
+| 8 | 4.9 | 5.0 | 0.0 | 3 |
+
 **Qwen/Qwen3.5-0.8B — rk3588-t3_08b — Decode**
 
 | Context | p50 (tok/s) | p95 (tok/s) | Spread | Repeats |
