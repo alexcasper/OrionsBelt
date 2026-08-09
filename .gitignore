@@ -29,6 +29,7 @@ artifacts/reference/
 # NOTE: .goose-task.md has historically carried a device sudo password; keep it
 # untracked so credentials never re-enter git.
 .goose-loop.log
+.goose-loop.pid
 .goose-session-created
 .goose-task.md
 .gitignore.repo
