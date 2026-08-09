@@ -214,6 +214,20 @@ All SDOT/INT4+SDOT measurements on A76 use `gcc -O3 -fopenmp -mcpu=cortex-a76`
 INT8+SDOT. INT4+SDOT is t4-only (t3 not yet captured). Thermals ≤62°C;
 governor `performance` confirmed in every manifest.
 
+### 2.6 Engine boundary-crossing cost (verified 2026-08-09)
+
+| Claim | Status |
+|---|---|
+| 16 crossings/token at 3.36 ms total (5KB hidden state, Mali-G610) | ✅ Confirmed — FINDINGS §39, CSV `rk3588-t4_gpu_boundary_crossing.csv`, manifest `rk3588-t4_gpu_boundary_crossing.json` (sha `7ca7f2a`, dirty=true, governor=performance, ~41°C) |
+| ~10% of 30 tok/s (33.3 ms) decode budget | ✅ Confirmed — 3.36/33.3 = 10.1% |
+| Latency-dominated: ~0.1 ms dispatch floor (1KB–100KB payloads all ~0.10 ms) | ✅ Confirmed — same CSV, write_blocking rows: 0.102/0.102/0.103/0.108/0.112 ms for 1KB/5KB/10KB/50KB/100KB |
+| Heterogeneous offload must deliver >11% speedup to break even | ✅ Confirmed — crossing tax is 10.1%, so net speedup must exceed this |
+
+Measured on RK3588 t4 Mali-G610 via RustiCL/Panfrost driver (open-source, not vendor blob).
+ADR 0005 designates this as a valid proxy for the O6's Immortalis-G720. Absolute latency
+will differ on target hardware; cost structure (latency-dominated for small payloads)
+is expected to transfer.
+
 ---
 
 ## 3. Finding that changes the technical thesis 🔴
