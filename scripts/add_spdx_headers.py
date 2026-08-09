@@ -60,9 +60,7 @@ def add_header_to_file(fpath: Path, *, repo: Path | None = None) -> bool:
     return True
 
 
-def add_headers_to_files(
-    paths: list[Path], *, repo: Path | None = None
-) -> int:
+def add_headers_to_files(paths: list[Path], *, repo: Path | None = None) -> int:
     """Add SPDX headers to every file in *paths*, returning the count modified."""
     count = 0
     for fpath in paths:

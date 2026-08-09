@@ -6,12 +6,9 @@
 import sys
 from pathlib import Path
 
-import pytest
-
 # Make the script importable
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 import add_spdx_headers as ash  # noqa: E402
-
 
 # ─── _insert_spdx: core text transformation ────────────────────────────────────
 
@@ -39,7 +36,7 @@ class TestInsertSpdxBasic:
         assert shebang_line == "#!/usr/bin/env python3"
 
     def test_blank_line_between_spdx_and_body(self):
-        text = '#!/usr/bin/env bash\necho hi\n'
+        text = "#!/usr/bin/env bash\necho hi\n"
         result = ash._insert_spdx(text)
         lines = result.split("\n")
         # Line 0: shebang, 1-2: SPDX, 3: blank, 4+: body
@@ -88,10 +85,7 @@ class TestInsertSpdxIdempotent:
 
     def test_already_has_spdx_no_shebang(self):
         text = (
-            "# SPDX-FileCopyrightText: Some other entity\n"
-            "# SPDX-License-Identifier: MIT\n"
-            "\n"
-            "x = 1\n"
+            "# SPDX-FileCopyrightText: Some other entity\n# SPDX-License-Identifier: MIT\n\nx = 1\n"
         )
         assert ash._insert_spdx(text) == text
 
@@ -195,9 +189,7 @@ class TestAddHeadersToFiles:
         needs = tmp_path / "needs.py"
         needs.write_text("x = 1\n")
         has = tmp_path / "has.py"
-        has.write_text(
-            "# SPDX-License-Identifier: Apache-2.0\nx = 2\n"
-        )
+        has.write_text("# SPDX-License-Identifier: Apache-2.0\nx = 2\n")
         count = ash.add_headers_to_files([needs, has])
         assert count == 1
 
@@ -266,7 +258,9 @@ class TestMain:
         ash.main()
 
         captured = capsys.readouterr()
-        assert "Total: 3 files updated" in captured.out  # tool.py, run.sh, kernel.py (test already has SPDX)
+        assert (
+            "Total: 3 files updated" in captured.out
+        )  # tool.py, run.sh, kernel.py (test already has SPDX)
 
     def test_main_idempotent(self, tmp_path, monkeypatch):
         (tmp_path / "scripts").mkdir()
