@@ -109,7 +109,7 @@ class Qwen3_5GDN2(nn.Module):
     gates supersede it.
     """
 
-    def __init__(self, gdn1_module: nn.Module):
+    def __init__(self, gdn1_module: nn.Module, smart_init: bool = False):
         super().__init__()
         # Copy all existing parameters and buffers
         self.hidden_size = gdn1_module.hidden_size
@@ -122,6 +122,7 @@ class Qwen3_5GDN2(nn.Module):
         self.conv_kernel_size = gdn1_module.conv_kernel_size
         self.layer_idx = gdn1_module.layer_idx
         self.layer_norm_epsilon = gdn1_module.layer_norm_epsilon
+        self.smart_init = smart_init
 
         # Copy shared modules (same references — weights come from checkpoint)
         self.conv1d = gdn1_module.conv1d
@@ -145,13 +146,60 @@ class Qwen3_5GDN2(nn.Module):
         self.in_proj_erase_gate = self.in_proj_erase_gate.to(model_dtype)
         self.in_proj_write_gate = self.in_proj_write_gate.to(model_dtype)
 
-        # Initialize so gates start near 0.5 (sigmoid of small values).
-        # With gain=0.1, the Xavier init produces small weights, so the gate
-        # logits are near 0 and sigmoid output ≈ 0.5.  Adaptation then
-        # adjusts the gates to learn the optimal erase/write split.
+        if smart_init:
+            # Smart initialization: copy in_proj_b weights so that GDN-2 gates
+            # start at GDN-1's learned β values instead of sigmoid≈0.5.
+            #
+            # GDN-1: beta = sigmoid(in_proj_b(h))  → [B, T, num_v_heads]
+            # GDN-2: b_gate = sigmoid(in_proj_erase_gate(h))  → [B, T, key_dim]
+            #
+            # When b_gate = w_gate = β broadcast to per-channel, GDN-2 reduces
+            # to GDN-1.  So we initialize each key/value channel row to the
+            # corresponding head's in_proj_b weight, giving sigmoid → β.
+            self._init_gates_from_gdn1(gdn1_module)
+        else:
+            # Random init: Xavier uniform with small gain so gates start near 0.5.
+            with torch.no_grad():
+                nn.init.xavier_uniform_(self.in_proj_erase_gate.weight, gain=0.1)
+                nn.init.xavier_uniform_(self.in_proj_write_gate.weight, gain=0.1)
+
+    def _init_gates_from_gdn1(self, gdn1_module: nn.Module):
+        """Initialize GDN-2 gate projections from GDN-1's in_proj_b weights.
+
+        Broadcasts per-head β weights to per-channel gate projections so
+        that sigmoid(gate_output) ≈ GDN-1's β at initialization.
+        """
         with torch.no_grad():
-            nn.init.xavier_uniform_(self.in_proj_erase_gate.weight, gain=0.1)
-            nn.init.xavier_uniform_(self.in_proj_write_gate.weight, gain=0.1)
+            b_weight = gdn1_module.in_proj_b.weight.data  # [num_v_heads, hidden_size]
+            dtype = self.in_proj_erase_gate.weight.dtype
+
+            # --- Erase gate: [key_dim, hidden_size] ---
+            # key_dim = num_k_heads * head_k_dim, organized as [num_k_heads, head_k_dim]
+            # Map each key head to the corresponding value head's β.
+            # If num_v_heads > num_k_heads (key-grouped), average the group.
+            rep = self.num_v_heads // self.num_k_heads
+            erase_weight = torch.zeros(
+                self.key_dim, self.hidden_size, dtype=dtype, device=b_weight.device
+            )
+            for k in range(self.num_k_heads):
+                if rep > 1:
+                    head_weight = b_weight[k * rep : (k + 1) * rep].mean(dim=0)
+                else:
+                    head_weight = b_weight[k]
+                for c in range(self.head_k_dim):
+                    erase_weight[k * self.head_k_dim + c] = head_weight
+            self.in_proj_erase_gate.weight.data.copy_(erase_weight)
+
+            # --- Write gate: [value_dim, hidden_size] ---
+            # value_dim = num_v_heads * head_v_dim, organized as [num_v_heads, head_v_dim]
+            # Direct 1:1 mapping since in_proj_b also outputs num_v_heads.
+            write_weight = torch.zeros(
+                self.value_dim, self.hidden_size, dtype=dtype, device=b_weight.device
+            )
+            for h in range(self.num_v_heads):
+                for c in range(self.head_v_dim):
+                    write_weight[h * self.head_v_dim + c] = b_weight[h]
+            self.in_proj_write_gate.weight.data.copy_(write_weight)
 
     def forward(
         self,
@@ -242,13 +290,20 @@ class Qwen3_5GDN2(nn.Module):
 # ── Layer swap ────────────────────────────────────────────────────────────────
 
 
-def swap_gdn1_to_gdn2(model, layer_indices):
-    """Replace GDN-1 modules at the given layer indices with GDN-2 modules."""
+def swap_gdn1_to_gdn2(model, layer_indices, smart_init=False):
+    """Replace GDN-1 modules at the given layer indices with GDN-2 modules.
+
+    Args:
+        model: The Qwen3.5 model.
+        layer_indices: List of GDN-1 layer indices to swap.
+        smart_init: If True, initialize GDN-2 gates from GDN-1's learned β
+            values instead of random Xavier uniform.
+    """
     tm = model.model  # Qwen3_5TextModel
     swapped = []
     for idx in layer_indices:
         old_module = tm.layers[idx].linear_attn
-        new_module = Qwen3_5GDN2(old_module)
+        new_module = Qwen3_5GDN2(old_module, smart_init=smart_init)
         tm.layers[idx].linear_attn = new_module
         swapped.append(idx)
     return swapped
@@ -329,6 +384,11 @@ def main():
     parser.add_argument("--steps", type=int, default=30, help="Adaptation steps")
     parser.add_argument("--seq-len", type=int, default=128, help="Sequence length")
     parser.add_argument("--lr", type=float, default=3e-4, help="Learning rate")
+    parser.add_argument(
+        "--smart-init",
+        action="store_true",
+        help="Initialize GDN-2 gates from GDN-1's learned β values (ob-t3b.9)",
+    )
     parser.add_argument("--csv", action="store_true", help="Write CSV results")
     args = parser.parse_args()
 
@@ -337,6 +397,8 @@ def main():
     print(f"Model: {args.model}", flush=True)
     print(f"Layers to swap: {layer_indices}", flush=True)
     print(f"Adaptation steps: {args.steps}, seq_len: {args.seq_len}, lr: {args.lr}", flush=True)
+    init_mode = "smart (from GDN-1 β)" if args.smart_init else "random (Xavier gain=0.1)"
+    print(f"Gate init: {init_mode}", flush=True)
 
     # ── Load model ──
     print("\n--- Loading model ---", flush=True)
@@ -421,7 +483,7 @@ def main():
         flush=True,
     )
 
-    swap_gdn1_to_gdn2(model, layer_indices)
+    swap_gdn1_to_gdn2(model, layer_indices, smart_init=args.smart_init)
     model.train()
 
     # ── Post-swap loss (before adaptation) ──
@@ -522,6 +584,7 @@ def main():
         "new_parameters": total_new_params,
         "trainable_parameters": trainable_count,
         "adaptation_strategy": "isolated_mse_distillation",
+        "gate_init": "smart_from_gdn1_beta" if args.smart_init else "random_xavier_0.1",
         "manifest": manifest,
     }
 
@@ -533,7 +596,9 @@ def main():
     if args.csv:
         csv_dir = "results/raw"
         os.makedirs(csv_dir, exist_ok=True)
-        csv_path = os.path.join(csv_dir, "gdn2_swap_t3.csv")
+        csv_path = os.path.join(
+            csv_dir, "gdn2_swap_smart_init_t3.csv" if args.smart_init else "gdn2_swap_t3.csv"
+        )
         with open(csv_path, "w") as f:
             f.write("step,mse_loss\n")
             for i, loss in enumerate(losses):
@@ -543,7 +608,10 @@ def main():
         # Write manifest
         manifest_dir = "results/manifests"
         os.makedirs(manifest_dir, exist_ok=True)
-        manifest_path = os.path.join(manifest_dir, "gdn2_swap_t3.json")
+        manifest_path = os.path.join(
+            manifest_dir,
+            "gdn2_swap_smart_init_t3.json" if args.smart_init else "gdn2_swap_t3.json",
+        )
         with open(manifest_path, "w") as f:
             json.dump(manifest, f, indent=2)
         print(f"Manifest written to {manifest_path}", flush=True)
