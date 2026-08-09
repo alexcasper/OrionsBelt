@@ -5,7 +5,9 @@
   "source": "scripts/capture_manifest.sh",
   "git": {
     "sha": "45ae679777f5c03d25481f2029b41359f2236a1b",
-    "dirty": true
+    "dirty": true,
+    "sha_resolved": "d539340ca520893a78087341053da988895ac485",
+    "sha_note": "Original SHA from j2 pre-rebase branch; equivalent commit: j2: rebase on main; restore OpenMP + sustained/power results"
   },
   "host": {
     "hostname": "j2",
@@ -14,10 +16,77 @@
     "os": "Linux #1 SMP PREEMPT Mon Nov 4 23:41:41 PST 2024",
     "cpu_model": "ARMv8 Processor rev 1 (v8l)",
     "core_count": 4,
-    "cpu_topology": [{"cpu":0,"max_freq_khz":1479000,"min_freq_khz":102000,"governor":"performance","cpu_capacity":null},{"cpu":1,"max_freq_khz":1479000,"min_freq_khz":102000,"governor":"performance","cpu_capacity":null},{"cpu":2,"max_freq_khz":1479000,"min_freq_khz":102000,"governor":"performance","cpu_capacity":null},{"cpu":3,"max_freq_khz":1479000,"min_freq_khz":102000,"governor":"performance","cpu_capacity":null}]
+    "cpu_topology": [
+      {
+        "cpu": 0,
+        "max_freq_khz": 1479000,
+        "min_freq_khz": 102000,
+        "governor": "performance",
+        "cpu_capacity": null
+      },
+      {
+        "cpu": 1,
+        "max_freq_khz": 1479000,
+        "min_freq_khz": 102000,
+        "governor": "performance",
+        "cpu_capacity": null
+      },
+      {
+        "cpu": 2,
+        "max_freq_khz": 1479000,
+        "min_freq_khz": 102000,
+        "governor": "performance",
+        "cpu_capacity": null
+      },
+      {
+        "cpu": 3,
+        "max_freq_khz": 1479000,
+        "min_freq_khz": 102000,
+        "governor": "performance",
+        "cpu_capacity": null
+      }
+    ]
   },
-  "isa_features": {"sve":false,"sve2":false,"i8mm":false,"bf16":false,"asimddp":false,"sme":false},
-  "thermal_zones": [{"zone":"thermal_zone0","type":"AO-therm","temp_millicelsius":51500},{"zone":"thermal_zone1","type":"CPU-therm","temp_millicelsius":48000},{"zone":"thermal_zone2","type":"GPU-therm","temp_millicelsius":46500},{"zone":"thermal_zone3","type":"PLL-therm","temp_millicelsius":44500},{"zone":"thermal_zone4","type":"PMIC-Die","temp_millicelsius":50000},{"zone":"thermal_zone5","type":"thermal-fan-est","temp_millicelsius":46750}],
+  "isa_features": {
+    "sve": false,
+    "sve2": false,
+    "i8mm": false,
+    "bf16": false,
+    "asimddp": false,
+    "sme": false
+  },
+  "thermal_zones": [
+    {
+      "zone": "thermal_zone0",
+      "type": "AO-therm",
+      "temp_millicelsius": 51500
+    },
+    {
+      "zone": "thermal_zone1",
+      "type": "CPU-therm",
+      "temp_millicelsius": 48000
+    },
+    {
+      "zone": "thermal_zone2",
+      "type": "GPU-therm",
+      "temp_millicelsius": 46500
+    },
+    {
+      "zone": "thermal_zone3",
+      "type": "PLL-therm",
+      "temp_millicelsius": 44500
+    },
+    {
+      "zone": "thermal_zone4",
+      "type": "PMIC-Die",
+      "temp_millicelsius": 50000
+    },
+    {
+      "zone": "thermal_zone5",
+      "type": "thermal-fan-est",
+      "temp_millicelsius": 46750
+    }
+  ],
   "memory": {
     "mem_total_kb": 4057740,
     "mem_available_kb": 2740400

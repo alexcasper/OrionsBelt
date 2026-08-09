@@ -1596,3 +1596,481 @@ class TestCheckAblationManifests:
         issues = []
         check_ablation_manifests(str(ablation_dir), issues)
         assert issues == []
+
+
+# ---------------------------------------------------------------------------
+# Additional gpu_micro_row edge cases (ob-8qt.24)
+# ---------------------------------------------------------------------------
+
+
+class TestValidateGpuMicroRowEdgeCases:
+    """Cover remaining branches in validate_gpu_micro_row."""
+
+    def test_missing_dim_keys(self):
+        """Missing dim1/dim2 keys should produce a parse error and return early."""
+        issues = []
+        row = _gpu_row()
+        del row["dim1"]
+        del row["dim2"]
+        validate_gpu_micro_row(row, "test.csv", issues, 2)
+        assert any("cannot parse dims" in i.message and i.severity == "ERROR" for i in issues)
+        # Should have returned early — no p50/bw checks
+        assert not any("p50" in i.message for i in issues)
+        assert not any("bw_mibs" in i.message for i in issues)
+
+    def test_non_integer_dim1(self):
+        """Non-integer dim1 should trigger parse error."""
+        issues = []
+        validate_gpu_micro_row(_gpu_row(dim1="abc"), "test.csv", issues, 2)
+        assert any("cannot parse dims" in i.message for i in issues)
+
+    def test_non_integer_dim2(self):
+        """Non-integer dim2 should trigger parse error."""
+        issues = []
+        validate_gpu_micro_row(_gpu_row(dim2="xyz"), "test.csv", issues, 2)
+        assert any("cannot parse dims" in i.message for i in issues)
+
+    def test_non_positive_dim3(self):
+        """dim3=0 should produce a non-positive dim3 error."""
+        issues = []
+        validate_gpu_micro_row(_gpu_row(dim3="0"), "test.csv", issues, 2)
+        assert any("non-positive dim3" in i.message and i.severity == "ERROR" for i in issues)
+
+    def test_non_integer_dim3(self):
+        """Non-integer dim3 should produce a warning."""
+        issues = []
+        validate_gpu_micro_row(_gpu_row(dim3="abc"), "test.csv", issues, 2)
+        assert any("non-integer dim3" in i.message and i.severity == "WARNING" for i in issues)
+
+    def test_non_positive_p50(self):
+        """p50_ms=0 should produce a non-positive p50_ms error."""
+        issues = []
+        validate_gpu_micro_row(_gpu_row(p50_ms="0.0"), "test.csv", issues, 2)
+        assert any("non-positive p50_ms" in i.message and i.severity == "ERROR" for i in issues)
+
+    def test_non_numeric_p95(self):
+        """Non-numeric p95_ms should produce a warning."""
+        issues = []
+        validate_gpu_micro_row(_gpu_row(p95_ms="abc"), "test.csv", issues, 2)
+        assert any("non-numeric p95_ms" in i.message and i.severity == "WARNING" for i in issues)
+
+    def test_cannot_parse_bw(self):
+        """Non-numeric bw_mibs should produce an error."""
+        issues = []
+        validate_gpu_micro_row(_gpu_row(bw_mibs="N/A"), "test.csv", issues, 2)
+        assert any("cannot parse bw_mibs" in i.message and i.severity == "ERROR" for i in issues)
+
+    def test_missing_bw_key(self):
+        """Missing bw_mibs key should produce an error."""
+        issues = []
+        row = _gpu_row()
+        del row["bw_mibs"]
+        validate_gpu_micro_row(row, "test.csv", issues, 2)
+        assert any("cannot parse bw_mibs" in i.message for i in issues)
+
+    def test_missing_p50_key_returns_early(self):
+        """Missing p50_ms key should return early (no p95 or bw checks)."""
+        issues = []
+        row = _gpu_row()
+        del row["p50_ms"]
+        validate_gpu_micro_row(row, "test.csv", issues, 2)
+        assert any("cannot parse p50_ms" in i.message for i in issues)
+        # Should have returned — no bw_mibs check
+        assert not any("bw_mibs" in i.message for i in issues)
+
+
+# ---------------------------------------------------------------------------
+# Additional kleidiai_matmul_row edge cases (ob-8qt.24)
+# ---------------------------------------------------------------------------
+
+
+class TestValidateKleidiaiMatmulRowEdgeCases:
+    """Cover remaining branches in validate_kleidiai_matmul_row."""
+
+    def test_malformed_gflops(self):
+        """Non-numeric GFLOP_s should produce a warning."""
+        issues = []
+        validate_kleidiai_matmul_row(_kleidiai_row(GFLOP_s="N/A"), "test.csv", issues, 2)
+        assert any("cannot parse GFLOP_s" in i.message and i.severity == "WARNING" for i in issues)
+
+    def test_missing_gflops_key(self):
+        """Missing GFLOP_s key should produce a warning."""
+        issues = []
+        row = _kleidiai_row()
+        del row["GFLOP_s"]
+        validate_kleidiai_matmul_row(row, "test.csv", issues, 2)
+        assert any("cannot parse GFLOP_s" in i.message for i in issues)
+
+    def test_malformed_gibs_missing_gflops(self):
+        """When both GiB_s and GFLOP_s are missing, both warnings should fire."""
+        issues = []
+        row = _kleidiai_row()
+        del row["GiB_s"]
+        del row["GFLOP_s"]
+        validate_kleidiai_matmul_row(row, "test.csv", issues, 2)
+        assert any("cannot parse GiB_s" in i.message for i in issues)
+        assert any("cannot parse GFLOP_s" in i.message for i in issues)
+
+
+# ---------------------------------------------------------------------------
+# Additional kleidiai_gdn_kernel_row edge cases (ob-8qt.24)
+# ---------------------------------------------------------------------------
+
+
+class TestValidateKleidiaiGdnKernelRowEdgeCases:
+    """Cover remaining branches in validate_kleidiai_gdn_kernel_row."""
+
+    def test_malformed_gibs(self):
+        """Non-numeric gib_per_s_p50 should produce a warning."""
+        issues = []
+        validate_kleidiai_gdn_kernel_row(
+            _gdn_kernel_row(gib_per_s_p50="N/A"), "test.csv", issues, 2
+        )
+        assert any(
+            "cannot parse gib_per_s_p50" in i.message and i.severity == "WARNING" for i in issues
+        )
+
+    def test_missing_gibs_key(self):
+        """Missing gib_per_s_p50 key should produce a warning."""
+        issues = []
+        row = _gdn_kernel_row()
+        del row["gib_per_s_p50"]
+        validate_kleidiai_gdn_kernel_row(row, "test.csv", issues, 2)
+        assert any("cannot parse gib_per_s_p50" in i.message for i in issues)
+
+
+# ---------------------------------------------------------------------------
+# Additional layer_profile_row edge cases (ob-8qt.24)
+# ---------------------------------------------------------------------------
+
+
+class TestValidateLayerProfileRowEdgeCases:
+    """Cover remaining branches: non-positive mean_us, ctx_len, layer_idx."""
+
+    def test_non_positive_mean_us(self):
+        issues = []
+        validate_layer_profile_row(_layer_profile_row(mean_us="0.0"), "test.csv", issues, 2)
+        assert any("non-positive mean_us" in i.message and i.severity == "ERROR" for i in issues)
+
+    def test_non_positive_ctx_len(self):
+        issues = []
+        validate_layer_profile_row(_layer_profile_row(ctx_len="0"), "test.csv", issues, 2)
+        assert any("non-positive ctx_len" in i.message and i.severity == "ERROR" for i in issues)
+
+    def test_negative_layer_idx(self):
+        issues = []
+        validate_layer_profile_row(_layer_profile_row(layer_idx="-1"), "test.csv", issues, 2)
+        assert any("negative layer_idx" in i.message and i.severity == "ERROR" for i in issues)
+
+
+# ---------------------------------------------------------------------------
+# CSV type dispatch inline sanity checks (ob-8qt.24)
+# ---------------------------------------------------------------------------
+
+
+def _write_csv(path, header, row_data):
+    """Write a single-row CSV file."""
+    path.write_text(f"{header}\n{row_data}\n")
+
+
+class TestValidateCsvE2eDecode:
+    """Test the inline tok_per_sec_mean sanity check for e2e_decode CSVs."""
+
+    def test_implausible_tok_per_sec_warns(self, tmp_path):
+        csv_path = tmp_path / "test_e2e_decode.csv"
+        header = "tok_per_sec_mean,gdn_proj_pct,ffn_pct"
+        _write_csv(csv_path, header, "2000,50,50")
+        issues = []
+        validate_csv(str(csv_path), "test_e2e_decode.csv", issues)
+        assert any("implausible tok/s" in i.message for i in issues)
+
+    def test_negative_tok_per_sec_warns(self, tmp_path):
+        csv_path = tmp_path / "test_e2e_decode.csv"
+        header = "tok_per_sec_mean,gdn_proj_pct,ffn_pct"
+        _write_csv(csv_path, header, "-5,50,50")
+        issues = []
+        validate_csv(str(csv_path), "test_e2e_decode.csv", issues)
+        assert any("implausible tok/s" in i.message for i in issues)
+
+    def test_valid_tok_per_sec_no_warning(self, tmp_path):
+        csv_path = tmp_path / "test_e2e_decode.csv"
+        header = "tok_per_sec_mean,gdn_proj_pct,ffn_pct"
+        _write_csv(csv_path, header, "42.5,50,50")
+        issues = []
+        validate_csv(str(csv_path), "test_e2e_decode.csv", issues)
+        assert not any("implausible tok/s" in i.message for i in issues)
+
+    def test_non_numeric_tok_per_sec_handled(self, tmp_path):
+        """Non-numeric tok_per_sec should not crash (ValueError silently caught)."""
+        csv_path = tmp_path / "test_e2e_decode.csv"
+        header = "tok_per_sec_mean,gdn_proj_pct,ffn_pct"
+        _write_csv(csv_path, header, "N/A,50,50")
+        issues = []
+        # Should not raise
+        validate_csv(str(csv_path), "test_e2e_decode.csv", issues)
+        assert not any("implausible" in i.message for i in issues)
+
+
+class TestValidateCsvPrefillGemm:
+    """Test the inline tok_per_sec_prefill sanity check."""
+
+    def test_implausible_prefill_tps_warns(self, tmp_path):
+        csv_path = tmp_path / "test_prefill.csv"
+        header = "prefill_M,ttft_ms,tok_per_sec_prefill"
+        _write_csv(csv_path, header, "1,100,5000")
+        issues = []
+        validate_csv(str(csv_path), "test_prefill.csv", issues)
+        assert any("implausible prefill tok/s" in i.message for i in issues)
+
+    def test_negative_prefill_tps_warns(self, tmp_path):
+        csv_path = tmp_path / "test_prefill.csv"
+        header = "prefill_M,ttft_ms,tok_per_sec_prefill"
+        _write_csv(csv_path, header, "1,100,-1")
+        issues = []
+        validate_csv(str(csv_path), "test_prefill.csv", issues)
+        assert any("implausible prefill tok/s" in i.message for i in issues)
+
+    def test_valid_prefill_tps_no_warning(self, tmp_path):
+        csv_path = tmp_path / "test_prefill.csv"
+        header = "prefill_M,ttft_ms,tok_per_sec_prefill"
+        _write_csv(csv_path, header, "1,100,250.5")
+        issues = []
+        validate_csv(str(csv_path), "test_prefill.csv", issues)
+        assert not any("implausible" in i.message for i in issues)
+
+
+class TestValidateCsvPrefillAb:
+    """Test the inline prefill_tps sanity check."""
+
+    def test_implausible_prefill_tps_warns(self, tmp_path):
+        csv_path = tmp_path / "test_prefill_ab.csv"
+        header = "variant,prefill_len,ttft_s,prefill_tps"
+        _write_csv(csv_path, header, "fp16,1024,0.5,5000")
+        issues = []
+        validate_csv(str(csv_path), "test_prefill_ab.csv", issues)
+        assert any("implausible prefill tok/s" in i.message for i in issues)
+
+    def test_negative_prefill_tps_warns(self, tmp_path):
+        csv_path = tmp_path / "test_prefill_ab.csv"
+        header = "variant,prefill_len,ttft_s,prefill_tps"
+        _write_csv(csv_path, header, "fp16,1024,0.5,-1")
+        issues = []
+        validate_csv(str(csv_path), "test_prefill_ab.csv", issues)
+        assert any("implausible prefill tok/s" in i.message for i in issues)
+
+    def test_valid_prefill_tps_no_warning(self, tmp_path):
+        csv_path = tmp_path / "test_prefill_ab.csv"
+        header = "variant,prefill_len,ttft_s,prefill_tps"
+        _write_csv(csv_path, header, "fp16,1024,0.5,180.0")
+        issues = []
+        validate_csv(str(csv_path), "test_prefill_ab.csv", issues)
+        assert not any("implausible" in i.message for i in issues)
+
+
+class TestValidateCsvQuantComparison:
+    """Test the inline tok_per_sec sanity check."""
+
+    def test_implausible_tok_per_sec_warns(self, tmp_path):
+        csv_path = tmp_path / "test_quant.csv"
+        header = "variant,tok_per_sec,ffn_pct,gdn_proj_pct"
+        _write_csv(csv_path, header, "int4,5000,50,50")
+        issues = []
+        validate_csv(str(csv_path), "test_quant.csv", issues)
+        assert any("implausible tok/s" in i.message for i in issues)
+
+    def test_negative_tok_per_sec_warns(self, tmp_path):
+        csv_path = tmp_path / "test_quant.csv"
+        header = "variant,tok_per_sec,ffn_pct,gdn_proj_pct"
+        _write_csv(csv_path, header, "int4,-1,50,50")
+        issues = []
+        validate_csv(str(csv_path), "test_quant.csv", issues)
+        assert any("implausible tok/s" in i.message for i in issues)
+
+    def test_valid_tok_per_sec_no_warning(self, tmp_path):
+        csv_path = tmp_path / "test_quant.csv"
+        header = "variant,tok_per_sec,ffn_pct,gdn_proj_pct"
+        _write_csv(csv_path, header, "int4,42.0,50,50")
+        issues = []
+        validate_csv(str(csv_path), "test_quant.csv", issues)
+        assert not any("implausible" in i.message for i in issues)
+
+
+class TestValidateCsvCrossToolComparison:
+    """Test the inline avg_ts sanity check."""
+
+    def test_implausible_avg_ts_warns(self, tmp_path):
+        csv_path = tmp_path / "test_cross.csv"
+        header = "engine,quant,test,n_tokens,avg_ts"
+        _write_csv(csv_path, header, "cpu,int8,gdn,1024,5000")
+        issues = []
+        validate_csv(str(csv_path), "test_cross.csv", issues)
+        assert any("implausible tok/s" in i.message for i in issues)
+
+    def test_negative_avg_ts_warns(self, tmp_path):
+        csv_path = tmp_path / "test_cross.csv"
+        header = "engine,quant,test,n_tokens,avg_ts"
+        _write_csv(csv_path, header, "cpu,int8,gdn,1024,-1")
+        issues = []
+        validate_csv(str(csv_path), "test_cross.csv", issues)
+        assert any("implausible tok/s" in i.message for i in issues)
+
+    def test_valid_avg_ts_no_warning(self, tmp_path):
+        csv_path = tmp_path / "test_cross.csv"
+        header = "engine,quant,test,n_tokens,avg_ts"
+        _write_csv(csv_path, header, "cpu,int8,gdn,1024,35.5")
+        issues = []
+        validate_csv(str(csv_path), "test_cross.csv", issues)
+        assert not any("implausible" in i.message for i in issues)
+
+
+class TestValidateCsvQuantAccuracy:
+    """Test the inline cos_sim sanity check."""
+
+    def test_low_cos_sim_warns(self, tmp_path):
+        csv_path = tmp_path / "test_qa.csv"
+        header = "quant_variant,matrix,cos_sim,rel_err_pct"
+        _write_csv(csv_path, header, "int8,wq,0.85,15.0")
+        issues = []
+        validate_csv(str(csv_path), "test_qa.csv", issues)
+        assert any("implausible cosine similarity" in i.message for i in issues)
+
+    def test_high_cos_sim_warns(self, tmp_path):
+        """cos_sim > 1.0 is mathematically impossible."""
+        csv_path = tmp_path / "test_qa.csv"
+        header = "quant_variant,matrix,cos_sim,rel_err_pct"
+        _write_csv(csv_path, header, "int8,wq,1.05,5.0")
+        issues = []
+        validate_csv(str(csv_path), "test_qa.csv", issues)
+        assert any("implausible cosine similarity" in i.message for i in issues)
+
+    def test_valid_cos_sim_no_warning(self, tmp_path):
+        csv_path = tmp_path / "test_qa.csv"
+        header = "quant_variant,matrix,cos_sim,rel_err_pct"
+        _write_csv(csv_path, header, "int8,wq,0.99,1.0")
+        issues = []
+        validate_csv(str(csv_path), "test_qa.csv", issues)
+        assert not any("implausible" in i.message for i in issues)
+
+
+# ---------------------------------------------------------------------------
+# check_ablation_manifests exception handling (ob-8qt.24)
+# ---------------------------------------------------------------------------
+
+
+class TestCheckAblationManifestsExceptions:
+    """Cover the exception branch when reading a malformed ablation CSV."""
+
+    def test_read_error_produces_error_issue(self, tmp_path):
+        """A CSV file that raises during read should produce an ERROR issue."""
+        ablation_dir = tmp_path / "ablation"
+        ablation_dir.mkdir()
+
+        csv_path = ablation_dir / "bad.csv"
+        # Write bytes that crash csv.DictReader
+        csv_path.write_bytes(b"\xff\xfeinvalid\x00csv")
+
+        issues = []
+        check_ablation_manifests(str(ablation_dir), issues)
+        assert any("cannot read ablation CSV" in i.message and i.severity == "ERROR" for i in issues)
+
+
+# ---------------------------------------------------------------------------
+# Non-numeric ValueError coverage for CSV type dispatch (ob-8qt.24)
+# ---------------------------------------------------------------------------
+
+
+class TestValidateCsvNonNumericPrefillGemm:
+    """Cover the ValueError handler for non-numeric prefill tok/s."""
+
+    def test_non_numeric_prefill_tps_handled(self, tmp_path):
+        csv_path = tmp_path / "test_prefill.csv"
+        header = "prefill_M,ttft_ms,tok_per_sec_prefill"
+        _write_csv(csv_path, header, "1,100,N/A")
+        issues = []
+        validate_csv(str(csv_path), "test_prefill.csv", issues)
+        assert not any("implausible" in i.message for i in issues)
+
+
+class TestValidateCsvNonNumericPrefillAb:
+    """Cover the ValueError handler for non-numeric prefill_ab tok/s."""
+
+    def test_non_numeric_prefill_tps_handled(self, tmp_path):
+        csv_path = tmp_path / "test_prefill_ab.csv"
+        header = "variant,prefill_len,ttft_s,prefill_tps"
+        _write_csv(csv_path, header, "fp16,1024,0.5,N/A")
+        issues = []
+        validate_csv(str(csv_path), "test_prefill_ab.csv", issues)
+        assert not any("implausible" in i.message for i in issues)
+
+
+class TestValidateCsvNonNumericQuantComparison:
+    """Cover the ValueError handler for non-numeric quant_comparison tok/s."""
+
+    def test_non_numeric_tok_per_sec_handled(self, tmp_path):
+        csv_path = tmp_path / "test_quant.csv"
+        header = "variant,tok_per_sec,ffn_pct,gdn_proj_pct"
+        _write_csv(csv_path, header, "int4,N/A,50,50")
+        issues = []
+        validate_csv(str(csv_path), "test_quant.csv", issues)
+        assert not any("implausible" in i.message for i in issues)
+
+
+class TestValidateCsvNonNumericCrossTool:
+    """Cover the ValueError handler for non-numeric cross_tool avg_ts."""
+
+    def test_non_numeric_avg_ts_handled(self, tmp_path):
+        csv_path = tmp_path / "test_cross.csv"
+        header = "engine,quant,test,n_tokens,avg_ts"
+        _write_csv(csv_path, header, "cpu,int8,gdn,1024,N/A")
+        issues = []
+        validate_csv(str(csv_path), "test_cross.csv", issues)
+        assert not any("implausible" in i.message for i in issues)
+
+
+class TestValidateCsvNonNumericQuantAccuracy:
+    """Cover the ValueError handler for non-numeric quant_accuracy cos_sim."""
+
+    def test_non_numeric_cos_sim_handled(self, tmp_path):
+        csv_path = tmp_path / "test_qa.csv"
+        header = "quant_variant,matrix,cos_sim,rel_err_pct"
+        _write_csv(csv_path, header, "int8,wq,N/A,15.0")
+        issues = []
+        validate_csv(str(csv_path), "test_qa.csv", issues)
+        assert not any("implausible" in i.message for i in issues)
+
+
+# ---------------------------------------------------------------------------
+# Dispatch branches through validate_csv for ctx_sweep, gpu_micro, kleidiai_gdn (ob-8qt.24)
+# ---------------------------------------------------------------------------
+
+
+class TestValidateCsvDispatch:
+    """Ensure the CSV type dispatch reaches the row validators for
+    ctx_sweep, gpu_micro, and kleidiai_gdn_kernel types."""
+
+    def test_ctx_sweep_dispatched(self, tmp_path):
+        """A ctx_sweep CSV with bad data should trigger validate_ctx_sweep_row."""
+        csv_path = tmp_path / "test_ctx.csv"
+        header = "model,ctx_len,gdn_layer_us,full_attn_us,ffn_us,total_us,tok_per_sec,kv_cache_mb"
+        _write_csv(csv_path, header, "qwen2.5,0,100,50,30,180,50,10")
+        issues = []
+        validate_csv(str(csv_path), "test_ctx.csv", issues)
+        assert any("non-positive ctx_len" in i.message for i in issues)
+
+    def test_gpu_micro_dispatched(self, tmp_path):
+        """A gpu_micro CSV with bad data should trigger validate_gpu_micro_row."""
+        csv_path = tmp_path / "test_gpu.csv"
+        header = "kernel,dim1,dim2,dim3,p50_ms,p95_ms,bw_mibs"
+        _write_csv(csv_path, header, "cumsum,64,64,64,1.0,2.0,-1.0")
+        issues = []
+        validate_csv(str(csv_path), "test_gpu.csv", issues)
+        assert any("bw_mibs" in i.message for i in issues)
+
+    def test_kleidiai_gdn_kernel_dispatched(self, tmp_path):
+        """A kleidiai_gdn_kernel CSV with bad data should trigger the validator."""
+        csv_path = tmp_path / "test_kgdn.csv"
+        header = "kernel,shape,p50_us,gib_per_s_p50"
+        _write_csv(csv_path, header, "cumdecay,64x2560,0.0,-1.0")
+        issues = []
+        validate_csv(str(csv_path), "test_kgdn.csv", issues)
+        assert any("negative gib_per_s_p50" in i.message for i in issues)

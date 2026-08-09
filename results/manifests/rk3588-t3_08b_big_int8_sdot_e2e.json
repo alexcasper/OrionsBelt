@@ -2,7 +2,9 @@
   "caller": {},
   "git": {
     "dirty": true,
-    "sha": "a6d21dffe425a5ddf9f31470ff0594ab8b23b8cc"
+    "sha": "a6d21dffe425a5ddf9f31470ff0594ab8b23b8cc",
+    "sha_resolved": "6170a39c657248b667e6f98966462600876c102b",
+    "sha_note": "Original SHA from t3 pre-rebase branch; equivalent commit: t3: add SDOT INT8 e2e data to fleet comparison (ob-9t0.8)"
   },
   "host": {
     "core_count": 8,

@@ -5,7 +5,9 @@
   "source": "scripts/capture_manifest.sh",
   "git": {
     "sha": "ce516f81c3b983a6511c598e76aecc69e417fad0",
-    "dirty": false
+    "dirty": false,
+    "sha_resolved": "8df684ef78dc91207512dc70318b3007ed09526d",
+    "sha_note": "Original SHA from t3 pre-rebase branch; equivalent commit: t3: e2e decode bench 0.8B INT8 little (ob-8qt.11)"
   },
   "host": {
     "hostname": "t3",
@@ -14,9 +16,73 @@
     "os": "Linux #37 SMP Fri Apr 26 05:16:30 UTC 2024",
     "cpu_model": null,
     "core_count": 8,
-    "cpu_topology": [{"cpu":0,"max_freq_khz":1800000,"min_freq_khz":1800000,"governor":"performance","cpu_capacity":414},{"cpu":1,"max_freq_khz":1800000,"min_freq_khz":1800000,"governor":"performance","cpu_capacity":414},{"cpu":2,"max_freq_khz":1800000,"min_freq_khz":1800000,"governor":"performance","cpu_capacity":414},{"cpu":3,"max_freq_khz":1800000,"min_freq_khz":1800000,"governor":"performance","cpu_capacity":414},{"cpu":4,"max_freq_khz":2304000,"min_freq_khz":408000,"governor":"performance","cpu_capacity":1024},{"cpu":5,"max_freq_khz":2304000,"min_freq_khz":408000,"governor":"performance","cpu_capacity":1024},{"cpu":6,"max_freq_khz":2304000,"min_freq_khz":408000,"governor":"performance","cpu_capacity":1024},{"cpu":7,"max_freq_khz":2304000,"min_freq_khz":408000,"governor":"performance","cpu_capacity":1024}]
+    "cpu_topology": [
+      {
+        "cpu": 0,
+        "max_freq_khz": 1800000,
+        "min_freq_khz": 1800000,
+        "governor": "performance",
+        "cpu_capacity": 414
+      },
+      {
+        "cpu": 1,
+        "max_freq_khz": 1800000,
+        "min_freq_khz": 1800000,
+        "governor": "performance",
+        "cpu_capacity": 414
+      },
+      {
+        "cpu": 2,
+        "max_freq_khz": 1800000,
+        "min_freq_khz": 1800000,
+        "governor": "performance",
+        "cpu_capacity": 414
+      },
+      {
+        "cpu": 3,
+        "max_freq_khz": 1800000,
+        "min_freq_khz": 1800000,
+        "governor": "performance",
+        "cpu_capacity": 414
+      },
+      {
+        "cpu": 4,
+        "max_freq_khz": 2304000,
+        "min_freq_khz": 408000,
+        "governor": "performance",
+        "cpu_capacity": 1024
+      },
+      {
+        "cpu": 5,
+        "max_freq_khz": 2304000,
+        "min_freq_khz": 408000,
+        "governor": "performance",
+        "cpu_capacity": 1024
+      },
+      {
+        "cpu": 6,
+        "max_freq_khz": 2304000,
+        "min_freq_khz": 408000,
+        "governor": "performance",
+        "cpu_capacity": 1024
+      },
+      {
+        "cpu": 7,
+        "max_freq_khz": 2304000,
+        "min_freq_khz": 408000,
+        "governor": "performance",
+        "cpu_capacity": 1024
+      }
+    ]
   },
-  "isa_features": {"sve":false,"sve2":false,"i8mm":false,"bf16":false,"asimddp":true,"sme":false},
+  "isa_features": {
+    "sve": false,
+    "sve2": false,
+    "i8mm": false,
+    "bf16": false,
+    "asimddp": true,
+    "sme": false
+  },
   "parallelism": {
     "omp_num_threads": null,
     "omp_proc_bind": null,
@@ -24,7 +90,43 @@
     "effective_threads": 8,
     "threads_source": "core_count_default"
   },
-  "thermal_zones": [{"zone":"thermal_zone0","type":"soc-thermal","temp_millicelsius":42538},{"zone":"thermal_zone1","type":"bigcore0-thermal","temp_millicelsius":41615},{"zone":"thermal_zone2","type":"bigcore1-thermal","temp_millicelsius":41615},{"zone":"thermal_zone3","type":"littlecore-thermal","temp_millicelsius":42538},{"zone":"thermal_zone4","type":"center-thermal","temp_millicelsius":40692},{"zone":"thermal_zone5","type":"gpu-thermal","temp_millicelsius":40692},{"zone":"thermal_zone6","type":"npu-thermal","temp_millicelsius":41615}],
+  "thermal_zones": [
+    {
+      "zone": "thermal_zone0",
+      "type": "soc-thermal",
+      "temp_millicelsius": 42538
+    },
+    {
+      "zone": "thermal_zone1",
+      "type": "bigcore0-thermal",
+      "temp_millicelsius": 41615
+    },
+    {
+      "zone": "thermal_zone2",
+      "type": "bigcore1-thermal",
+      "temp_millicelsius": 41615
+    },
+    {
+      "zone": "thermal_zone3",
+      "type": "littlecore-thermal",
+      "temp_millicelsius": 42538
+    },
+    {
+      "zone": "thermal_zone4",
+      "type": "center-thermal",
+      "temp_millicelsius": 40692
+    },
+    {
+      "zone": "thermal_zone5",
+      "type": "gpu-thermal",
+      "temp_millicelsius": 40692
+    },
+    {
+      "zone": "thermal_zone6",
+      "type": "npu-thermal",
+      "temp_millicelsius": 41615
+    }
+  ],
   "memory": {
     "mem_total_kb": 32550332,
     "mem_available_kb": 31255816

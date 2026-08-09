@@ -333,3 +333,127 @@ def test_gdn2_uniform_gates_approximates_gdn1():
     assert np.all(np.isfinite(o1)) and np.all(np.isfinite(o2))
     # States have the same shape
     assert S1.shape == S2.shape
+
+
+# ---------------------------------------------------------------------------
+# Hand-verified exact computation (from in-module test_gdn2_known_answer)
+# ---------------------------------------------------------------------------
+
+
+class TestGdn2KnownAnswer:
+    """Hand-verified single-step GDN-2 recurrence with exact expected values."""
+
+    def test_single_step_state_exact(self):
+        """With zero initial state, verify the state matrix element-by-element."""
+        K = 2
+        q = np.array([[[0.6, 0.8]]], dtype=np.float64)
+        k_vec = np.array([[[0.8, 0.6]]], dtype=np.float64)
+        v_vec = np.array([[[1.0, 2.0]]], dtype=np.float64)
+        g = np.array([[[-0.5, -0.3]]], dtype=np.float64)
+        b_gate = np.array([[[0.9, 0.8]]], dtype=np.float64)
+        w_gate = np.array([[[0.7, 0.6]]], dtype=np.float64)
+
+        o, S = gdn2_recurrent(
+            q, k_vec, v_vec, g, b_gate, w_gate, scale=1.0 / math.sqrt(K), use_qk_l2norm=False
+        )
+
+        # Step-by-step:
+        # S *= exp(g) → S stays 0 (zero initial state)
+        # erase = (b⊙k)^T @ S = 0
+        # v_new = w⊙v = [0.7, 1.2]
+        # S += k ⊗ v_new = [[0.56, 0.96], [0.42, 0.72]]
+        expected_S = np.array([[0.56, 0.96], [0.42, 0.72]])
+        assert np.allclose(S[0], expected_S, atol=1e-10)
+
+    def test_single_step_output_exact(self):
+        """Verify the output vector element-by-element against hand computation."""
+        K = 2
+        q = np.array([[[0.6, 0.8]]], dtype=np.float64)
+        k_vec = np.array([[[0.8, 0.6]]], dtype=np.float64)
+        v_vec = np.array([[[1.0, 2.0]]], dtype=np.float64)
+        g = np.array([[[-0.5, -0.3]]], dtype=np.float64)
+        b_gate = np.array([[[0.9, 0.8]]], dtype=np.float64)
+        w_gate = np.array([[[0.7, 0.6]]], dtype=np.float64)
+
+        scale = 1.0 / math.sqrt(K)
+        o, _ = gdn2_recurrent(q, k_vec, v_vec, g, b_gate, w_gate, scale=scale, use_qk_l2norm=False)
+
+        # o = scale * [0.6*0.56 + 0.8*0.42, 0.6*0.96 + 0.8*0.72]
+        #   = scale * [0.672, 1.152]
+        expected_o = np.array([[scale * 0.672, scale * 1.152]])
+        assert np.allclose(o[0, 0], expected_o[0], atol=1e-10)
+
+
+# ---------------------------------------------------------------------------
+# State continuity (from in-module test_gdn2_multi_step_consistency)
+# ---------------------------------------------------------------------------
+
+
+class TestGdn2StateContinuity:
+    """Verify that initial_state lets a recurrence continue seamlessly."""
+
+    def test_continued_run_is_finite(self):
+        """Running a second batch with initial_state=S_final stays finite."""
+        T, H, K, V = 16, 4, 16, 16
+        q1, k1, v1, g1, b1, w1, _, _ = make_synthetic_input(T, H, K, V, seed=99)
+        o1, S_final = gdn2_recurrent(
+            q1, k1, v1, g1, b1, w1, scale=1.0 / math.sqrt(K), use_qk_l2norm=True
+        )
+        assert np.all(np.isfinite(S_final))
+
+        q2, k2, v2, g2, b2, w2, _, _ = make_synthetic_input(T, H, K, V, seed=77)
+        o_cont, S_cont = gdn2_recurrent(
+            q2,
+            k2,
+            v2,
+            g2,
+            b2,
+            w2,
+            scale=1.0 / math.sqrt(K),
+            initial_state=S_final,
+            use_qk_l2norm=True,
+        )
+        assert np.all(np.isfinite(o_cont))
+        assert np.all(np.isfinite(S_cont))
+
+    def test_nonzero_initial_state_affects_output(self):
+        """A non-zero initial state must change the output vs zero initial state."""
+        T, H, K, V = 4, 2, 8, 8
+        q, k, v, g, b_gate, w_gate, _, _ = make_synthetic_input(T, H, K, V, seed=42)
+
+        o_zero, _ = gdn2_recurrent(q, k, v, g, b_gate, w_gate, use_qk_l2norm=True)
+        S_init = np.ones((H, K, V), dtype=np.float64) * 0.1
+        o_init, _ = gdn2_recurrent(
+            q, k, v, g, b_gate, w_gate, initial_state=S_init, use_qk_l2norm=True
+        )
+        assert not np.allclose(o_zero, o_init), "Non-zero initial state had no effect on output"
+
+
+# ---------------------------------------------------------------------------
+# Bandwidth cost invariant (from in-module test_bandwidth_analysis)
+# ---------------------------------------------------------------------------
+
+
+class TestBandwidthAnalysis:
+    """Document the per-token bandwidth overhead of GDN-2 vs GDN-1."""
+
+    def test_gdn2_gate_overhead_under_5pct(self):
+        """GDN-2's extra gate vectors add <5% bandwidth vs the state R/M/W."""
+        H, d_k, d_v = 16, 128, 128
+        bytes_f32 = 4
+
+        state_bytes = H * d_k * d_v * bytes_f32 * 2  # read + write
+        gdn2_extra = (H * d_k + H * d_v + H * d_k) * bytes_f32
+        overhead_pct = 100.0 * gdn2_extra / state_bytes
+
+        assert overhead_pct < 5.0, f"GDN-2 overhead {overhead_pct:.2f}% unexpectedly high"
+
+    def test_gdn2_more_traffic_than_gdn1(self):
+        """GDN-2 has strictly more per-token gate traffic than GDN-1."""
+        H, d_k, d_v = 16, 128, 128
+        bytes_f32 = 4
+
+        gdn1_extra = 2 * bytes_f32  # alpha + beta scalars
+        gdn2_extra = (H * d_k + H * d_v + H * d_k) * bytes_f32
+
+        assert gdn2_extra > gdn1_extra
