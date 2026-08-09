@@ -218,15 +218,25 @@ static void check_affinity(int csv_mode) {
     }
 
     if (n_big > 0 && n_little > 0) {
+        /* Build the big-core range string (e.g. "4-7") */
+        int first_big = -1, last_big = -1;
+        for (long c = 0; c < ncpu && c < 32; c++) {
+            if (!(allowed_mask & (1UL << c))) continue;
+            if (max_freq[c] == freq_max) {
+                if (first_big < 0) first_big = (int)c;
+                last_big = (int)c;
+            }
+        }
         fprintf(stderr,
             "⚠  WARNING: process affinity spans big.LITTLE cores (%d big @ %d kHz"
             " + %d little @ %d kHz).\n"
             "   Short kernels may be scheduled on little cores, giving "
             "misleading results.\n"
-            "   Pin to one cluster:  taskset -c <big-cores> %s --repeats 30\n"
+            "   Pin to big cluster:  taskset -c %d-%d %s --repeats 30\n"
             "   (See ob-jvx / FINDINGS.md §24 for the cumdecay 64×160 "
             "methodology incident.)\n\n",
-            n_big, big_freq, n_little, little_freq, "bench_kai_gdn");
+            n_big, big_freq, n_little, little_freq,
+            first_big, last_big, "bench_kai_gdn");
         (void)csv_mode;  /* warning always goes to stderr */
     }
 }

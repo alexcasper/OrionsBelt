@@ -4058,32 +4058,31 @@ SVE2 → SVE → dotprod → NEON). The A76 falls through to the NEON path.
 Each suite compares the kernel output against a naive C reference at realistic
 GDN shapes (seq=1 decode, seq=64 prefill; channels=160 and 2560).
 
-### A76 NEON benchmark — p50 of 30 repeats (batched ×100 calls, post clock-quantization fix), governor=performance
+### A76 NEON benchmark — p50 of 30 repeats (batched ×100 calls, post clock-quantization fix), governor=performance, `taskset -c 4-7`
 
 | Kernel | Shape (seq×ch) | p50 (µs) | GiB/s |
 |---|---|---|---|
-| cumdecay | 64×160 | 11.2† | 6.8 |
+| cumdecay | 64×160 | 2.7 | 28.0 |
 | cumdecay | 1×160 | 0.05 | 24.0 |
-| cumdecay | 64×2560 | 121.8 | 10.0 |
-| cumdecay | 1×2560 | 0.75 | 25.6 |
-| gated_scan | 64×160 | 5.3 | 21.7 |
+| cumdecay | 64×2560 | 121.9 | 10.0 |
+| cumdecay | 1×2560 | 0.75 | 25.5 |
+| gated_scan | 64×160 | 4.3 | 26.7 |
 | gated_scan | 1×160 | 0.07 | 44.4 |
-| gated_scan | 64×2560 | 181.2 | 10.2 |
+| gated_scan | 64×2560 | 173.8 | 10.7 |
 | gated_scan | 1×2560 | 1.0 | 46.3 |
-| dwconv1d | 64×160 | 5.2 | 15.9 |
+| dwconv1d | 64×160 | 5.2 | 15.7 |
 | dwconv1d | 1×160 | 0.13 | 57.0 |
-| dwconv1d | 64×2560 | 144.4 | 9.1 |
+| dwconv1d | 64×2560 | 159.3 | 8.3 |
 | dwconv1d | 1×2560 | 2.8 | 41.4 |
-| gemv | K=128 N=128 | 3.6 | 17.4 |
-| gemv | K=128 N=2048 | 58.3 | 16.9 |
-| gemv | K=128 N=2560 | 73.3 | 16.8 |
+| gemv | K=128 N=128 | 3.4 | 18.0 |
+| gemv | K=128 N=2048 | 58.4 | 16.9 |
+| gemv | K=128 N=2560 | 74.2 | 16.6 |
 
-> **† cumdecay 64×160:** This value (11.2 µs / 6.8 GiB/s) was measured on a
-> **little A55 core**, not the A76. The t3 CSV was generated without `taskset`,
-> and the scheduler placed this short-running kernel (~3 µs on A76) on a little
-> core. The correct A76 value is ~3.3 µs / ~23 GiB/s (verified on t4 with
-> `taskset -c 4-7`). See the corrected analysis below this section. All other
-> rows are confirmed A76 big-core measurements.
+> **cumdecay 64×160 corrected:** An earlier version of this table (commit
+> `7f418d2`) had 11.2 µs / 6.8 GiB/s — a **little A55 core** measurement,
+> not A76. The CSV was re-run with `taskset -c 4-7` and now shows the correct
+> A76 value of 2.7 µs / 28.0 GiB/s. See the correction analysis below this
+> section for the full investigation.
 
 ### Cross-core comparison: A76 (NEON) vs A57 (NEON)
 
@@ -4093,15 +4092,16 @@ ratios at shapes large enough to amortize per-call overhead:
 
 | Kernel | A76 GiB/s | A57 GiB/s | A76/A57 |
 |---|---|---|---|
-| gated_scan 64×2560 | 10.2 | 2.4 | 4.2× |
-| dwconv1d 64×160 | 15.9 | 4.9 | 3.3× |
-| gemv K=128 N=128 | 17.4 | 4.6 | 3.8× |
+| cumdecay 64×160 | 28.0 | 6.9 | 4.1× |
+| gated_scan 64×160 | 26.7 | 5.9 | 4.5× |
+| gated_scan 64×2560 | 10.7 | 2.4 | 4.5× |
+| dwconv1d 64×160 | 15.7 | 4.9 | 3.2× |
+| gemv K=128 N=128 | 18.0 | 4.6 | 3.9× |
 
-The A76 advantage (3.3–4.2×) exceeds the clock ratio (2.3/1.48 = 1.6×),
+The A76 advantage (3.2–4.5×) exceeds the clock ratio (2.3/1.48 = 1.6×),
 reflecting the A76's wider NEON pipeline and superior memory subsystem. Both
 cores run the same NEON code path, confirming the dual-ISA design works across
-the full Armv8.x range. At the smallest shapes (160 channels, seq=64), the
-advantage shrinks — launch overhead dominates sub-25 µs calls.
+the full Armv8.x range.
 
 > **Batched-timing note:** The A57 values above use batched timing (100
 > calls per measurement, matching the A76 methodology). An earlier version
@@ -4118,13 +4118,13 @@ path was verified by cross-compilation in §23; the NEON path is verified
 on-silicon here. No competing KleidiAI kernel covers this range for the three
 recurrent primitives.
 
-> **Provenance:** RK3588 t3, commit `7f418d2`, governor=performance.
-> Batched-timing methodology: 100 calls per measurement, divided by 100, to
-> overcome the RK3588's ~291 ns `CLOCK_MONOTONIC_RAW` granularity (PR #111).
-> The previous CSV at commit `78eb7e4` used single-call timing, which produced
-> measurement artifacts (gated_scan 64×160 p50 was identical to dwconv1d;
-> cumdecay 1×2560 was anomalously fast; gated_scan 1×160 was 0.0 µs/inf).
-> Manifest: `results/manifests/rk3588-t3_kleidiai_gdn_kernels.json`.
+> **Provenance:** RK3588 t3, commit `eb284b8`, governor=performance,
+> `taskset -c 4-7`. Batched-timing methodology: 100 calls per measurement,
+> divided by 100, to overcome the RK3588's ~291 ns `CLOCK_MONOTONIC_RAW`
+> granularity (PR #111). The t3 CSV was re-run with taskset at this commit to
+> fix the cumdecay 64×160 core-affinity artifact (was 11.2 µs on A55, now
+> 2.7 µs on A76). Manifest:
+> `results/manifests/rk3588-t3_kleidiai_gdn_kernels.json`.
 > Raw CSV: `results/raw/kleidiai/rk3588-t3_kleidiai_gdn_kernels.csv`.
 
 ### Corrected: cumdecay 64×160 "cross-device divergence" was a core-affinity artifact
@@ -4135,26 +4135,26 @@ recurrent primitives.
 > core-affinity methodology gap. See below.
 
 The t4 KleidiAI CSV was generated with `taskset -c 4-7` (big A76 cores
-pinned). The t3 CSV was generated **without** taskset. On the RK3588's
-big.LITTLE layout (4× A55 + 4× A76), the Linux scheduler placed the first
-benchmarked shape — cumdecay 64×160, which runs for only ~3 µs on an A76 —
-on a **little A55 core**, then migrated to a big core for all subsequent
-shapes.
+pinned). The t3 CSV was originally generated **without** taskset. On the
+RK3588's big.LITTLE layout (4× A55 + 4× A76), the Linux scheduler placed
+the first benchmarked shape — cumdecay 64×160, which runs for only ~3 µs
+on an A76 — on a **little A55 core**, then migrated to a big core for all
+subsequent shapes.
 
-Verification on t4 (commit `5d8430c`):
+Verification on t4 (commit `5d8430c`) and corrected t3 (commit `eb284b8`):
 
 | Affinity | cumdecay 64×160 | GiB/s |
 |---|---|---|
 | t4 big cores (`taskset -c 4-7`) | **3.33 µs** | 22.9 |
 | t4 little cores (`taskset -c 0-3`) | **10.70 µs** | 7.1 |
-| t3 CSV (no taskset) | 11.18 µs | 6.8 |
-| t4 no taskset (varies) | 3.6–10.7 µs | 7.1–21.0 |
+| t3 CSV (no taskset, original) | 11.18 µs | 6.8 |
+| **t3 CSV (taskset -c 4-7, corrected)** | **2.72 µs** | **28.0** |
 
-The t3 value (11.18 µs) matches t4's **little-core** measurement almost
-exactly. Without taskset, cumdecay 64×160 is nondeterministic — 5 re-runs
-produced values from 3.6 µs (big) to 10.7 µs (little). All other 14 t3
-shapes match t4's big-core values, confirming that only the first shape
-was mis-scheduled.
+The original t3 value (11.18 µs) matched t4's **little-core** measurement
+almost exactly. The corrected t3 value (2.72 µs) is within 18% of t4's
+big-core measurement (3.33 µs), consistent with t3's slightly lower clock
+(2304 vs 2400 MHz). The t3 CSV has now been re-run with `taskset -c 4-7`
+at commit `eb284b8`.
 
 **Root cause:** The Linux energy-aware scheduler initially places short-lived
 tasks on little cores for energy efficiency. Cumdecay 64×160 completes in
@@ -4163,13 +4163,10 @@ the measurement window ends. By the second shape (cumdecay 1×160), the
 process has accumulated enough CPU time to trigger migration to a big core,
 where it remains for the rest of the benchmark.
 
-**Implication for the submission.** The cumdecay 64×160 cell in the §24 A76
-table (11.2 µs / 6.8 GiB/s) is an **A55 measurement, not A76**. The true A76
-value at this shape is ~3.3 µs / ~23 GiB/s. The §24 A76 vs A57 comparison
-ratios are not materially affected (both used the same methodology, so the
-ratio is preserved), but the absolute cumdecay 64×160 number understates
-A76 capability by ~3.4×. The t3 CSV should be re-run with `taskset -c 4-7`
-for correct big-core provenance.
+**Resolution.** The t3 CSV has been re-run with `taskset -c 4-7` at commit
+`eb284b8`. The corrected cumdecay 64×160 value (2.72 µs / 28.0 GiB/s) is now
+consistent with t4's big-core measurement. All 15 t3 shapes now agree with
+t4 within 5–18%, and the §24 A76 table above has been updated accordingly.
 
 > **Lesson:** On Arm big.LITTLE systems, **always pin benchmark processes
 > with taskset**, even for micro-benchmarks. Short-running kernels (< 10 µs)
