@@ -11,13 +11,23 @@ LOG="$HOME/OrionsBelt/.goose-loop.log"; TASK="$HOME/OrionsBelt/.goose-task.md"; 
 # running, exit silently. Prevents two agents working the same branch
 # concurrently (seen on t3 2026-08-09: two sessions spawned two goose
 # agents; the stale one generated 146 runaway gitignored manifests).
-# Anchored ^bash excludes the tmux wrapper that launches this script.
-# The .* handles full-path invocation (bash /home/.../goose-loop.sh).
-_OTHER=$(pgrep -f '^bash.*goose-loop\.sh' | grep -v "^$$\$" | head -1)
-if [ -n "$_OTHER" ]; then
-  echo "[guard] another goose-loop.sh (PID $_OTHER) is already running — exiting" >>"$LOG"
+#
+# Uses a PID-file lock rather than `pgrep -f <pattern>` matching on the
+# script's own command line: that approach self-matched the command-
+# substitution subshell bash forks to evaluate the pgrep|grep|head
+# pipeline itself (its cmdline also starts with "bash" and contains the
+# literal pattern text "goose-loop.sh"), so the guard saw a "duplicate"
+# on every single invocation, including the very first one from a
+# completely clean state -- this is why the loop could never stay up
+# (ob-94u). kill -0 confirms the recorded PID is still alive, so a
+# lockfile left behind by a crashed instance doesn't wedge future runs.
+LOCKFILE="$HOME/OrionsBelt/.goose-loop.pid"
+if [ -f "$LOCKFILE" ] && kill -0 "$(cat "$LOCKFILE" 2>/dev/null)" 2>/dev/null; then
+  echo "[guard] another goose-loop.sh (PID $(cat "$LOCKFILE")) is already running — exiting" >>"$LOG"
   exit 0
 fi
+echo $$ > "$LOCKFILE"
+trap 'rm -f "$LOCKFILE"' EXIT
 TEMPLATE="$HOME/OrionsBelt/docs/agent-task.template.md"
 # Max session age before forced fresh start. A resumed session can drift
 # arbitrarily far behind main if it never re-reads the task template's
