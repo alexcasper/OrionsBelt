@@ -41,3 +41,4 @@ results/manifests/generic_aarch64_*
 # Exception: ablation provenance manifest referenced by results/raw/ablation/*.csv
 # (force-added by j1, restored by j2 after accidental deletion — see commit f36552d)
 !results/manifests/generic_aarch64_20260806T145501Z_23550d6.json
+gpu/boundary_crossing_bench
