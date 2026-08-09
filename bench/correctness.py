@@ -342,7 +342,8 @@ def compare_logits(
         argmax_acc = float(np.mean(ref_argmax == cand_argmax))
     else:
         matches = sum(
-            1 for r, c in zip(ref, cand, strict=True)
+            1
+            for r, c in zip(ref, cand, strict=True)
             if r and c and r.index(max(r)) == c.index(max(c))
         )
         argmax_acc = matches / len(ref) if ref else 0.0

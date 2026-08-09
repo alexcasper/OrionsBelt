@@ -881,8 +881,7 @@ def main(argv: list[str] | None = None) -> int:
         context_lengths = [int(x.strip()) for x in args.context_lengths.split(",")]
     except ValueError:
         parser.error(
-            f"--context-lengths must be comma-separated integers, "
-            f"got: {args.context_lengths!r}"
+            f"--context-lengths must be comma-separated integers, got: {args.context_lengths!r}"
         )
     model_cfg = _MODEL_PRESETS[args.model]
 
