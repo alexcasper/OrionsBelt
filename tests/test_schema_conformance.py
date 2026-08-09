@@ -94,6 +94,8 @@ def test_csv_header_from_existing_results():
     retrieval_marker = (
         "num_keys"  # GDN-2 retrieval capacity study (bench/gdn2_retrieval.py, ob-zak)
     )
+    swap_marker = "mse_loss"  # GDN-2 layer swap training curve (bench/gdn2_swap.py, ob-68l)
+    ruler_eval_marker = "correct_logprob"  # RULER retrieval eval (bench/gdn2_ruler.py, ob-zak)
     result_row_columns = set(RESULT_ROW_COLUMNS)
 
     checked = 0
@@ -117,6 +119,8 @@ def test_csv_header_from_existing_results():
             or quant_accuracy_marker in cols
             or thermal_stress_marker in cols
             or retrieval_marker in cols
+            or swap_marker in cols
+            or ruler_eval_marker in cols
         ):
             continue  # different shape by design, not a conformance failure
         if e2e_decode_marker in cols:

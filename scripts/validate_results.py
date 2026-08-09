@@ -265,6 +265,21 @@ RETRIEVAL_CAPACITY_COLS = [
     "param_value",
 ]
 
+GDN2_SWAP_COLS = [
+    "step",
+    "mse_loss",
+]
+
+RULER_EVAL_COLS = [
+    "prompt_idx",
+    "seed",
+    "query_key",
+    "correct_answer",
+    "hit",
+    "correct_logprob",
+    "margin",
+]
+
 # Device spec bandwidth (GiB/s) for sanity-check upper bounds.
 # Vendor datasheets quote GB/s; converted to GiB/s for unit-consistency
 # with the bench binary (÷2^30).  See ADR 0005 for GB/s originals.
@@ -320,6 +335,10 @@ def detect_csv_type(header):
         return "thermal_stress"
     if cols >= {"test", "model", "num_keys", "accuracy"}:
         return "retrieval_capacity"
+    if cols >= {"step", "mse_loss"}:
+        return "gdn2_swap"
+    if cols >= {"prompt_idx", "correct_logprob", "margin"}:
+        return "ruler_eval"
     return None
 
 
@@ -362,6 +381,10 @@ def expected_columns(csv_type):
         return THERMAL_STRESS_COLS
     if csv_type == "retrieval_capacity":
         return RETRIEVAL_CAPACITY_COLS
+    if csv_type == "gdn2_swap":
+        return GDN2_SWAP_COLS
+    if csv_type == "ruler_eval":
+        return RULER_EVAL_COLS
     return []
 
 

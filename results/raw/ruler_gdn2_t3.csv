@@ -1,0 +1,11 @@
+prompt_idx,seed,query_key,correct_answer,hit,correct_logprob,margin
+1,100,config_beta_0001,violet-vellum-849,0,-79.4620,-8.7889
+2,101,config_beta_0001,magenta-zephyr-149,0,-88.1567,-14.9630
+3,102,config_delta_0003,jade-engine-539,0,-54.5626,-8.8469
+4,103,config_beta_0001,emerald-engine-856,1,-59.7926,0.0000
+5,104,config_delta_0003,crimson-marble-207,0,-74.7219,-13.5449
+6,105,config_gamma_0002,ruby-delta-442,0,-71.6141,-5.7849
+7,106,config_gamma_0002,ivory-beacon-292,0,-75.1871,-16.1639
+8,107,config_beta_0001,obsidian-anchor-881,0,-72.5226,-23.6162
+9,108,config_beta_0001,navy-quiver-487,0,-65.2356,-9.0677
+10,109,config_delta_0003,quartz-rampart-676,0,-70.8545,-8.0028
