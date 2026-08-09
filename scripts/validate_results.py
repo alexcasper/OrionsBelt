@@ -1052,7 +1052,7 @@ def check_readme_counts(issues, repo_root="."):
 
     def _count_files(dirpath, suffix=None, exclude_name=None):
         total = 0
-        for root, _dirs, files in os.walk(os.path.join(repo_root, dirpath)):
+        for _root, _dirs, files in os.walk(os.path.join(repo_root, dirpath)):
             for fname in files:
                 if suffix and not fname.endswith(suffix):
                     continue
@@ -1142,7 +1142,10 @@ def main():
     ablation_dir = os.path.join(args.csv_dir, "ablation")
     check_ablation_manifests(ablation_dir, all_issues)
 
-    check_readme_counts(all_issues)
+    # Only cross-check README counts when using the default repo directories;
+    # skip for custom --csv-dir/--manifest-dir (e.g. unit tests with temp dirs).
+    if args.csv_dir == "results/raw" and args.manifest_dir == "results/manifests":
+        check_readme_counts(all_issues)
 
     # Report
     errors = [i for i in all_issues if i.severity == "ERROR"]
