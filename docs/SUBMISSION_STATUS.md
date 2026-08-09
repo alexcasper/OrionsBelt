@@ -54,12 +54,17 @@ ADR 0007 — the submission framing is locked to Edge AI.
 | 0.8B INT8: 10.61 tok/s (t3) | same | ✓ |
 | 0.8B INT8: 2.45 tok/s (Jetson) | same | ✓ |
 | 4B INT8: 0.51 tok/s (Jetson) | same | ✓ |
-| 4B INT8+SDOT: 3.34 tok/s (t3) | rk3588-t3_big_int8_sdot_e2e.json | ✓ |
-| 0.8B INT8+SDOT: 28.9 tok/s (t3) | rk3588-t3_08b_big_int8_sdot_e2e.json | ✓ |
-| ~48× cumulative speedup (with SDOT) | 0.07 → 3.34 tok/s = 47.7× | ✓ |
+| 4B INT8+SDOT: 3.48 tok/s (t4) | rk3588-t4_big_int8_sdot_e2e_schema.csv | ✓ |
+| 0.8B INT8+SDOT: 30.2 tok/s (t4) | rk3588-t4_08b_big_int8_sdot_e2e_schema.csv | ✓ |
+| 4B INT4+SDOT: 4.43 tok/s (t4) | rk3588-t4_big_int4_sdot_e2e_schema.csv | ✓ |
+| 0.8B INT4+SDOT: 37.21 tok/s (t4) | rk3588-t4_08b_big_int4_sdot_e2e_schema.csv | ✓ |
+| ~50× cumulative speedup (INT8+SDOT) | 0.07 → 3.48 tok/s = 49.7× | ✓ |
+| ~63× cumulative speedup (INT4+SDOT) | 0.07 → 4.43 tok/s = 63.3× | ✓ |
 
-All manifests: dirty=false, governor=performance, 30 repeats (kernel) /
-3 runs (e2e), git_sha recorded.
+All manifests: governor=performance, 30 repeats (kernel) / 1–3 runs (e2e),
+git_sha recorded. t3 manifests are dirty=false; t4 SDOT manifests are
+dirty=true (binary built and run before source commit — result files
+written first, then committed together with the source).
 
 ---
 
