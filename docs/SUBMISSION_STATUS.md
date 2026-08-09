@@ -122,6 +122,7 @@ cutoff has passed with no board; any future arrival is additive bonus per ADR 00
 | #151 | j1 | Add PR #150 to merged PRs table in SUBMISSION_STATUS.md + loop flush + beads export | MERGED |
 | #152 | j1 | Fix stale manifest count in README (125 → 138) + fix stale test count (1788 → 1799) in Devpost submission, SUBMISSION_STATUS, README | MERGED |
 | #153 | j1 | Add PR #152 to merged PRs table + energy efficiency section to Devpost + backfill 4 j1 power CSV manifests + INA3221 energy profiling in README + fix stale manifest count (138 → 142) | MERGED |
+| #154 | j1 | Add PR #153 to merged PRs table + fix --help/error message omitting gdn2_gated_scan from valid sustained kernels | MERGED |
 
 ---
 

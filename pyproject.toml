@@ -26,7 +26,6 @@ classifiers = [
 # must install inside the CIX NOE Compiler toolchain environment (see
 # docs/CLAIM_VERIFICATION.md section 2.2a: the NOE Compiler requires Python 3.10
 # (VERIFIED against Radxa docs — the "Python 3.8" figure in brief.md was wrong).
-# unverified, so we design for it rather than assert it as confirmed).
 # Heavy ML deps (torch, transformers, weights) are deliberately NOT pinned
 # here; they land with bead t-weights-fetch.
 dependencies = [
