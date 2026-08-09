@@ -143,7 +143,23 @@ typedef struct {
 typedef struct {
     uint8_t *q;  /* packed int4 weights [K × ceil(N/2)] row-major */
     float   *s;  /* per-column (output) scale [N] */
+#if defined(INT4_WEIGHTS) && defined(__ARM_FEATURE_DOTPROD)
+    uint8_t *q_sdot; /* K-grouped repack for SDOT GEMV (NULL if not DOTPROD) */
+    size_t   K, N;   /* dimensions at quantize time (for SDOT dispatch) */
+#endif
 } QW4;
+
+#if defined(INT4_WEIGHTS) && defined(__ARM_FEATURE_DOTPROD)
+/* Forward decl — implementation further down, with gemv_int4_sdot. */
+static uint8_t *repack_int4_k_grouped(const uint8_t *Bq, size_t K, size_t N);
+
+/* Repack INT4 weights for SDOT. Called after quantize_weight_int4. */
+static void repack_qw4_for_sdot(QW4 *qw, size_t K, size_t N) {
+    qw->q_sdot = repack_int4_k_grouped(qw->q, K, N);
+    qw->K = K;
+    qw->N = N;
+}
+#endif
 
 /* Quantize a [K×N] float matrix to int8 + per-column scale (symmetric).
  * B_in is read-only; q and s are allocated and filled.
@@ -970,10 +986,222 @@ static void gemm_int4_neon(const float *A, const uint8_t *Bq, const float *Bs,
     }
 }
 
+/* ---- INT4 + SDOT hybrid GEMV (ob-8qt.20) ----
+ *
+ * The INT4 NEON kernel (gemv_int4_neon) widens int4→int8→int16→int32→float32
+ * in the inner loop for float FMA accumulation — ~20+ NEON instructions per
+ * K-step per 32-column tile. This compute overhead makes INT4 slower than
+ * INT8 NEON on A76 (1.55 vs 1.82 tok/s) and far slower than INT8 SDOT
+ * (3.48 tok/s).
+ *
+ * The hybrid kernel combines INT4's 2× memory advantage with SDOT's integer-
+ * domain accumulation: quantize input to int8 once, unpack INT4 nibbles to
+ * int8 on-the-fly (mask+shift+sign-extend+zip = ~6 NEON ops per 16 bytes),
+ * then use vdotq_lane_s32 for int8×int8→int32 accumulation. Scale is applied
+ * once at the end.
+ *
+ * K-grouped repack: standard packed INT4 stores 2 column-adjacent values per
+ * byte (row-major). SDOT needs 4 K-adjacent values per column contiguously.
+ * The repack rearranges to: for each K-group g, column j, store k0/k1 in byte
+ * 0 (low/high nibble) and k2/k3 in byte 1. This gives 2 bytes per column per
+ * K-group (vs 4 for INT8), halving memory traffic.
+ *
+ * On-the-fly unpack (8 columns × 2 bytes = 16 bytes loaded):
+ *   1. Extract low nibbles: byte & 0x0F → [k0,k2, k0,k2, ...] per column pair
+ *   2. Extract high nibbles: byte >> 4 → [k1,k3, k1,k3, ...]
+ *   3. Sign-extend both: (x<<4)>>4 arithmetic
+ *   4. vzipq_s8 interleaves to [k0,k1,k2,k3, k0,k1,k2,k3, ...] per column
+ *   5. vdotq_lane_s32 accumulates 4 columns × 4 K-values per instruction
+ */
+#if defined(INT4_WEIGHTS) && defined(__ARM_FEATURE_DOTPROD)
+
+/* Quantize input vector to int8 — local copy (INT8 version not compiled
+ * under INT4_WEIGHTS due to mutual-exclusion build flags). */
+static void quantize_input_int8_i4(const float *a, int8_t *a_q, size_t K,
+                                   float *scale_out) {
+    float max_abs = 0.0f;
+    for (size_t k = 0; k < K; ++k) {
+        float v = fabsf(a[k]);
+        if (v > max_abs) max_abs = v;
+    }
+    float scale = (max_abs > 0.0f) ? max_abs / 127.0f : 1.0f;
+    float inv = 1.0f / scale;
+    for (size_t k = 0; k < K; ++k) {
+        int vi = (int)lroundf(a[k] * inv);
+        if (vi > 127) vi = 127;
+        if (vi < -128) vi = -128;
+        a_q[k] = (int8_t)vi;
+    }
+    *scale_out = scale;
+}
+
+/* Repack standard packed int4 [K × ceil(N/2)] into K-grouped layout.
+ *
+ * Input:  Bq[k * q_cols + j/2], even col → low nibble, odd col → high nibble
+ * Output: for K-group g, column j, 2 bytes at (g*N + j)*2:
+ *           byte 0: low nibble = k0_val, high nibble = k1_val
+ *           byte 1: low nibble = k2_val, high nibble = k3_val
+ *         where kN = weight at K-element g*4+N, column j.
+ * K is zero-padded to a multiple of 4. */
+static uint8_t *repack_int4_k_grouped(const uint8_t *Bq, size_t K, size_t N) {
+    size_t K_pad = (K + 3) & ~(size_t)3;
+    size_t num_g = K_pad / 4;
+    size_t q_cols = (N + 1) / 2;
+    uint8_t *out = xcalloc(num_g * N * 2, 1);  /* zero-padded */
+    if (!out) { fprintf(stderr, "OOM in repack_int4_k_grouped\n"); exit(1); }
+
+    for (size_t g = 0; g < num_g; ++g) {
+        for (size_t j = 0; j < N; ++j) {
+            for (size_t i = 0; i < 4; ++i) {
+                size_t k = g * 4 + i;
+                uint8_t val = 0;
+                if (k < K) {
+                    uint8_t byte = Bq[k * q_cols + j / 2];
+                    val = (j % 2 == 0) ? (uint8_t)(byte & 0x0F)
+                                       : (uint8_t)(byte >> 4);
+                }
+                /* val is unsigned nibble (0-15); store as-is */
+                size_t byte_idx = i / 2;  /* 0 for k0,k1; 1 for k2,k3 */
+                if (i % 2 == 0)
+                    out[(g * N + j) * 2 + byte_idx] |= val;        /* low nibble */
+                else
+                    out[(g * N + j) * 2 + byte_idx] |= (val << 4); /* high nibble */
+            }
+        }
+    }
+    return out;
+}
+
+/* INT4 SDOT GEMV: K-outer tiled, nibble-unpack on-the-fly.
+ *
+ * a is [K] float, Bq_grouped is K-grouped packed int4, Bs is [N] float
+ * weight scale, c is [N] float output.
+ *
+ * c[n] = Bs[n] * a_scale * sum_k(a_q[k] * unpack(Bq_grouped, k, n))
+ */
+static void gemv_int4_sdot(const float *a, const uint8_t *Bq_grouped,
+                           const float *Bs, float *c, size_t K, size_t N) {
+    size_t K_pad = (K + 3) & ~(size_t)3;
+    size_t num_g = K_pad / 4;
+
+    /* Quantize input vector once (shared across all tiles/threads) */
+    int8_t a_q[K_pad];
+    memset(a_q, 0, K_pad);
+    float a_scale;
+    quantize_input_int8_i4(a, a_q, K, &a_scale);
+
+    /*
+     * Same K-outer column-tiled structure as gemv_int8_sdot (ob-8qt.14):
+     * column tiles on the outside (OpenMP parallelized), K-groups in the
+     * middle, sequential column loads on the inside. Accumulators in L1.
+     *
+     * Weight bytes per K-group per tile column: 2 (vs 4 for INT8 SDOT).
+     * Nibble unpack adds ~6 NEON ops per 16 bytes (8 columns × 2 bytes).
+     */
+    const size_t TILE = 256;
+
+#ifdef _OPENMP
+#pragma omp parallel for schedule(static)
+#endif
+    for (size_t jt = 0; jt < N; jt += TILE) {
+        size_t tn = (N - jt >= TILE) ? TILE : (N - jt);
+
+        int32_t acc[TILE];
+        memset(acc, 0, tn * sizeof(int32_t));
+
+        for (size_t g = 0; g < num_g; ++g) {
+            int8x8_t a_vec = vld1_s8(a_q + g * 4);
+            const uint8_t *wp = Bq_grouped + (g * N + jt) * 2;
+            int32_t *accp = acc;
+            size_t j = 0;
+
+            /* 8-column unrolled: 16 bytes → nibble unpack → 2 × vdotq */
+            for (; j + 8 <= tn; j += 8) {
+                uint8x16_t raw = vld1q_u8(wp);
+                /* Split nibbles */
+                uint8x16_t lo_u = vandq_u8(raw, vdupq_n_u8(0x0F));
+                uint8x16_t hi_u = vshrq_n_u8(raw, 4);
+                /* Sign-extend 4→8 bit: (x << 4) >> 4 (arithmetic) */
+                int8x16_t lo_s = vshrq_n_s8(
+                    vshlq_n_s8(vreinterpretq_s8_u8(lo_u), 4), 4);
+                int8x16_t hi_s = vshrq_n_s8(
+                    vshlq_n_s8(vreinterpretq_s8_u8(hi_u), 4), 4);
+                /* Interleave: [k0,k2,...] × [k1,k3,...] → [k0,k1,k2,k3,...] */
+                int8x16x2_t inter = vzipq_s8(lo_s, hi_s);
+
+                /* SDOT columns j..j+3 */
+                int32x4_t a0 = vld1q_s32(accp);
+                a0 = vdotq_lane_s32(a0, inter.val[0], a_vec, 0);
+                vst1q_s32(accp, a0);
+                /* SDOT columns j+4..j+7 */
+                int32x4_t a1 = vld1q_s32(accp + 4);
+                a1 = vdotq_lane_s32(a1, inter.val[1], a_vec, 0);
+                vst1q_s32(accp + 4, a1);
+
+                wp += 16;  /* 8 columns × 2 bytes */
+                accp += 8;
+            }
+            /* 4-column tail */
+            for (; j + 4 <= tn; j += 4) {
+                uint8x8_t raw8 = vld1_u8(wp);
+                uint8x8_t lo_u8 = vand_u8(raw8, vdup_n_u8(0x0F));
+                uint8x8_t hi_u8 = vshr_n_u8(raw8, 4);
+                int8x8_t lo_s8 = vshr_n_s8(
+                    vshl_n_s8(vreinterpret_s8_u8(lo_u8), 4), 4);
+                int8x8_t hi_s8 = vshr_n_s8(
+                    vshl_n_s8(vreinterpret_s8_u8(hi_u8), 4), 4);
+                int8x8x2_t inter8 = vzip_s8(lo_s8, hi_s8);
+                int8x16_t w0 = vcombine_s8(inter8.val[0], inter8.val[1]);
+
+                int32x4_t a0 = vld1q_s32(accp);
+                a0 = vdotq_lane_s32(a0, w0, a_vec, 0);
+                vst1q_s32(accp, a0);
+
+                wp += 8;  /* 4 columns × 2 bytes */
+                accp += 4;
+            }
+            /* Scalar tail for remaining columns (< 4) */
+            for (; j < tn; ++j) {
+                for (size_t i = 0; i < 4; ++i) {
+                    size_t k = g * 4 + i;
+                    if (k >= K) break;
+                    uint8_t byte = wp[(i / 2)];
+                    int8_t val = (i % 2 == 0) ? (int8_t)(byte & 0x0F)
+                                              : (int8_t)(byte >> 4);
+                    if (val >= 8) val -= 16;
+                    acc[j] += a_q[k] * val;
+                }
+                wp += 2;
+            }
+        }
+
+        /* Apply combined scale: c[n] = acc[n] * a_scale * Bs[n] */
+        float32x4_t scv = vdupq_n_f32(a_scale);
+        size_t j = 0;
+        for (; j + 4 <= tn; j += 4) {
+            float32x4_t av = vcvtq_f32_s32(vld1q_s32(acc + j));
+            float32x4_t bsv = vld1q_f32(Bs + jt + j);
+            av = vmulq_f32(av, scv);
+            av = vmulq_f32(av, bsv);
+            vst1q_f32(c + jt + j, av);
+        }
+        for (; j < tn; ++j)
+            c[jt + j] = (float)acc[j] * a_scale * Bs[jt + j];
+    }
+}
+
+#endif /* INT4_WEIGHTS && __ARM_FEATURE_DOTPROD */
+
 /* INT4 matmul wrapper (ob-8qt.16): dispatches GEMV (M=1) or GEMM (M>1). */
 static void matmul_int4(const float *A, const QW4 *qw,
                         float *C, size_t M, size_t K, size_t N) {
     if (M == 1) {
+#if defined(__ARM_FEATURE_DOTPROD)
+        if (qw->q_sdot) {
+            gemv_int4_sdot(A, qw->q_sdot, qw->s, C, K, N);
+            return;
+        }
+#endif
         gemv_int4_neon(A, qw->q, qw->s, C, K, N);
         return;
     }
@@ -1558,7 +1786,11 @@ static void free_weights(Weights *w) {
     free(w->f_q_proj); free(w->f_k_proj); free(w->f_v_proj); free(w->f_o_proj);
     free(w->gate_proj); free(w->up_proj); free(w->down_proj);
 #if defined(INT4_WEIGHTS)
+#if defined(__ARM_FEATURE_DOTPROD)
+#define FREE_QW(qw) do { free((qw).q); free((qw).s); free((qw).q_sdot); } while(0)
+#else
 #define FREE_QW(qw) do { free((qw).q); free((qw).s); } while(0)
+#endif
     FREE_QW(w->g_q_proj_q);
     FREE_QW(w->g_k_proj_q);
     FREE_QW(w->g_v_proj_q);
@@ -1779,6 +2011,8 @@ int main(int argc, char **argv) {
 
             uint8_t *q4; float *s4;
             quantize_weight_int4(B, &q4, &s4, K, N);
+
+            /* NEON path */
             gemv_int4_neon(a, q4, s4, c_int4, K, N);
 
             double sig_energy = 0.0, err_energy = 0.0;
@@ -1801,6 +2035,43 @@ int main(int argc, char **argv) {
             printf("  %-14s K=%-5zu N=%-5zu  SNR=%.1f dB  max_rel_err=%.2f%%  %s\n",
                    tests[t].desc, K, N, snr_db, rel_err * 100.0f,
                    ok ? "PASS" : "FAIL");
+
+#if defined(__ARM_FEATURE_DOTPROD)
+            /* SDOT path (ob-8qt.20): repack to K-grouped, verify vs FP32 and NEON */
+            {
+                uint8_t *q4_sdot = repack_int4_k_grouped(q4, K, N);
+                float *c_sdot = xmalloc(N * sizeof(float));
+                gemv_int4_sdot(a, q4_sdot, s4, c_sdot, K, N);
+
+                /* SDOT vs FP32 */
+                double se2 = 0.0, ee2 = 0.0;
+                float me2 = 0.0f;
+                for (size_t i = 0; i < N; ++i) {
+                    float diff = fabsf(c_fp32[i] - c_sdot[i]);
+                    if (diff > me2) me2 = diff;
+                    se2 += (double)c_fp32[i] * c_fp32[i];
+                    ee2 += (double)diff * diff;
+                }
+                double snr2 = (ee2 > 0.0) ? 10.0 * log10(se2 / ee2) : 999.0;
+
+                /* SDOT vs NEON: should be very close (same int4 weights, different
+                 * accumulation order + extra input quantization in SDOT) */
+                double sum_diff = 0.0;
+                for (size_t i = 0; i < N; ++i)
+                    sum_diff += fabsf(c_sdot[i] - c_int4[i]);
+                float mean_diff = (float)(sum_diff / N);
+                float max_snr_rel = (max_val > 0) ? me2 / max_val : me2;
+                int ok2 = (snr2 > 20.0);
+                if (!ok2) failures++;
+
+                printf("  %-14s K=%-5zu N=%-5zu  SNR=%.1f dB  max_rel_err=%.2f%%  "
+                       "vs-NEON mean_diff=%.6f  %s  [SDOT]\n",
+                       tests[t].desc, K, N, snr2, max_snr_rel * 100.0f,
+                       mean_diff, ok2 ? "PASS" : "FAIL");
+
+                free(q4_sdot); free(c_sdot);
+            }
+#endif
 
             free(B); free(a); free(c_fp32); free(c_int4); free(q4); free(s4);
         }
@@ -2012,9 +2283,27 @@ int main(int argc, char **argv) {
     quantize_weight_int4(w.gate_proj, &w.gate_proj_q.q, &w.gate_proj_q.s, HIDDEN, INTER);
     quantize_weight_int4(w.up_proj,   &w.up_proj_q.q,   &w.up_proj_q.s,   HIDDEN, INTER);
     quantize_weight_int4(w.down_proj, &w.down_proj_q.q, &w.down_proj_q.s, INTER, HIDDEN);
+
+#if defined(__ARM_FEATURE_DOTPROD)
+    repack_qw4_for_sdot(&w.g_q_proj_q,  HIDDEN, KEY_DIM);
+    repack_qw4_for_sdot(&w.g_k_proj_q,  HIDDEN, KEY_DIM);
+    repack_qw4_for_sdot(&w.g_v_proj_q,  HIDDEN, VALUE_DIM);
+    repack_qw4_for_sdot(&w.g_o_proj_q,  VALUE_DIM, HIDDEN);
+    repack_qw4_for_sdot(&w.f_q_proj_q,  HIDDEN, FULL_HEADS * FULL_HEAD_DIM);
+    repack_qw4_for_sdot(&w.f_k_proj_q,  HIDDEN, FULL_KV_HEADS * FULL_HEAD_DIM);
+    repack_qw4_for_sdot(&w.f_v_proj_q,  HIDDEN, FULL_KV_HEADS * FULL_HEAD_DIM);
+    repack_qw4_for_sdot(&w.f_o_proj_q,  FULL_HEADS * FULL_HEAD_DIM, HIDDEN);
+    repack_qw4_for_sdot(&w.gate_proj_q, HIDDEN, INTER);
+    repack_qw4_for_sdot(&w.up_proj_q,   HIDDEN, INTER);
+    repack_qw4_for_sdot(&w.down_proj_q, INTER, HIDDEN);
+    if (!csv)
+        printf("  Weight quantization: INT4 (weight-only, packed nibbles, per-column symmetric scale)\n"
+               "  INT4+SDOT repack: enabled (__ARM_FEATURE_DOTPROD)\n\n");
+#else
     if (!csv)
         printf("  Weight quantization: INT4 (weight-only, packed nibbles, per-column symmetric scale)\n\n");
 #endif
+#endif /* INT4_WEIGHTS */
 
 #ifdef Q80_WEIGHTS
     quantize_weight_q8_0(w.g_q_proj,  &w.g_q_proj_q.qb,  HIDDEN, KEY_DIM);

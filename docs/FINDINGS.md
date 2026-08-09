@@ -4908,3 +4908,98 @@ path from saturating bandwidth.
 
 From the naive FP32 baseline to SDOT INT8, the 4B model sees a **~50×
 cumulative speedup**; over the INT8-NEON path alone, SDOT adds 1.9–3.1×.
+
+## 34. INT4+SDOT hybrid GEMV: 2.85× over INT4 NEON, 1.27× over INT8 SDOT on A76 (2026-08-09, ob-8qt.20)
+
+### Motivation
+
+FINDINGS §26 (ob-8qt.16) showed that INT4 weight-only quantization was
+**slower** than INT8 NEON on A76 (1.55 vs 1.82 tok/s) despite halving weight
+memory traffic. The root cause: the INT4 NEON kernel (`gemv_int4_neon`)
+widens int4→int8→int16→int32→float32 in the inner loop for float FMA
+accumulation — ~20+ NEON instructions per K-step per 32-column tile. The
+type-widening pipeline dominates compute, eating the bandwidth savings.
+
+Meanwhile, §33 showed SDOT (int8×int8→int32 via `vdotq_lane_s32`) achieves
+3.48 tok/s on the 4B model by keeping accumulation entirely in the integer
+domain. The question: can we combine INT4's 2× memory advantage with SDOT's
+integer-domain efficiency?
+
+### Design: K-grouped repack + on-the-fly nibble unpack
+
+The INT4 packing stores 2 column-adjacent values per byte (even col in low
+nibble, odd col in high nibble). SDOT needs 4 K-adjacent values per column
+contiguous (one `vdotq_lane_s32` processes 4 K-elements × 4 columns). These
+layouts are incompatible, so a **K-grouped repack** is required.
+
+**Repack layout** (`repack_int4_k_grouped`): for each K-group g (4 K-elements),
+column j, store 2 bytes:
+- Byte 0: low nibble = k₀ value, high nibble = k₁ value
+- Byte 1: low nibble = k₂ value, high nibble = k₃ value
+
+This gives 2 bytes per column per K-group (vs 4 for INT8 K-interleaved),
+preserving the 2× memory advantage.
+
+**On-the-fly unpack** in the inner loop (16 bytes → 8 columns × 4 K-values):
+1. `vandq_u8(raw, 0x0F)` — extract low nibbles: [k₀,k₂, k₀,k₂, ...]
+2. `vshrq_n_u8(raw, 4)` — extract high nibbles: [k₁,k₃, k₁,k₃, ...]
+3. `(x << 4) >> 4` arithmetic — sign-extend 4→8 bit
+4. `vzipq_s8(lo, hi)` — interleave to [k₀,k₁,k₂,k₃, ...] per column
+5. `vdotq_lane_s32` — accumulate 4 columns × 4 K-values per instruction
+
+Total: ~12 NEON instructions per 8 columns per K-group (vs 8 for INT8 SDOT,
+vs ~28 for INT4 NEON float-widening). Memory: 16 bytes (vs 32 for INT8 SDOT).
+
+### Kernel structure
+
+Same K-outer column-tiled pattern as §33's INT8 SDOT: column tiles (TILE=256)
+on the outside (OpenMP parallelized), K-groups in the middle, sequential
+column loads on the inside. Accumulators stay in L1 (1 KB for TILE=256).
+
+### Results
+
+| Configuration | A76 big 4B | A76 big 0.8B | A55 little 4B | A55 little 0.8B |
+|---|---:|---:|---:|---:|
+| INT4 NEON (§26) | 1.55 | — | — | — |
+| INT8 NEON (§16) | 1.82 | — | — | — |
+| INT8 SDOT (§33) | 3.48 | 30.17 | 1.36 | — |
+| **INT4+SDOT** | **4.43** | **37.21** | **1.30** | **10.42** |
+
+**Speedups:**
+- vs INT4 NEON: **2.85×** (4B A76) — the float-widening bottleneck eliminated
+- vs INT8 SDOT: **1.27×** (4B A76), **1.23×** (0.8B A76) — halved memory traffic
+- vs INT8 SDOT on A55: **0.96×** — slightly slower, see analysis below
+
+### Analysis: why A55 doesn't benefit
+
+On the A76 big cluster, INT4+SDOT gives a clear 1.27× win because the A76 is
+memory-bandwidth-bound — halving weight traffic directly improves throughput
+despite the ~1.5× instruction overhead from nibble unpacking.
+
+On the A55 little cluster, INT4+SDOT is slightly slower (1.30 vs 1.36 tok/s).
+The A55 has lower per-core compute throughput (1.8 GHz, simpler pipeline), so
+the nibble-unpack overhead (6 extra NEON ops per 16 bytes) is relatively more
+expensive. The A55 is closer to compute-bound, and the 2× memory savings don't
+fully compensate for the 1.5× compute increase.
+
+**Practical implication**: INT4+SDOT is the fastest decode kernel on A76. On
+A55, INT8 SDOT remains optimal. A heterogeneous dispatcher (ob-7a9) should
+select the quantization format per-cluster.
+
+### Correctness
+
+`--verify-int4` extended to test both NEON and SDOT paths (12 test cases
+total). SDOT SNR: 46.7–49.7 dB vs FP32 oracle, statistically identical to
+NEON (46.9–49.7 dB). The small SDOT-vs-NEON difference comes from additional
+input-vector quantization to int8 (the SDOT path quantizes the float input
+once, while NEON uses float FMA directly).
+
+### Cumulative optimization stack
+
+| Optimization | A76 4B tok/s | vs FP32 baseline |
+|---|---:|---:|
+| Naive column-sweep GEMV (FP32) | 0.07 | 1.0× |
+| Row-sweep + OpenMP (FP32, §15) | 1.04 | ~15× |
+| + INT8 weight-only NEON (§16) | 1.84 | ~26× |
+| + SDOT INT8 (§33) | 3.48 | ~50× |
+| + **INT4+SDOT** (this section) | **4.43** | **~63×** |
