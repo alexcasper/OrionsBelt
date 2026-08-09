@@ -167,6 +167,7 @@ All figures above are verified against primary sources (Radxa product page and d
 | CPU GDN kernels (NEON/SVE/scalar) | Verified, benchmarked across fleet |
 | Mixed-precision state kernels (bf16/fp16) | Implemented, benchmarked on Jetson |
 | NPU operator-coverage audit (CIX NOE + RKNN) | Done — [FINDINGS.md](./docs/FINDINGS.md) §1, §7 |
+| NPU offload design (designed, not executed) | Done — [NPU_OFFLOAD_DESIGN.md](./docs/NPU_OFFLOAD_DESIGN.md) |
 | KleidiAI matmul evaluation | Done — [FINDINGS.md](./docs/FINDINGS.md) §8 |
 | big.LITTLE affinity policy | Done — [FINDINGS.md](./docs/FINDINGS.md) §9 |
 | GDN-2 vs GDN-1 microbenchmark | Done — [FINDINGS.md](./docs/FINDINGS.md) §10, clean-tree re-run |
