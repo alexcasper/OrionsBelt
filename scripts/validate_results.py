@@ -1056,7 +1056,10 @@ def check_readme_counts(issues, repo_root="."):
         try:
             result = subprocess.run(
                 ["git", "ls-files", "--", f"{dirpath}/"],
-                capture_output=True, text=True, check=True, cwd=repo_root,
+                capture_output=True,
+                text=True,
+                check=True,
+                cwd=repo_root,
             )
             files = [os.path.basename(f) for f in result.stdout.strip().splitlines() if f]
         except (subprocess.CalledProcessError, FileNotFoundError):
