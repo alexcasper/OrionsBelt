@@ -185,6 +185,7 @@ cutoff has passed with no board; any future arrival is additive bonus per ADR 00
 | #182 | t3 | Fix ruff format + keep branch current with main | MERGED |
 | #183 | t3 | Regenerated fleet_cross_device.png after t4 PR merge | MERGED |
 | #184 | t4 | Doc consistency fixes — stale counts + PR table backfill | MERGED |
+| #185 | t4 | SDOT/INT4+SDOT e2e fleet data (7 schema CSVs) + DEVPOST/README/submission doc consistency + ~63× cumulative speedup | MERGED |
 
 ---
 
