@@ -96,6 +96,25 @@ cutoff has passed with no board; any future arrival is additive bonus per ADR 00
 | #103 | t4 | O6 baseline script + onboarding docs | MERGED |
 | #104 | t3 | GB/s→GiB/s in human-authored docs (7 files) | MERGED |
 | #102 | j1 | GB/s→GiB/s in generated tables (32 files) + KleidiAI README | MERGED |
+| #106 | j1 | Fix O6 spec unit mismatch in comparison_table.md | MERGED |
+| #107 | t4 | Fix README unit consistency — device spec table + headline percentages | MERGED |
+| #108 | t3 | Fix FINDINGS.md §3 header + GEMV overflow defense | MERGED |
+| #110 | j1 | Fix stale counts + flag t4 KleidiAI artifacts in submission docs | MERGED |
+| #111 | t3 | Fix KleidiAI bench cold-start artifacts — batched timing | MERGED |
+| #113 | t4 | KleidiAI batched-timing tables + security runbook refresh | MERGED |
+| #114 | j1 | Re-run A57 KleidiAI bench with batched-timing fix | MERGED |
+| #115 | t4 | Cumdecay core-affinity fix + big.LITTLE affinity warnings | MERGED |
+| #116 | j1 | Dolt sync reset + ob-9xr (device bench decode timing) | MERGED |
+| #117 | t4 | Device bench + CI fixes | MERGED |
+| #118 | j1 | A57 prefill benchmark data (ob-8qt.15) | MERGED |
+| #119 | t4 | CI lint/test fixes + merge j1 INT4 findings | MERGED |
+| #120 | j1 | llama.cpp baseline + Q8_0 block-quantized GEMV on A57 (ob-mrd.15, ob-8qt.17) | MERGED |
+| #121 | j1 | Q8_0 GEMV (2.97× speedup) + accuracy validation + llama.cpp baseline | MERGED |
+| #122 | j1 | Q8_0/INT4 context sweeps, Devpost submission + CLAIM_VERIFICATION updates | MERGED |
+| #123 | j1 | Fix CI — schema conformance test missing cross_tool & quant_accuracy CSV markers | MERGED |
+| #124 | j1 | Regenerate fleet analysis figures with batched-timing CSVs | MERGED |
+| #125 | j1 | Add --quant int4 support to run_e2e_decode.sh | MERGED |
+| #126 | j1 | Fix broken relative link in ONNX probe research note | MERGED |
 | #127 | j1 | KleidiAI README URL fix, pyproject.toml Edge AI framing, Devpost writeup | MERGED |
 | #128 | j1 | Stale "Physical AI" + bare PLAN.md refs (31+ files) | MERGED |
 | #129 | j1 | SUBMISSION_STATUS.md Aug 8 cutoff + 3 broken link fixes | MERGED |
