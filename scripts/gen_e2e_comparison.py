@@ -193,7 +193,7 @@ def _check_commit_lineage(base_commit, commits):
 
     def _run(cmd):
         r = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=REPO_ROOT)  # noqa: UP022
-        return r.stdout.decode("utf-8", errors="replace")
+        return r.returncode, r.stdout.decode("utf-8", errors="replace")
 
     results = {}
     for sha in commits:
@@ -201,14 +201,19 @@ def _check_commit_lineage(base_commit, commits):
             results[sha] = {"status": "matched", "detail": "base commit"}
             continue
 
-        full_base = _run(["git", "rev-parse", base_commit]).strip()
+        rc_base, full_base = _run(["git", "rev-parse", base_commit])
 
-        # Try to resolve the short SHA to a full SHA
-        resolved = _run(["git", "rev-parse", sha]).strip()
+        # Try to resolve the short SHA to a full SHA.
+        # Check the return code: git rev-parse echoes the input to stdout
+        # even on failure, so a non-empty string does NOT mean success.
+        rc, resolved = _run(["git", "rev-parse", sha])
 
-        if not resolved or not full_base:
+        if rc != 0 or rc_base != 0 or not resolved.strip() or not full_base.strip():
             results[sha] = {"status": "unknown", "detail": "unresolvable"}
             continue
+
+        resolved = resolved.strip()
+        full_base = full_base.strip()
 
         # Check ancestry
         # Note: stdout/stderr=PIPE (not capture_output=True) for Python 3.6
@@ -228,7 +233,8 @@ def _check_commit_lineage(base_commit, commits):
             continue
 
         # It's a descendant — check for kernel/binary-affecting changes
-        changed = _run(["git", "diff", "--name-only", full_base, resolved]).strip().splitlines()
+        _rc, diff_out = _run(["git", "diff", "--name-only", full_base, resolved])
+        changed = diff_out.strip().splitlines()
 
         # Files that affect the benchmark binary or kernel
         kernel_patterns = (

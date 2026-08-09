@@ -2,7 +2,9 @@
   "caller": {},
   "git": {
     "dirty": true,
-    "sha": "e1f03f89b423c27f21e5a9241affcfbf3c86ee78"
+    "sha": "e1f03f89b423c27f21e5a9241affcfbf3c86ee78",
+    "sha_resolved": "a06b15415b31a6ea2cbbc3d6a5cf456648b365c4",
+    "sha_note": "Original SHA from t3 pre-rebase branch; equivalent commit: t3: re-run KleidiAI bench with taskset -c 4-7"
   },
   "host": {
     "core_count": 8,

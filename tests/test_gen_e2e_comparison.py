@@ -22,6 +22,7 @@ if _SCRIPTS not in sys.path:
     sys.path.insert(0, _SCRIPTS)
 
 from gen_e2e_comparison import (  # noqa: E402
+    _check_commit_lineage,
     _check_manifest_dirty,
     _dedup_rows,
     _normalize_device,
@@ -451,3 +452,146 @@ class TestGenerateTable:
         data = extract_metrics([_row()])
         md = generate_table(data)
         assert "|--------|" in md
+
+    def test_pre_matched_commit_warning(self):
+        """When commit_info has pre-matched entries, show partial-match warning."""
+        rows = [_row(git_sha="dead0000")]
+        data = extract_metrics(rows)
+        commit_info = {"dead0000": {"status": "pre-matched", "detail": "pre-dates base commit"}}
+        md = generate_table(data, base_commit="aaaa1111", commit_info=commit_info)
+        assert "Partial commit match" in md
+        assert "dead0000" in md
+
+    def test_diverged_commit_warning(self):
+        """When commit_info has diverged entries, show partial-match warning."""
+        rows = [_row(git_sha="beef2222")]
+        data = extract_metrics(rows)
+        commit_info = {"beef2222": {"status": "diverged", "detail": "kernel changes: src/foo.c"}}
+        md = generate_table(data, base_commit="aaaa1111", commit_info=commit_info)
+        assert "Partial commit match" in md
+        assert "beef2222" in md
+
+    def test_matched_commit_lists_non_base_shas(self):
+        """When all commits are code-identical, non-base SHAs are listed."""
+        rows = [_row(git_sha="cccc3333")]
+        data = extract_metrics(rows)
+        commit_info = {"cccc3333": {"status": "code-identical", "detail": "results/docs only"}}
+        md = generate_table(data, base_commit="aaaa1111", commit_info=commit_info)
+        assert "Matched-commit" in md
+        assert "cccc3333" in md
+
+    def test_multi_sha_dirty_manifest_warning(self):
+        """With multiple SHAs and dirty manifests, show dirty warning."""
+        rows = [
+            _row(git_sha="aaaa1111", value=1.0, device="dev1_big"),
+            _row(git_sha="bbbb2222", value=2.0, device="dev2_big"),
+        ]
+        data = extract_metrics(rows)
+        md = generate_table(data)  # no base_commit → fallback path
+        assert "Commit mismatch" in md or "dirty" in md.lower()
+
+    def test_multi_commit_note_per_row(self):
+        """When an entry has multiple SHAs, the note 'multi-commit' appears."""
+        rows = [
+            _row(git_sha="aaaa1111", device="dev_big", repeat_count=1),
+            _row(git_sha="bbbb2222", device="dev_big", repeat_count=1),
+        ]
+        data = extract_metrics(rows)
+        md = generate_table(data)
+        assert "multi-commit" in md
+
+    def test_int8_speedup_without_fp32_baseline(self):
+        """When int8 exists but no fp32 baseline, speedup shows '—'."""
+        rows = [_row(quant="int8", value=2.0, device="rk3588-t3_big")]
+        data = extract_metrics(rows)
+        md = generate_table(data)
+        assert "INT8 vs FP32" in md
+        # No fp32 data → em dash for speedup
+        assert "—" in md
+
+    def test_q8_0_speedup_calculation(self):
+        """Q8_0 speedup is correctly computed as ratio."""
+        rows = [
+            _row(quant="fp32", value=1.0, device="rk3588-t3_big"),
+            _row(quant="q8_0", value=3.0, device="rk3588-t3_big"),
+        ]
+        data = extract_metrics(rows)
+        md = generate_table(data)
+        assert "Q8_0 vs FP32" in md
+        assert "3.00×" in md
+
+    def test_data_sources_section(self):
+        """Generated table ends with a Data Sources section."""
+        data = extract_metrics([_row()])
+        md = generate_table(data)
+        assert "## Data Sources" in md
+
+
+# ---------------------------------------------------------------------------
+# _check_commit_lineage — git-provenance classification
+# ---------------------------------------------------------------------------
+
+# Real commits from this repo's history, chosen so that each branch of
+# _check_commit_lineage is exercised.  These are stable SHAs — they reference
+# the project's own history and will never be garbage-collected.
+_BASE = "54c94df"  # "t4: device-fleet bench rk3588-t4 (ob-8ms.3)"
+_DESC_CODE_IDENTICAL = "2619f8d"  # descendant of _BASE, only results/docs/tests changed
+_ANCESTOR = "8227e98"  # ancestor of _BASE (pre-dates it)
+# For the diverged case we use a different base: the very first commit has
+# descendants that added kernel source files (src/, bench/).
+_BASE_EARLY = "dd50acd"  # "Create project brief for Qwen3.5 optimization"
+_DESC_DIVERGED = "9c8d239"  # descendant of _BASE_EARLY, touches src/ (kernel)
+
+
+class TestCheckCommitLineage:
+    """Test the git-provenance commit classifier."""
+
+    def test_base_commit_self_matches(self):
+        """The base commit itself is classified as 'matched'."""
+        result = _check_commit_lineage(_BASE, {_BASE})
+        assert result[_BASE]["status"] == "matched"
+
+    def test_code_identical_descendant(self):
+        """A descendant with no kernel-affecting changes is 'code-identical'."""
+        result = _check_commit_lineage(_BASE, {_DESC_CODE_IDENTICAL})
+        entry = result[_DESC_CODE_IDENTICAL]
+        assert entry["status"] == "code-identical"
+
+    def test_diverged_descendant(self):
+        """A descendant with kernel-affecting changes is 'diverged'."""
+        result = _check_commit_lineage(_BASE_EARLY, {_DESC_DIVERGED})
+        entry = result[_DESC_DIVERGED]
+        assert entry["status"] == "diverged"
+
+    def test_pre_matched_ancestor(self):
+        """A commit that predates the base is 'pre-matched'."""
+        result = _check_commit_lineage(_BASE, {_ANCESTOR})
+        entry = result[_ANCESTOR]
+        assert entry["status"] == "pre-matched"
+
+    def test_unresolvable_sha_is_unknown(self):
+        """A SHA that git cannot resolve is classified as 'unknown'."""
+        result = _check_commit_lineage(_BASE, {"zzzz999"})
+        assert result["zzzz999"]["status"] == "unknown"
+
+    def test_mixed_commits(self):
+        """Multiple statuses appear when a mix of commits is passed."""
+        # Use _BASE for matched/code-identical/pre-matched, _BASE_EARLY for diverged
+        result_a = _check_commit_lineage(_BASE, {_BASE, _DESC_CODE_IDENTICAL, _ANCESTOR})
+        statuses_a = {ci["status"] for ci in result_a.values()}
+        assert "matched" in statuses_a
+        assert "code-identical" in statuses_a
+        assert "pre-matched" in statuses_a
+
+        result_b = _check_commit_lineage(_BASE_EARLY, {_DESC_DIVERGED})
+        assert result_b[_DESC_DIVERGED]["status"] == "diverged"
+
+    def test_diverged_detail_lists_files(self):
+        """The diverged detail string lists the changed kernel files."""
+        result = _check_commit_lineage(_BASE_EARLY, {_DESC_DIVERGED})
+        entry = result[_DESC_DIVERGED]
+        assert entry["status"] == "diverged"
+        # The detail should mention at least one of the kernel-pattern files
+        assert any(
+            kw in entry["detail"] for kw in ("bench", "src", "include", "build_device", "run_e2e")
+        )

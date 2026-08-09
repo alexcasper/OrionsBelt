@@ -2,7 +2,9 @@
   "caller": {},
   "git": {
     "dirty": true,
-    "sha": "cceb04c8d9537a7398d44f0ca2ea6e82e487143d"
+    "sha": "cceb04c8d9537a7398d44f0ca2ea6e82e487143d",
+    "sha_resolved": "f1004bb1f522eadb7e8244a884525c66e3ff1902",
+    "sha_note": "Original SHA from t3 pre-rebase branch; equivalent commit: t3: big.LITTLE affinity policy study (ob-dqu)"
   },
   "host": {
     "core_count": 8,

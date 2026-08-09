@@ -2,7 +2,9 @@
   "caller": {},
   "git": {
     "dirty": true,
-    "sha": "aad6189071736d17282a8545ecbe6501b566c6c6"
+    "sha": "aad6189071736d17282a8545ecbe6501b566c6c6",
+    "sha_note": "SHA is unrecoverable -- not present in this repo's git history (checked git cat-file -t, git rev-list --all, git fsck --unreachable --dangling; no equivalent commit found, unlike the other stale-SHA manifests in this batch which had commit-message breadcrumbs). The commit was lost during a branch rebase/force-push before this SHA reached any remote-tracked branch. Result is dirty=true and remains a valid measurement; only full commit-lineage tracking is broken for this manifest. See ob-mrd.18.",
+    "sha_resolved": null
   },
   "host": {
     "core_count": 8,

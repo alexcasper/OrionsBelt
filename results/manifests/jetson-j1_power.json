@@ -1,6 +1,6 @@
 {
   "device": "jetson-j1",
-  "label": "Jetson Nano (Tegra X1, Cortex-A57 ×4, Armv8.0-A, NEON only)",
+  "label": "Jetson Nano (Tegra X1, Cortex-A57 \u00d74, Armv8.0-A, NEON only)",
   "timestamp": "2026-08-03T01:08:00Z",
   "governor": "performance",
   "python": "3.6.9 (manifest generated manually)",
@@ -10,7 +10,11 @@
   "power_monitor": {
     "chip": "TI INA3221",
     "sysfs": "/sys/devices/50000000.host1x/546c0000.i2c/i2c-6/6-0040/iio:device0",
-    "rails": ["POM_5V_IN (board total)", "POM_5V_GPU", "POM_5V_CPU"],
+    "rails": [
+      "POM_5V_IN (board total)",
+      "POM_5V_GPU",
+      "POM_5V_CPU"
+    ],
     "sample_interval_ms": 100
   },
   "thermal_zone": "/sys/class/thermal/thermal_zone0/temp",
@@ -21,12 +25,24 @@
       "seq": 64,
       "duration_s": 10.0,
       "throughput_gib_per_s": 0.74,
-      "idle_power_mw": {"board": 1906, "cpu": 448},
-      "avg_load_power_mw": {"board": 2831, "cpu": 1067},
-      "delta_power_mw": {"board": 925, "cpu": 619},
+      "idle_power_mw": {
+        "board": 1906,
+        "cpu": 448
+      },
+      "avg_load_power_mw": {
+        "board": 2831,
+        "cpu": 1067
+      },
+      "delta_power_mw": {
+        "board": 925,
+        "cpu": 619
+      },
       "energy_per_gib_board_mj": 1250,
       "energy_per_gib_cpu_mj": 836,
-      "thermal_c": {"idle": 51.7, "peak": 52.0}
+      "thermal_c": {
+        "idle": 51.7,
+        "peak": 52.0
+      }
     },
     {
       "kernel": "gdn_causal_dwconv1d",
@@ -34,12 +50,24 @@
       "seq": 64,
       "duration_s": 10.0,
       "throughput_gib_per_s": 0.88,
-      "idle_power_mw": {"board": 1934, "cpu": 473},
-      "avg_load_power_mw": {"board": 2837, "cpu": 1148},
-      "delta_power_mw": {"board": 903, "cpu": 675},
+      "idle_power_mw": {
+        "board": 1934,
+        "cpu": 473
+      },
+      "avg_load_power_mw": {
+        "board": 2837,
+        "cpu": 1148
+      },
+      "delta_power_mw": {
+        "board": 903,
+        "cpu": 675
+      },
       "energy_per_gib_board_mj": 1026,
       "energy_per_gib_cpu_mj": 767,
-      "thermal_c": {"idle": 51.7, "peak": 52.0}
+      "thermal_c": {
+        "idle": 51.7,
+        "peak": 52.0
+      }
     },
     {
       "kernel": "gdn_cumdecay",
@@ -47,12 +75,24 @@
       "seq": 64,
       "duration_s": 10.0,
       "throughput_gib_per_s": 1.06,
-      "idle_power_mw": {"board": 1918, "cpu": 444},
-      "avg_load_power_mw": {"board": 2843, "cpu": 1150},
-      "delta_power_mw": {"board": 925, "cpu": 706},
+      "idle_power_mw": {
+        "board": 1918,
+        "cpu": 444
+      },
+      "avg_load_power_mw": {
+        "board": 2843,
+        "cpu": 1150
+      },
+      "delta_power_mw": {
+        "board": 925,
+        "cpu": 706
+      },
       "energy_per_gib_board_mj": 874,
       "energy_per_gib_cpu_mj": 667,
-      "thermal_c": {"idle": 52.0, "peak": 52.5}
+      "thermal_c": {
+        "idle": 52.0,
+        "peak": 52.5
+      }
     }
   ],
   "files": {
@@ -60,5 +100,10 @@
     "power_sustained_dwconv1d": "results/raw/jetson-j1_power_sustained_dwconv1d.csv",
     "power_sustained_cumdecay": "results/raw/jetson-j1_power_sustained_cumdecay.csv",
     "power_sweep": "results/raw/jetson-j1_power_sweep.csv"
+  },
+  "git": {
+    "sha": "7705d79e83994f741a6c988cd37c18a917af3f05",
+    "dirty": false,
+    "sha_note": "SHA added retroactively: manifest was manually generated on Jetson Nano (Python 3.6.9) without git. Points to commit where power CSVs were first committed: j1: INA3221 power/energy sampling (ob-agf.1)."
   }
 }
