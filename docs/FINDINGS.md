@@ -5198,7 +5198,7 @@ int8×int8→int32 dot-product kernel. The ~1.8× gap matches the expected SDOT 
 
 **This is not a hardware discrepancy** — both devices report `asimddp: true` (DOTPROD
 available on A76). When both devices run the same binary, the gap should close to
-the same ~5% FP32 variance. **✅ Confirmed in §37** — t3 re-ran with SDOT binary
+the same ~5% FP32 variance. **✅ Confirmed in §38** — t3 re-ran with SDOT binary
 and the gap closed to 3.0% (4B) and 5.1% (0.8B).
 
 ### Conclusion
@@ -5207,7 +5207,7 @@ The cross-device validation confirms:
 1. **FP32 performance is reproducible** across independent RK3588 silicon (4.8% agreement).
 2. **The O(1) GDN scaling pattern is confirmed on both devices** — neither shows
    context-dependent throughput change for pure-GDN decode.
-3. **INT8 data from t3 reflects a pre-SDOT binary** — **resolved in §37**: t3
+3. **INT8 data from t3 reflects a pre-SDOT binary** — **resolved in §38**: t3
    re-ran with SDOT and the gap closed to 3–5%. Use `rk3588-t3_*_sdot_*` CSVs
    for headline comparisons.
 

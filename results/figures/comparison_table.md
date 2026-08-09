@@ -217,7 +217,7 @@ t4 = 8 tokens (re-run, see per-row manifest for details).
 > sensitive to board-level compute differences.
 > See FINDINGS.md "INT8 weight-only quantization" section for full analysis.
 
-**After SDOT INT8 GEMV kernel (commit `dccee52`, §33/§37):**
+**After SDOT INT8 GEMV kernel (commit `dccee52`, §33/§38):**
 
 | Device | Model | Quant | tok/s | TTFT (ms) | Git SHA | Manifest |
 |---|---|---|---:|---:|---|---|
@@ -230,7 +230,7 @@ t4 = 8 tokens (re-run, see per-row manifest for details).
 > dequant→float32 FMA path, cutting GDN projection and FFN decode time by
 > 1.63× and 1.85× respectively. t3's pre-SDOT INT8 was 1.84 tok/s (4B) / 10.58
 > tok/s (0.8B); with SDOT, 3.34 / 28.94 — a 1.82× and 2.74× speedup. Cross-device
-> agreement tightens to 0.9% (4B) and 1.1% (0.8B). See FINDINGS §33 and §37.
+> agreement tightens to 0.9% (4B) and 1.1% (0.8B). See FINDINGS §33 and §38.
 
 ## 8. OpenMP multi-threading scaling (t4)
 
