@@ -4,12 +4,13 @@
 Data sourced from results/figures/comparison_table.md §7 and FINDINGS.md §33-34.
 Every number traces to a manifest-backed CSV.
 """
+import os
+
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
-import os
-import sys
 
 # ── Data from comparison_table.md §7 (rk3588-t4, A76 big cluster) ──────────────
 
@@ -41,7 +42,7 @@ ax1.set_xticklabels(stages, fontsize=8.5)
 ax1.set_ylabel("Decode throughput (tok/s)", fontsize=11)
 ax1.set_title("Qwen3.5-4B (A76 big cluster)", fontsize=12, fontweight="bold")
 ax1.set_ylim(0, 5.2)
-for bar, val in zip(bars1, tput_4b):
+for bar, val in zip(bars1, tput_4b, strict=True):
     ax1.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.1,
              f"{val:.2f}", ha="center", va="bottom", fontsize=10, fontweight="bold")
 # Annotate cumulative speedup
@@ -58,7 +59,7 @@ ax2.set_xticklabels(stages, fontsize=8.5)
 ax2.set_ylabel("Decode throughput (tok/s)", fontsize=11)
 ax2.set_title("Qwen3.5-0.8B (A76 big cluster)", fontsize=12, fontweight="bold")
 ax2.set_ylim(0, 42)
-for bar, val in zip(bars2, tput_08b):
+for bar, val in zip(bars2, tput_08b, strict=True):
     ax2.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.5,
              f"{val:.1f}", ha="center", va="bottom", fontsize=10, fontweight="bold")
 ax2.annotate("", xy=(4, 37.21), xytext=(0, 0.68),
