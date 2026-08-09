@@ -256,6 +256,15 @@ THERMAL_STRESS_COLS = [
     "elapsed_s",
 ]
 
+RETRIEVAL_CAPACITY_COLS = [
+    "test",
+    "model",
+    "num_keys",
+    "accuracy",
+    "param",
+    "param_value",
+]
+
 # Device spec bandwidth (GiB/s) for sanity-check upper bounds.
 # Vendor datasheets quote GB/s; converted to GiB/s for unit-consistency
 # with the bench binary (÷2^30).  See ADR 0005 for GB/s originals.
@@ -271,7 +280,7 @@ ABSURD_THROUGHPUT = 200.0  # GiB/s
 
 
 def detect_csv_type(header):
-    """Return CSV type: standard, sustained, power, layer_profile, delta_matmul, e2e_decode, ctx_sweep, e2e_sweep, e2e_ctxsweep, gpu_micro, kleidiai_matmul, kleidiai_gdn, prefill_gemm, prefill_ab, quant_comparison, cross_tool_comparison, quant_accuracy, or None."""
+    """Return CSV type: standard, sustained, power, layer_profile, delta_matmul, e2e_decode, ctx_sweep, e2e_sweep, e2e_ctxsweep, gpu_micro, kleidiai_matmul, kleidiai_gdn, prefill_gemm, prefill_ab, quant_comparison, cross_tool_comparison, quant_accuracy, thermal_stress, retrieval_capacity, or None."""
     cols = set(header)
     if cols >= set(STANDARD_COLS):
         return "standard"
@@ -309,6 +318,8 @@ def detect_csv_type(header):
         return "quant_accuracy"
     if cols >= {"iteration", "tok_per_sec", "thermal_zone1_C", "elapsed_s"}:
         return "thermal_stress"
+    if cols >= {"test", "model", "num_keys", "accuracy"}:
+        return "retrieval_capacity"
     return None
 
 
@@ -349,6 +360,8 @@ def expected_columns(csv_type):
         return QUANT_ACCURACY_COLS
     if csv_type == "thermal_stress":
         return THERMAL_STRESS_COLS
+    if csv_type == "retrieval_capacity":
+        return RETRIEVAL_CAPACITY_COLS
     return []
 
 
