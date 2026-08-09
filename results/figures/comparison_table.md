@@ -232,6 +232,22 @@ t4 = 8 tokens (re-run, see per-row manifest for details).
 > tok/s (0.8B); with SDOT, 3.34 / 28.94 — a 1.82× and 2.74× speedup. Cross-device
 > agreement tightens to 0.9% (4B) and 1.1% (0.8B). See FINDINGS §33 and §38.
 
+**After INT4+SDOT hybrid GEMV kernel (commit `3bff376`, §34):**
+
+| Device | Model | Quant | tok/s | TTFT (ms) | Git SHA | Manifest |
+|---|---|---|---:|---:|---|---|
+| rk3588-t4 | 4B   | INT4+SDOT | 4.43 | 226 | `3bff376` | `rk3588-t4_int4sdot_4b.json` |
+| rk3588-t4 | 0.8B | INT4+SDOT | 37.21 | 27 | `3bff376` | `rk3588-t4_int4sdot_08b.json` |
+
+> INT4+SDOT combines K-grouped nibble repack with `vdotq_lane_s32` integer
+> dot-product, achieving 2× memory advantage of INT4 with the compute efficiency
+> of SDOT. vs INT8+SDOT: **1.27×** (4B) and **1.23×** (0.8B) on A76. The A55
+> little cluster does NOT benefit (0.96× — compute-bound, nibble-unpack overhead
+> dominates). t3 INT4+SDOT data not yet captured. See FINDINGS §34.
+>
+> **Cumulative optimization stack (4B A76):** 0.07 → 1.04 → 1.84 → 3.37 → **4.43 tok/s**
+> (~63× over naive FP32 baseline).
+
 ## 8. OpenMP multi-threading scaling (t4)
 
 Qwen3.5-4B, prefill (seq=64), fp32, A76 big cluster.
