@@ -843,6 +843,50 @@ class TestGetManifestSha:
         assert sha == "abc123def456"
 
 
+class TestGetManifestThreads:
+    """Cover get_manifest_threads edge cases."""
+
+    def test_missing_manifest_returns_none(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(fa, "MANIFEST_DIR", str(tmp_path))
+        t, src = fa.get_manifest_threads(str(tmp_path / "nonexistent.csv"))
+        assert t is None
+        assert src is None
+
+    def test_valid_manifest_with_threads(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(fa, "MANIFEST_DIR", str(tmp_path))
+        (tmp_path / "rk3588-t4.json").write_text(
+            json.dumps({"parallelism": {"effective_threads": 4, "threads_source": "taskset"}})
+        )
+        t, src = fa.get_manifest_threads("rk3588-t4.csv")
+        assert t == 4
+        assert src == "taskset"
+
+    def test_manifest_without_parallelism(self, tmp_path, monkeypatch):
+        """A manifest without a parallelism key returns (None, None)."""
+        monkeypatch.setattr(fa, "MANIFEST_DIR", str(tmp_path))
+        (tmp_path / "rk3588-t4.json").write_text(json.dumps({"git": {"sha": "abc123"}}))
+        t, src = fa.get_manifest_threads("rk3588-t4.csv")
+        assert t is None
+        assert src is None
+
+    def test_corrupt_manifest_returns_none(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(fa, "MANIFEST_DIR", str(tmp_path))
+        (tmp_path / "rk3588-t4.json").write_text("{not valid json")
+        t, src = fa.get_manifest_threads("rk3588-t4.csv")
+        assert t is None
+        assert src is None
+
+    def test_big_suffix_finds_shared_manifest(self, tmp_path, monkeypatch):
+        """_big CSV finds the shared manifest (without _big suffix)."""
+        monkeypatch.setattr(fa, "MANIFEST_DIR", str(tmp_path))
+        (tmp_path / "rk3588-t4.json").write_text(
+            json.dumps({"parallelism": {"effective_threads": 8, "threads_source": "default"}})
+        )
+        t, src = fa.get_manifest_threads("rk3588-t4_big.csv")
+        assert t == 8
+        assert src == "default"
+
+
 class TestMainCLI:
     """Cover fleet_analysis.main()."""
 

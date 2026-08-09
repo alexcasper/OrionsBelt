@@ -186,6 +186,7 @@ cutoff has passed with no board; any future arrival is additive bonus per ADR 00
 | #183 | t3 | Regenerated fleet_cross_device.png after t4 PR merge | MERGED |
 | #184 | t4 | Doc consistency fixes — stale counts + PR table backfill | MERGED |
 | #185 | t4 | SDOT/INT4+SDOT e2e fleet data (7 schema CSVs) + DEVPOST/README/submission doc consistency + ~63× cumulative speedup | MERGED |
+| #189 | t4 | Add PR #185 to SUBMISSION_STATUS + fix check_readme_counts bugs (git ls-files, FINDINGS validation, 8 unit tests) | MERGED |
 
 ---
 
