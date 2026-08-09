@@ -16,7 +16,8 @@ from __future__ import annotations
 import math
 
 import numpy as np
-from scripts.ort_gdn_probe import numpy_gdn_reference
+import pytest
+from scripts.ort_gdn_probe import build_gdn_loop_model, main, numpy_gdn_reference
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -261,3 +262,207 @@ class TestInvariants:
         # attn should reflect the updated state (which has v[0]=3 at [0,0]),
         # not the pre-update zero state.
         assert attn[0, 0] > 0, "Attention must use post-update state"
+
+
+# ---------------------------------------------------------------------------
+# build_gdn_loop_model — ONNX model construction
+# ---------------------------------------------------------------------------
+
+
+class TestBuildGdnLoopModel:
+    """Test build_gdn_loop_model() — ONNX model construction."""
+
+    def test_returns_model_and_data(self):
+        """build_gdn_loop_model returns (model, q, k, v, g, beta)."""
+        model, q, k, v, g, beta = build_gdn_loop_model(head_dim=8, seq_len=4)
+        assert model is not None
+        assert q.shape == (4, 8)
+        assert k.shape == (4, 8)
+        assert v.shape == (4, 8)
+        assert g.shape == (4,)
+        assert beta.shape == (4,)
+
+    def test_model_passes_checker(self):
+        """The built model passes onnx.checker.check_model."""
+        model, *_ = build_gdn_loop_model(head_dim=8, seq_len=4)
+        import onnx
+
+        onnx.checker.check_model(model)
+
+    def test_model_has_loop_node(self):
+        """The outer graph contains a Loop node."""
+        model, *_ = build_gdn_loop_model(head_dim=8, seq_len=4)
+        op_types = [n.op_type for n in model.graph.node]
+        assert "Loop" in op_types
+
+    def test_model_opset_17(self):
+        """Model uses opset 17."""
+        model, *_ = build_gdn_loop_model(head_dim=8, seq_len=4)
+        assert any(op.domain == "" and op.version == 17 for op in model.opset_import)
+
+    def test_custom_data_used(self):
+        """When custom data is provided, it's returned unchanged."""
+        q_data = np.ones((4, 8), dtype=np.float32) * 0.5
+        k_data = np.ones((4, 8), dtype=np.float32) * 0.3
+        v_data = np.ones((4, 8), dtype=np.float32) * 0.7
+        g_data = np.zeros(4, dtype=np.float32)
+        beta_data = np.ones(4, dtype=np.float32) * 0.2
+
+        _, q, k, v, g, beta = build_gdn_loop_model(
+            head_dim=8,
+            seq_len=4,
+            q_data=q_data,
+            k_data=k_data,
+            v_data=v_data,
+            g_data=g_data,
+            beta_data=beta_data,
+        )
+        np.testing.assert_array_equal(q, q_data)
+        np.testing.assert_array_equal(k, k_data)
+        np.testing.assert_array_equal(v, v_data)
+
+    def test_custom_scale(self):
+        """A custom scale is baked into the model body initializer."""
+        model, *_ = build_gdn_loop_model(head_dim=8, seq_len=4, scale=0.25)
+        from onnx import numpy_helper
+
+        for node in model.graph.node:
+            if node.op_type == "Loop":
+                for attr in node.attribute:
+                    if attr.name == "body":
+                        for init in attr.g.initializer:
+                            if init.name == "scale_val":
+                                assert float(numpy_helper.to_array(init)) == 0.25
+                                return
+        pytest.fail("scale_val not found in model body")
+
+    def test_body_has_gather_nodes(self):
+        """Body subgraph uses Gather for per-token data access."""
+        model, *_ = build_gdn_loop_model(head_dim=8, seq_len=4)
+        for node in model.graph.node:
+            if node.op_type == "Loop":
+                for attr in node.attribute:
+                    if attr.name == "body":
+                        body_ops = [n.op_type for n in attr.g.node]
+                        assert body_ops.count("Gather") == 5
+                        return
+        pytest.fail("Loop body not found")
+
+    def test_default_scale_is_inv_sqrt(self):
+        """Default scale = 1/sqrt(head_dim)."""
+        V = 16
+        model, *_ = build_gdn_loop_model(head_dim=V, seq_len=4)
+        from onnx import numpy_helper
+
+        for node in model.graph.node:
+            if node.op_type == "Loop":
+                for attr in node.attribute:
+                    if attr.name == "body":
+                        for init in attr.g.initializer:
+                            if init.name == "scale_val":
+                                val = float(numpy_helper.to_array(init))
+                                assert abs(val - 1.0 / np.sqrt(V)) < 1e-6
+                                return
+        pytest.fail("scale_val not found")
+
+
+# ---------------------------------------------------------------------------
+# main — integration with ORT
+# ---------------------------------------------------------------------------
+
+
+class TestMain:
+    """Test main() — full ORT probe pipeline with tiny dimensions."""
+
+    def test_main_success(self, monkeypatch, capsys):
+        """main() builds model, runs ORT, checks correctness — returns 0."""
+        monkeypatch.setattr(
+            "sys.argv",
+            ["ort_gdn_probe.py", "--tokens", "4", "--dim", "8"],
+        )
+        rc = main()
+        assert rc == 0
+        captured = capsys.readouterr()
+        assert "PASS" in captured.out
+        assert "VERDICT" in captured.out
+
+    def test_main_benchmark(self, monkeypatch, capsys):
+        """main() with --benchmark reports timing."""
+        monkeypatch.setattr(
+            "sys.argv",
+            [
+                "ort_gdn_probe.py",
+                "--tokens",
+                "4",
+                "--dim",
+                "8",
+                "--benchmark",
+                "--repeats",
+                "3",
+            ],
+        )
+        rc = main()
+        assert rc == 0
+        captured = capsys.readouterr()
+        assert "Benchmark" in captured.out
+        assert "tok/s" in captured.out
+
+    def test_main_default_args(self, monkeypatch):
+        """main() works with default arguments (tokens=8, dim=128)."""
+        monkeypatch.setattr("sys.argv", ["ort_gdn_probe.py"])
+        rc = main()
+        assert rc == 0
+
+
+class TestMainErrorPaths:
+    """Cover error-handling branches in main()."""
+
+    def test_build_failure_returns_1(self, monkeypatch, capsys):
+        """When build_gdn_loop_model raises, main() returns 1."""
+        monkeypatch.setattr(
+            "sys.argv", ["ort_gdn_probe.py", "--tokens", "4", "--dim", "8"],
+        )
+
+        def _boom(**kw):
+            raise RuntimeError("bad model")
+
+        monkeypatch.setattr("scripts.ort_gdn_probe.build_gdn_loop_model", _boom)
+        rc = main()
+        assert rc == 1
+        captured = capsys.readouterr()
+        assert "FAIL" in captured.out
+
+    def test_session_failure_returns_1(self, monkeypatch, capsys):
+        """When ORT session creation fails, main() returns 1."""
+        monkeypatch.setattr(
+            "sys.argv", ["ort_gdn_probe.py", "--tokens", "4", "--dim", "8"],
+        )
+
+        import onnxruntime as ort
+
+        def _boom(*a, **kw):
+            raise RuntimeError("no EP")
+
+        monkeypatch.setattr(ort, "InferenceSession", _boom)
+        rc = main()
+        assert rc == 1
+        captured = capsys.readouterr()
+        assert "FAIL" in captured.out
+
+    def test_inference_failure_returns_1(self, monkeypatch, capsys):
+        """When sess.run raises, main() returns 1."""
+        monkeypatch.setattr(
+            "sys.argv", ["ort_gdn_probe.py", "--tokens", "4", "--dim", "8"],
+        )
+
+        import onnxruntime as ort
+
+        class FakeSession:
+            def run(self, *_a, **_kw):
+                raise RuntimeError("inference failed")
+
+        monkeypatch.setattr(ort, "InferenceSession", lambda *a, **kw: FakeSession())
+        rc = main()
+        assert rc == 1
+        captured = capsys.readouterr()
+        assert "FAIL" in captured.out
