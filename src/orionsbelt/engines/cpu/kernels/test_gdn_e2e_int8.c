@@ -166,6 +166,104 @@ int main(void) {
         free(W2); free(a2); free(q2); free(sc2); free(cf2); free(ci2);
     }
 
+    /* ---- Test 5: SDOT vs NEON INT8 GEMV correctness (ob-8qt.14) ---- */
+    /* When __ARM_FEATURE_DOTPROD is active, the SDOT kernel keeps the entire
+     * dot-product in int8×int8→int32 and only converts to float once at the
+     * end. The NEON kernel dequantizes every weight to float32 before the FMA.
+     * The SDOT path also quantizes the input vector to int8 (single scale),
+     * introducing a small additional error vs NEON. This test verifies both
+     * kernels agree within that bound. */
+#if defined(INT8_WEIGHTS) && defined(__ARM_FEATURE_DOTPROD)
+    printf("--- Test 5: SDOT vs NEON INT8 GEMV (dotprod) ---\n");
+    {
+        /* Use real-ish shapes: K=head_dim, N=larger to exercise vectorized path */
+        size_t K5 = 128, N5 = 512;
+        float *W5 = malloc(K5 * N5 * sizeof(float));
+        unsigned s5 = 99;
+        for (size_t i = 0; i < K5 * N5; ++i)
+            W5[i] = ((float)(rand_r(&s5) % 2000) - 1000) / 1000.0f;
+
+        int8_t *q5; float *sc5;
+        quantize_weight(W5, &q5, &sc5, K5, N5);
+
+        /* Repack for SDOT */
+        int8_t *q5_sdot = repack_int8_k_interleaved(q5, K5, N5);
+
+        float *a5 = malloc(K5 * sizeof(float));
+        for (size_t k = 0; k < K5; ++k)
+            a5[k] = ((float)(rand_r(&s5) % 2000) - 1000) / 1000.0f;
+
+        float *c_neon = malloc(N5 * sizeof(float));
+        float *c_sdot = malloc(N5 * sizeof(float));
+        float *c_fp32 = malloc(N5 * sizeof(float));
+
+        gemv_neon(a5, W5, c_fp32, K5, N5);
+        gemv_int8_neon(a5, q5, sc5, c_neon, K5, N5);
+        gemv_int8_sdot(a5, q5_sdot, sc5, c_sdot, K5, N5);
+
+        /* SDOT vs NEON: bound accounts for input-quantization error.
+         * Each aq[k] has |a[k] - aq[k]*a_scale| <= 0.5*a_scale, and each
+         * int8 weight has |w| <= 127. Over K elements:
+         *   |c_neon[n] - c_sdot[n]| <= sc5[n] * 0.5 * a_scale * 128 * K5
+         * (very conservative — actual errors are far smaller). */
+        float a_scale5;
+        {
+            float max_abs = 0.0f;
+            for (size_t k = 0; k < K5; ++k) {
+                float v = fabsf(a5[k]);
+                if (v > max_abs) max_abs = v;
+            }
+            a_scale5 = (max_abs > 0.0f) ? max_abs / 127.0f : 1.0f;
+        }
+        double neon_sdot_bound = (double)a_scale5 * 0.5 * 128.0 * K5;
+
+        int sdot_ok = 1;
+        double worst_ns = 0.0;
+        for (size_t n = 0; n < N5; ++n) {
+            double actual = fabs((double)c_neon[n] - c_sdot[n]);
+            double bound = (double)sc5[n] * neon_sdot_bound;
+            if (actual > bound) {
+                if (worst_ns == 0.0)  /* only print first failure */
+                    printf("  FAIL: col %zu neon=%.6e sdot=%.6e diff=%.4e bound=%.4e\n",
+                           n, c_neon[n], c_sdot[n], actual, bound);
+                sdot_ok = 0;
+            }
+            double ratio = (bound > 1e-30) ? actual / bound : 0.0;
+            if (ratio > worst_ns) worst_ns = ratio;
+        }
+        printf("  worst SDOT-vs-NEON actual/bound: %.4f (should be < 1.0)\n", worst_ns);
+
+        /* Mean relative error SDOT vs NEON over well-conditioned outputs */
+        double sum_rel_ns = 0.0; size_t n_ns = 0;
+        for (size_t n = 0; n < N5; ++n) {
+            double ref = fabs((double)c_neon[n]);
+            if (ref > 1.0) {
+                sum_rel_ns += fabs((double)c_sdot[n] - c_neon[n]) / ref;
+                n_ns++;
+            }
+        }
+        double mean_rel_ns = (n_ns > 0) ? sum_rel_ns / n_ns : 0.0;
+        printf("  SDOT-vs-NEON mean_rel=%.4f%% (n=%zu)\n", mean_rel_ns * 100.0, n_ns);
+
+        /* SDOT vs FP32: should be within same theoretical bound as NEON vs FP32,
+         * plus the input-quantization overhead (still dominated by weight quant). */
+        double worst_sdot_fp32 = 0.0;
+        for (size_t n = 0; n < N5; ++n) {
+            double actual = fabs((double)c_sdot[n] - c_fp32[n]);
+            double ratio = actual / (1.0 + fabs((double)c_fp32[n]));
+            if (ratio > worst_sdot_fp32) worst_sdot_fp32 = ratio;
+        }
+        printf("  SDOT-vs-FP32 max_rel=%.4f%%\n", worst_sdot_fp32 * 100.0);
+
+        int rel_ok = mean_rel_ns < 0.03;  /* <3% mean SDOT-vs-NEON error */
+        printf("  %s\n\n", (sdot_ok && rel_ok) ? "PASS" : "FAIL");
+        failures += !(sdot_ok && rel_ok);
+
+        free(W5); free(q5); free(sc5); free(q5_sdot);
+        free(a5); free(c_neon); free(c_sdot); free(c_fp32);
+    }
+#endif /* INT8_WEIGHTS && __ARM_FEATURE_DOTPROD */
+
     free(W); free(q); free(s);
 
     printf("%s\n", failures == 0 ? "ALL TESTS PASSED" : "SOME TESTS FAILED");

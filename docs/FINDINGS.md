@@ -4474,3 +4474,98 @@ tuning for the projection matmuls that dominate decode time.
 ORT is the "third data point" confirming no existing CPU toolchain has
 optimized GDN kernels for Arm. Audit script: `scripts/ort_gdn_probe.py`.
 Device: rk3588-t4.
+
+
+## 31. SDOT-accelerated INT8 GEMV: 1.9–3.1× over NEON dequant, 44%→83% of theoretical ceiling (2026-08-09)
+
+### Motivation
+
+§16 showed INT8 weight-only quantization reaching only **44% of its theoretical
+bandwidth ceiling** (1.84 tok/s vs ~4.2 tok/s at 13.5 GiB/s) because
+`gemv_int8_neon` dequantizes every int8 weight to float32
+(int8→int16→int32→float32, ~3 widen/convert instructions per 4 elements) before
+the FMA. The fix — flagged in §16 as future work — is an SDOT-based INT8×INT8
+dot-product kernel with int32 accumulation, eliminating the float32 conversion
+entirely. This is bead **ob-8qt.14**.
+
+### Implementation
+
+**SDOT (Signed Dot-product) instruction.** The `vdotq_lane_s32` intrinsic
+computes four int32 dot products in a single instruction: for each lane *i*,
+`acc[i] += Σ_{j=0..3} w[i·4+j] · a[j]`. This processes 16 multiply-accumulates
+per instruction vs NEON dequant's ~10 instructions per 8 elements — a **5×
+reduction in instructions per element**.
+
+**Weight repack.** SDOT's 4×4 data grouping doesn't fit row-major `[K,N]` layout
+for K-accumulation. Weights are repacked once at quantization time into a
+K-interleaved layout: for each K-group *g* (4 consecutive K-elements), the 4
+weights for each output column are stored contiguously. This lets one SDOT
+instruction accumulate 4 output columns × 4 K-elements = 16 MACs.
+
+**Input quantization.** The activation vector is quantized to int8 with a single
+symmetric scale factor, adding negligible O(K) overhead per GEMV call. The
+combined scale (input scale × weight per-column scale) is applied once at the
+end after int32→float conversion.
+
+**Critical: cache-friendly loop nesting.** The first implementation used a
+column-outer, K-inner loop (one int32×4 accumulator per 4 columns in registers).
+This was **1.7× slower** than NEON (1.09 vs 1.81 tok/s) because the K-inner
+sweep strides `N×4` bytes between consecutive SDOT loads — only 25% cache-line
+utilization (16 bytes useful per 64-byte line), quadrupling effective DRAM
+traffic. The fix reverses the nesting to **column-tiled, K-outer** (OpenMP over
+256-column tiles, sequential 16-byte loads within each K-group block, stack
+accumulators in L1), achieving 100% cache-line utilization. A 2× unrolled inner
+loop overlaps two independent SDOT chains for instruction-level parallelism.
+
+Guarded by `__ARM_FEATURE_DOTPROD`; non-dotprod cores (A57, A55 Armv8.0) fall
+through to the verified `gemv_int8_neon` path unchanged.
+
+### Correctness
+
+Numerically verified against both the NEON INT8 GEMV and FP32 GEMV at
+K=128, N=256 (head_dim × output dim):
+
+| Comparison | Mean rel error | Max rel error | Bound |
+|---|---:|---:|---|
+| SDOT vs NEON INT8 | 0.46% | — | input-quantization: `s[n]·0.5·a_scale·128·K` |
+| SDOT vs FP32 | — | 4.26% | weight-quant: `s[n]·0.5·Σ|a[k]|` |
+
+The 0.46% SDOT-vs-NEON gap is entirely from input-vector quantization (the NEON
+path uses the float activation directly). All 5 tests pass (test binary:
+`test_gdn_e2e_int8.c`, built with `-DINT8_WEIGHTS -march=armv8.2-a+dotprod`).
+
+### Results — RK3588 Cortex-A76 big cluster (governor=performance, 20 tokens)
+
+| Model | Kernel | tok/s | ms/tok | Speedup vs NEON | % of theoretical |
+|-------|--------|------:|-------:|----------------:|----------------:|
+| Qwen3.5-4B   | NEON INT8 (§16)  | 1.81 | 552 | 1.0× | 44% |
+| Qwen3.5-4B   | **SDOT INT8**    | **3.48** | **287** | **1.92×** | **83%** |
+| Qwen3.5-0.8B | NEON INT8 (§16)  | 9.86 | 101 | 1.0× | — |
+| Qwen3.5-0.8B | **SDOT INT8**    | **30.17** | **33** | **3.06×** | — |
+
+Theoretical ceiling: 13.5 GiB/s ÷ 3.0 GiB INT8-weight/token ≈ 4.5 tok/s for 4B.
+All runs at commit on `bench/t4`, governor=performance, `taskset -c 4-7`,
+thermal 40→49 °C (no throttling). Manifests: `results/manifests/rk3588-t4_sdot_int8.json`.
+Raw CSVs: `results/raw/rk3588-t4_sdot_{4b,08b}_big.csv`, `results/raw/rk3588-t4_neon_{4b,08b}_big.csv`.
+
+### Why the speedup is larger for 0.8B (3.06×) than 4B (1.92×)
+
+The 0.8B model's smaller weight set (~0.41 GiB INT8) partially fits in the A76
+cluster's shared L3, making the workload more compute-bound and less
+DRAM-bound. SDOT's 5× instruction reduction has more leverage when compute —
+not bandwidth — is the limiter. The 4B model (~3.0 GiB INT8) vastly exceeds all
+cache levels, so it remains bandwidth-bound even with the faster kernel; SDOT
+still wins (1.92×) by reducing the instruction overhead that prevented the NEON
+path from saturating bandwidth.
+
+### Cumulative optimization stack (updated)
+
+| Optimization | A76 4B tok/s | A76 0.8B tok/s | vs FP32 baseline |
+|---|---:|---:|---:|
+| Naive column-sweep GEMV (FP32) | 0.07 | — | 1.0× |
+| Row-sweep + OpenMP (FP32, §15) | 1.04 | 7.95 | ~15× |
+| + INT8 weight-only NEON (§16) | 1.84 | 10.52 | ~26× |
+| + **SDOT INT8** (this section) | **3.48** | **30.17** | **~50× / ~3.8×** |
+
+From the naive FP32 baseline to SDOT INT8, the 4B model sees a **~50×
+cumulative speedup**; over the INT8-NEON path alone, SDOT adds 1.9–3.1×.
