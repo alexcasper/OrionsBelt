@@ -1630,6 +1630,13 @@ int main(int argc, char **argv) {
         return 1;
     }
 
+#ifndef INT4_WEIGHTS
+    (void)verify_int4;
+#endif
+#if !defined(Q80_WEIGHTS) && !defined(INT8_WEIGHTS) && !defined(INT4_WEIGHTS)
+    (void)verify_quant;
+#endif
+
     /* ---- --verify-matmul: correctness check of gemm_neon vs naive (ob-8qt.15) ----
      *
      * Runs both matmul implementations on small test cases covering the actual
