@@ -5522,3 +5522,42 @@ architecture. Full end-to-end fine-tuning is needed for a fair comparison.
 | 100-step random | `937ba25` | rk3588-t3 A76 | `gdn2_swap_100step_t3.json` |
 | RULER GDN-1 | `1743c3e` | rk3588-t3 A76 | `ruler_gdn1_t3.json` |
 | RULER GDN-2 | `1743c3e` | rk3588-t3 A76 | `ruler_gdn2_t3.json` |
+
+### RK3588 unit-to-unit cross-check: t3 vs t4 (ob-8ms.3)
+
+Both boards are RK3588 (Cortex-A76 big @ cores 4-7, Cortex-A55 little @ cores 0-3).
+Governor = performance, --repeats 30, manifest provenance on both runs.
+
+**DRAM-bandwidth ceiling is identical across units.** gdn_cumdecay_f16 on big
+cores gives exactly 36.13 GiB/s (40.544 µs) on both t3 and t4 — the kernel is
+purely memory-bound and both boards share the same LPDDR4X subsystem.
+
+**Compute-bound scan kernels diverge ±20-30%, asymmetrically by model size:**
+
+| Kernel (big cores, fp32) | Model | T4 GiB/s | T3 GiB/s | Δ |
+|--------------------------|-------|----------|----------|------|
+| gdn_gated_scan | 4B (4096ch) | 11.53 | 10.33 | +11.6% |
+| gdn_gated_scan | 0.8B (2048ch) | 11.28 | 15.42 | -26.9% |
+| gdn2_gated_scan | 4B (4096ch) | 7.14 | 9.04 | -21.0% |
+| gdn2_gated_scan | 0.8B (2048ch) | 8.26 | 10.35 | -20.2% |
+
+T4 is faster on the larger working set (4096ch) but slower on the smaller one
+(2048ch). The 0.8B scan timings on t3 are suspiciously uniform across
+precisions (~96 µs for fp32/f16/bf16), suggesting the kernel is L2-resident on
+t3 at that size. T4 shows more precision sensitivity (~129-131 µs).
+
+**Little-core scans: t4 generally faster, t3 showed thermal instability.**
+T3's gdn_gated_scan on little cores had 40.9% p50/p95 spread (vs t4's 18.0%),
+indicating throttling or background interference during t3's run.
+
+**Implication for fleet methodology:** single-device numbers carry ±20-30%
+unit-to-unit noise on compute-bound kernels. Report ranges across the fleet,
+not single points. Memory-bound kernels (f16 cumdecay) are reproducible to
+<1%.
+
+### Provenance (cross-check)
+
+| Device | Commit | Manifest |
+|--------|--------|----------|
+| rk3588-t4 | `8227e98` | `results/manifests/rk3588-t4.json` |
+| rk3588-t3 | `47efdf8` | `results/manifests/rk3588-t3.json` |
