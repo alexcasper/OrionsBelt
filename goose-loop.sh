@@ -12,7 +12,8 @@ LOG="$HOME/OrionsBelt/.goose-loop.log"; TASK="$HOME/OrionsBelt/.goose-task.md"; 
 # concurrently (seen on t3 2026-08-09: two sessions spawned two goose
 # agents; the stale one generated 146 runaway gitignored manifests).
 # Anchored ^bash excludes the tmux wrapper that launches this script.
-_OTHER=$(pgrep -f "^bash goose-loop.sh" | grep -v "^$$\$" | head -1)
+# The .* handles full-path invocation (bash /home/.../goose-loop.sh).
+_OTHER=$(pgrep -f '^bash.*goose-loop\.sh' | grep -v "^$$\$" | head -1)
 if [ -n "$_OTHER" ]; then
   echo "[guard] another goose-loop.sh (PID $_OTHER) is already running — exiting" >>"$LOG"
   exit 0
