@@ -25,6 +25,7 @@ import csv
 import json
 import math
 import os
+import re
 import subprocess
 import sys
 
@@ -1018,6 +1019,69 @@ def validate_manifest(csv_name, csv_type, row_count, manifest_path, issues, head
 # ---------------------------------------------------------------------------
 
 
+def check_readme_counts(issues, repo_root="."):
+    """Cross-check README.md's "Results so far" line against the real counts.
+
+    This exact line has regressed repeatedly (at least 6 times in one
+    session) because agents hand-edit it without recounting, most often
+    getting the figures count wrong by including results/figures/README.md
+    (an index file, not a generated figure -- the line's own surrounding
+    comment already documents this, but gets missed). Catching it here
+    means the next validate_results.py run flags it instead of a human
+    or reviewer having to notice by eye.
+    """
+    readme_path = os.path.join(repo_root, "README.md")
+    if not os.path.isfile(readme_path):
+        return
+    with open(readme_path) as f:
+        readme_text = f.read()
+
+    # FINDINGS section count deliberately not cross-checked here: the
+    # counting convention behind that number has never been fully pinned
+    # down (a plain `grep -c "^## [0-9]"` disagrees with it by a wide,
+    # inconsistent margin), unlike CSVs/manifests/figures which reliably
+    # match a plain recursive file count every time.
+    m = re.search(
+        r"Results so far:\*\*\s*(\d+)\s*CSVs.*?,\s*(\d+)\s*provenance manifests,\s*"
+        r"(\d+)\s*generated figures/tables",
+        readme_text,
+    )
+    if not m:
+        return
+    claimed_csvs, claimed_manifests, claimed_figures = (int(x) for x in m.groups())
+
+    def _count_files(dirpath, suffix=None, exclude_name=None):
+        total = 0
+        for root, _dirs, files in os.walk(os.path.join(repo_root, dirpath)):
+            for fname in files:
+                if suffix and not fname.endswith(suffix):
+                    continue
+                if exclude_name and fname == exclude_name:
+                    continue
+                total += 1
+        return total
+
+    actual_csvs = _count_files("results/raw", suffix=".csv")
+    actual_manifests = _count_files("results/manifests", suffix=".json")
+    actual_figures = _count_files("results/figures", exclude_name="README.md")
+
+    mismatches = []
+    if claimed_csvs != actual_csvs:
+        mismatches.append(f"CSVs: README says {claimed_csvs}, actual is {actual_csvs}")
+    if claimed_manifests != actual_manifests:
+        mismatches.append(
+            f"manifests: README says {claimed_manifests}, actual is {actual_manifests}"
+        )
+    if claimed_figures != actual_figures:
+        mismatches.append(
+            f"figures: README says {claimed_figures}, actual is {actual_figures} "
+            f"(excludes results/figures/README.md)"
+        )
+
+    for mismatch in mismatches:
+        issues.append(Issue("WARNING", "README.md", f"stale 'Results so far' line -- {mismatch}"))
+
+
 def main():
     parser = argparse.ArgumentParser(description="Validate benchmark CSVs and manifests.")
     parser.add_argument(
@@ -1077,6 +1141,8 @@ def main():
     # Check ablation CSVs (subdirectory) — different schema, manifest_ref in rows
     ablation_dir = os.path.join(args.csv_dir, "ablation")
     check_ablation_manifests(ablation_dir, all_issues)
+
+    check_readme_counts(all_issues)
 
     # Report
     errors = [i for i in all_issues if i.severity == "ERROR"]
