@@ -3077,9 +3077,24 @@ ran **single-thread**. The committed manifests contradict this:
 
 `t3-clean` is an **8-thread** run; `t4-clean` is genuinely **1-thread**. The
 1.25–4.87× "gap" is therefore primarily an **8-thread-vs-1-thread** confound,
-not evidence of a hardware difference. **No genuine single-thread t3 run
-exists** in committed data, so a strict 1-thread t3↔t4 comparison is not
-currently possible.
+not evidence of a hardware difference.
+
+**Update (ob-mrd.13, 2026-08-07):** A genuine single-thread t3 run was captured
+(`rk3588-t3-clean-singlethread.csv`, OMP_NUM_THREADS=1, taskset -c 4,
+governor=performance, dirty=false, commit `c772cf4`). The 1-thread t3↔t4
+comparison:
+
+| Kernel (4B, seq=64) | t3 1-thread GiB/s | t4 1-thread GiB/s | t4÷t3 |
+|---|---:|---:|---:|
+| gdn_cumdecay | 7.01 | 7.04 | **1.00×** |
+| gdn_gated_scan | 3.07 | 5.74 | **1.87×** |
+| gdn_causal_dwconv1d | 6.02 | 6.93 | **1.15×** |
+
+Cumulative decay is **essentially identical** (1.00×) — the two boards have the
+same A76 core IP and LPDDR4x bandwidth class. Gated scan, however, shows a
+genuine **1.87× board-level difference**, likely from a memory-subsystem or
+interconnect difference that the scan's sequential recurrence pattern exposes
+but the cumulative-decay pattern does not.
 
 The **equal-thread-count** comparison removes the confound. Both boards at
 8-thread (`rk3588-t4_big.csv` / `rk3588-t4.json` vs `rk3588-t3-clean.csv`):
@@ -3092,10 +3107,11 @@ The **equal-thread-count** comparison removes the confound. Both boards at
 
 At equal thread count the two boards agree to within ~9% (cumdecay/scan) and
 **t4 is marginally faster**, consistent with its higher A76 clock (2400 vs
-2304 MHz). The "gap is REAL and hardware/environmental" conclusion above is
-**not supported** by these runs; it should be treated as unproven pending a
-genuine single-thread t3 capture. `comparison_table.md` carries the matching
-correction.
+2304 MHz). The genuine single-thread comparison (above) confirms that cumdecay
+is identical but gated_scan shows a real ~1.87× board-level difference — the
+"gap is a thread-count artifact" conclusion holds for cumdecay but not for
+gated_scan, where a microarchitectural difference persists even at equal thread
+count. `comparison_table.md` carries the matching correction.
 
 ---
 

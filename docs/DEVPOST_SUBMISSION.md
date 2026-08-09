@@ -131,6 +131,8 @@ Both CIX NOE (Orion O6) and Rockchip RKNN (RK3588) compilers **reject GDN's vari
 
 This is not a bug in one toolchain — it is an **architectural constraint** of current edge NPU compilers: they require static, parallelizable dataflow graphs, and GDN's per-token sequential recurrence violates that. Our kernels run on the CPU because the OoO pipeline handles sequential dependencies well; the NPU's strength (massive parallelism) is exactly the wrong tool for this recurrence.
 
+**Even if the NPU could run GDN layers, the dispatch cost kills the benefit.** A 3:1 hybrid (24 GDN + 8 attention layers) means 16 engine-boundary crossings per token. We measured this cost on the RK3588 Mali-G610 GPU as a proxy for the Orion O6's Immortalis G720: **3.36 ms for 16 crossings** — roughly **10% of the 30 tok/s decode budget** spent purely on engine dispatch overhead, before any useful work. The cost is latency-dominated (a ~0.1 ms dispatch floor per crossing), not bandwidth-dominated. At 30 tok/s (33 ms/token), dispatch alone consumes 3.4 ms — so offloading GDN layers to the NPU would need to save more than 3.36 ms per token just to break even. Full analysis: [`FINDINGS.md §39`](./FINDINGS.md).
+
 ### Fleet cross-device validation
 
 5 devices, 3 core classes (A76, A55, A57), spec bandwidth ranging 15.8–31.7 GiB/s:
@@ -199,7 +201,7 @@ No GPU, NPU, or proprietary SDK required. Full setup guide: [`docs/SETUP_PORTABL
 ### Reproducibility
 
 - Every measurement has a **provenance manifest** (git SHA, governor state, CPU topology, thermals)
-- 1884 unit tests covering kernel correctness and schema conformance
+- 2233 unit tests covering kernel correctness and schema conformance
 - All figures are **regenerable** from committed CSVs (`bench/plots.py`, `scripts/generate_memory_plots.py`)
 - t3 benchmark data: manifest git_sha `f015982`, dirty=false, governor=performance, 30 repeats per kernel
 
@@ -224,7 +226,7 @@ Specifically:
 
 - **Repository:** https://github.com/alexcasper/OrionsBelt
 - **License:** Apache-2.0
-- **Findings (52 sections, 5349 lines):** [`docs/FINDINGS.md`](../docs/FINDINGS.md)
+- **Findings (53 sections, 5455 lines):** [`docs/FINDINGS.md`](../docs/FINDINGS.md)
 - **Comparison table:** [`results/figures/comparison_table.md`](../results/figures/comparison_table.md)
 - **Fleet bandwidth analysis:** [`results/figures/fleet_bandwidth_scaling.md`](../results/figures/fleet_bandwidth_scaling.md)
 - **Memory scaling figures:** [`results/figures/memory_comparison.md`](../results/figures/memory_comparison.md)

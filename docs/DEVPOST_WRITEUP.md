@@ -458,6 +458,12 @@ ORIONS_FORCE_FP32=1 python3 bench/harness.py \
 - **Dynamic heterogeneous dispatcher:** designed but not implemented (requires
   the O6's GPU+NPU for a meaningful test). The phase-dependent routing policy
   is described in [`NPU_OFFLOAD_DESIGN.md`](./NPU_OFFLOAD_DESIGN.md) §4.4.
+  A proxy measurement on the RK3588 Mali-G610 quantifies the barrier: 16
+  engine-boundary crossings per token (in a 3:1 hybrid stack) cost **3.36 ms**
+  — ~10% of the 30 tok/s decode budget, before any useful work. Even if the
+  NPU could run GDN layers, dispatch overhead alone would need to save more
+  than 3.36 ms/token just to break even. See
+  [FINDINGS.md §39](./FINDINGS.md).
 
 ---
 
