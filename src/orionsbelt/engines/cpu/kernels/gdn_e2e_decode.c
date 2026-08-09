@@ -410,57 +410,85 @@ static void quantize_input_int8(const float *a, int8_t *a_q, size_t K, float *sc
 static void gemv_int8_sdot(const float *a, const int8_t *Bq_packed,
                            const float *Bs, float *c, size_t K, size_t N) {
     size_t K_pad = (K + 3) & ~(size_t)3;
+    size_t num_g = K_pad / 4;
 
-    /* Quantize input vector */
+    /* Quantize input vector once (shared across all tiles/threads) */
     int8_t a_q[K_pad];
     memset(a_q, 0, K_pad);  /* zero-pad to multiple of 4 */
     float a_scale;
     quantize_input_int8(a, a_q, K, &a_scale);
 
-    /* Combined scale applied at the end */
-    float combined_scale_mul = a_scale;  /* each c[j] *= a_scale * Bs[j] */
+    /* Column-tiled SDOT GEMV with K-outer sweep (ob-8qt.14).
+     *
+     * The naive column-outer version (j4 outer, g inner) strides N×4 bytes
+     * between consecutive K-group loads — only 25% cache-line utilization,
+     * making the SDOT kernel ~1.7× slower than NEON dequant despite 5× fewer
+     * instructions per element.
+     *
+     * This version reverses the nesting: column tiles on the outside (OpenMP
+     * parallelized), K-groups in the middle, and sequential 16-byte column
+     * loads on the inside. Within each K-group g, the repacked data for
+     * columns jt..jt+TILE is contiguous (stride = 16 bytes between loads),
+     * giving 100% cache-line utilization — 4× better effective bandwidth.
+     *
+     * Accumulators stay in L1 (TILE × 4 bytes = 1 KB for TILE=256), loaded
+     * and stored once per K-group iteration. The 2× unrolled inner loop
+     * overlaps two independent SDOT chains for instruction-level parallelism.
+     */
+    const size_t TILE = 256;
 
 #ifdef _OPENMP
 #pragma omp parallel for schedule(static)
 #endif
-    for (size_t j4 = 0; j4 < N; j4 += 4) {
-        size_t cols = (N - j4 >= 4) ? 4 : (N - j4);
+    for (size_t jt = 0; jt < N; jt += TILE) {
+        size_t tn = (N - jt >= TILE) ? TILE : (N - jt);
 
-        if (cols == 4) {
-            int32x4_t acc = vdupq_n_s32(0);
+        /* Stack accumulators — int32 dot products before final float conversion */
+        int32_t acc[TILE];
+        memset(acc, 0, tn * sizeof(int32_t));
 
-            for (size_t g = 0; g < K_pad / 4; ++g) {
-                /* Load 16 repacked weight bytes for 4 columns at K-group g.
-                 * Layout: [Bq[k][j], Bq[k+1][j], Bq[k+2][j], Bq[k+3][j],
-                 *          Bq[k][j+1], ..., Bq[k+3][j+3]] */
-                int8x16_t w = vld1q_s8(Bq_packed + (g * N + j4) * 4);
+        /* K-outer sweep: for each K-group, stream through all tile columns */
+        for (size_t g = 0; g < num_g; ++g) {
+            int8x8_t a_vec = vld1_s8(a_q + g * 4);
+            const int8_t *wp = Bq_packed + (g * N + jt) * 4;
+            int32_t *accp = acc;
+            size_t j = 0;
 
-                /* Load 4 input int8 values (lane 0 of int8x8_t) */
-                int8x8_t a_vec = vld1_s8(a_q + g * 4);
-
-                /* SDOT: acc[i] += sum_{i'=0..3}(w[i*4+i'] * a_vec[i']) */
-                acc = vdotq_lane_s32(acc, w, a_vec, 0);
+            /* 2× unrolled: two independent SDOT chains for ILP */
+            for (; j + 8 <= tn; j += 8) {
+                int8x16_t w0 = vld1q_s8(wp);
+                int8x16_t w1 = vld1q_s8(wp + 16);
+                int32x4_t a0 = vld1q_s32(accp);
+                int32x4_t a1 = vld1q_s32(accp + 4);
+                a0 = vdotq_lane_s32(a0, w0, a_vec, 0);
+                a1 = vdotq_lane_s32(a1, w1, a_vec, 0);
+                vst1q_s32(accp, a0);
+                vst1q_s32(accp + 4, a1);
+                wp += 32;
+                accp += 8;
             }
-
-            /* Convert int32 accumulators to float and apply combined scale */
-            float32x4_t favg = vcvtq_f32_s32(acc);
-            float32x4_t bsv = vld1q_f32(Bs + j4);
-            float32x4_t scale_v = vdupq_n_f32(combined_scale_mul);
-            favg = vmulq_f32(favg, vmulq_f32(bsv, scale_v));
-            vst1q_f32(c + j4, favg);
-        } else {
-            /* Scalar tail for last < 4 columns */
-            for (size_t jj = 0; jj < cols; ++jj) {
-                int32_t dot = 0;
-                for (size_t g = 0; g < K_pad / 4; ++g) {
-                    const int8_t *w = Bq_packed + (g * N + j4 + jj) * 4;
-                    const int8_t *aq = a_q + g * 4;
-                    dot += (int32_t)w[0]*aq[0] + (int32_t)w[1]*aq[1]
-                         + (int32_t)w[2]*aq[2] + (int32_t)w[3]*aq[3];
-                }
-                c[j4 + jj] = (float)dot * combined_scale_mul * Bs[j4 + jj];
+            /* Single SDOT for remaining full 4-column groups */
+            for (; j + 4 <= tn; j += 4) {
+                int8x16_t w0 = vld1q_s8(wp);
+                int32x4_t a0 = vld1q_s32(accp);
+                a0 = vdotq_lane_s32(a0, w0, a_vec, 0);
+                vst1q_s32(accp, a0);
+                wp += 16;
+                accp += 4;
             }
         }
+
+        /* Apply per-column scale: c[n] = acc[n] * a_scale * Bs[n] */
+        float32x4_t scv = vdupq_n_f32(a_scale);
+        size_t j = 0;
+        for (; j + 4 <= tn; j += 4) {
+            float32x4_t av = vcvtq_f32_s32(vld1q_s32(acc + j));
+            float32x4_t bsv = vld1q_f32(Bs + jt + j);
+            av = vmulq_f32(av, vmulq_f32(bsv, scv));
+            vst1q_f32(c + jt + j, av);
+        }
+        for (; j < tn; ++j)
+            c[jt + j] = (float)acc[j] * a_scale * Bs[jt + j];
     }
 }
 #endif /* INT8_WEIGHTS && __ARM_FEATURE_DOTPROD */
@@ -1894,12 +1922,10 @@ int main(int argc, char **argv) {
 
     /* Allocate weights (random, benchmark only) */
     Weights w;
-    /* Zero first: under -DINT8_WEIGHTS with dotprod, QW.q_sdot/K/N (ob-8qt.14
-     * SDOT scaffolding) are never populated by quantize_weight() below and
-     * repack_qw_for_sdot() is not yet wired up anywhere, so without this,
-     * matmul_int8()'s `if (qw->q_sdot)` check reads indeterminate stack
-     * memory as a weight pointer. Zeroing keeps the SDOT path inert (falls
-     * through to the verified gemv_int8_neon path) until it's finished. */
+    /* Zero first: QW.q_sdot/K/N (ob-8qt.14 SDOT path) are populated below by
+     * repack_qw_for_sdot() on dotprod cores; without zeroing, the QW structs
+     * on non-dotprod builds would have indeterminate stack garbage in any
+     * padding fields. */
     memset(&w, 0, sizeof(w));
     w.embed = NULL;  /* not allocated (VOCAB×HIDDEN = 2.5 GB) — NULL prevents dangling */
     w.g_q_proj  = alloc_aligned(HIDDEN * KEY_DIM);
@@ -1946,9 +1972,32 @@ int main(int argc, char **argv) {
     quantize_weight(w.gate_proj, &w.gate_proj_q.q, &w.gate_proj_q.s, HIDDEN, INTER);
     quantize_weight(w.up_proj,   &w.up_proj_q.q,   &w.up_proj_q.s,   HIDDEN, INTER);
     quantize_weight(w.down_proj, &w.down_proj_q.q, &w.down_proj_q.s, INTER, HIDDEN);
+
+    /* Repack INT8 weights into K-interleaved layout for SDOT GEMV (ob-8qt.14).
+     * On dotprod cores this enables the gemv_int8_sdot path (int8×int8→int32,
+     * no float32 dequant overhead). On non-dotprod cores (A57, A55 Armv8.0)
+     * the SDOT path is not compiled and q_sdot stays NULL, falling through to
+     * the verified gemv_int8_neon path. */
+#if defined(__ARM_FEATURE_DOTPROD)
+    repack_qw_for_sdot(&w.g_q_proj_q,  HIDDEN, KEY_DIM);
+    repack_qw_for_sdot(&w.g_k_proj_q,  HIDDEN, KEY_DIM);
+    repack_qw_for_sdot(&w.g_v_proj_q,  HIDDEN, VALUE_DIM);
+    repack_qw_for_sdot(&w.g_o_proj_q,  VALUE_DIM, HIDDEN);
+    repack_qw_for_sdot(&w.f_q_proj_q,  HIDDEN, FULL_HEADS * FULL_HEAD_DIM);
+    repack_qw_for_sdot(&w.f_k_proj_q,  HIDDEN, FULL_KV_HEADS * FULL_HEAD_DIM);
+    repack_qw_for_sdot(&w.f_v_proj_q,  HIDDEN, FULL_KV_HEADS * FULL_HEAD_DIM);
+    repack_qw_for_sdot(&w.f_o_proj_q,  FULL_HEADS * FULL_HEAD_DIM, HIDDEN);
+    repack_qw_for_sdot(&w.gate_proj_q, HIDDEN, INTER);
+    repack_qw_for_sdot(&w.up_proj_q,   HIDDEN, INTER);
+    repack_qw_for_sdot(&w.down_proj_q, INTER, HIDDEN);
+    if (!csv)
+        printf("  Weight quantization: INT8 (weight-only, per-column symmetric scale)\n"
+               "  SDOT repack: enabled (__ARM_FEATURE_DOTPROD)\n\n");
+#else
     if (!csv)
         printf("  Weight quantization: INT8 (weight-only, per-column symmetric scale)\n\n");
 #endif
+#endif /* INT8_WEIGHTS */
 
 #ifdef INT4_WEIGHTS
     quantize_weight_int4(w.g_q_proj,  &w.g_q_proj_q.q,  &w.g_q_proj_q.s,  HIDDEN, KEY_DIM);
