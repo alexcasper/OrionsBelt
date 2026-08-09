@@ -37,7 +37,7 @@ ADR 0007 — the submission framing is locked to Edge AI.
 | Submission prep (README, write-up, repro) | ✓ All beads closed | ob-fnq, ob-f7k, ob-kdi, ob-9e2 |
 | Compliance checklist | ✓ ob-9e2 closed | Apache-2.0, no credentials at tip of main/t4 |
 
-**Submission readiness:** 15/15 checks pass, 1799 tests (1798 passed, 1 skipped), Ruff clean, CI green.
+**Submission readiness:** 15/15 checks pass, 1803 tests, Ruff clean, CI green.
 
 ---
 
@@ -165,6 +165,17 @@ cutoff has passed with no board; any future arrival is additive bonus per ADR 00
 | #169 | t3 | Fix stale counts after t4 merge + add 6 missing manifests for t4 SDOT/INT4+SDOT/NEON CSVs | MERGED |
 | #170 | t4 | NEON+SDOT full-attention scoring — 33% faster attn at ctx=4096 (ob-8qt.21) + session max-age policy for goose-loop.sh (ob-462) | MERGED |
 | #171 | t3 | Fix stale manifest count in README (270→150 tracked) + manifest naming convention note in DEVICE_RUNBOOK | MERGED |
+| #172 | t3 | Fix stale FINDINGS section count after PR #170 merge | MERGED |
+| #173 | t4 | Session max-age fix + INT8 KV V-accum warning cleanup (ob-462, ob-4nd) | MERGED |
+| #174 | t3 | Fix stale manifest count (151→237) and figure count (88→89) in README | MERGED |
+| #175 | t4 | OpenMP fairness fix + fair-comparison benchmark (ob-m2j) | MERGED |
+| #176 | t3 | Build script cleanup + goose-loop log rotation + guard fix | MERGED |
+| #177 | t4 | Cross-device validation §36 + post-#175 sync | MERGED |
+| #178 | t4 | README refresh — cross-validation §36, thermal §37, updated counts | MERGED |
+| #179 | t3 | Provenance fixes — corrupted manifest, 14 missing manifests, comparison_table SHA drift, README counts | MERGED |
+| #180 | t3 | SDOT INT8 cross-device validation + rebase provenance fixes | MERGED |
+| #181 | t4 | Device bench + submission readiness fixes + GDN-2 unit tests | MERGED |
+| #182 | t3 | Fix ruff format + keep branch current with main | MERGED |
 
 ---
 
