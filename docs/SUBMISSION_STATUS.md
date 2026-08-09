@@ -27,6 +27,7 @@ ADR 0007 — the submission framing is locked to Edge AI.
 | GEMV optimization | ✓ 14.9× speedup | 0.07→1.04 tok/s (4B FP32), dirty=false manifests |
 | INT8 weight-only quant | ✓ 1.65–1.77× on big cores | KV cache context sweep on t3+t4, <6% divergence |
 | SDOT INT8 GEMV (dotprod cores) | ✓ 1.92–3.06× over NEON INT8 | 4B: 3.48 tok/s (83% of theoretical); 0.8B: 30.2 tok/s (t4, cross-val with t3 within 5%) |
+| INT4+SDOT hybrid GEMV | ✓ 1.27× over INT8+SDOT on A76 | 4B: 4.43 tok/s; 0.8B: 37.21 tok/s (t4, big cluster); A55: INT8+SDOT remains optimal |
 | Mixed-precision (fp16/bf16) | ✓ fp16 gives 1.77× on decay | scan compute-bound, flat under fp16 |
 | GDN-2 vs GDN-1 comparison | ✓ Microbenchmark | 1.2–1.5× decode cost on big, 2.2–2.4× on little |
 | NOE op-coverage audit | ✓ Hardware-independent | Scan rejected, Loop trap documented (both CIX NOE + RKNN) |
@@ -56,7 +57,10 @@ ADR 0007 — the submission framing is locked to Edge AI.
 | 4B INT8: 0.51 tok/s (Jetson) | same | ✓ |
 | 4B INT8+SDOT: 3.48 tok/s (t4) | rk3588-t4_sdot_4b.json | ✓ |
 | 0.8B INT8+SDOT: 30.2 tok/s (t4) | rk3588-t4_sdot_08b.json | ✓ |
-| ~50× cumulative speedup (with SDOT) | 0.07 → 3.48 tok/s = 49.7× | ✓ |
+| ~50× cumulative speedup (with INT8+SDOT) | 0.07 → 3.48 tok/s = 49.7× | ✓ |
+| ~63× cumulative speedup (with INT4+SDOT) | 0.07 → 4.43 tok/s = 63.3× | ✓ |
+| 4B INT4+SDOT: 4.43 tok/s (t4) | rk3588-t4_int4sdot_4b.json | ✓ |
+| 0.8B INT4+SDOT: 37.21 tok/s (t4) | rk3588-t4_int4sdot_08b.json | ✓ |
 | (t3 cross-validation) | rk3588-t3_big_int8_sdot_e2e.json (3.34), rk3588-t3_08b_big_int8_sdot_e2e.json (28.9) | ✓ within 5% |
 
 Kernel microbenchmark manifests: dirty=false, governor=performance, 30 repeats.
