@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 /* Correctness test for mixed-precision GDN kernel variants (bead ob-8qt.4).
  *
  * Strategy: run each fp32 kernel on identical inputs, then run the bf16/fp16

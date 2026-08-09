@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 /* Correctness oracle for gdn_delta_rule_matmul (bead ob-8qt.1).
  *
  * Naive triple-loop fp32 reference vs. the dispatcher, at the four GDN

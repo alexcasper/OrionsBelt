@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 /* End-to-end CPU decode loop for Qwen3.5 (bead ob-8qt.9).
  *
  * Wires the optimized GDN kernels (gdn_sve.c, gdn_delta_matmul.c) into a

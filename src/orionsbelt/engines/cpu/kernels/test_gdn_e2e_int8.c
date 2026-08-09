@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 /* Correctness test for INT8 weight quantization + GEMV (gdn_e2e_decode.c).
  *
  * The INT8 weight-only quantization path (-DINT8_WEIGHTS) stores projection

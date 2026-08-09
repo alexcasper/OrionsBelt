@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 /* Correctness oracle for gdn2_gated_scan_f32 (bead ob-y3f / ob-82b).
  *
  * The GDN-2 decoupled-gating scan kernel is implemented in gdn_sve.c and
