@@ -2,7 +2,9 @@
   "caller": {},
   "git": {
     "dirty": true,
-    "sha": "96f89847ea51788b0d3110a38bc641ba9fdddf88"
+    "sha": "96f89847ea51788b0d3110a38bc641ba9fdddf88",
+    "sha_resolved": "b36118e6bf1e3a9d086eadde7588bd3537981adb",
+    "sha_note": "Original SHA from t3 pre-rebase branch; equivalent commit: t3: SDOT INT8 re-run confirms cross-device gap (ob-jai, \u00a737)"
   },
   "host": {
     "core_count": 8,
