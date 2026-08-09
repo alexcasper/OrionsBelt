@@ -258,15 +258,20 @@ The microbenchmark shows the compute cost is comparable. We then attempted
 the retrieval-quality test directly: swapping GDN-1's layer-0 for a GDN-2
 module in a live Qwen3.5-0.8B checkpoint and running 30-step isolated MSE
 distillation (see [`gdn2_swap_findings.md`](./gdn2_swap_findings.md)).
-MSE dropped 94%, but cross-entropy loss recovered only 18% of the gap.
-A 10-prompt RULER multi-key retrieval evaluation
+MSE dropped 94%, but cross-entropy loss recovered only 17% of the gap
+(matched hyperparameters). A 10-prompt RULER multi-key retrieval evaluation
 ([`gdn2_ruler_findings.md`](./gdn2_ruler_findings.md)) showed GDN-2 at 10%
 accuracy vs GDN-1's 30% (below the 20% random baseline), with 5× worse
-log-probabilities. This is an honest negative result: the 30-step
-single-layer adaptation is insufficient to test whether decoupled gating
-improves retrieval, not evidence against the GDN-2 architecture itself.
-Full fine-tuning or smart gate initialization from GDN-1's β values is
-needed for a meaningful comparison.
+log-probabilities.
+
+Two follow-up experiments confirmed this is a **structural ceiling**, not
+an optimization limitation. Smart gate initialization from GDN-1's learned
+β values improved CE recovery from 17.1% to 19.9% (+2.8 pp). Tripling
+adaptation steps from 30 to 100 dropped MSE 66% but improved CE recovery by
+only 2.5 pp (to 19.6%). Both interventions converge at ~20% — the remaining
+80% gap comes from downstream layers amplifying residual per-layer
+mismatches, which isolated-layer distillation cannot address. Full
+end-to-end fine-tuning is needed for a meaningful retrieval comparison.
 
 ### Potential impact (20 pts)
 
@@ -383,7 +388,7 @@ ORIONS_FORCE_FP32=1 python3 bench/harness.py \
 |----------|-----------------|
 | [`README.md`](../README.md) | Project overview, claims, status table |
 | [`PLAN.md`](./archive/PLAN.md) | Implementation plan, rubric mapping, risk register |
-| [`docs/FINDINGS.md`](./FINDINGS.md) | All measured results with analysis (49 sections) |
+| [`docs/FINDINGS.md`](./FINDINGS.md) | All measured results with analysis (53 sections) |
 | [`docs/SETUP_PORTABLE.md`](./SETUP_PORTABLE.md) | Step-by-step device setup |
 | [`docs/adr/`](./adr/) | 8 architecture decision records |
 | [`docs/CLAIM_VERIFICATION.md`](./CLAIM_VERIFICATION.md) | Every quantitative claim traced to primary source |
@@ -451,9 +456,12 @@ ORIONS_FORCE_FP32=1 python3 bench/harness.py \
   Cortex-A76. Model inference runs in fp32 only on this platform.
 - **GDN-2 layer swap into a live checkpoint:** completed on RK3588 (t3).
   Layer 0 swapped, 30-step isolated MSE distillation achieved 94% MSE
-  reduction but only 18% CE recovery. RULER retrieval: 10% vs 30% baseline
-  (below random) — insufficient adaptation, not architectural failure.
-  See [`gdn2_swap_findings.md`](./gdn2_swap_findings.md) and
+  reduction but only 17% CE recovery (matched params). Smart gate
+  initialization from GDN-1 β (+2.8 pp) and 100-step adaptation (+2.5 pp)
+  each confirm a ~20% structural CE ceiling — isolated-layer distillation
+  cannot compensate for downstream amplification. RULER retrieval: 10% vs
+  30% baseline (below random) — insufficient adaptation, not architectural
+  failure. See [`gdn2_swap_findings.md`](./gdn2_swap_findings.md) and
   [`gdn2_ruler_findings.md`](./gdn2_ruler_findings.md).
 - **Dynamic heterogeneous dispatcher:** designed but not implemented (requires
   the O6's GPU+NPU for a meaningful test). The phase-dependent routing policy

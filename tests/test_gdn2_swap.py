@@ -179,16 +179,19 @@ class TestCaptureManifest:
     def test_returns_dict_with_required_fields(self):
         m = capture_manifest()
         assert isinstance(m, dict)
-        for field in ("git_sha", "git_dirty", "device", "machine", "python"):
+        assert "git" in m
+        for field in ("sha", "dirty"):
+            assert field in m["git"], f"missing git.{field}"
+        for field in ("device", "machine", "python"):
             assert field in m, f"missing field: {field}"
 
     def test_git_sha_is_string(self):
         m = capture_manifest()
-        assert isinstance(m["git_sha"], str)
+        assert isinstance(m["git"]["sha"], str)
 
     def test_git_dirty_is_bool(self):
         m = capture_manifest()
-        assert isinstance(m["git_dirty"], bool)
+        assert isinstance(m["git"]["dirty"], bool)
 
     def test_python_version_present(self):
         import platform
@@ -203,3 +206,158 @@ class TestCaptureManifest:
         assert ts.endswith("Z")
         assert "T" in ts
         assert len(ts) == 16  # 8+1+6+1
+
+
+# ---------------------------------------------------------------------------
+# Smart gate initialization (ob-t3b.9)
+# ---------------------------------------------------------------------------
+
+
+class _MockGDN1(nn.Module):
+    """Minimal mock of Qwen3_5GatedDeltaNet for testing gate initialization."""
+
+    def __init__(self, hidden_size=64, num_v_heads=4, num_k_heads=4, head_k_dim=16, head_v_dim=16):
+        super().__init__()
+        self.hidden_size = hidden_size
+        self.num_v_heads = num_v_heads
+        self.num_k_heads = num_k_heads
+        self.head_k_dim = head_k_dim
+        self.head_v_dim = head_v_dim
+        self.key_dim = num_k_heads * head_k_dim
+        self.value_dim = num_v_heads * head_v_dim
+        self.conv_kernel_size = 4
+        self.layer_idx = 0
+        self.layer_norm_epsilon = 1e-6
+
+        # Core modules with random weights
+        self.conv1d = nn.Conv1d(
+            self.key_dim * 2 + self.value_dim,
+            self.key_dim * 2 + self.value_dim,
+            kernel_size=4,
+            groups=self.key_dim * 2 + self.value_dim,
+            padding=3,
+            bias=False,
+        )
+        self.dt_bias = nn.Parameter(torch.ones(num_v_heads))
+        self.A_log = nn.Parameter(torch.log(torch.empty(num_v_heads).uniform_(1, 8)))
+        self.norm = nn.Identity()  # simplified
+        self.out_proj = nn.Linear(self.value_dim, hidden_size, bias=False)
+        self.in_proj_qkv = nn.Linear(hidden_size, self.key_dim * 2 + self.value_dim, bias=False)
+        self.in_proj_z = nn.Linear(hidden_size, self.value_dim, bias=False)
+        self.in_proj_a = nn.Linear(hidden_size, num_v_heads, bias=False)
+        # This is the key weight we copy from:
+        self.in_proj_b = nn.Linear(hidden_size, num_v_heads, bias=False)
+
+
+class TestSmartGateInit:
+    """Tests for _init_gates_from_gdn1 / smart_init parameter (ob-t3b.9)."""
+
+    def test_smart_init_flag_default_false(self):
+        """Default is random init (smart_init=False)."""
+        gdn1 = _MockGDN1()
+        from gdn2_swap import Qwen3_5GDN2
+
+        gdn2 = Qwen3_5GDN2(gdn1, smart_init=False)
+        assert gdn2.smart_init is False
+
+    def test_smart_init_flag_true(self):
+        gdn1 = _MockGDN1()
+        from gdn2_swap import Qwen3_5GDN2
+
+        gdn2 = Qwen3_5GDN2(gdn1, smart_init=True)
+        assert gdn2.smart_init is True
+
+    def test_erase_gate_weight_copies_in_proj_b(self):
+        """Each key channel's erase gate row should equal the corresponding
+        head's in_proj_b row."""
+        torch.manual_seed(123)
+        gdn1 = _MockGDN1(hidden_size=32, num_v_heads=4, num_k_heads=4, head_k_dim=8, head_v_dim=8)
+        from gdn2_swap import Qwen3_5GDN2
+
+        gdn2 = Qwen3_5GDN2(gdn1, smart_init=True)
+        b_weight = gdn1.in_proj_b.weight.data  # [4, 32]
+        erase_weight = gdn2.in_proj_erase_gate.weight.data  # [32, 32] (4*8, 32)
+        # For head 2, channel 5: should match in_proj_b row 2
+        assert torch.allclose(erase_weight[2 * 8 + 5], b_weight[2].to(erase_weight.dtype))
+
+    def test_write_gate_weight_copies_in_proj_b(self):
+        """Each value channel's write gate row should equal the corresponding
+        head's in_proj_b row."""
+        torch.manual_seed(123)
+        gdn1 = _MockGDN1(hidden_size=32, num_v_heads=4, num_k_heads=4, head_k_dim=8, head_v_dim=8)
+        from gdn2_swap import Qwen3_5GDN2
+
+        gdn2 = Qwen3_5GDN2(gdn1, smart_init=True)
+        b_weight = gdn1.in_proj_b.weight.data  # [4, 32]
+        write_weight = gdn2.in_proj_write_gate.weight.data  # [32, 32]
+        assert torch.allclose(write_weight[3 * 8 + 7], b_weight[3].to(write_weight.dtype))
+
+    def test_smart_init_gates_match_beta(self):
+        """sigmoid(gate_output) should approximately equal GDN-1's beta
+        when evaluated on the same hidden states."""
+        torch.manual_seed(42)
+        gdn1 = _MockGDN1(hidden_size=32, num_v_heads=4, num_k_heads=4, head_k_dim=8, head_v_dim=8)
+        from gdn2_swap import Qwen3_5GDN2
+
+        gdn2 = Qwen3_5GDN2(gdn1, smart_init=True)
+
+        h = torch.randn(1, 10, 32, dtype=gdn1.in_proj_b.weight.dtype)
+        # GDN-1 beta
+        beta = torch.sigmoid(gdn1.in_proj_b(h))  # [1, 10, 4]
+        # GDN-2 gates (pre-sigmoid → sigmoid)
+        erase_raw = gdn2.in_proj_erase_gate(h)  # [1, 10, 32]
+        erase_gate = torch.sigmoid(erase_raw)  # [1, 10, 32]
+        # Reshape to [1, 10, 4, 8] to check per-head
+        erase_gate_reshaped = erase_gate.reshape(1, 10, 4, 8)
+        beta_expanded = beta.unsqueeze(-1).expand(1, 10, 4, 8)
+        assert torch.allclose(erase_gate_reshaped.float(), beta_expanded.float(), atol=1e-5)
+
+    def test_smart_init_differs_from_random(self):
+        """Smart init should produce different weights than random init."""
+        torch.manual_seed(42)
+        gdn1 = _MockGDN1(hidden_size=32, num_v_heads=4, num_k_heads=4, head_k_dim=8, head_v_dim=8)
+        from gdn2_swap import Qwen3_5GDN2
+
+        gdn2_random = Qwen3_5GDN2(gdn1, smart_init=False)
+        torch.manual_seed(42)
+        gdn2_smart = Qwen3_5GDN2(gdn1, smart_init=True)
+        assert not torch.allclose(
+            gdn2_random.in_proj_erase_gate.weight.data.float(),
+            gdn2_smart.in_proj_erase_gate.weight.data.float(),
+        )
+
+    def test_smart_init_with_key_grouping(self):
+        """When num_v_heads > num_k_heads, erase gate should average in_proj_b
+        across the group."""
+        torch.manual_seed(99)
+        gdn1 = _MockGDN1(hidden_size=16, num_v_heads=4, num_k_heads=2, head_k_dim=4, head_v_dim=4)
+        from gdn2_swap import Qwen3_5GDN2
+
+        gdn2 = Qwen3_5GDN2(gdn1, smart_init=True)
+        b_weight = gdn1.in_proj_b.weight.data  # [4, 16]
+        erase_weight = gdn2.in_proj_erase_gate.weight.data  # [8, 16] (2*4)
+        # Key head 0 → value heads 0,1 (rep=2). Average them.
+        expected = b_weight[0:2].mean(dim=0)
+        assert torch.allclose(erase_weight[0], expected.to(erase_weight.dtype))
+        assert torch.allclose(erase_weight[3], expected.to(erase_weight.dtype))
+
+    def test_swap_function_passes_smart_init(self):
+        """swap_gdn1_to_gdn2 should pass smart_init through."""
+        from gdn2_swap import Qwen3_5GDN2, swap_gdn1_to_gdn2
+
+        class _MockModel:
+            class _TM:
+                class _Layer:
+                    def __init__(self):
+                        self.linear_attn = _MockGDN1(
+                            hidden_size=16, num_v_heads=2, num_k_heads=2, head_k_dim=4, head_v_dim=4
+                        )
+
+                layers = [_Layer(), _Layer()]
+
+            model = _TM()
+
+        swapped = swap_gdn1_to_gdn2(_MockModel(), [0], smart_init=True)
+        assert swapped == [0]
+        assert isinstance(_MockModel.model.layers[0].linear_attn, Qwen3_5GDN2)
+        assert _MockModel.model.layers[0].linear_attn.smart_init is True
