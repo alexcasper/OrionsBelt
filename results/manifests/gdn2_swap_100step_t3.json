@@ -1,0 +1,12 @@
+{
+  "git": {
+    "sha": "937ba25405b6e69fb38714abefe04ee347c8c9e9",
+    "dirty": false
+  },
+  "device": "t3",
+  "machine": "aarch64",
+  "processor": "aarch64",
+  "python": "3.10.12",
+  "torch": "2.5.0",
+  "timestamp": "20260809T221528Z"
+}

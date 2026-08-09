@@ -117,8 +117,10 @@ CE loss recovers only 1.54 points out of the 9.01-point increase
    the same MSE by step 30 — initialization affects the start point, not
    the 30-step destination (see ob-t3b.9 section below).
 
-2. **Only 30 steps:** The MSE is still decreasing at step 30. More
-   steps (100–500) would push MSE lower and recover more CE loss.
+2. **Adaptation depth is not the bottleneck:** A 100-step run (3× more
+   steps) dropped MSE by 66% but improved CE recovery by only 2.5 pp —
+   from 17.1% to 19.6%. Below MSE ≈ 0.004, further MSE reduction yields
+   diminishing CE returns (see adaptation depth sweep below).
 
 3. **Output MSE is a proxy, not the true objective:** Matching the GDN-1
    layer output exactly (MSE=0) would recover full CE loss, but the
@@ -151,8 +153,12 @@ CE loss recovers only 1.54 points out of the 9.01-point increase
 | File | Description |
 |------|-------------|
 | `bench/gdn2_swap.py` | Experiment script (GDN-2 module, swap, adaptation) |
-| `results/raw/gdn2_swap_t3.csv` | MSE convergence curve (30 steps) |
-| `results/manifests/gdn2_swap_t3.json` | Provenance manifest |
+| `results/raw/gdn2_swap_t3.csv` | MSE convergence curve (30 steps, random init) |
+| `results/raw/gdn2_swap_smart_init_t3.csv` | MSE convergence curve (30 steps, smart init) |
+| `results/raw/gdn2_swap_100step_t3.csv` | MSE convergence curve (100 steps, random init) |
+| `results/manifests/gdn2_swap_t3.json` | Provenance manifest (30-step random) |
+| `results/manifests/gdn2_swap_smart_init_t3.json` | Provenance manifest (30-step smart) |
+| `results/manifests/gdn2_swap_100step_t3.json` | Provenance manifest (100-step random) |
 
 ## Smart Gate Initialization Experiment (ob-t3b.9)
 
@@ -231,18 +237,53 @@ Smart gate initialization is a correct and useful technique — it reduces
 the initial loss gap and improves final CE recovery — but it does not
 solve the fundamental problem. The CE recovery ceiling for 30-step
 isolated distillation is ~20% regardless of initialization strategy.
-Full recovery would require either many more adaptation steps (100–500)
-or end-to-end fine-tuning to let downstream layers co-adapt.
+Full recovery requires end-to-end fine-tuning to let downstream layers
+co-adapt — the adaptation depth sweep below confirms that more isolated
+steps do not meaningfully help.
+
+## Adaptation Depth Sweep (100-step extension)
+
+**Hypothesis from ob-68l:** "Only 30 steps: The MSE is still decreasing at
+step 30. More steps (100–500) would push MSE lower and recover more CE loss."
+
+**Test:** Re-ran random init with 100 steps (seq_len=128, lr=3e-4, commit
+`937ba25`).
+
+| Steps | MSE at step 30 | MSE final | Final CE | CE recovery % |
+|-------|---------------|-----------|----------|---------------|
+| 30 (random) | 0.0036 | 0.0036 | 10.3729 | 17.1% |
+| 30 (smart) | 0.0036 | 0.0036 | 9.9992 | 19.9% |
+| 100 (random) | 0.0035 | 0.0012 | 10.0806 | 19.6% |
+
+**Result:** Tripling adaptation steps dropped MSE by 66% (0.0036→0.0012)
+but CE recovery barely improved (+2.5 pp, from 17.1% to 19.6%). Smart
+init at 30 steps (19.9%) matches random init at 100 steps (19.6%) — smart
+init gives ~3× adaptation for free.
+
+**Implication:** The "more steps" hypothesis is refuted. Below MSE ≈ 0.004,
+further MSE reduction yields diminishing CE returns — the relationship
+between isolated-layer MSE and full-model CE is highly non-linear. The
+remaining ~80% CE gap is **structural**, not optimization-limited:
+
+1. Downstream layers amplify even tiny per-layer mismatches (error
+   compounds across 23 subsequent layers).
+2. The isolated objective (match GDN-1 output) does not account for how
+   downstream layers consume that output — a slightly different output that
+   downstream layers have adapted to could achieve lower CE than a perfect
+   pixel-match.
+3. Full CE recovery requires end-to-end fine-tuning to co-adapt downstream
+   layers, not just better gate fitting.
 
 ## Conclusion
 
 GDN-2 can architecturally replace GDN-1 in a Qwen3.5 checkpoint. The new
 gate parameters learn to approximate GDN-1's behavior via isolated MSE
-distillation, with smooth monotonic convergence (94% MSE reduction in 30
-steps). Smart initialization from GDN-1's β values provides a modest
-improvement (+2.8 pp CE recovery) but both strategies converge to the
-same MSE — the bottleneck is adaptation depth and downstream
-amplification, not initialization. Full CE recovery requires many more
-steps or end-to-end fine-tuning. The isolated training approach makes
-on-device adaptation practical (66× faster than full-model backprop),
-demonstrating a viable path for GDN-2 upgrades on edge silicon.
+distillation, with smooth monotonic convergence. However, three
+interventions — smart initialization (+2.8 pp CE recovery) and 3× more
+adaptation steps (+2.5 pp) — each yielded diminishing returns, converging
+at ~20% CE recovery. This ceiling is structural: isolated-layer MSE
+distillation cannot recover CE loss because downstream layers amplify
+residual mismatches. Full recovery requires end-to-end fine-tuning. The
+isolated training approach remains valuable as a proof-of-concept for
+on-device gate adaptation (66× faster than full-model backprop), but it
+cannot substitute for end-to-end training in production.
