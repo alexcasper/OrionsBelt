@@ -875,3 +875,77 @@ class TestHFBackendImportError:
                 ]
             )
         assert exc_info.value.code == 2
+
+
+# ---------------------------------------------------------------------------
+# Coverage gap tests (ob-82d)
+# ---------------------------------------------------------------------------
+
+
+class TestCLIBadArgs:
+    def test_bad_context_lengths(self, tmp_path, monkeypatch):
+        """Non-integer context-lengths → parser.error → SystemExit(2)."""
+        monkeypatch.chdir(tmp_path)
+        with pytest.raises(SystemExit) as exc_info:
+            main([
+                "--backend", "synthetic",
+                "--model", "0.8b",
+                "--context-lengths", "64,abc",
+                "--warmup", "1",
+                "--repeats", "5",
+                "--allow-missing-sha",
+            ])
+        assert exc_info.value.code == 2
+
+    def test_unknown_backend(self, tmp_path, monkeypatch):
+        """Unknown backend → parser.error → SystemExit(2)."""
+        monkeypatch.chdir(tmp_path)
+        with pytest.raises(SystemExit) as exc_info:
+            main([
+                "--backend", "quantum",
+                "--context-lengths", "64",
+                "--warmup", "1",
+                "--repeats", "5",
+                "--allow-missing-sha",
+            ])
+        assert exc_info.value.code == 2
+
+
+class TestSweepNeedlePrompt:
+    def test_needle_prompt_type_runs(self, tmp_path, monkeypatch):
+        """SweepConfig with prompt_type='needle' exercises load_corpus_prompt path."""
+        monkeypatch.chdir(tmp_path)
+        # No corpus file exists → load_corpus_prompt falls back to generate_prompt
+        config = SweepConfig(
+            context_lengths=[64],
+            warmup_count=1,
+            repeat_count=5,
+            decode_length=10,
+            prompt_type="needle",
+        )
+        backend = SyntheticBackend(QWEN35_4B)
+        config.allow_missing_sha = True
+        rows = run_sweep(backend, config)
+        assert len(rows) > 0
+
+
+class TestMainEntryRunpy:
+    def test_main_via_runpy(self, tmp_path, monkeypatch):
+        """Running harness.py as __main__ covers the __main__ guard."""
+        import runpy
+
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr("sys.argv", [
+            "harness.py",
+            "--backend", "synthetic",
+            "--model", "0.8b",
+            "--context-lengths", "64",
+            "--warmup", "1",
+            "--repeats", "5",
+            "--decode-length", "10",
+            "--allow-missing-sha",
+        ])
+        script_path = str(Path(__file__).resolve().parent.parent / "bench" / "harness.py")
+        with pytest.raises(SystemExit) as exc_info:
+            runpy.run_path(script_path, run_name="__main__")
+        assert exc_info.value.code == 0
