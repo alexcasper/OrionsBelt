@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """Tests for the golden reference capture script (scripts/capture_reference.py, bead ob-aqv).
 
 The capture script itself needs torch+transformers to run, but the logic it wraps

@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """Executable form of docs/RESULTS_SCHEMA.md.
 
 This module is the machine-enforced counterpart to the human contract in

@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """Download Qwen3.5 model weights from HuggingFace at setup time.
 
 Design goals (see scripts/README.md and ADR 0003):

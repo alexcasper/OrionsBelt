@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """Tests for bench/convert_e2e_decode.py — raw CSV → schema-conformant conversion.
 
 Covers the transformation pipeline that converts the C binary's wide CSV

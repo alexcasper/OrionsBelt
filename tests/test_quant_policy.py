@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """Tests for src/orionsbelt/quant/policy.py — GDN quantization policy.
 
 This module defines the precision carve-outs that keep GDN numerically

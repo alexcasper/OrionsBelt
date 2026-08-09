@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """Comparison table generator from harness CSVs (ob-8qt.5).
 
 Reads one or more CSVs in the frozen tidy/long schema (RESULTS_SCHEMA.md) and

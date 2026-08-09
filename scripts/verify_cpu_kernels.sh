@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 # Build the Armv9.2 GDN kernels and verify them numerically under QEMU.
 # No Orion O6 board required — QEMU emulates SVE2, so correctness is checkable today.
 # Bead ob-8qt.1. See docs/FINDINGS.md §4.

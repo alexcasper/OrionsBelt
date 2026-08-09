@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """NPU backend via the CIX NOE Compiler.
 
 Owned by beads ``t-npu-opcov`` (op-coverage audit for GDN operators),

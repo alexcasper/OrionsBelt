@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """Three-way memory instrumentation: weights / KV cache / recurrent state.
 
 The central measurement of this project (docs/archive/PLAN.md §2.4, bead ``ob-vfp``):

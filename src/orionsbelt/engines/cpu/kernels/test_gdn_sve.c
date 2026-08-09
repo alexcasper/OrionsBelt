@@ -10,6 +10,13 @@
 
 #include "gdn_sve.h"
 
+static void *xmalloc(size_t n) {
+    void *p = malloc(n);
+    if (!p) { fprintf(stderr, "out of memory\n"); exit(1); }
+    return p;
+}
+
+
 /* precision-MATCHED scalar reference (float accumulators, like the kernel) */
 static void refF_scan(const float*g,const float*x,float*s,float*st,size_t T,size_t C){
   for(size_t c=0;c<C;c++){float a=st[c];for(size_t t=0;t<T;t++){a=x[t*C+c]+a*g[t*C+c];s[t*C+c]=a;}st[c]=a;}}
@@ -33,11 +40,11 @@ static void report(const char*n,const float*a,const float*b,size_t N){
 
 int main(void){
   size_t T=64, C=2051, N=T*C;   /* 2051 exercises the predicated tail */
-  float *g=malloc(N*4),*x=malloc(N*4),*w=malloc(4*C*4);
-  float *s1=malloc(N*4),*s2=malloc(N*4),*s3=malloc(N*4);
-  float *o1=malloc(N*4),*o2=malloc(N*4);
-  float *stA=malloc(C*4),*stB=malloc(C*4),*stC=malloc(C*4);
-  float *hA=malloc(3*C*4),*hB=malloc(3*C*4);
+  float *g=xmalloc(N*4),*x=xmalloc(N*4),*w=xmalloc(4*C*4);
+  float *s1=xmalloc(N*4),*s2=xmalloc(N*4),*s3=xmalloc(N*4);
+  float *o1=xmalloc(N*4),*o2=xmalloc(N*4);
+  float *stA=xmalloc(C*4),*stB=xmalloc(C*4),*stC=xmalloc(C*4);
+  float *hA=xmalloc(3*C*4),*hB=xmalloc(3*C*4);
   srand(7);
   for(size_t i=0;i<N;i++){g[i]=0.5f+0.4f*(rand()/(float)RAND_MAX);x[i]=(rand()/(float)RAND_MAX)-0.5f;}
   for(size_t i=0;i<4*C;i++)w[i]=(rand()/(float)RAND_MAX)-0.5f;
@@ -65,7 +72,7 @@ int main(void){
    * reference for the fp16/bf16 comparisons, with nothing checking it against a
    * precision-matched scalar. OpenMP and the double-width unrolling both touch
    * this kernel, so it needs its own gate. */
-  float *dK=malloc(N*4),*dR=malloc(N*4);
+  float *dK=xmalloc(N*4),*dR=xmalloc(N*4);
   gdn_cumdecay_f32(g,dK,T,C);
   refF_decay(g,dR,T,C);
   report("cumdecay",dK,dR,N);
@@ -86,10 +93,10 @@ int main(void){
    * ==================================================================== */
   {
     size_t T2 = 2 * T, N2 = T2 * C;
-    float *x2 = malloc(N2 * sizeof(float));
-    float *oFull = malloc(N2 * sizeof(float));
-    float *oChunk = malloc(T * C * sizeof(float));
-    float *hC = malloc(3 * C * sizeof(float));
+    float *x2 = xmalloc(N2 * sizeof(float));
+    float *oFull = xmalloc(N2 * sizeof(float));
+    float *oChunk = xmalloc(T * C * sizeof(float));
+    float *hC = xmalloc(3 * C * sizeof(float));
     if (!x2 || !oFull || !oChunk || !hC) { fprintf(stderr, "alloc fail\n"); return 1; }
     for (size_t i = 0; i < N2; i++)
       x2[i] = (rand() / (float)RAND_MAX) - 0.5f;
@@ -127,10 +134,10 @@ int main(void){
   printf("\nMixed-precision state variants vs fp32 (ob-8qt.4):\n");
 
   /* --- gated_scan: fp16 state --- */
-  float *sF16=malloc(N*4),*sBF16=malloc(N*4);
-  float *stF32=malloc(C*4),*stBF32=malloc(C*4);
-  __fp16 *stH=malloc(C*sizeof(__fp16));
-  uint16_t *stBraw=malloc(C*sizeof(uint16_t));
+  float *sF16=xmalloc(N*4),*sBF16=xmalloc(N*4);
+  float *stF32=xmalloc(C*4),*stBF32=xmalloc(C*4);
+  __fp16 *stH=xmalloc(C*sizeof(__fp16));
+  uint16_t *stBraw=xmalloc(C*sizeof(uint16_t));
   /* same initial state for all variants */
   for(size_t i=0;i<C;i++){
     float v=(rand()/(float)RAND_MAX)-0.5f;
@@ -148,7 +155,7 @@ int main(void){
   }
 
   /* fp32 baseline (re-run with matching initial state) */
-  float *sRef=malloc(N*4);
+  float *sRef=xmalloc(N*4);
   gdn_gated_scan_f32(g,x,sRef,stF32,T,C);
 
   /* fp16 state */
@@ -162,11 +169,11 @@ int main(void){
   report("    vs fp32",sBF16,sRef,N);
 
   /* --- cumulative decay: fp16 and bf16 output --- */
-  __fp16 *dH=malloc(N*sizeof(__fp16));
-  uint16_t *dB=malloc(N*sizeof(uint16_t));
-  float *dF=malloc(N*4),*dFfromH=malloc(N*4),*dFfromB=malloc(N*4);
+  __fp16 *dH=xmalloc(N*sizeof(__fp16));
+  uint16_t *dB=xmalloc(N*sizeof(uint16_t));
+  float *dF=xmalloc(N*4),*dFfromH=xmalloc(N*4),*dFfromB=xmalloc(N*4);
   /* decay input: values in (0.90, 0.99) so the cumulative product stays in fp32 range */
-  float *aDecay=malloc(N*sizeof(float));
+  float *aDecay=xmalloc(N*sizeof(float));
   for(size_t i=0;i<N;i++) aDecay[i]=0.90f+0.09f*(float)((i*2654435761u)%1000)/1000.0f;
   gdn_cumdecay_f32(aDecay,dF,T,C);
   gdn_cumdecay_f16(aDecay,dH,T,C);

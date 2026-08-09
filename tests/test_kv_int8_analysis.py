@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """Tests for bench/kv_int8_analysis.py — INT8 KV cache quantization report generator.
 
 Covers CSV reading and markdown report generation including edge cases

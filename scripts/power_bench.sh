@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 # Power-instrumented benchmark wrapper for Jetson Nano (Jetson-J1).
 #
 # Samples the onboard INA3221 power monitor at /sys/devices/.../iio:device0/

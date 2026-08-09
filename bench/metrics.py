@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """Metric computation helpers for the benchmark harness.
 
 Implements the statistical protocol from docs/METRICS.md section 7 (nearest-rank

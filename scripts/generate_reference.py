@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """Generate golden reference outputs from a HuggingFace Qwen3.5 checkpoint.
 
 This is the **correctness oracle source** (bead ``ob-aqv``).  It runs the

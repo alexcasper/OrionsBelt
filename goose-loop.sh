@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 # OrionsBelt goose loop: one per node, in tmux 'orion-bench'. Self-heals bloat-stalls.
 export PATH="$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
 cd "$HOME/OrionsBelt" || { echo "no ~/OrionsBelt"; exit 1; }

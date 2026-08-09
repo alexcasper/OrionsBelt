@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """Tests for scripts/validate_results.py — benchmark CSV and manifest validation.
 
 Covers CSV-type detection, row-level sanity checks (impossible latencies, absurd

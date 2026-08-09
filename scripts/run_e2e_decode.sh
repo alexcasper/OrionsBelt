@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 # Fleet e2e decode benchmark — end-to-end Qwen3.5 CPU-only tokens/sec.
 #
 # Runs the C decode loop (gdn_e2e_decode.c) on the local device with the same

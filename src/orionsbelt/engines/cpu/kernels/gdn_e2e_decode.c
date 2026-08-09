@@ -42,6 +42,18 @@
 
 #include "gdn_delta_matmul.h"
 
+/* Safe malloc/calloc wrappers — exit on OOM instead of dereferencing NULL. */
+static void *xmalloc(size_t n) {
+    void *p = malloc(n);
+    if (!p) { fprintf(stderr, "out of memory (%zu bytes)\n", n); exit(1); }
+    return p;
+}
+static void *xcalloc(size_t nmemb, size_t size) {
+    void *p = calloc(nmemb, size);
+    if (!p) { fprintf(stderr, "out of memory (%zu * %zu bytes)\n", nmemb, size); exit(1); }
+    return p;
+}
+
 /* Global flag: when set (--naive), M>1 matmul uses the old naive scalar loop
  * instead of gemm_neon, for before/after performance comparison (ob-8qt.15). */
 static int g_use_naive_matmul = 0;
@@ -138,9 +150,8 @@ typedef struct {
 #ifdef INT8_WEIGHTS
 static void quantize_weight(const float *B_in, int8_t **q_out, float **s_out,
                             size_t K, size_t N) {
-    int8_t *q = malloc(K * N);
-    float  *s = malloc(N * sizeof(float));
-    if (!q || !s) { fprintf(stderr, "OOM in quantize\n"); exit(1); }
+    int8_t *q = xmalloc(K * N);
+    float  *s = xmalloc(N * sizeof(float));
 
     for (size_t n = 0; n < N; ++n) {
         /* Find max abs in column n */
@@ -358,8 +369,7 @@ static void gemv_int8_neon(const float *a, const int8_t *Bq, const float *Bs,
  */
 static int8_t *repack_int8_k_interleaved(const int8_t *Bq, size_t K, size_t N) {
     size_t K_pad = (K + 3) & ~(size_t)3;
-    int8_t *out = calloc(K_pad * N, 1);  /* zero-padded */
-    if (!out) { fprintf(stderr, "OOM in repack_int8\n"); exit(1); }
+    int8_t *out = xcalloc(K_pad * N, 1);  /* zero-padded */
 
     for (size_t g = 0; g < K_pad / 4; ++g) {
         for (size_t j = 0; j < N; ++j) {
@@ -631,7 +641,7 @@ static void matmul_int8(const float *A, const QW *qw,
     /* Prefill path */
     if (g_use_naive_matmul) {
         /* Old behavior: full dequant + naive scalar matmul (for A/B comparison) */
-        float *Bf = malloc(K * N * sizeof(float));
+        float *Bf = xmalloc(K * N * sizeof(float));
         if (!Bf) { fprintf(stderr, "OOM in INT8 dequant\n"); exit(1); }
         for (size_t k = 0; k < K; ++k)
             for (size_t n = 0; n < N; ++n)
@@ -671,9 +681,8 @@ static void matmul_int8(const float *A, const QW *qw,
 static void quantize_weight_int4(const float *B_in, uint8_t **q_out, float **s_out,
                                  size_t K, size_t N) {
     size_t q_cols = (N + 1) / 2;
-    uint8_t *q = calloc(K * q_cols, 1);  /* zero-init (we OR nibbles in) */
-    float  *s = malloc(N * sizeof(float));
-    if (!q || !s) { fprintf(stderr, "OOM in quantize_weight_int4\n"); exit(1); }
+    uint8_t *q = xcalloc(K * q_cols, 1);  /* zero-init (we OR nibbles in) */
+    float  *s = xmalloc(N * sizeof(float));
 
     for (size_t n = 0; n < N; ++n) {
         float max_abs = 0.0f;
@@ -960,8 +969,7 @@ static void matmul_int4(const float *A, const QW4 *qw,
 static void quantize_weight_q8_0(const float *B_in, Q8Block **blk_out,
                                  size_t K, size_t N) {
     size_t nblk = (K + 31) / 32;
-    Q8Block *blk = calloc(N * nblk, sizeof(Q8Block));
-    if (!blk) { fprintf(stderr, "OOM in quantize_weight_q8_0\n"); exit(1); }
+    Q8Block *blk = xcalloc(N * nblk, sizeof(Q8Block));
     for (size_t j = 0; j < N; ++j) {
         for (size_t b = 0; b < nblk; ++b) {
             size_t k0 = b * 32;
@@ -1004,9 +1012,8 @@ static void gemv_q8_0_neon(const float *a, const Q8Block *Bblk,
     size_t nblk = (K + 31) / 32;
 
     /* Quantize activation vector once — amortized over all N output columns */
-    int8_t  *a_q = malloc(nblk * 32);      /* int8 quantized activations */
-    float   *a_d = malloc(nblk * sizeof(float));  /* per-block activation scales */
-    if (!a_q || !a_d) { fprintf(stderr, "OOM in gemv_q8_0_neon\n"); exit(1); }
+    int8_t  *a_q = xmalloc(nblk * 32);      /* int8 quantized activations */
+    float   *a_d = xmalloc(nblk * sizeof(float));  /* per-block activation scales */
     for (size_t b = 0; b < nblk; ++b) {
         size_t k0 = b * 32;
         size_t klen = (k0 + 32 <= K) ? 32 : (K - k0);
@@ -1055,7 +1062,7 @@ static void matmul_q8_0(const float *A, const QW *qw,
         return;
     }
     /* Prefill: dequant to FP32 and use FP32 GEMM */
-    float *Bf = malloc((size_t)K * N * sizeof(float));
+    float *Bf = xmalloc((size_t)K * N * sizeof(float));
     if (!Bf) { fprintf(stderr, "OOM in Q8_0 dequant\n"); exit(1); }
     size_t nblk = (K + 31) / 32;
     for (size_t j = 0; j < N; ++j)
@@ -1670,10 +1677,10 @@ int main(int argc, char **argv) {
 
         for (int t = 0; t < n_tests; ++t) {
             size_t M = tests[t].M, K = tests[t].K, N = tests[t].N;
-            float *A  = malloc(M * K * sizeof(float));
-            float *B  = malloc(K * N * sizeof(float));
-            float *C1 = malloc(M * N * sizeof(float));
-            float *C2 = malloc(M * N * sizeof(float));
+            float *A  = xmalloc(M * K * sizeof(float));
+            float *B  = xmalloc(K * N * sizeof(float));
+            float *C1 = xmalloc(M * N * sizeof(float));
+            float *C2 = xmalloc(M * N * sizeof(float));
 
             for (size_t i = 0; i < M * K; ++i) A[i] = ((float)(vseed = (vseed * 1103515245 + 12345)) / 2147483647.0f - 0.5f) * 2.0f;
             for (size_t i = 0; i < K * N; ++i) B[i] = ((float)(vseed = (vseed * 1103515245 + 12345)) / 2147483647.0f - 0.5f) * 2.0f;
@@ -1729,10 +1736,10 @@ int main(int argc, char **argv) {
 
         for (int t = 0; t < n_tests; ++t) {
             size_t K = tests[t].K, N = tests[t].N;
-            float *B = malloc(K * N * sizeof(float));
-            float *a = malloc(K * sizeof(float));
-            float *c_fp32 = malloc(N * sizeof(float));
-            float *c_int4 = malloc(N * sizeof(float));
+            float *B = xmalloc(K * N * sizeof(float));
+            float *a = xmalloc(K * sizeof(float));
+            float *c_fp32 = xmalloc(N * sizeof(float));
+            float *c_int4 = xmalloc(N * sizeof(float));
 
             for (size_t i = 0; i < K * N; ++i)
                 B[i] = ((float)(vseed = (vseed * 1103515245 + 12345)) / 2147483647.0f - 0.5f) * 2.0f;
@@ -1814,10 +1821,10 @@ int main(int argc, char **argv) {
 
         for (int t = 0; t < n_tests; ++t) {
             size_t K = tests[t].K, N = tests[t].N;
-            float *B = malloc(K * N * sizeof(float));
-            float *a = malloc(K * sizeof(float));
-            float *c_fp32 = malloc(N * sizeof(float));
-            float *c_quant = malloc(N * sizeof(float));
+            float *B = xmalloc(K * N * sizeof(float));
+            float *a = xmalloc(K * sizeof(float));
+            float *c_fp32 = xmalloc(N * sizeof(float));
+            float *c_quant = xmalloc(N * sizeof(float));
 
             /* Random weights & activation (fixed seed, reproducible) */
             for (size_t i = 0; i < K * N; ++i)
@@ -2348,7 +2355,7 @@ int main(int argc, char **argv) {
         fprintf(stderr, "Internal error: decode loop reached with num_tokens=%d\n", num_tokens);
         return 1;
     }
-    double *tok_times = malloc(num_tokens * sizeof(double));
+    double *tok_times = xmalloc(num_tokens * sizeof(double));
     if (!tok_times) { fprintf(stderr, "OOM allocating tok_times\n"); return 1; }
     double t_start_all = now_us();
 

@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """Comprehensive edge-case tests for bench/metrics.py (bead ob-1lm).
 
 The existing tests in test_harness.py cover the happy path; this file adds

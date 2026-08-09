@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """Plot and table generation from committed benchmark results.
 
 Bead ``ob-9y8`` (t-plots).  Every figure in the write-up and README must be

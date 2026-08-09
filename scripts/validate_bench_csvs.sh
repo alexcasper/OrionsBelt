@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 # Validate device benchmark CSVs for data completeness and staleness.
 #
 # Catches the kind of issue found 2026-08-03: jetson-j2.csv had only 6 rows

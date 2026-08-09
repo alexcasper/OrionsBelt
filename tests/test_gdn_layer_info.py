@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """Unit tests for the GDN layer-info module (ob-37v).
 
 These test the figures that downstream beads (memory instrumentation,

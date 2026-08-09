@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 # Tests for scripts/fleet.sh with NO hardware (bead ob-8ms.4).
 #
 # fleet.sh routes every remote call through _ssh/_scp, which honour $FLEET_SSH and

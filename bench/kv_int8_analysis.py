@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """INT8 KV cache quantization analysis for the GDN decode benchmark (bead ob-8qt.12).
 
 Reads ctx-sweep CSV files from results/raw/ for all 4 quantization configs

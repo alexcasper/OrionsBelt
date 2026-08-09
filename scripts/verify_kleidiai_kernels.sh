@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 # Cross-compile the KleidiAI GDN submission kernels for aarch64 and verify
 # them under QEMU.  Mirrors scripts/verify_cpu_kernels.sh but targets the
 # kleidiai_submission/ package (the upstream-ready contribution), not the

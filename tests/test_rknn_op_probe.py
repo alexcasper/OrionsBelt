@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """Tests for scripts/rknn_op_probe.py — RKNN output parsing logic.
 
 The two pure-Python parsing functions, ``extract_op_table`` and

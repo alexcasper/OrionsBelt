@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """Long-context prompt corpus — needle-in-a-haystack and RULER multi-key tasks.
 
 Bead ``ob-del``.  Generates reproducible evaluation prompts across the canonical

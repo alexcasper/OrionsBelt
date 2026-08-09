@@ -22,6 +22,13 @@
 
 #include "gdn_delta_matmul.h"
 
+static void *xmalloc(size_t n) {
+    void *p = malloc(n);
+    if (!p) { fprintf(stderr, "out of memory\n"); exit(1); }
+    return p;
+}
+
+
 static void naive_matmul(const float *A, const float *B, float *C, size_t M, size_t K,
                          size_t N) {
     for (size_t i = 0; i < M; ++i) {
@@ -34,10 +41,10 @@ static void naive_matmul(const float *A, const float *B, float *C, size_t M, siz
 }
 
 static int check_shape(const char *label, size_t M, size_t K, size_t N) {
-    float *A = malloc(M * K * sizeof(float));
-    float *B = malloc(K * N * sizeof(float));
-    float *C_ref = malloc(M * N * sizeof(float));
-    float *C_test = malloc(M * N * sizeof(float));
+    float *A = xmalloc(M * K * sizeof(float));
+    float *B = xmalloc(K * N * sizeof(float));
+    float *C_ref = xmalloc(M * N * sizeof(float));
+    float *C_test = xmalloc(M * N * sizeof(float));
 
     unsigned int seed = 42;
     for (size_t i = 0; i < M * K; ++i) A[i] = ((float)(rand_r(&seed) % 2000) - 1000) / 1000.0f;

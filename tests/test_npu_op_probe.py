@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """Tests for scripts/npu_op_probe.py — ONNX probe graph generation.
 
 Each probe in ``npu_op_probe`` generates a minimal ONNX model containing one

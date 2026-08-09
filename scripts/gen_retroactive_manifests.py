@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """Generate retroactive manifests for t4 CSVs that are missing them.
 
 Uses an existing t4 retroactive manifest as the device-info template,

@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 # Fleet orchestration for the Arm device fleet (bead ob-8ms.4).
 #
 # ONE orchestrator drives every node in a matched configuration, instead of a

@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 # Build the standalone GDN kernel microbenchmark for a real aarch64 device.
 #
 # Produces STATIC binaries with no runtime dependencies — copy one to the device and run it.

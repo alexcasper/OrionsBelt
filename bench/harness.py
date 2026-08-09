@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """Benchmark runner CLI: context sweep with warmup, repeats, and percentiles.
 
 Bead ``ob-ljh``. Protocol: ``docs/METRICS.md``. Schema: ``docs/RESULTS_SCHEMA.md``

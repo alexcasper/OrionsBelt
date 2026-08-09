@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """Programmatic GDN layer-info for Qwen3.5 checkpoints.
 
 Derived from the modeling-code audit (``docs/GDN_ARCHITECTURE_AUDIT.md``,

@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """Three-component memory accounting for GDN hybrid models — the single source
 of truth for the predicted ``peak_memory_bytes`` columns (ob-7m6).
 

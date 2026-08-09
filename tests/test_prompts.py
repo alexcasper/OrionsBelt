@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """Tests for the prompt corpus generator (ob-del).
 
 Verifies determinism (same seed → same output) and approximate token counts.

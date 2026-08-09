@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """Integration test: full pipeline end-to-end (harness → CSV → table → memory).
 
 Exercises every module I built in a single end-to-end flow to catch regressions
