@@ -1,0 +1,4 @@
+model,tokens,ttft_ms,tok_per_sec_mean,p50_us,p95_us,p99_us,mean_us,gdn_proj_pct,gdn_conv_pct,gdn_decay_pct,gdn_scan_pct,gdn_oproj_pct,full_pct,ffn_pct
+Qwen3.5-4B,20,289.25,3.46,289400,290268,290268,289069,15.5,0.2,0.0,0.0,7.8,6.3,70.1
+Qwen3.5-4B,20,287.40,3.48,287948,288839,288839,287355,15.4,0.2,0.0,0.0,7.9,6.4,70.1
+Qwen3.5-4B,20,285.65,3.49,287433,288263,288263,286925,15.5,0.2,0.0,0.0,7.9,6.4,70.0
