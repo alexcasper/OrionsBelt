@@ -3483,6 +3483,70 @@ cc -O3 -fopenmp -march=armv8.2-a+dotprod -static \
 taskset -c 4-7 ./bench_e2e_ctx --ctx-sweep 1,64,256,512,1024,2048,4096 --csv
 ```
 
+### Correction: OpenMP fairness fix (ob-m2j, 2026-08-09)
+
+The §17 data above was captured at commit `c4cc9be` (2026-08-07), **before**
+the OpenMP parallelization of the full-attention head loop (ob-m2j). At that
+point, GDN layers ran multi-threaded (`OMP_NUM_THREADS=4`) while the
+full-attention scoring loop ran single-threaded — the per-layer comparison
+was **unfair to full-attention**.
+
+After ob-m2j (commit `a1c5cf2`), both layer types use `#pragma omp parallel
+for`. Re-measured on **rk3588-t4** (A76 big cluster, cpu4-7,
+governor=performance, OMP_NUM_THREADS=4, commit `31cba63`):
+
+#### 4B FP32 — fair 4-thread comparison (t4)
+
+| ctx | GDN (ms) | Full-attn (ms) | FFN (ms) | Total (ms) | tok/s |
+|----:|---------:|---------------:|---------:|-----------:|------:|
+| 512 | 204 | 59 | 663 | 927 | 1.08 |
+| 1024 | 204 | 69 | 663 | 936 | 1.07 |
+| 2048 | 204 | 93 | 664 | 961 | 1.04 |
+| 4096 | 204 | 143 | 664 | 1011 | 0.99 |
+| 8192 | 204 | 241 | 663 | 1108 | 0.90 |
+
+#### 4B FP32 — single-thread baseline (t4)
+
+| ctx | GDN (ms) | Full-attn (ms) | FFN (ms) | Total (ms) | tok/s |
+|----:|---------:|---------------:|---------:|-----------:|------:|
+| 512 | 451 | 133 | 1385 | 1969 | 0.51 |
+| 1024 | 450 | 160 | 1385 | 1995 | 0.50 |
+| 2048 | 450 | 211 | 1384 | 2044 | 0.49 |
+| 4096 | 450 | 312 | 1383 | 2145 | 0.47 |
+| 8192 | 450 | 514 | 1383 | 2346 | 0.43 |
+
+#### 4B INT8 — fair 4-thread comparison (t4)
+
+| ctx | GDN (ms) | Full-attn (ms) | FFN (ms) | Total (ms) | tok/s |
+|----:|---------:|---------------:|---------:|-----------:|------:|
+| 512 | 69 | 27 | 201 | 297 | 3.37 |
+| 1024 | 69 | 36 | 203 | 308 | 3.25 |
+| 2048 | 69 | 57 | 202 | 327 | 3.05 |
+| 4096 | 69 | 102 | 203 | 373 | 2.68 |
+| 8192 | 69 | 202 | 203 | 473 | 2.11 |
+
+#### 4B INT8 — single-thread baseline (t4)
+
+| ctx | GDN (ms) | Full-attn (ms) | FFN (ms) | Total (ms) | tok/s |
+|----:|---------:|---------------:|---------:|-----------:|------:|
+| 512 | 158 | 65 | 456 | 678 | 1.47 |
+| 1024 | 158 | 91 | 456 | 704 | 1.42 |
+| 2048 | 158 | 143 | 456 | 757 | 1.32 |
+| 4096 | 158 | 245 | 456 | 858 | 1.17 |
+| 8192 | 158 | 449 | 456 | 1064 | 0.94 |
+
+**Full-attention speedup from OpenMP: 2.0–2.4×** across both FP32 and INT8.
+GDN speedup: 2.2× (constant). The scaling *shape* (O(1) vs O(n)) is
+unchanged — GDN layers remain flat at ~204 ms regardless of context length,
+while full-attention grows linearly. The O(n) crossover still occurs; it is
+simply pushed to a higher context length than the unfair §17 data suggested.
+
+Data: `results/raw/rk3588-t4_e2e_ctxsweep_4t_fair.csv`,
+`results/raw/rk3588-t4_e2e_ctxsweep_1t.csv`,
+`results/raw/rk3588-t4_e2e_ctxsweep_int8_4t_fair.csv`,
+`results/raw/rk3588-t4_e2e_ctxsweep_int8_1t.csv`.
+Manifest: `results/manifests/rk3588-t4.json` (SHA `31cba63`).
+
 ## 18. Sustained-load thermal stability: no throttling on RK3588 (2026-08-07)
 
 **Addresses docs/archive/PLAN.md risk R7: burst numbers must be sustainable.**
