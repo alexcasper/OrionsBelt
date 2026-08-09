@@ -94,6 +94,8 @@ cutoff has passed with no board; any future arrival is additive bonus per ADR 00
 | PR | Author | Scope | Status |
 |---|---|---|---|
 | #103 | t4 | O6 baseline script + onboarding docs | MERGED |
+| #101 | j1 | Close ob-8qt.10 KleidiAI packaging complete | MERGED |
+| #100 | t3 | Fix bandwidth ceiling label with measured DRAM probe data | MERGED |
 | #104 | t3 | GB/s→GiB/s in human-authored docs (7 files) | MERGED |
 | #102 | j1 | GB/s→GiB/s in generated tables (32 files) + KleidiAI README | MERGED |
 | #106 | j1 | Fix O6 spec unit mismatch in comparison_table.md | MERGED |
@@ -147,6 +149,7 @@ cutoff has passed with no board; any future arrival is additive bonus per ADR 00
 | #156 | j1 | GPU kernel fixes (dead code + incorrect matrix notation in OpenCL) + NPU probe README (document probe 07) + stale Python version + broken doc ref fixes | MERGED |
 | #157 | j1 | Add 19 missing merged PRs (#106–#126) to SUBMISSION_STATUS table | MERGED |
 | #158 | t3 | Re-run KleidiAI bench with taskset -c 4-7 — fix cumdecay 64×160 A55 mis-measurement + suppress -Wunused-but-set-variable + improve big.LITTLE affinity warning | MERGED |
+| #159 | t3 | Fix GPU kernel read-step matrix notation (S_h^T) + add PRs #156–#158 to table + stale FINDINGS line count + warn on unrecognized CLI args + fix -Wmaybe-uninitialized in e2e_decode | MERGED |
 
 ---
 
