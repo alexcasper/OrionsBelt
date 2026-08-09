@@ -12,7 +12,8 @@ LOG="$HOME/OrionsBelt/.goose-loop.log"; TASK="$HOME/OrionsBelt/.goose-task.md"; 
 # concurrently (seen on t3 2026-08-09: two sessions spawned two goose
 # agents; the stale one generated 146 runaway gitignored manifests).
 # Anchored ^bash excludes the tmux wrapper that launches this script.
-_OTHER=$(pgrep -f "^bash goose-loop.sh" | grep -v "^$$\$" | head -1)
+# The .* handles full-path invocation (bash /home/.../goose-loop.sh).
+_OTHER=$(pgrep -f '^bash.*goose-loop\.sh' | grep -v "^$$\$" | head -1)
 if [ -n "$_OTHER" ]; then
   echo "[guard] another goose-loop.sh (PID $_OTHER) is already running — exiting" >>"$LOG"
   exit 0
@@ -51,6 +52,14 @@ ensure_task() {
 
 while true; do
   echo "--- $HOST iter $(date) ---" | tee -a "$LOG"
+  # Rotate log if it exceeds 10 MB to prevent disk fill (ob-502).
+  # Keep last 2000 lines — enough for the tail -40 bloat-stall check below
+  # and recent debugging context. Atomic via tmp+mv.
+  _LOG_SIZE=$(stat -c%s "$LOG" 2>/dev/null || echo 0)
+  if [ "$_LOG_SIZE" -gt 10485760 ]; then
+    tail -2000 "$LOG" > "$LOG.tmp" && mv "$LOG.tmp" "$LOG"
+    echo "[log-rotate: truncated to last 2000 lines, was $((_LOG_SIZE / 1048576))MB]" >> "$LOG"
+  fi
   # self-heal: if the last run tripped the bloat-stall signature, force a fresh session
   if tail -40 "$LOG" 2>/dev/null | grep -q "create a new session"; then
     rm -f "$HOME/OrionsBelt/.goose-session-created"; echo "[self-heal: fresh session]" >>"$LOG"
