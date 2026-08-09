@@ -118,11 +118,13 @@ cutoff has passed with no board; any future arrival is additive bonus per ADR 00
 | #146 | j1 | Add PR #145 to merged PRs table in SUBMISSION_STATUS.md | MERGED |
 | #147 | j1 | Add PR #146 to merged PRs table in SUBMISSION_STATUS.md | MERGED |
 | #148 | j1 | Add PR #147 to merged PRs table in SUBMISSION_STATUS.md | MERGED |
+| #149 | alex | Fleet ssh orchestration: drive all four nodes from one dev box (ob-8ms.4) | MERGED |
 | #150 | j1 | Add PR #148 to merged PRs table + fix dirty-tree guard test (ob-7cf) + add tests for ort_gdn_probe numpy_gdn_reference (ob-9o7) | MERGED |
 | #151 | j1 | Add PR #150 to merged PRs table in SUBMISSION_STATUS.md + loop flush + beads export | MERGED |
 | #152 | j1 | Fix stale manifest count in README (125 → 138) + fix stale test count (1788 → 1799) in Devpost submission, SUBMISSION_STATUS, README | MERGED |
 | #153 | j1 | Add PR #152 to merged PRs table + energy efficiency section to Devpost + backfill 4 j1 power CSV manifests + INA3221 energy profiling in README + fix stale manifest count (138 → 142) | MERGED |
 | #154 | j1 | Add PR #153 to merged PRs table + fix --help/error message omitting gdn2_gated_scan from valid sustained kernels | MERGED |
+| #155 | j1 | Add PR #154 to merged table + fix isa_detect docstring + fix README broken doc ref (SETUP_O6→O6_ONBOARDING) + fix stale 'unverified' comment in pyproject.toml | MERGED |
 
 ---
 
