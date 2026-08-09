@@ -34,10 +34,10 @@ At 262K context on the 4B checkpoint, that difference is **23.95 GiB of RAM** �
 - **Cross-vendor NPU operator-coverage audit** — both CIX NOE and Rockchip RKNN reject GDN's variable-length recurrence (the "Loop" op). This generalizes: no current edge NPU compiler handles it
 - **GDN-2 vs GDN-1 comparison** — the decoupled gating in GDN-2 costs 1.2–1.5× at decode on big cores (2.2–2.4× on little), 2.2–2.7× at prefill
 - **Analytical memory model** decomposing weights, KV cache, and recurrent state at every context length
-- **End-to-end model decode** — C decode loop with row-sweep NEON GEMV + INT8 weight-only quantization: **28.9 tok/s (0.8B, A76, INT8+SDOT)**, **2.45 tok/s (0.8B, A57)**, 3.34 tok/s (4B, A76, INT8+SDOT), 0.51 tok/s (4B, A57). ~48× cumulative speedup over the Python/transformers baseline
+- **End-to-end model decode** — C decode loop with row-sweep NEON GEMV + INT8 weight-only quantization: **30.2 tok/s (0.8B, A76, INT8+SDOT)**, **2.45 tok/s (0.8B, A57)**, 3.48 tok/s (4B, A76, INT8+SDOT), 0.51 tok/s (4B, A57). ~50× cumulative speedup over the Python/transformers baseline
 - **Q8_0 block-quantized GEMV** — per-block fp16 scale + 32 int8 values, matching the llama.cpp Q8_0 format: **2.97× decode speedup over FP32 on the A57** (5.12 tok/s vs 1.72 tok/s), with cosine similarity 1.000000 (numerically indistinguishable from FP32). Context-length sweep confirms the GDN layer cost stays flat at 73–80 ms across ctx 1–4096
 - **INT4 weight-only quantization** — core-type-dependent: 1.40× on A55 little cores (bandwidth wins), 15% slower than INT8 on A76 (compute-bound), no benefit on A57 (narrow pipeline can't hide unpack cost). The optimal precision is core-type-aware, not "always lower"
-- **SDOT-accelerated INT8 GEMV** — `vdotq_lane_s32` INT8×INT8→int32 dot-product kernel for dotprod-capable cores (A76): **1.92× over NEON INT8 on 4B, 3.06× on 0.8B**, reaching 83% of the theoretical DRAM bandwidth ceiling. Cumulative speedup from the naive FP32 baseline reaches ~48× (4B) — see [§33](./FINDINGS.md)
+- **SDOT-accelerated INT8 GEMV** — `vdotq_lane_s32` INT8×INT8→int32 dot-product kernel for dotprod-capable cores (A76): **1.92× over NEON INT8 on 4B, 3.06× on 0.8B**, reaching 83% of the theoretical DRAM bandwidth ceiling. Cumulative speedup from the naive FP32 baseline reaches ~50× (4B) — see [§33](./FINDINGS.md)
 - **Cache-blocked GEMM prefill** — 49–78× prefill speedup from switching naive single-row GEMV to cache-blocked GEMM at M>1, measured across the fleet
 - **ONNX Runtime CPU EP audit** — GDN recurrence is expressible via ONNX `Loop` but 16× slower than our fused kernel. Confirms no existing CPU toolchain has optimized GDN for Arm
 - **Hardware energy profiling** — INA3221 rail-level power characterization on Jetson Nano: 874–1250 mJ/GiB board-wide, power is constant across kernels, `performance` governor is both faster and 28% more energy-efficient than `ondemand`
@@ -107,7 +107,7 @@ On dotprod-capable cores (A76, A720), the Arm `vdotq_lane_s32` instruction compu
 | Qwen3.5-4B (A55) | NEON INT8 | 0.49 | 2034 | 1.0× | — |
 | Qwen3.5-4B (A55) | **SDOT INT8** | **1.36** | **734** | **2.78×** | — |
 
-> SDOT nearly doubles 4B throughput (83% of the 4.5 tok/s theoretical ceiling) and triples 0.8B throughput. The speedup is larger for 0.8B because its smaller weight set (~0.41 GiB INT8) partially fits in the A76 cluster's shared L3, making it more compute-bound — where SDOT's 5× instruction reduction has the most leverage. Cross-validated on two independent RK3588 nodes (t3, t4): agreement within 1%. Full analysis: [FINDINGS §33](../docs/FINDINGS.md), data: `results/raw/rk3588-t4_sdot_*.csv`.
+> SDOT nearly doubles 4B throughput (83% of the 4.5 tok/s theoretical ceiling) and triples 0.8B throughput. The speedup is larger for 0.8B because its smaller weight set (~0.41 GiB INT8) partially fits in the A76 cluster's shared L3, making it more compute-bound — where SDOT's 5× instruction reduction has the most leverage. Cross-validated on two independent RK3588 nodes (t3, t4): agreement within 5%. Full analysis: [FINDINGS §33](../docs/FINDINGS.md), data: `results/raw/rk3588-t4_sdot_*.csv`.
 
 ### Memory: the architectural advantage
 
@@ -194,7 +194,7 @@ No GPU, NPU, or proprietary SDK required. Full setup guide: [`docs/SETUP_PORTABL
 ### Reproducibility
 
 - Every measurement has a **provenance manifest** (git SHA, governor state, CPU topology, thermals)
-- 1799 unit tests covering kernel correctness and schema conformance (1798 passed, 1 skipped in CI)
+- 1803 unit tests covering kernel correctness and schema conformance
 - All figures are **regenerable** from committed CSVs (`bench/plots.py`, `scripts/generate_memory_plots.py`)
 - t3 benchmark data: manifest git_sha `f015982`, dirty=false, governor=performance, 30 repeats per kernel
 
@@ -219,7 +219,7 @@ Specifically:
 
 - **Repository:** https://github.com/alexcasper/OrionsBelt
 - **License:** Apache-2.0
-- **Findings (52 sections, 5345 lines):** [`docs/FINDINGS.md`](../docs/FINDINGS.md)
+- **Findings (52 sections, 5349 lines):** [`docs/FINDINGS.md`](../docs/FINDINGS.md)
 - **Comparison table:** [`results/figures/comparison_table.md`](../results/figures/comparison_table.md)
 - **Fleet bandwidth analysis:** [`results/figures/fleet_bandwidth_scaling.md`](../results/figures/fleet_bandwidth_scaling.md)
 - **Memory scaling figures:** [`results/figures/memory_comparison.md`](../results/figures/memory_comparison.md)
