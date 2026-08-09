@@ -46,16 +46,19 @@
 
 
 /* Safe alloc wrappers — exit on OOM instead of dereferencing NULL. */
+__attribute__((unused))
 static void *xmalloc(size_t n) {
     void *p = malloc(n);
     if (!p) { fprintf(stderr, "out of memory (%zu bytes)\n", n); exit(1); }
     return p;
 }
+__attribute__((unused))
 static void *xcalloc(size_t nmemb, size_t size) {
     void *p = calloc(nmemb, size);
     if (!p) { fprintf(stderr, "out of memory (%zu * %zu bytes)\n", nmemb, size); exit(1); }
     return p;
 }
+__attribute__((unused))
 static void *xaligned_alloc(size_t alignment, size_t size) {
     void *p = aligned_alloc(alignment, size);
     if (!p) { fprintf(stderr, "out of memory (aligned %zu, %zu bytes)\n", alignment, size); exit(1); }
