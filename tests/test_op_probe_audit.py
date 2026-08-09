@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """Tests for scripts/run_op_probe_audit.py — classify() verdict logic.
 
 The classify() function is the core decision-making for the NPU operator-coverage

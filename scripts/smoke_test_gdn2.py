@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """Smoke-test the NVLabs GatedDeltaNet-2 reference implementation.
 
 Bead ob-y3f. Designed to run on an x86 host with CUDA (not on the Jetson —

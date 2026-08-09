@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """HuggingFace transformers Backend for the benchmark harness (ob-xh3.3).
 
 Implements the ``Backend`` ABC (``bench/harness.py``) for a real Qwen3.5 model

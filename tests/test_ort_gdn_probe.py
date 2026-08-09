@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """Tests for scripts/ort_gdn_probe.py — GDN reference implementation correctness.
 
 numpy_gdn_reference() is the reference implementation for GDN's delta-rule

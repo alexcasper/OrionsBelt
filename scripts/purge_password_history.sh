@@ -1,4 +1,7 @@
 #!/bin/bash
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 # git history purge procedure for ob-3i5
 # Removes .goose-task.md and .goose-loop.log from all git history.
 #

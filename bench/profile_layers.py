@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """Per-layer latency profiling for Qwen3.5 hybrid GDN model.
 
 Registers forward pre/post hooks on each decoder layer to measure wall-clock

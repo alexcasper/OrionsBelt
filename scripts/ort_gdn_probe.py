@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """ONNX Runtime CPU EP feasibility probe for Gated DeltaNet recurrence (ob-mrd.16).
 
 Architecture decision: data tensors are baked into the Loop body as initializers

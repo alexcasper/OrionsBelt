@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """Tests for the ported config-driven memory accounting (ob-7m6).
 
 Ported from ``origin/bench/t4:tests/test_metrics.py`` and adapted to the

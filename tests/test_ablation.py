@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """Tests for the ablation matrix runner (scripts/run_ablation.py, bead ob-rqd/ob-1lm).
 
 The ablation grid drives the headline comparison table for the submission.

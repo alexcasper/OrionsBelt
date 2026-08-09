@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """Generate reproducible long-context prompt corpus (ob-del).
 
 Produces two prompt types at each canonical context length (4K, 32K, 128K, 262K):

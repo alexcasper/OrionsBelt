@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """Runtime ISA feature detection for aarch64 devices.
 
 Per bead ob-ng6: confirm the feature flags are actually active at runtime

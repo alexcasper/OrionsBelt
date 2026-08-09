@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """Capture golden reference logits for the correctness oracle (bead ob-aqv).
 
 Runs the selected Qwen3.5 checkpoint via ``HFTorchBackend`` on an x86/CUDA host

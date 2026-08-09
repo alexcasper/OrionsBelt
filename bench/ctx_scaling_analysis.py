@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """Context-length scaling analysis for the GDN decode benchmark (bead ob-mrd.10).
 
 Reads ctx-sweep CSV files from results/raw/ and generates a markdown report

@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """Tests for the benchmark harness (ob-ljh).
 
 Exercises the timing protocol (METRICS.md sections 1-5), schema conformance

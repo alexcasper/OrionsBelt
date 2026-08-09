@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """Emit minimal per-operator ONNX graphs to probe CIX NOE Compiler coverage of GDN ops.
 
 Bead ``ob-t3b.2``, feeding the op-coverage audit ``ob-t3b.1``.

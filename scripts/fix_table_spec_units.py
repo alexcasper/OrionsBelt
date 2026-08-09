@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """Fix stale GB/s→GiB/s spec bandwidth in generated per-device table files.
 
 t3's systematic unit fix (commit 78ffcdb) corrected DEVICE_SPEC_BANDWIDTH in

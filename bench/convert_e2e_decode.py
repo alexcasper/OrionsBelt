@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """Convert raw e2e decode CSV to RESULTS_SCHEMA-conformant tidy rows.
 
 The C binary (gdn_e2e_decode.c) emits a simple wide CSV:

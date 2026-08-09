@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """Smoke tests that the orionsbelt src-layout package is importable.
 
 These exist to catch packaging regressions (bad ``pyproject.toml``, missing

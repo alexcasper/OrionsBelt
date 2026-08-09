@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """Per-accelerator execution backends for the CIX P1 SoC.
 
 One subpackage per engine, because the interesting question in this project is

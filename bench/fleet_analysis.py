@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """Fleet bandwidth-scaling analysis for the device-fleet study (bead ob-8ms.3).
 
 Reads all device microbenchmark CSVs from results/raw/, compares achieved GiB/s

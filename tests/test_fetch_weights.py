@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """Tests for scripts/fetch_weights.py weight-fetch tooling.
 
 Tests cover pure logic (plan computation, display formatting, manifest

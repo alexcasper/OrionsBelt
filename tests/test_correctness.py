@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """Tests for bench/correctness.py — tolerance comparison framework (ob-3uh).
 
 Validates logit comparison, perplexity comparison, long-context drift

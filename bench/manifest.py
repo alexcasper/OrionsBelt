@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """Run manifest — provenance capture for benchmark runs.
 
 Per docs/archive/PLAN.md section 9: "a number without a manifest is not a result." On a

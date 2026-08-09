@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """Quantization policy for Qwen3.5 on Arm silicon.
 
 Derived from the GDN architecture audit (``docs/GDN_ARCHITECTURE_AUDIT.md``,

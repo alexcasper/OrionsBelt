@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """Generate the e2e fleet comparison table from committed schema CSVs.
 
 Reads every results/raw/*_e2e_schema.csv, extracts decode tok/s and TTFT,

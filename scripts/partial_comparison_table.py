@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 # ob-9t0.2: partial comparison table aggregation. stdlib only (csv, statistics, json).
 # Reads committed CSVs + manifests, prints structured numbers with provenance.
 # Does NOT import bench/ (this node is Py 3.6.9; bench/ needs 3.7+).

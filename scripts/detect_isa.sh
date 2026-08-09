@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 # Standalone ISA feature detection for aarch64 devices (bead ob-ng6).
 #
 # Works on ANY device — no Python required. Mirrors the logic of

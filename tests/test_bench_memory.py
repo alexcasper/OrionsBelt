@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """Tests for bench/memory.py — the three-way memory decomposition (ob-vfp).
 
 Verifies that weights are flat, KV cache grows linearly, recurrent state is O(1),

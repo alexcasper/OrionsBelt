@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """End-to-end smoke tests: sweep -> CSV -> manifest linkage (bead ob-1lm).
 
 Ported from bench/j1's test_e2e_smoke.py, which was written against that branch's
