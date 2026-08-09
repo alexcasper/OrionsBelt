@@ -152,6 +152,10 @@ cutoff has passed with no board; any future arrival is additive bonus per ADR 00
 | #159 | t3 | Fix GPU kernel read-step matrix notation (S_h^T) + add PRs #156–#158 to table + stale FINDINGS line count + warn on unrecognized CLI args + fix -Wmaybe-uninitialized in e2e_decode | MERGED |
 | #160 | t3 | Add missing PRs #100–#101 to merged PRs table (gap before #102) + beads sync after ob-502 note | MERGED |
 | #161 | t3 | Defensive hardening — malloc NULL checks in e2e_decode.c (INT8/Q8_0 quantized paths) + delta_matmul.c KleidiAI path + CSV/CLI input validation in fleet_analysis.py, harness.py, correctness.py, comparison_table.py | MERGED |
+| #162 | t3 | Add PR #161 to merged PRs table in SUBMISSION_STATUS.md | MERGED |
+| #163 | t3 | SPDX Python/shell headers (109 files) + xmalloc wrappers for 5 kernel test files (107 sites) + bench_gdn.c (24) + gdn_e2e_decode.c main paths (20+3) | MERGED |
+| #164 | t4 | SDOT INT8 GEMV kernel for A55 little-cluster — 2.78× over NEON (ob-8qt.14) + duplicate xmalloc fix | MERGED |
+| #165 | t3 | Complete malloc audit to ALL remaining C files (bench/gpu/scripts, 71 sites) + __attribute__((unused)) on all wrappers + fix 2 pre-existing dead-code warnings | MERGED |
 
 ---
 
