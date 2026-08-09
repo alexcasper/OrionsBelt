@@ -249,3 +249,70 @@ class TestUpdateReadmeEdgeCases:
         _write_readme(tmp_path, csvs=3, manifests=5, figs=4)
         n = urc.update_readme()
         assert n == 0  # already correct, README.md excluded
+
+
+# ---------------------------------------------------------------------------
+# _count_files — git ls-files success path
+# ---------------------------------------------------------------------------
+
+
+class TestCountFilesGitLsFiles:
+    """Cover the git ls-files success path (line 47) and suffix filter (line 56)."""
+
+    def test_git_ls_files_success_path(self, tmp_path, monkeypatch):
+        """When git ls-files succeeds, its parsed output is used."""
+        import subprocess as sp
+
+        monkeypatch.setattr(urc, "REPO_ROOT", str(tmp_path))
+        mock_result = sp.CompletedProcess(
+            args=["git", "ls-files"],
+            returncode=0,
+            stdout="results/raw/a.csv\nresults/raw/b.csv\n",
+        )
+        monkeypatch.setattr(sp, "run", lambda *a, **kw: mock_result)
+        assert urc._count_files("results/raw", suffix=".csv") == 2
+
+    def test_suffix_filter_skips_non_matching(self, tmp_path, monkeypatch):
+        """Files not matching the suffix are skipped."""
+        monkeypatch.setattr(urc, "REPO_ROOT", str(tmp_path))
+        raw = tmp_path / "results" / "raw"
+        raw.mkdir(parents=True)
+        (raw / "a.csv").write_text("data")
+        (raw / "b.txt").write_text("text")
+        (raw / "c.csv").write_text("data")
+        assert urc._count_files("results/raw", suffix=".csv") == 2
+
+
+# ---------------------------------------------------------------------------
+# main()
+# ---------------------------------------------------------------------------
+
+
+class TestMain:
+    """Test the main() CLI entry point."""
+
+    def test_main_default_no_dry_run(self, monkeypatch):
+        """main() calls update_readme without dry_run."""
+        called = {}
+
+        def mock_update(dry_run=False):
+            called["dry_run"] = dry_run
+            return 0
+
+        monkeypatch.setattr(urc, "update_readme", mock_update)
+        monkeypatch.setattr("sys.argv", ["update_readme_counts.py"])
+        assert urc.main() == 0
+        assert called["dry_run"] is False
+
+    def test_main_dry_run_flag(self, monkeypatch):
+        """main() passes --dry-run to update_readme."""
+        called = {}
+
+        def mock_update(dry_run=False):
+            called["dry_run"] = dry_run
+            return 0
+
+        monkeypatch.setattr(urc, "update_readme", mock_update)
+        monkeypatch.setattr("sys.argv", ["update_readme_counts.py", "--dry-run"])
+        assert urc.main() == 0
+        assert called["dry_run"] is True

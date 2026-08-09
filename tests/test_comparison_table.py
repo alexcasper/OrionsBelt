@@ -565,3 +565,100 @@ class TestMainCLI:
         summaries = load_and_summarize([str(good), str(bad)])
         assert len(summaries) == 1
         assert summaries[0]["p50"] == 110.0  # p50 of [100, 110, 120]
+
+
+# ---------------------------------------------------------------------------
+# Coverage gap tests (ob-eek)
+# ---------------------------------------------------------------------------
+
+import os  # noqa: E402
+
+
+class TestLoadAndSummarizeEdgeCases:
+    def test_row_missing_context_length_skipped(self, tmp_path):
+        """Row where context_length field is empty after fieldnames check passes."""
+        path = tmp_path / "data.csv"
+        with open(path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=COLUMNS)
+            writer.writeheader()
+            row = _row()
+            row["context_length"] = ""
+            writer.writerow(row)
+        summaries = load_and_summarize([str(path)])
+        assert len(summaries) == 0
+
+    def test_non_numeric_value_skipped(self, tmp_path):
+        """Row with non-numeric value → ValueError → row skipped."""
+        path = tmp_path / "data.csv"
+        with open(path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=COLUMNS)
+            writer.writeheader()
+            row = _row()
+            row["value"] = "not_a_number"
+            writer.writerow(row)
+        summaries = load_and_summarize([str(path)])
+        assert len(summaries) == 0
+
+    def test_oserror_on_file_skipped(self, tmp_path):
+        """Unreadable file → OSError → silently skipped."""
+        # Use a path that exists as a directory (open raises IsADirectoryError, subclass of OSError)
+        dir_path = tmp_path / "results" / "raw"
+        dir_path.mkdir(parents=True)
+        summaries = load_and_summarize([str(dir_path)])
+        assert len(summaries) == 0
+
+
+class TestMainCLIGuardCurated:
+    def test_refuse_overwrite_curated_table(self, tmp_path, capsys):
+        """main() refuses to overwrite results/figures/comparison_table.md."""
+        from bench.comparison_table import main as ct_main
+
+        good = tmp_path / "good.csv"
+        _write_csv(
+            good,
+            [
+                _row(value=100, repeat=0),
+                _row(value=110, repeat=1),
+                _row(value=120, repeat=2),
+            ],
+        )
+        figures_dir = tmp_path / "results" / "figures"
+        figures_dir.mkdir(parents=True)
+
+        old_cwd = os.getcwd()
+        try:
+            os.chdir(tmp_path)
+            rc = ct_main(
+                [
+                    "--csv",
+                    str(good),
+                    "--output",
+                    "results/figures/comparison_table.md",
+                ]
+            )
+        finally:
+            os.chdir(old_cwd)
+        assert rc == 1
+        captured = capsys.readouterr()
+        assert "refusing to overwrite" in captured.err
+
+    def test_main_via_runpy(self, tmp_path, monkeypatch):
+        """Running as __main__ via runpy covers the __main__ guard."""
+        import runpy
+
+        good = tmp_path / "good.csv"
+        _write_csv(
+            good,
+            [
+                _row(value=100, repeat=0),
+                _row(value=110, repeat=1),
+                _row(value=120, repeat=2),
+            ],
+        )
+        monkeypatch.setattr("sys.argv", ["comparison_table.py", "--csv", str(good)])
+        script_path = str(Path(__file__).resolve().parent.parent / "bench" / "comparison_table.py")
+        import pytest as _pt
+
+        with _pt.raises(SystemExit) as exc_info:
+            runpy.run_path(script_path, run_name="__main__")
+        assert exc_info.value.code == 0

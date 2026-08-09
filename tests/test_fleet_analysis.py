@@ -15,6 +15,7 @@ Covers:
 import csv
 import json
 import os
+from pathlib import Path
 
 import bench.fleet_analysis as fa
 import pytest
@@ -903,3 +904,48 @@ class TestMainCLI:
         finally:
             sys.argv = old_argv
         assert os.path.exists(str(tmp_path / "out" / "fleet_bandwidth_scaling.md"))
+
+
+# ---------------------------------------------------------------------------
+# Coverage gap tests (ob-eek)
+# ---------------------------------------------------------------------------
+
+
+class TestReadRowsOSError:
+    def test_directory_path_handled_gracefully(self, tmp_path):
+        """Passing a directory to load_device_csv → OSError caught, empty list."""
+        # load_device_csv checks os.path.exists first, so we need to
+        # mock os.path.exists to return True for a directory
+        import unittest.mock
+
+        dir_path = str(tmp_path)
+        with unittest.mock.patch("os.path.exists", return_value=True):
+            rows = fa.load_device_csv(dir_path)
+        assert rows == []
+
+
+class TestGetGibsErrorPaths:
+    def test_missing_gib_key(self):
+        """Row without gib_per_s_p50 key → KeyError → None."""
+        rows = [{"model": "Qwen3.5-4B", "kernel": "gdn_gated_scan"}]
+        result = fa.get_gibs(rows, "Qwen3.5-4B", "gdn_gated_scan")
+        assert result is None
+
+    def test_non_numeric_gib_value(self):
+        """Row with non-numeric gib_per_s_p50 → ValueError → None."""
+        rows = [{"model": "Qwen3.5-4B", "kernel": "gdn_gated_scan", "gib_per_s_p50": "N/A"}]
+        result = fa.get_gibs(rows, "Qwen3.5-4B", "gdn_gated_scan")
+        assert result is None
+
+
+class TestMainEntryRunpy:
+    def test_main_via_runpy(self, tmp_path, monkeypatch):
+        """Running fleet_analysis.py as __main__ covers the __main__ guard."""
+        import runpy
+
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr(
+            "sys.argv", ["fleet_analysis.py", "--output-dir", str(tmp_path / "out")]
+        )
+        script_path = str(Path(__file__).resolve().parent.parent / "bench" / "fleet_analysis.py")
+        runpy.run_path(script_path, run_name="__main__")

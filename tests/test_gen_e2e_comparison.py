@@ -12,6 +12,8 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import pytest
+
 _ROOT = str(Path(__file__).resolve().parent.parent)
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
@@ -29,6 +31,8 @@ from gen_e2e_comparison import (  # noqa: E402
     extract_metrics,
     fmt_mean_std,
     generate_table,
+    load_rows,
+    main,
 )
 
 # ---------------------------------------------------------------------------
@@ -543,8 +547,25 @@ _BASE_EARLY = "dd50acd"  # "Create project brief for Qwen3.5 optimization"
 _DESC_DIVERGED = "9c8d239"  # descendant of _BASE_EARLY, touches src/ (kernel)
 
 
+def _is_shallow_checkout() -> bool:
+    """CI uses fetch-depth=1 (shallow); historical SHAs are unreachable there."""
+    import subprocess
+
+    r = subprocess.run(
+        ["git", "rev-parse", "--is-shallow-repository"],
+        capture_output=True,
+        text=True,
+    )
+    return r.returncode == 0 and r.stdout.strip() == "true"
+
+
 class TestCheckCommitLineage:
     """Test the git-provenance commit classifier."""
+
+    pytestmark = pytest.mark.skipif(
+        _is_shallow_checkout(),
+        reason="historical commit SHAs unreachable in shallow CI checkout",
+    )
 
     def test_base_commit_self_matches(self):
         """The base commit itself is classified as 'matched'."""
@@ -595,3 +616,227 @@ class TestCheckCommitLineage:
         assert any(
             kw in entry["detail"] for kw in ("bench", "src", "include", "build_device", "run_e2e")
         )
+
+    def test_empty_manifest_ref_skipped(self, tmp_path, monkeypatch):
+        """An empty string in manifest refs is skipped via 'continue'."""
+        monkeypatch.setattr("gen_e2e_comparison.MANIFESTS_DIR", tmp_path)
+        any_dirty, all_checked = _check_manifest_dirty([""])
+        assert any_dirty is False
+        assert all_checked is True
+
+
+# ---------------------------------------------------------------------------
+# load_rows()
+# ---------------------------------------------------------------------------
+
+
+def _write_e2e_csv(path: Path, rows: list[dict]) -> None:
+    """Write rows as an e2e schema CSV file."""
+    import csv
+
+    with open(path, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=COLUMNS)
+        writer.writeheader()
+        for row in rows:
+            writer.writerow(row)
+
+
+class TestLoadRows:
+    """Test load_rows() — reading CSVs from disk."""
+
+    def test_loads_single_csv(self, tmp_path, monkeypatch):
+        raw = tmp_path / "raw"
+        raw.mkdir()
+        _write_e2e_csv(raw / "dev_e2e_schema.csv", [_row()])
+        monkeypatch.setattr("gen_e2e_comparison.RAW_DIR", raw)
+        monkeypatch.setattr("gen_e2e_comparison.REPO_ROOT", tmp_path)
+        rows = load_rows()
+        assert len(rows) == 1
+        assert rows[0]["device"] == "rk3588-t3_big"
+
+    def test_loads_multiple_csvs(self, tmp_path, monkeypatch):
+        raw = tmp_path / "raw"
+        raw.mkdir()
+        _write_e2e_csv(raw / "dev1_e2e_schema.csv", [_row(device="dev1_big")])
+        _write_e2e_csv(raw / "dev2_e2e_schema.csv", [_row(device="dev2_big")])
+        monkeypatch.setattr("gen_e2e_comparison.RAW_DIR", raw)
+        monkeypatch.setattr("gen_e2e_comparison.REPO_ROOT", tmp_path)
+        rows = load_rows()
+        devices = {r["device"] for r in rows}
+        assert devices == {"dev1_big", "dev2_big"}
+
+    def test_empty_raw_dir(self, tmp_path, monkeypatch):
+        raw = tmp_path / "raw"
+        raw.mkdir()
+        monkeypatch.setattr("gen_e2e_comparison.RAW_DIR", raw)
+        monkeypatch.setattr("gen_e2e_comparison.REPO_ROOT", tmp_path)
+        rows = load_rows()
+        assert rows == []
+
+    def test_dedup_applied_during_load(self, tmp_path, monkeypatch):
+        """load_rows() calls _dedup_rows to remove superseded entries."""
+        raw = tmp_path / "raw"
+        raw.mkdir()
+        _write_e2e_csv(
+            raw / "dev_e2e_schema.csv",
+            [
+                _row(device="rk3588-t3", repeat_count=2, value=1.0),
+                _row(device="rk3588-t3_big", repeat_count=3, value=1.1),
+            ],
+        )
+        monkeypatch.setattr("gen_e2e_comparison.RAW_DIR", raw)
+        monkeypatch.setattr("gen_e2e_comparison.REPO_ROOT", tmp_path)
+        rows = load_rows()
+        devices = {r["device"] for r in rows}
+        assert devices == {"rk3588-t3_big"}
+
+
+# ---------------------------------------------------------------------------
+# _dedup_rows — edge cases
+# ---------------------------------------------------------------------------
+
+
+class TestDedupEdgeCases:
+    """Cover remaining _dedup_rows branches."""
+
+    def test_unknown_model_uses_full_name(self):
+        """Model with neither '4B' nor '0.8B' falls back to full model name."""
+        rows = [
+            _row(device="dev_big", model="custom-model", repeat_count=2, value=1.0),
+            _row(device="dev_big", model="custom-model", repeat_count=3, value=2.0),
+        ]
+        _dedup_rows(rows)
+        # Higher repeat_count wins
+        assert len(rows) == 1
+        assert float(rows[0]["value"]) == 2.0
+
+    def test_non_integer_repeat_count_defaults_to_one(self):
+        """Non-integer repeat_count triggers ValueError, defaults to 1."""
+        rows = [
+            _row(device="dev_big", repeat_count="invalid", value=1.0),
+            _row(device="dev_big", repeat_count="also_bad", value=2.0),
+        ]
+        _dedup_rows(rows)
+        # Both default to rep_count=1, same group, same max_rep → both kept
+        assert len(rows) == 2
+
+
+# ---------------------------------------------------------------------------
+# generate_table — manifest, dirty, and cross-quant branches
+# ---------------------------------------------------------------------------
+
+
+class TestGenerateTableManifestBranches:
+    """Cover manifest-related branches in generate_table()."""
+
+    def test_multi_sha_dirty_manifests(self, monkeypatch):
+        """Multiple SHAs with dirty manifests → dirty-manifest warning."""
+        rows = [
+            _row(git_sha="aaaa1111", device="dev1_big"),
+            _row(git_sha="bbbb2222", device="dev2_big"),
+        ]
+        data = extract_metrics(rows)
+        monkeypatch.setattr("gen_e2e_comparison._check_manifest_dirty", lambda refs: (True, True))
+        md = generate_table(data)
+        assert "dirty" in md.lower()
+
+    def test_multi_sha_all_clean_manifests(self, monkeypatch):
+        """Multiple SHAs, all manifests dirty=false → comparable message."""
+        rows = [
+            _row(git_sha="aaaa1111", device="dev1_big"),
+            _row(git_sha="bbbb2222", device="dev2_big"),
+        ]
+        data = extract_metrics(rows)
+        monkeypatch.setattr("gen_e2e_comparison._check_manifest_dirty", lambda refs: (False, True))
+        md = generate_table(data)
+        assert "dirty=false" in md.lower() or "comparable" in md.lower()
+
+    def test_dirty_per_row_note(self):
+        """Manifest ref containing 'dirty' triggers per-row ⚠ dirty note."""
+        rows = [_row(device="dev_dirty")]
+        data = extract_metrics(rows)
+        md = generate_table(data)
+        assert "⚠ dirty" in md
+
+    def test_fp32_without_cluster_matches_int8_big(self):
+        """FP32 without _big suffix still matches INT8 _big via auto-append."""
+        rows = [
+            _row(quant="fp32", value=1.0, device="rk3588-t3"),
+            _row(quant="int8", value=2.0, device="rk3588-t3_big"),
+        ]
+        data = extract_metrics(rows)
+        md = generate_table(data)
+        assert "INT8 vs FP32" in md
+        assert "2.00×" in md
+
+    def test_q8_0_without_fp32_baseline(self):
+        """Q8_0 with no matching FP32 baseline shows '—' for speedup."""
+        rows = [_row(quant="q8_0", value=3.0, device="rk3588-t3_big")]
+        data = extract_metrics(rows)
+        md = generate_table(data)
+        assert "Q8_0 vs FP32" in md
+        assert "3.00" in md
+        assert "—" in md
+
+
+# ---------------------------------------------------------------------------
+# main() — CLI entry point
+# ---------------------------------------------------------------------------
+
+
+class TestMain:
+    """Test the main() CLI entry point."""
+
+    def test_main_writes_table(self, tmp_path, monkeypatch):
+        """main() reads CSVs and writes the comparison table."""
+        raw = tmp_path / "raw"
+        raw.mkdir()
+        _write_e2e_csv(raw / "dev_e2e_schema.csv", [_row()])
+        monkeypatch.setattr("gen_e2e_comparison.RAW_DIR", raw)
+        monkeypatch.setattr("gen_e2e_comparison.REPO_ROOT", tmp_path)
+        out = tmp_path / "output.md"
+        monkeypatch.setattr("sys.argv", ["gen_e2e_comparison.py", "--output", str(out)])
+        main()
+        assert out.exists()
+        content = out.read_text()
+        assert "# E2E Decode Fleet Comparison" in content
+
+    def test_main_no_csvs_exits_with_error(self, tmp_path, monkeypatch):
+        """main() exits when no CSVs found."""
+        raw = tmp_path / "raw"
+        raw.mkdir()
+        monkeypatch.setattr("gen_e2e_comparison.RAW_DIR", raw)
+        monkeypatch.setattr("gen_e2e_comparison.REPO_ROOT", tmp_path)
+        out = tmp_path / "output.md"
+        monkeypatch.setattr("sys.argv", ["gen_e2e_comparison.py", "--output", str(out)])
+        with pytest.raises(SystemExit) as exc_info:
+            main()
+        assert exc_info.value.code == 1
+
+    def test_main_with_base_commit(self, tmp_path, monkeypatch):
+        """main() with --base-commit runs lineage classification."""
+        raw = tmp_path / "raw"
+        raw.mkdir()
+        _write_e2e_csv(raw / "dev_e2e_schema.csv", [_row(git_sha=_BASE[:8])])
+        monkeypatch.setattr("gen_e2e_comparison.RAW_DIR", raw)
+        monkeypatch.setattr("gen_e2e_comparison.REPO_ROOT", tmp_path)
+        out = tmp_path / "output.md"
+        monkeypatch.setattr(
+            "sys.argv",
+            ["gen_e2e_comparison.py", "--output", str(out), "--base-commit", _BASE],
+        )
+        main()
+        assert out.exists()
+
+    def test_main_multi_sha_no_base_commit(self, tmp_path, monkeypatch):
+        """main() with multiple SHAs and no --base-commit prints warning."""
+        raw = tmp_path / "raw"
+        raw.mkdir()
+        _write_e2e_csv(raw / "dev1_e2e_schema.csv", [_row(git_sha="aaaa1111", device="dev1_big")])
+        _write_e2e_csv(raw / "dev2_e2e_schema.csv", [_row(git_sha="bbbb2222", device="dev2_big")])
+        monkeypatch.setattr("gen_e2e_comparison.RAW_DIR", raw)
+        monkeypatch.setattr("gen_e2e_comparison.REPO_ROOT", tmp_path)
+        out = tmp_path / "output.md"
+        monkeypatch.setattr("sys.argv", ["gen_e2e_comparison.py", "--output", str(out)])
+        main()
+        assert out.exists()

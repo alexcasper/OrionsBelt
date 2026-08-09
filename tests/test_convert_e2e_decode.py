@@ -622,3 +622,165 @@ class TestEmptyCSV:
         with pytest.raises(SystemExit) as exc_info:
             convert(str(raw), _make_args(raw, out))
         assert exc_info.value.code == 1
+
+
+# ---------------------------------------------------------------------------
+# parse_args — CLI entry point
+# ---------------------------------------------------------------------------
+
+
+class TestParseArgs:
+    def test_required_args(self, monkeypatch):
+        """parse_args parses all required arguments from sys.argv."""
+        from bench.convert_e2e_decode import parse_args
+
+        monkeypatch.setattr(
+            "sys.argv",
+            [
+                "convert_e2e_decode.py",
+                "--raw",
+                "input.csv",
+                "--device",
+                "rk3588-t4",
+                "--output",
+                "out.csv",
+                "--run-id",
+                "run-42",
+                "--git-sha",
+                "abc1234",
+                "--manifest-ref",
+                "results/manifests/t4.json",
+            ],
+        )
+        args = parse_args()
+        assert args.raw == "input.csv"
+        assert args.device == "rk3588-t4"
+        assert args.output == "out.csv"
+        assert args.run_id == "run-42"
+        assert args.git_sha == "abc1234"
+        assert args.manifest_ref == "results/manifests/t4.json"
+
+    def test_defaults(self, monkeypatch):
+        """Optional arguments get their default values."""
+        from bench.convert_e2e_decode import parse_args
+
+        monkeypatch.setattr(
+            "sys.argv",
+            [
+                "convert_e2e_decode.py",
+                "--raw",
+                "input.csv",
+                "--device",
+                "rk3588-t4",
+                "--output",
+                "out.csv",
+                "--run-id",
+                "run-42",
+                "--git-sha",
+                "abc1234",
+                "--manifest-ref",
+                "results/manifests/t4.json",
+            ],
+        )
+        args = parse_args()
+        assert args.quantization == "fp32"
+        assert args.model_checkpoint == "Qwen/Qwen3.5-4B"
+        assert args.context_length == 0
+        assert args.cluster == "all"
+
+    def test_optional_overrides(self, monkeypatch):
+        """Optional arguments can be overridden."""
+        from bench.convert_e2e_decode import parse_args
+
+        monkeypatch.setattr(
+            "sys.argv",
+            [
+                "convert_e2e_decode.py",
+                "--raw",
+                "input.csv",
+                "--device",
+                "rk3588-t4",
+                "--output",
+                "out.csv",
+                "--run-id",
+                "run-42",
+                "--git-sha",
+                "abc1234",
+                "--manifest-ref",
+                "results/manifests/t4.json",
+                "--quantization",
+                "int8",
+                "--model-checkpoint",
+                "Qwen/Qwen3.5-0.8B",
+                "--context-length",
+                "2048",
+                "--cluster",
+                "big",
+            ],
+        )
+        args = parse_args()
+        assert args.quantization == "int8"
+        assert args.model_checkpoint == "Qwen/Qwen3.5-0.8B"
+        assert args.context_length == 2048
+        assert args.cluster == "big"
+
+    def test_missing_required_exits(self, monkeypatch):
+        """Missing required arguments causes SystemExit(2)."""
+        from bench.convert_e2e_decode import parse_args
+
+        monkeypatch.setattr("sys.argv", ["convert_e2e_decode.py", "--raw", "x.csv"])
+        with pytest.raises(SystemExit) as exc_info:
+            parse_args()
+        assert exc_info.value.code == 2
+
+
+# ---------------------------------------------------------------------------
+# main entry — __main__ guard via subprocess
+# ---------------------------------------------------------------------------
+
+
+class TestMainEntry:
+    def test_main_entry_via_runpy(self, tmp_path, monkeypatch):
+        """Running the script as __main__ via runpy covers the __main__ guard."""
+        import runpy
+
+        raw = _write_raw_csv(
+            tmp_path,
+            [
+                {
+                    "model": "Qwen3.5-4B",
+                    "tokens": "8",
+                    "ttft_ms": "1000",
+                    "tok_per_sec_mean": "5.0",
+                    "p50_us": "1",
+                    "p95_us": "1",
+                    "p99_us": "1",
+                    "mean_us": "1",
+                }
+            ],
+        )
+        out = tmp_path / "out.csv"
+        monkeypatch.setattr(
+            "sys.argv",
+            [
+                "convert_e2e_decode.py",
+                "--raw",
+                str(raw),
+                "--device",
+                "rk3588-t4",
+                "--output",
+                str(out),
+                "--run-id",
+                "sp-run",
+                "--git-sha",
+                "deadbee",
+                "--manifest-ref",
+                "results/manifests/t4.json",
+            ],
+        )
+        script_path = str(
+            Path(__file__).resolve().parent.parent / "bench" / "convert_e2e_decode.py"
+        )
+        runpy.run_path(script_path, run_name="__main__")
+        rows = _read_output(out)
+        assert len(rows) == 2

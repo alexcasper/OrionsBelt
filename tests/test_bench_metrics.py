@@ -270,3 +270,24 @@ class TestSummaryDataclass:
     def test_n_matches_input_length(self):
         s = summarize(list(range(1, 31)))
         assert s.n == 30
+
+
+# ---------------------------------------------------------------------------
+# Error paths
+# ---------------------------------------------------------------------------
+
+
+class TestErrorPaths:
+    """Cover ValueError guards in percentile() and summarize()."""
+
+    def test_percentile_empty_raises(self):
+        with pytest.raises(ValueError, match="empty"):
+            percentile([], 50)
+
+    def test_percentile_invalid_p_raises(self):
+        with pytest.raises(ValueError, match="p must be"):
+            percentile([1, 2, 3], 101)
+
+    def test_summarize_empty_raises(self):
+        with pytest.raises(ValueError, match="empty"):
+            summarize([])

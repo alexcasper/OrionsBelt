@@ -775,3 +775,36 @@ class TestWriteCsvSkipValidation:
         # File was written despite bad row
         loaded = read_csv(path, validate=False)
         assert loaded[0].device == "bad-device"
+
+
+# ---------------------------------------------------------------------------
+# Coverage gap tests (ob-82d)
+# ---------------------------------------------------------------------------
+
+
+class TestParseIntError:
+    def test_non_numeric_raises(self):
+        from bench.schema import SchemaValidationError, _parse_int
+
+        with pytest.raises(SchemaValidationError, match="could not parse"):
+            _parse_int("not_a_number", "test_field")
+
+    def test_none_raises(self):
+        from bench.schema import SchemaValidationError, _parse_int
+
+        with pytest.raises(SchemaValidationError, match="could not parse"):
+            _parse_int(None, "test_field")
+
+
+class TestParseFloatError:
+    def test_non_numeric_raises(self):
+        from bench.schema import SchemaValidationError, _parse_float
+
+        with pytest.raises(SchemaValidationError, match="could not parse"):
+            _parse_float("xyz", "test_field")
+
+    def test_none_raises(self):
+        from bench.schema import SchemaValidationError, _parse_float
+
+        with pytest.raises(SchemaValidationError, match="could not parse"):
+            _parse_float(None, "test_field")
