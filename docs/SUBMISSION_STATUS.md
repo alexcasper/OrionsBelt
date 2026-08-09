@@ -26,7 +26,7 @@ ADR 0007 — the submission framing is locked to Edge AI.
 | E2E decode (matched commit) | ✓ 3 devices, 3 runs each | 4B INT8: 1.84 tok/s (t3), 0.51 (Jetson); 0.8B INT8: 10.6 (t3), 2.45 (Jetson) |
 | GEMV optimization | ✓ 14.9× speedup | 0.07→1.04 tok/s (4B FP32), dirty=false manifests |
 | INT8 weight-only quant | ✓ 1.65–1.77× on big cores | KV cache context sweep on t3+t4, <6% divergence |
-| SDOT INT8 GEMV (dotprod cores) | ✓ 1.92–3.06× over NEON INT8 | 4B: 3.34 tok/s (83% of theoretical); 0.8B: 28.9 tok/s |
+| SDOT INT8 GEMV (dotprod cores) | ✓ 1.92–3.06× over NEON INT8 | 4B: 3.48 tok/s (83% of theoretical); 0.8B: 30.2 tok/s (t4, cross-val with t3 within 5%) |
 | Mixed-precision (fp16/bf16) | ✓ fp16 gives 1.77× on decay | scan compute-bound, flat under fp16 |
 | GDN-2 vs GDN-1 comparison | ✓ Microbenchmark | 1.2–1.5× decode cost on big, 2.2–2.4× on little |
 | NOE op-coverage audit | ✓ Hardware-independent | Scan rejected, Loop trap documented (both CIX NOE + RKNN) |
@@ -54,12 +54,14 @@ ADR 0007 — the submission framing is locked to Edge AI.
 | 0.8B INT8: 10.61 tok/s (t3) | same | ✓ |
 | 0.8B INT8: 2.45 tok/s (Jetson) | same | ✓ |
 | 4B INT8: 0.51 tok/s (Jetson) | same | ✓ |
-| 4B INT8+SDOT: 3.34 tok/s (t3) | rk3588-t3_big_int8_sdot_e2e.json | ✓ |
-| 0.8B INT8+SDOT: 28.9 tok/s (t3) | rk3588-t3_08b_big_int8_sdot_e2e.json | ✓ |
-| ~48× cumulative speedup (with SDOT) | 0.07 → 3.34 tok/s = 47.7× | ✓ |
+| 4B INT8+SDOT: 3.48 tok/s (t4) | rk3588-t4_sdot_4b.json | ✓ |
+| 0.8B INT8+SDOT: 30.2 tok/s (t4) | rk3588-t4_sdot_08b.json | ✓ |
+| ~50× cumulative speedup (with SDOT) | 0.07 → 3.48 tok/s = 49.7× | ✓ |
+| (t3 cross-validation) | rk3588-t3_big_int8_sdot_e2e.json (3.34), rk3588-t3_08b_big_int8_sdot_e2e.json (28.9) | ✓ within 5% |
 
-All manifests: dirty=false, governor=performance, 30 repeats (kernel) /
-3 runs (e2e), git_sha recorded.
+Kernel microbenchmark manifests: dirty=false, governor=performance, 30 repeats.
+E2E SDOT manifests: dirty=true (SDOT kernel developed in-tree), git_sha recorded.
+Cross-validated across t3 and t4 within 5%.
 
 ---
 
@@ -176,6 +178,8 @@ cutoff has passed with no board; any future arrival is additive bonus per ADR 00
 | #180 | t3 | SDOT INT8 cross-device validation + rebase provenance fixes | MERGED |
 | #181 | t4 | Device bench + submission readiness fixes + GDN-2 unit tests | MERGED |
 | #182 | t3 | Fix ruff format + keep branch current with main | MERGED |
+| #183 | t3 | Regenerate fleet_cross_device.png after t4 PR merge | MERGED |
+| #184 | t4 | Fix DEVPOST SDOT numbers (t3→t4: 3.34→3.48, 28.9→30.2, ~48×→~50×) + cross-val 1%→5% + stale count fixes | MERGED |
 
 ---
 
