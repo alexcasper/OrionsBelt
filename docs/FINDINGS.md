@@ -3515,14 +3515,36 @@ governor=performance, OMP_NUM_THREADS=4, commit `31cba63`):
 | 4096 | 450 | 312 | 1383 | 2145 | 0.47 |
 | 8192 | 450 | 514 | 1383 | 2346 | 0.43 |
 
-**Full-attention speedup from OpenMP: 2.0–2.3×** across all context lengths.
+#### 4B INT8 — fair 4-thread comparison (t4)
+
+| ctx | GDN (ms) | Full-attn (ms) | FFN (ms) | Total (ms) | tok/s |
+|----:|---------:|---------------:|---------:|-----------:|------:|
+| 512 | 69 | 27 | 201 | 297 | 3.37 |
+| 1024 | 69 | 36 | 203 | 308 | 3.25 |
+| 2048 | 69 | 57 | 202 | 327 | 3.05 |
+| 4096 | 69 | 102 | 203 | 373 | 2.68 |
+| 8192 | 69 | 202 | 203 | 473 | 2.11 |
+
+#### 4B INT8 — single-thread baseline (t4)
+
+| ctx | GDN (ms) | Full-attn (ms) | FFN (ms) | Total (ms) | tok/s |
+|----:|---------:|---------------:|---------:|-----------:|------:|
+| 512 | 158 | 65 | 456 | 678 | 1.47 |
+| 1024 | 158 | 91 | 456 | 704 | 1.42 |
+| 2048 | 158 | 143 | 456 | 757 | 1.32 |
+| 4096 | 158 | 245 | 456 | 858 | 1.17 |
+| 8192 | 158 | 449 | 456 | 1064 | 0.94 |
+
+**Full-attention speedup from OpenMP: 2.0–2.4×** across both FP32 and INT8.
 GDN speedup: 2.2× (constant). The scaling *shape* (O(1) vs O(n)) is
 unchanged — GDN layers remain flat at ~204 ms regardless of context length,
 while full-attention grows linearly. The O(n) crossover still occurs; it is
 simply pushed to a higher context length than the unfair §17 data suggested.
 
 Data: `results/raw/rk3588-t4_e2e_ctxsweep_4t_fair.csv`,
-`results/raw/rk3588-t4_e2e_ctxsweep_1t.csv`.
+`results/raw/rk3588-t4_e2e_ctxsweep_1t.csv`,
+`results/raw/rk3588-t4_e2e_ctxsweep_int8_4t_fair.csv`,
+`results/raw/rk3588-t4_e2e_ctxsweep_int8_1t.csv`.
 Manifest: `results/manifests/rk3588-t4.json` (SHA `31cba63`).
 
 ## 18. Sustained-load thermal stability: no throttling on RK3588 (2026-08-07)
