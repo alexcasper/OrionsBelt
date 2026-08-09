@@ -27,6 +27,7 @@ from scripts.validate_results import (  # noqa: E402
     STANDARD_COLS,
     SUSTAINED_COLS,
     Issue,
+    check_ablation_manifests,
     check_manifest_exists,
     check_readme_counts,
     detect_csv_type,
@@ -36,6 +37,8 @@ from scripts.validate_results import (  # noqa: E402
     load_manifest,
     main,
     validate_csv,
+    validate_ctx_sweep_row,
+    validate_delta_matmul_row,
     validate_e2e_sweep_row,
     validate_gpu_micro_row,
     validate_kleidiai_gdn_kernel_row,
@@ -225,6 +228,51 @@ class TestDetectCsvType:
         cols = ["kernel", "shape", "p50_us", "gib_per_s_p50"]
         assert detect_csv_type(cols) == "kleidiai_gdn_kernel"
 
+    def test_ctx_sweep_detected(self):
+        """Context-length sweep CSV should be detected (most common CSV type)."""
+        cols = ["model", "ctx_len", "gdn_layer_us", "full_attn_us", "kv_cache_mb"]
+        assert detect_csv_type(cols) == "ctx_sweep"
+
+    def test_ctx_sweep_minimal_cols(self):
+        """Detection only needs the four key columns."""
+        cols = ["ctx_len", "gdn_layer_us", "full_attn_us", "kv_cache_mb"]
+        assert detect_csv_type(cols) == "ctx_sweep"
+
+    def test_e2e_decode_detected(self):
+        """E2E decode CSV should be detected."""
+        cols = ["tok_per_sec_mean", "gdn_proj_pct", "ffn_pct"]
+        assert detect_csv_type(cols) == "e2e_decode"
+
+    def test_thermal_stress_detected(self):
+        """Thermal stress test CSV should be detected."""
+        cols = ["iteration", "tok_per_sec", "thermal_zone1_C", "elapsed_s"]
+        assert detect_csv_type(cols) == "thermal_stress"
+
+    def test_prefill_gemm_detected(self):
+        """Prefill GEMM CSV should be detected."""
+        cols = ["prefill_M", "ttft_ms", "tok_per_sec_prefill"]
+        assert detect_csv_type(cols) == "prefill_gemm"
+
+    def test_prefill_ab_detected(self):
+        """Prefill A/B comparison CSV should be detected."""
+        cols = ["variant", "prefill_len", "ttft_s", "prefill_tps"]
+        assert detect_csv_type(cols) == "prefill_ab"
+
+    def test_quant_comparison_detected(self):
+        """Quantization comparison CSV should be detected."""
+        cols = ["variant", "tok_per_sec", "ffn_pct", "gdn_proj_pct"]
+        assert detect_csv_type(cols) == "quant_comparison"
+
+    def test_quant_accuracy_detected(self):
+        """Quantization accuracy CSV should be detected."""
+        cols = ["quant_variant", "matrix", "cos_sim", "rel_err_pct"]
+        assert detect_csv_type(cols) == "quant_accuracy"
+
+    def test_cross_tool_comparison_detected(self):
+        """Cross-tool comparison CSV should be detected."""
+        cols = ["engine", "quant", "test", "n_tokens", "avg_ts"]
+        assert detect_csv_type(cols) == "cross_tool_comparison"
+
 
 # ---------------------------------------------------------------------------
 # expected_columns
@@ -265,6 +313,41 @@ class TestExpectedColumns:
         assert "p50_us" in expected_columns("kleidiai_gdn_kernel")
         assert "gib_per_s_p50" in expected_columns("kleidiai_gdn_kernel")
         assert "kernel" in expected_columns("kleidiai_gdn_kernel")
+
+    def test_ctx_sweep_columns(self):
+        assert "ctx_len" in expected_columns("ctx_sweep")
+        assert "gdn_layer_us" in expected_columns("ctx_sweep")
+
+    def test_delta_matmul_columns(self):
+        assert "M" in expected_columns("delta_matmul")
+        assert "p50_us" in expected_columns("delta_matmul")
+
+    def test_e2e_decode_columns(self):
+        assert "tok_per_sec_mean" in expected_columns("e2e_decode")
+
+    def test_thermal_stress_columns(self):
+        assert "thermal_zone1_C" in expected_columns("thermal_stress")
+        assert "elapsed_s" in expected_columns("thermal_stress")
+
+    def test_prefill_gemm_columns(self):
+        assert "prefill_M" in expected_columns("prefill_gemm")
+        assert "ttft_ms" in expected_columns("prefill_gemm")
+
+    def test_prefill_ab_columns(self):
+        assert "variant" in expected_columns("prefill_ab")
+        assert "prefill_tps" in expected_columns("prefill_ab")
+
+    def test_quant_comparison_columns(self):
+        assert "variant" in expected_columns("quant_comparison")
+        assert "tok_per_sec" in expected_columns("quant_comparison")
+
+    def test_quant_accuracy_columns(self):
+        assert "cos_sim" in expected_columns("quant_accuracy")
+        assert "rel_err_pct" in expected_columns("quant_accuracy")
+
+    def test_cross_tool_comparison_columns(self):
+        assert "engine" in expected_columns("cross_tool_comparison")
+        assert "avg_ts" in expected_columns("cross_tool_comparison")
 
 
 # ---------------------------------------------------------------------------
@@ -1322,4 +1405,194 @@ class TestCheckReadmeCounts:
         root.mkdir()
         issues = []
         check_readme_counts(issues, repo_root=str(root))
+        assert issues == []
+
+
+# ---------------------------------------------------------------------------
+# validate_delta_matmul_row
+# ---------------------------------------------------------------------------
+
+
+def _delta_matmul_row(**overrides):
+    """A valid delta-rule matmul row dict."""
+    base = {
+        "kernel": "delta_matmul",
+        "M": "128",
+        "K": "256",
+        "N": "512",
+        "repeats": "30",
+        "p50_us": "100.0",
+        "p95_us": "120.0",
+        "gib_per_s_p50": "5.2",
+    }
+    base.update(overrides)
+    return base
+
+
+class TestValidateDeltaMatmulRow:
+    def test_valid_row_no_issues(self):
+        issues = []
+        validate_delta_matmul_row(_delta_matmul_row(), "test.csv", issues, 2)
+        assert issues == []
+
+    def test_non_positive_dimension(self):
+        issues = []
+        validate_delta_matmul_row(_delta_matmul_row(M="0", K="256", N="512"), "test.csv", issues, 2)
+        assert any("non-positive matmul dim" in i.message for i in issues)
+
+    def test_non_positive_p50(self):
+        issues = []
+        validate_delta_matmul_row(_delta_matmul_row(p50_us="0.0"), "test.csv", issues, 2)
+        assert any("non-positive p50_us" in i.message for i in issues)
+
+    def test_p95_less_than_p50(self):
+        issues = []
+        validate_delta_matmul_row(
+            _delta_matmul_row(p50_us="200.0", p95_us="100.0"), "test.csv", issues, 2
+        )
+        assert any("p95" in i.message and i.severity == "WARNING" for i in issues)
+
+    def test_malformed_value(self):
+        issues = []
+        validate_delta_matmul_row(_delta_matmul_row(p50_us="abc"), "test.csv", issues, 2)
+        assert any("cannot parse" in i.message for i in issues)
+
+
+# ---------------------------------------------------------------------------
+# validate_ctx_sweep_row
+# ---------------------------------------------------------------------------
+
+
+def _ctx_sweep_row(**overrides):
+    """A valid context-length sweep row dict (gdn_e2e_decode.c --ctx-sweep)."""
+    base = {
+        "model": "qwen35_4b",
+        "ctx_len": "4096",
+        "gdn_layer_us": "500.0",
+        "full_attn_us": "800.0",
+        "ffn_us": "300.0",
+        "total_us": "1600.0",
+        "tok_per_sec": "625.0",
+        "kv_cache_mb": "512.0",
+    }
+    base.update(overrides)
+    return base
+
+
+class TestValidateCtxSweepRow:
+    def test_valid_row_no_issues(self):
+        issues = []
+        validate_ctx_sweep_row(_ctx_sweep_row(), "test.csv", issues, 2)
+        assert issues == []
+
+    def test_non_positive_ctx_len(self):
+        issues = []
+        validate_ctx_sweep_row(_ctx_sweep_row(ctx_len="0"), "test.csv", issues, 2)
+        assert any("non-positive ctx_len" in i.message for i in issues)
+
+    def test_non_positive_gdn_layer_us(self):
+        issues = []
+        validate_ctx_sweep_row(_ctx_sweep_row(gdn_layer_us="0.0"), "test.csv", issues, 2)
+        assert any("non-positive gdn_layer_us" in i.message for i in issues)
+
+    def test_non_positive_ffn_us(self):
+        issues = []
+        validate_ctx_sweep_row(_ctx_sweep_row(ffn_us="0.0"), "test.csv", issues, 2)
+        assert any("non-positive ffn_us" in i.message for i in issues)
+
+    def test_non_positive_total_us(self):
+        issues = []
+        validate_ctx_sweep_row(_ctx_sweep_row(total_us="0.0"), "test.csv", issues, 2)
+        assert any("non-positive total_us" in i.message for i in issues)
+
+    def test_zero_full_attn_us_is_ok(self):
+        """full_attn_us=0 is valid for --pure-gdn sweeps (no full-attention layers)."""
+        issues = []
+        validate_ctx_sweep_row(_ctx_sweep_row(full_attn_us="0.0"), "test.csv", issues, 2)
+        assert issues == []
+
+    def test_negative_full_attn_us(self):
+        issues = []
+        validate_ctx_sweep_row(_ctx_sweep_row(full_attn_us="-1.0"), "test.csv", issues, 2)
+        assert any("negative full_attn_us" in i.message for i in issues)
+
+    def test_non_positive_tok_per_sec(self):
+        issues = []
+        validate_ctx_sweep_row(_ctx_sweep_row(tok_per_sec="0.0"), "test.csv", issues, 2)
+        assert any("non-positive tok_per_sec" in i.message for i in issues)
+
+    def test_negative_kv_cache_mb(self):
+        issues = []
+        validate_ctx_sweep_row(_ctx_sweep_row(kv_cache_mb="-1.0"), "test.csv", issues, 2)
+        assert any("negative kv_cache_mb" in i.message for i in issues)
+
+    def test_malformed_value(self):
+        issues = []
+        validate_ctx_sweep_row(_ctx_sweep_row(gdn_layer_us="not_a_number"), "test.csv", issues, 2)
+        assert any("cannot parse" in i.message for i in issues)
+
+
+# ---------------------------------------------------------------------------
+# check_ablation_manifests
+# ---------------------------------------------------------------------------
+
+
+class TestCheckAblationManifests:
+    """Tests for ablation CSV manifest_ref validation."""
+
+    def test_valid_manifest_ref(self, tmp_path):
+        """An existing manifest_ref file should produce a NOTE, not a WARNING."""
+        ablation_dir = tmp_path / "ablation"
+        ablation_dir.mkdir()
+        manifest = tmp_path / "manifest.json"
+        manifest.write_text("{}")
+
+        csv_path = ablation_dir / "ablation_test.csv"
+        csv_path.write_text(f"metric_name,manifest_ref\nfoo,{manifest}\n")
+
+        issues = []
+        check_ablation_manifests(str(ablation_dir), issues)
+        assert any("manifest_ref OK" in i.message and i.severity == "NOTE" for i in issues)
+        assert not any(i.severity == "WARNING" for i in issues)
+
+    def test_missing_manifest_ref(self, tmp_path):
+        """A manifest_ref pointing to a non-existent file should produce a WARNING."""
+        ablation_dir = tmp_path / "ablation"
+        ablation_dir.mkdir()
+
+        csv_path = ablation_dir / "ablation_test.csv"
+        csv_path.write_text("metric_name,manifest_ref\nfoo,/nonexistent/manifest.json\n")
+
+        issues = []
+        check_ablation_manifests(str(ablation_dir), issues)
+        assert any("MISSING" in i.message and i.severity == "WARNING" for i in issues)
+
+    def test_no_manifest_ref_column(self, tmp_path):
+        """A CSV without manifest_ref column should produce no issues."""
+        ablation_dir = tmp_path / "ablation"
+        ablation_dir.mkdir()
+
+        csv_path = ablation_dir / "ablation_test.csv"
+        csv_path.write_text("metric_name,value\nfoo,42\n")
+
+        issues = []
+        check_ablation_manifests(str(ablation_dir), issues)
+        assert issues == []
+
+    def test_nonexistent_dir(self):
+        """A non-existent directory should return without error."""
+        issues = []
+        check_ablation_manifests("/nonexistent/path/xyz", issues)
+        assert issues == []
+
+    def test_empty_manifest_ref_skipped(self, tmp_path):
+        """Empty manifest_ref values should be skipped (no issue)."""
+        ablation_dir = tmp_path / "ablation"
+        ablation_dir.mkdir()
+
+        csv_path = ablation_dir / "ablation_test.csv"
+        csv_path.write_text("metric_name,manifest_ref\nfoo,\n")
+
+        issues = []
+        check_ablation_manifests(str(ablation_dir), issues)
         assert issues == []
