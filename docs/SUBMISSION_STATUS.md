@@ -159,7 +159,7 @@ cutoff has passed with no board; any future arrival is additive bonus per ADR 00
 | #166 | t4 | SDOT INT4 hybrid GEMV — 2.85× over INT4 NEON (ob-8qt.20) | MERGED |
 | #167 | t3 | CRITICAL FIX — remove leftover git conflict markers in gdn_e2e_decode.c breaking build on main | MERGED |
 | #168 | t3 | Fix 5 missed bare malloc calls in test_gdn_e2e_int8.c SDOT block + SPDX self-header on add_spdx_headers.py | MERGED |
-| #169 | t3 | Fix stale counts after t4 merge (manifests 191→256, FINDINGS 47→48/5005 lines, tests 1769+30→1798+1) + add 6 missing manifests for t4 SDOT/INT4+SDOT/NEON CSVs | MERGED |
+| #169 | t3 | Fix stale counts after t4 merge + add 6 missing manifests for t4 SDOT/INT4+SDOT/NEON CSVs | MERGED |
 
 ---
 
