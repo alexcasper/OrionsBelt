@@ -3211,6 +3211,10 @@ From the naive baseline to the fully optimized INT8 path, the 4B model sees a
 **~26× cumulative speedup** across both core classes — purely from memory
 access pattern and weight precision, with no algorithmic changes to the model.
 
+> **Updated in §33:** SDOT INT8 GEMV (`vdotq_lane_s32`) pushes the 4B model
+> to 3.48 tok/s (**~50×** cumulative) and 0.8B to 30.17 tok/s on dotprod-capable
+> cores (A76). See the cumulative table in §33 for the full optimization stack.
+
 ### Implication for submission
 
 INT8 weight-only quantization is a portable, accuracy-preserving optimization
