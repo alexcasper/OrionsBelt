@@ -28,6 +28,7 @@ That attribution is the entire value of the audit.
 | `04_gate_chain` | Sigmoid, Softplus, Neg, Exp, Mul | Elementwise gating. Expected to pass; included so a failure isolates cheaply. |
 | `05_scan_recurrence` | **Scan**, Mul, Add, Identity | **The crux.** Chunk-to-chunk recurrence via ONNX control flow. NPU compilers built for feed-forward networks frequently support no control flow at all. |
 | `06_loop_recurrence` | **Loop**, Mul, Identity | Same recurrence via `Loop` instead of `Scan` — compilers sometimes accept one form and not the other. |
+| `07_loop_dynamic_trip` | **Loop**, Mul, Identity | Identical to probe 06 but `trip_count` is a graph **input** (not a constant initializer). This forces genuine control flow rather than static unrolling — the NOE Compiler rejects it ("Graph is not DAG"), proving `Loop` is only ever unrolled. **The negative control that makes probe 06's rc=0 meaningful.** |
 
 Shapes come from Qwen3.5's verified linear-attention config (`docs/CLAIM_VERIFICATION.md` §2.3):
 `linear_conv_kernel_dim=4`, `linear_key_head_dim=128`, `linear_value_head_dim=128`,
@@ -37,11 +38,11 @@ a finding worth recording.**
 
 ## These graphs are known-good
 
-Before drawing any conclusion from a `cixbuild` rejection, note that all six graphs have been
+Before drawing any conclusion from a `cixbuild` rejection, note that all seven graphs have been
 verified locally, so a failure is a NOE coverage gap rather than a malformed input:
 
-- all six pass `onnx.checker.check_model(..., full_check=True)`
-- all six execute under `onnxruntime` 1.28 (CPUExecutionProvider) with finite outputs
+- all seven pass `onnx.checker.check_model(..., full_check=True)`
+- all seven execute under `onnxruntime` 1.28 (CPUExecutionProvider) with finite outputs
 - `01_causal_conv1d` is verified **genuinely causal**: perturbing the final timestep leaves every
   earlier output bit-identical (max delta 0.0) while changing the last one
 
