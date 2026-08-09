@@ -28,12 +28,7 @@
 
 #include <math.h>
 
-static void *xmalloc(size_t n) {
-    void *p = malloc(n);
-    if (!p) { fprintf(stderr, "out of memory\n"); exit(1); }
-    return p;
-}
-
+/* xmalloc() already defined in gdn_e2e_decode.c (included above). */
 
 int main(void) {
     int failures = 0;
