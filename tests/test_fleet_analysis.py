@@ -886,6 +886,8 @@ class TestGetManifestThreads:
         assert t == 8
         assert src == "default"
 
+
+class TestMainCLI:
     """Cover fleet_analysis.main()."""
 
     def test_main_creates_report(self, tmp_path, monkeypatch):
