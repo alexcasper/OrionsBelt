@@ -178,7 +178,7 @@ No GPU, NPU, or proprietary SDK required. Full setup guide: [`docs/SETUP_PORTABL
 ### Reproducibility
 
 - Every measurement has a **provenance manifest** (git SHA, governor state, CPU topology, thermals)
-- 1799 unit tests covering kernel correctness and schema conformance (1769 passed, 30 skipped in CI)
+- 1799 unit tests covering kernel correctness and schema conformance (1798 passed, 1 skipped in CI)
 - All figures are **regenerable** from committed CSVs (`bench/plots.py`, `scripts/generate_memory_plots.py`)
 - t3 benchmark data: manifest git_sha `f015982`, dirty=false, governor=performance, 30 repeats per kernel
 
@@ -203,7 +203,7 @@ Specifically:
 
 - **Repository:** https://github.com/alexcasper/OrionsBelt
 - **License:** Apache-2.0
-- **Findings (46 sections, 4812 lines):** [`docs/FINDINGS.md`](../docs/FINDINGS.md)
+- **Findings (48 sections, 5005 lines):** [`docs/FINDINGS.md`](../docs/FINDINGS.md)
 - **Comparison table:** [`results/figures/comparison_table.md`](../results/figures/comparison_table.md)
 - **Fleet bandwidth analysis:** [`results/figures/fleet_bandwidth_scaling.md`](../results/figures/fleet_bandwidth_scaling.md)
 - **Memory scaling figures:** [`results/figures/memory_comparison.md`](../results/figures/memory_comparison.md)

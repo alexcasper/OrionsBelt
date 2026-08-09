@@ -36,7 +36,7 @@ ADR 0007 — the submission framing is locked to Edge AI.
 | Submission prep (README, write-up, repro) | ✓ All beads closed | ob-fnq, ob-f7k, ob-kdi, ob-9e2 |
 | Compliance checklist | ✓ ob-9e2 closed | Apache-2.0, no credentials at tip of main/t4 |
 
-**Submission readiness:** 15/15 checks pass, 1799 tests (1769 passed, 30 skipped), Ruff clean, CI green.
+**Submission readiness:** 15/15 checks pass, 1799 tests (1798 passed, 1 skipped), Ruff clean, CI green.
 
 ---
 
@@ -156,6 +156,9 @@ cutoff has passed with no board; any future arrival is additive bonus per ADR 00
 | #163 | t3 | SPDX Python/shell headers (109 files) + xmalloc wrappers for 5 kernel test files (107 sites) + bench_gdn.c (24) + gdn_e2e_decode.c main paths (20+3) | MERGED |
 | #164 | t4 | SDOT INT8 GEMV kernel for A55 little-cluster — 2.78× over NEON (ob-8qt.14) + duplicate xmalloc fix | MERGED |
 | #165 | t3 | Complete malloc audit to ALL remaining C files (bench/gpu/scripts, 71 sites) + __attribute__((unused)) on all wrappers + fix 2 pre-existing dead-code warnings | MERGED |
+| #166 | t4 | SDOT INT4 hybrid GEMV — 2.85× over INT4 NEON (ob-8qt.20) | MERGED |
+| #167 | t3 | CRITICAL FIX — remove leftover git conflict markers in gdn_e2e_decode.c breaking build on main | MERGED |
+| #168 | t3 | Fix 5 missed bare malloc calls in test_gdn_e2e_int8.c SDOT block + SPDX self-header on add_spdx_headers.py | MERGED |
 
 ---
 
