@@ -4,6 +4,7 @@
 Data sourced from results/figures/comparison_table.md §7 and FINDINGS.md §33-34.
 Every number traces to a manifest-backed CSV.
 """
+
 import os
 
 import matplotlib
@@ -43,13 +44,23 @@ ax1.set_ylabel("Decode throughput (tok/s)", fontsize=11)
 ax1.set_title("Qwen3.5-4B (A76 big cluster)", fontsize=12, fontweight="bold")
 ax1.set_ylim(0, 5.2)
 for bar, val in zip(bars1, tput_4b, strict=True):
-    ax1.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.1,
-             f"{val:.2f}", ha="center", va="bottom", fontsize=10, fontweight="bold")
+    ax1.text(
+        bar.get_x() + bar.get_width() / 2,
+        bar.get_height() + 0.1,
+        f"{val:.2f}",
+        ha="center",
+        va="bottom",
+        fontsize=10,
+        fontweight="bold",
+    )
 # Annotate cumulative speedup
-ax1.annotate("", xy=(4, 4.43), xytext=(0, 0.07),
-             arrowprops=dict(arrowstyle="->", color="#c62828", lw=1.5, ls="--"))
-ax1.text(2.5, 4.8, "~63× cumulative", ha="center", fontsize=11,
-         color="#c62828", fontweight="bold")
+ax1.annotate(
+    "",
+    xy=(4, 4.43),
+    xytext=(0, 0.07),
+    arrowprops=dict(arrowstyle="->", color="#c62828", lw=1.5, ls="--"),
+)
+ax1.text(2.5, 4.8, "~63× cumulative", ha="center", fontsize=11, color="#c62828", fontweight="bold")
 ax1.yaxis.set_major_formatter(ticker.FormatStrFormatter("%.1f"))
 
 # --- 0.8B panel ---
@@ -60,15 +71,29 @@ ax2.set_ylabel("Decode throughput (tok/s)", fontsize=11)
 ax2.set_title("Qwen3.5-0.8B (A76 big cluster)", fontsize=12, fontweight="bold")
 ax2.set_ylim(0, 42)
 for bar, val in zip(bars2, tput_08b, strict=True):
-    ax2.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.5,
-             f"{val:.1f}", ha="center", va="bottom", fontsize=10, fontweight="bold")
-ax2.annotate("", xy=(4, 37.21), xytext=(0, 0.68),
-             arrowprops=dict(arrowstyle="->", color="#c62828", lw=1.5, ls="--"))
-ax2.text(2.5, 39, "~55× cumulative", ha="center", fontsize=11,
-         color="#c62828", fontweight="bold")
+    ax2.text(
+        bar.get_x() + bar.get_width() / 2,
+        bar.get_height() + 0.5,
+        f"{val:.1f}",
+        ha="center",
+        va="bottom",
+        fontsize=10,
+        fontweight="bold",
+    )
+ax2.annotate(
+    "",
+    xy=(4, 37.21),
+    xytext=(0, 0.68),
+    arrowprops=dict(arrowstyle="->", color="#c62828", lw=1.5, ls="--"),
+)
+ax2.text(2.5, 39, "~55× cumulative", ha="center", fontsize=11, color="#c62828", fontweight="bold")
 
-fig.suptitle("Decode Optimization Stack — RK3588 Cortex-A76 (rk3588-t4)",
-             fontsize=13, fontweight="bold", y=1.02)
+fig.suptitle(
+    "Decode Optimization Stack — RK3588 Cortex-A76 (rk3588-t4)",
+    fontsize=13,
+    fontweight="bold",
+    y=1.02,
+)
 fig.tight_layout()
 
 output = os.path.join("results", "figures", "optimization_stack.png")
