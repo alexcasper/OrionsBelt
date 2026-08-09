@@ -48,6 +48,7 @@ static void *xmalloc(size_t n) {
     if (!p) { fprintf(stderr, "out of memory (%zu bytes)\n", n); exit(1); }
     return p;
 }
+__attribute__((unused))
 static void *xcalloc(size_t nmemb, size_t size) {
     void *p = calloc(nmemb, size);
     if (!p) { fprintf(stderr, "out of memory (%zu * %zu bytes)\n", nmemb, size); exit(1); }
@@ -2405,7 +2406,10 @@ int main(int argc, char **argv) {
         return 1;
     }
     double *tok_times = xmalloc(num_tokens * sizeof(double));
+<<<<<<< HEAD
     if (!tok_times) { fprintf(stderr, "OOM allocating tok_times\n"); return 1; }
+=======
+>>>>>>> 8c4792a (t3: add xmalloc/xcalloc wrappers to bench_gdn.c and gdn_e2e_decode.c (44+20 call sites))
     double t_start_all = now_us();
 
     for (int t = 0; t < num_tokens; ++t) {
