@@ -143,7 +143,7 @@ All figures above are verified against primary sources (Radxa product page and d
 
 **Context-length scaling proves GDN's core value proposition on silicon (§17).** Sweeping context length from 1 to 4096 tokens with real grouped-query attention: **pure-GDN throughput is flat to within 0.3%** while the hybrid model degrades 1.55× (4B) to 2.14× (0.8B) — entirely from the full-attention layers whose KV cache reads grow linearly. INT8 KV cache quantization (§20) cuts KV memory 4× and delivers 1.7–2.6× full-attention speedup at long context, but full-attention's cost still scales O(n). Sustained-load tests confirm 0.3% throughput decay over 94s — burst numbers are steady-state sustainable (§18). Cross-validated on both A57 and A76. See [FINDINGS.md §17–20](./docs/FINDINGS.md).
 
-**Operator analysis findings** ([`docs/FINDINGS.md`](./docs/FINDINGS.md), 46 sections):
+**Operator analysis findings** ([`docs/FINDINGS.md`](./docs/FINDINGS.md), 47 sections):
 - CIX NOE and Rockchip RKNN toolchains both reject GDN's runtime-length recurrence — the limitation generalises beyond one vendor (§1, §7)
 - KleidiAI packed GEMM wins 1.7–3.6× on matmul but packing cost dominates at decode; dual-path strategy recommended (§8)
 - big.LITTLE affinity: pinning to A76 big cores is 2–3× faster than default scheduler placement (§9)
@@ -184,7 +184,7 @@ All figures above are verified against primary sources (Radxa product page and d
 | Per-layer engine mapping (NPU/GPU/CPU) | Hypothesis only — pending measurements |
 | Full inference results (tokens/sec, TTFT, memory) | Done — C decode loop (FP32+INT8+Q8_0), ctx-length scaling (§17–20), quantization accuracy (§30), cross-device (A57+A76), sustained-load thermal stability (§18). [e2e comparison](./results/figures/e2e_fleet_comparison.md) |
 
-> **Results so far:** 156 CSVs from the device fleet, 142 provenance manifests, 88 generated figures/tables, 46 FINDINGS sections.
+> **Results so far:** 162 CSVs from the device fleet, 142 provenance manifests, 89 generated figures/tables, 47 FINDINGS sections.
 > (Counted recursively — `results/raw/` and `results/manifests/` include
 > subdirectories `ablation/`, `affinity/`, and `kleidiai/`, which hold real
 > fleet benchmark data, not scratch files. A non-recursive `ls *.csv` count
@@ -198,7 +198,7 @@ All figures above are verified against primary sources (Radxa product page and d
 >
 > ```
 > results/
->   raw/         <- 156 per-run CSVs across 5 devices (incl. ablation/, affinity/, kleidiai/ subdirs)
+>   raw/         <- 162 per-run CSVs across 5 devices (incl. ablation/, affinity/, kleidiai/ subdirs)
 >   manifests/   <- 142 provenance manifests (git SHA, governor, thermals)
 >   figures/     <- fleet analysis, comparison table, kernel/memory plots> ```
 >
