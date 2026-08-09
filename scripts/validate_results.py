@@ -673,10 +673,48 @@ def validate_e2e_sweep_row(row, csv_name, issues, row_num):
 
 _GPU_KERNELS = {"gdn_gated_scan", "gdn_cumdecay", "gdn_causal_dwconv1d", "gdn_delta_rule_decode"}
 
+# gpu/boundary_crossing_bench.c reuses the gpu_micro column set (same header)
+# but dim1 is a human-readable payload-size label ("512B", "5KB_hidden_fp16"),
+# not a numeric matmul dimension, and p95_ms/bw_mibs=0 are valid "not measured"
+# / "not applicable" markers rather than errors. Route these to their own
+# lightweight validator instead of forcing them through the numeric-dims,
+# p95>=p50, bw>0 assumptions that hold for the matmul-shape kernels above.
+_BOUNDARY_CROSSING_KERNELS = {
+    "write_blocking",
+    "read_blocking",
+    "roundtrip_blocking",
+    "n_crossings_16",
+}
+
+
+def validate_boundary_crossing_row(row, csv_name, issues, row_num):
+    """Validate a row of the engine-boundary-crossing latency CSV (bead ob-t3b.6)."""
+    dim1 = row.get("dim1", "")
+    if not dim1:
+        issues.append(Issue("ERROR", csv_name, f"row {row_num}: missing dim1 (payload size)"))
+
+    try:
+        p50 = float(row["p50_ms"])
+        if p50 <= 0:
+            issues.append(Issue("ERROR", csv_name, f"row {row_num}: non-positive p50_ms"))
+    except (ValueError, KeyError, TypeError):
+        issues.append(Issue("ERROR", csv_name, f"row {row_num}: cannot parse p50_ms"))
+        return
+
+    try:
+        bw = float(row["bw_mibs"])
+        if bw < 0:
+            issues.append(Issue("ERROR", csv_name, f"row {row_num}: negative bw_mibs"))
+    except (ValueError, KeyError, TypeError):
+        issues.append(Issue("ERROR", csv_name, f"row {row_num}: cannot parse bw_mibs"))
+
 
 def validate_gpu_micro_row(row, csv_name, issues, row_num):
     """Validate a single row of a GPU microbenchmark CSV (gpu/gdn_gpu_bench.c)."""
     kernel = row.get("kernel", "")
+    if kernel in _BOUNDARY_CROSSING_KERNELS:
+        validate_boundary_crossing_row(row, csv_name, issues, row_num)
+        return
     if kernel not in _GPU_KERNELS:
         issues.append(Issue("WARNING", csv_name, f"row {row_num}: unknown kernel '{kernel}'"))
 

@@ -46,10 +46,16 @@ echo "Building GDN GPU validation suite..."
 $CC $CFLAGS -o "$OUT_DIR/gdn_gpu_validate" "$SRC_DIR/gdn_gpu_validate.c" -lOpenCL -lm
 echo "  → $OUT_DIR/gdn_gpu_validate"
 
+echo "Building boundary-crossing micro-benchmark..."
+$CC $CFLAGS -o "$OUT_DIR/boundary_crossing_bench" "$SRC_DIR/boundary_crossing_bench.c" -lOpenCL -lm
+echo "  → $OUT_DIR/boundary_crossing_bench"
+
 echo ""
 echo "Build complete. Run from the repo root so the kernel source path resolves:"
 echo "  # On RK3588 Mali-G610 (RusticL/Panfrost):"
 echo "  RUSTICL_ENABLE=panfrost ./gpu/gdn_gpu_bench --repeats 50"
 echo "  RUSTICL_ENABLE=panfrost ./gpu/gdn_gpu_validate"
+echo "  RUSTICL_ENABLE=panfrost ./gpu/boundary_crossing_bench --repeats 100"
 echo "  # On other OpenCL platforms:"
 echo "  ./gpu/gdn_gpu_bench --repeats 50"
+echo "  ./gpu/boundary_crossing_bench --repeats 100"
