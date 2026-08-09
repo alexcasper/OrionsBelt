@@ -107,6 +107,13 @@ extern void gdn_causal_dwconv1d_f32(const float *in, const float *w, float *out,
 #define FULL_KV_HEADS 4
 #endif
 
+/* Geometry invariant: FULL_HEAD_DIM must be divisible by 8 for NEON
+ * vectorization (8 × float32x4_t or 16 × int8x16_t per pass).  This
+ * lets the compiler prove that scalar tail loops are dead code and
+ * silences -Waggressive-loop-optimizations. */
+_Static_assert(FULL_HEAD_DIM % 8 == 0,
+               "FULL_HEAD_DIM must be a multiple of 8 for NEON");
+
 /* ---- INT8 weight-only quantization ----
  *
  * Stores weights as int8 + per-output-column float scale. Dequantizes
@@ -1772,10 +1779,13 @@ static void full_attn_real_forward_int8kv(const Weights *w, LayerState *st,
         for (size_t t = 0; t < ctx; ++t) {
             const int8_t *vt = st->kv_v_grow_q + t * kv_dim + kh * FULL_HEAD_DIM;
             float ew = scores[t] / sum_exp * sv;  /* effective weight with V scale */
-            size_t d = 0;
 #ifdef __ARM_NEON
+            /* NEON vectorized: widen int8 → int16 → int32 → float, then FMA.
+             * FULL_HEAD_DIM % 8 == 0 (guaranteed by _Static_assert), so the
+             * 8-wide loop consumes all elements — the 4-wide and scalar
+             * tails below are dead code, kept for non-multiple-of-8 safety. */
             float32x4_t ewv = vdupq_n_f32(ew);
-            for (; d + 8 <= FULL_HEAD_DIM; d += 8) {
+            for (size_t d = 0; d + 8 <= FULL_HEAD_DIM; d += 8) {
                 int8x8_t   i8  = vld1_s8((const int8_t*)(vt + d));
                 int16x8_t  i16 = vmovl_s8(i8);
                 int32x4_t  i32lo = vmovl_s16(vget_low_s16(i16));
@@ -1789,18 +1799,11 @@ static void full_attn_real_forward_int8kv(const Weights *w, LayerState *st,
                 vst1q_f32(out_h + d, olo);
                 vst1q_f32(out_h + d + 4, ohi);
             }
-            for (; d + 4 <= FULL_HEAD_DIM; d += 4) {
-                int8x8_t  i8  = vld1_s8((const int8_t*)(vt + d));
-                int16x8_t i16 = vmovl_s8(i8);
-                int32x4_t i32 = vmovl_s16(vget_low_s16(i16));
-                float32x4_t fq = vcvtq_f32_s32(i32);
-                float32x4_t oh = vld1q_f32(out_h + d);
-                oh = vfmaq_f32(oh, ewv, fq);
-                vst1q_f32(out_h + d, oh);
-            }
-#endif
-            for (; d < FULL_HEAD_DIM; ++d)
+#else
+            /* Scalar fallback (no NEON) */
+            for (size_t d = 0; d < FULL_HEAD_DIM; ++d)
                 out_h[d] += ew * (float)vt[d];
+#endif
         }
     }
 
