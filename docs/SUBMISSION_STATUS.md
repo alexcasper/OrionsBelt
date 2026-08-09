@@ -202,7 +202,7 @@ The Edge AI submission's strengths:
 - **Novel kernels** that no existing library provides for Arm
 - **5-device cross-validation** proving the bandwidth-boundedness thesis
 - **The NPU wall finding** — a genuinely novel, citable result
-- **~26× end-to-end speedup** from C kernel + GEMV + INT8
+- **~63× end-to-end speedup** from C kernel + GEMV + INT8 + SDOT + INT4+SDOT
 - **Honest negative results** (NPU compilers reject the recurrence)
 
 The one weakness: no heterogeneous NPU/GPU/CPU dispatch on target
