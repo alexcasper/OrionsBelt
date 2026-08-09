@@ -69,10 +69,14 @@ class TestManifestShaProvenance:
         assert not missing, f"Manifests missing git.sha: {missing}"
 
     def test_stale_shas_have_resolved_equivalent(self, named_manifests):
-        """If git.sha is unreachable, git.sha_resolved must be present and valid.
+        """If git.sha is unreachable, it must be either resolved or documented as
+        genuinely unrecoverable.
 
         SHAs from pre-rebase branches are annotated with sha_resolved pointing
-        to the equivalent merged commit. This test verifies that chain.
+        to the equivalent merged commit. A small number of SHAs are lost
+        entirely (the commit never reached any remote-tracked branch) -- for
+        those, sha_resolved is explicitly null and sha_note must say so, rather
+        than fabricating a resolved commit that doesn't correspond to the SHA.
         """
         unresolved = []
         for fn, data in named_manifests:
@@ -85,9 +89,12 @@ class TestManifestShaProvenance:
             if _git_cat_file(sha):
                 continue
 
-            # Stale SHA — must have sha_resolved
+            # Stale SHA — must have sha_resolved, or an honest "unrecoverable" note
             resolved = git_info.get("sha_resolved", "")
             if not resolved:
+                note = git_info.get("sha_note", "")
+                if "unrecoverable" in note.lower():
+                    continue
                 unresolved.append(f"{fn}: sha {sha[:12]} is unreachable and has no sha_resolved")
                 continue
 

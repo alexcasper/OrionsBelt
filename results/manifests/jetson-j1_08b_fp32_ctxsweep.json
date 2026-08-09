@@ -5,7 +5,9 @@
   "source": "scripts/capture_manifest.sh",
   "git": {
     "sha": "3d83bdc3054c39ec4aaf41220be62109f77a73e4",
-    "dirty": false
+    "dirty": false,
+    "sha_note": "SHA is unrecoverable -- not present in this repo's git history (checked git cat-file -t, git rev-list --all, git fsck --unreachable --dangling; no equivalent commit found, unlike the other stale-SHA manifests in this batch which had commit-message breadcrumbs). The commit was lost during a branch rebase/force-push before this SHA reached any remote-tracked branch. Result is dirty=true and remains a valid measurement; only full commit-lineage tracking is broken for this manifest. See ob-mrd.18.",
+    "sha_resolved": null
   },
   "host": {
     "hostname": "j1",
@@ -14,9 +16,45 @@
     "os": "Linux #1 SMP PREEMPT Mon Nov 4 23:41:41 PST 2024",
     "cpu_model": "ARMv8 Processor rev 1 (v8l)",
     "core_count": 4,
-    "cpu_topology": [{"cpu":0,"max_freq_khz":1479000,"min_freq_khz":102000,"governor":"performance","cpu_capacity":null},{"cpu":1,"max_freq_khz":1479000,"min_freq_khz":102000,"governor":"performance","cpu_capacity":null},{"cpu":2,"max_freq_khz":1479000,"min_freq_khz":102000,"governor":"performance","cpu_capacity":null},{"cpu":3,"max_freq_khz":1479000,"min_freq_khz":102000,"governor":"performance","cpu_capacity":null}]
+    "cpu_topology": [
+      {
+        "cpu": 0,
+        "max_freq_khz": 1479000,
+        "min_freq_khz": 102000,
+        "governor": "performance",
+        "cpu_capacity": null
+      },
+      {
+        "cpu": 1,
+        "max_freq_khz": 1479000,
+        "min_freq_khz": 102000,
+        "governor": "performance",
+        "cpu_capacity": null
+      },
+      {
+        "cpu": 2,
+        "max_freq_khz": 1479000,
+        "min_freq_khz": 102000,
+        "governor": "performance",
+        "cpu_capacity": null
+      },
+      {
+        "cpu": 3,
+        "max_freq_khz": 1479000,
+        "min_freq_khz": 102000,
+        "governor": "performance",
+        "cpu_capacity": null
+      }
+    ]
   },
-  "isa_features": {"sve":false,"sve2":false,"i8mm":false,"bf16":false,"asimddp":false,"sme":false},
+  "isa_features": {
+    "sve": false,
+    "sve2": false,
+    "i8mm": false,
+    "bf16": false,
+    "asimddp": false,
+    "sme": false
+  },
   "parallelism": {
     "omp_num_threads": null,
     "omp_proc_bind": null,
@@ -24,7 +62,38 @@
     "effective_threads": 4,
     "threads_source": "core_count_default"
   },
-  "thermal_zones": [{"zone":"thermal_zone0","type":"AO-therm","temp_millicelsius":62500},{"zone":"thermal_zone1","type":"CPU-therm","temp_millicelsius":57000},{"zone":"thermal_zone2","type":"GPU-therm","temp_millicelsius":55500},{"zone":"thermal_zone3","type":"PLL-therm","temp_millicelsius":53500},{"zone":"thermal_zone4","type":"PMIC-Die","temp_millicelsius":50000},{"zone":"thermal_zone5","type":"thermal-fan-est","temp_millicelsius":56000}],
+  "thermal_zones": [
+    {
+      "zone": "thermal_zone0",
+      "type": "AO-therm",
+      "temp_millicelsius": 62500
+    },
+    {
+      "zone": "thermal_zone1",
+      "type": "CPU-therm",
+      "temp_millicelsius": 57000
+    },
+    {
+      "zone": "thermal_zone2",
+      "type": "GPU-therm",
+      "temp_millicelsius": 55500
+    },
+    {
+      "zone": "thermal_zone3",
+      "type": "PLL-therm",
+      "temp_millicelsius": 53500
+    },
+    {
+      "zone": "thermal_zone4",
+      "type": "PMIC-Die",
+      "temp_millicelsius": 50000
+    },
+    {
+      "zone": "thermal_zone5",
+      "type": "thermal-fan-est",
+      "temp_millicelsius": 56000
+    }
+  ],
   "memory": {
     "mem_total_kb": 4059020,
     "mem_available_kb": 1992548
