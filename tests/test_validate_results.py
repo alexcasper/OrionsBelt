@@ -36,6 +36,8 @@ from scripts.validate_results import (  # noqa: E402
     load_manifest,
     main,
     validate_csv,
+    validate_ctx_sweep_row,
+    validate_delta_matmul_row,
     validate_e2e_sweep_row,
     validate_gpu_micro_row,
     validate_kleidiai_gdn_kernel_row,
@@ -1323,3 +1325,127 @@ class TestCheckReadmeCounts:
         issues = []
         check_readme_counts(issues, repo_root=str(root))
         assert issues == []
+
+
+# ---------------------------------------------------------------------------
+# validate_delta_matmul_row
+# ---------------------------------------------------------------------------
+
+
+def _delta_matmul_row(**overrides):
+    """A valid delta-rule matmul row dict."""
+    base = {
+        "kernel": "delta_matmul",
+        "M": "128",
+        "K": "256",
+        "N": "512",
+        "repeats": "30",
+        "p50_us": "100.0",
+        "p95_us": "120.0",
+        "gib_per_s_p50": "5.2",
+    }
+    base.update(overrides)
+    return base
+
+
+class TestValidateDeltaMatmulRow:
+    def test_valid_row_no_issues(self):
+        issues = []
+        validate_delta_matmul_row(_delta_matmul_row(), "test.csv", issues, 2)
+        assert issues == []
+
+    def test_non_positive_dimension(self):
+        issues = []
+        validate_delta_matmul_row(_delta_matmul_row(M="0", K="256", N="512"), "test.csv", issues, 2)
+        assert any("non-positive matmul dim" in i.message for i in issues)
+
+    def test_non_positive_p50(self):
+        issues = []
+        validate_delta_matmul_row(_delta_matmul_row(p50_us="0.0"), "test.csv", issues, 2)
+        assert any("non-positive p50_us" in i.message for i in issues)
+
+    def test_p95_less_than_p50(self):
+        issues = []
+        validate_delta_matmul_row(
+            _delta_matmul_row(p50_us="200.0", p95_us="100.0"), "test.csv", issues, 2
+        )
+        assert any("p95" in i.message and i.severity == "WARNING" for i in issues)
+
+    def test_malformed_value(self):
+        issues = []
+        validate_delta_matmul_row(_delta_matmul_row(p50_us="abc"), "test.csv", issues, 2)
+        assert any("cannot parse" in i.message for i in issues)
+
+
+# ---------------------------------------------------------------------------
+# validate_ctx_sweep_row
+# ---------------------------------------------------------------------------
+
+
+def _ctx_sweep_row(**overrides):
+    """A valid context-length sweep row dict (gdn_e2e_decode.c --ctx-sweep)."""
+    base = {
+        "model": "qwen35_4b",
+        "ctx_len": "4096",
+        "gdn_layer_us": "500.0",
+        "full_attn_us": "800.0",
+        "ffn_us": "300.0",
+        "total_us": "1600.0",
+        "tok_per_sec": "625.0",
+        "kv_cache_mb": "512.0",
+    }
+    base.update(overrides)
+    return base
+
+
+class TestValidateCtxSweepRow:
+    def test_valid_row_no_issues(self):
+        issues = []
+        validate_ctx_sweep_row(_ctx_sweep_row(), "test.csv", issues, 2)
+        assert issues == []
+
+    def test_non_positive_ctx_len(self):
+        issues = []
+        validate_ctx_sweep_row(_ctx_sweep_row(ctx_len="0"), "test.csv", issues, 2)
+        assert any("non-positive ctx_len" in i.message for i in issues)
+
+    def test_non_positive_gdn_layer_us(self):
+        issues = []
+        validate_ctx_sweep_row(_ctx_sweep_row(gdn_layer_us="0.0"), "test.csv", issues, 2)
+        assert any("non-positive gdn_layer_us" in i.message for i in issues)
+
+    def test_non_positive_ffn_us(self):
+        issues = []
+        validate_ctx_sweep_row(_ctx_sweep_row(ffn_us="0.0"), "test.csv", issues, 2)
+        assert any("non-positive ffn_us" in i.message for i in issues)
+
+    def test_non_positive_total_us(self):
+        issues = []
+        validate_ctx_sweep_row(_ctx_sweep_row(total_us="0.0"), "test.csv", issues, 2)
+        assert any("non-positive total_us" in i.message for i in issues)
+
+    def test_zero_full_attn_us_is_ok(self):
+        """full_attn_us=0 is valid for --pure-gdn sweeps (no full-attention layers)."""
+        issues = []
+        validate_ctx_sweep_row(_ctx_sweep_row(full_attn_us="0.0"), "test.csv", issues, 2)
+        assert issues == []
+
+    def test_negative_full_attn_us(self):
+        issues = []
+        validate_ctx_sweep_row(_ctx_sweep_row(full_attn_us="-1.0"), "test.csv", issues, 2)
+        assert any("negative full_attn_us" in i.message for i in issues)
+
+    def test_non_positive_tok_per_sec(self):
+        issues = []
+        validate_ctx_sweep_row(_ctx_sweep_row(tok_per_sec="0.0"), "test.csv", issues, 2)
+        assert any("non-positive tok_per_sec" in i.message for i in issues)
+
+    def test_negative_kv_cache_mb(self):
+        issues = []
+        validate_ctx_sweep_row(_ctx_sweep_row(kv_cache_mb="-1.0"), "test.csv", issues, 2)
+        assert any("negative kv_cache_mb" in i.message for i in issues)
+
+    def test_malformed_value(self):
+        issues = []
+        validate_ctx_sweep_row(_ctx_sweep_row(gdn_layer_us="not_a_number"), "test.csv", issues, 2)
+        assert any("cannot parse" in i.message for i in issues)
