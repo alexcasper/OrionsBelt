@@ -25,7 +25,9 @@ from gen_e2e_comparison import (  # noqa: E402
     _check_manifest_dirty,
     _dedup_rows,
     _normalize_device,
+    extract_metrics,
     fmt_mean_std,
+    generate_table,
 )
 
 # ---------------------------------------------------------------------------
@@ -284,3 +286,168 @@ class TestCheckManifestDirty:
         any_dirty, all_checked = _check_manifest_dirty(refs)
         assert any_dirty is False
         assert all_checked is True
+
+
+# ---------------------------------------------------------------------------
+# extract_metrics()
+# ---------------------------------------------------------------------------
+
+
+class TestExtractMetrics:
+    """Test metric extraction from raw rows."""
+
+    def test_single_decode_metric(self):
+        rows = [_row(value=1.5)]
+        data = extract_metrics(rows)
+        assert len(data) == 1
+        key = ("rk3588-t3_big", "4B", "fp32")
+        assert key in data
+        assert data[key]["tok_per_sec"] == [1.5]
+
+    def test_ttft_converted_to_ms(self):
+        """ttft_seconds should be converted to milliseconds (×1000)."""
+        rows = [_row(value=0.5, metric="ttft_seconds")]
+        data = extract_metrics(rows)
+        key = ("rk3588-t3_big", "4B", "fp32")
+        assert data[key]["ttft"] == [500.0]  # 0.5s = 500ms
+
+    def test_model_shortening_4b(self):
+        rows = [_row(model="Qwen/Qwen3.5-4B")]
+        data = extract_metrics(rows)
+        assert ("rk3588-t3_big", "4B", "fp32") in data
+
+    def test_model_shortening_08b(self):
+        rows = [_row(model="Qwen/Qwen3.5-0.8B")]
+        data = extract_metrics(rows)
+        assert ("rk3588-t3_big", "0.8B", "fp32") in data
+
+    def test_unknown_model_uses_basename(self):
+        rows = [_row(model="some-org/custom-model")]
+        data = extract_metrics(rows)
+        assert ("rk3588-t3_big", "custom-model", "fp32") in data
+
+    def test_quant_grouping(self):
+        """fp32 and int8 for same device go to separate keys."""
+        rows = [
+            _row(quant="fp32", value=1.0),
+            _row(quant="int8", value=2.0, device="rk3588-t3_big_int8"),
+        ]
+        data = extract_metrics(rows)
+        assert ("rk3588-t3_big", "4B", "fp32") in data
+        assert ("rk3588-t3_big_int8", "4B", "int8") in data
+
+    def test_sha_truncation(self):
+        rows = [_row(git_sha="abcdef0123456789")]
+        data = extract_metrics(rows)
+        key = ("rk3588-t3_big", "4B", "fp32")
+        assert "abcdef01" in data[key]["sha"]
+
+    def test_repeat_count_tracked(self):
+        rows = [_row(repeat_count=5)]
+        data = extract_metrics(rows)
+        key = ("rk3588-t3_big", "4B", "fp32")
+        assert data[key]["runs"] == 5
+
+    def test_invalid_value_skipped(self):
+        rows = [_row(value="not_a_number")]
+        data = extract_metrics(rows)
+        key = ("rk3588-t3_big", "4B", "fp32")
+        assert data[key]["tok_per_sec"] == []
+
+    def test_multiple_values_accumulate(self):
+        rows = [
+            _row(value=1.0),
+            _row(value=1.1),
+            _row(value=1.2),
+        ]
+        data = extract_metrics(rows)
+        key = ("rk3588-t3_big", "4B", "fp32")
+        assert data[key]["tok_per_sec"] == [1.0, 1.1, 1.2]
+
+    def test_manifest_ref_tracked(self):
+        rows = [_row()]
+        data = extract_metrics(rows)
+        key = ("rk3588-t3_big", "4B", "fp32")
+        assert "results/manifests/rk3588-t3_big_e2e.json" in data[key]["manifests"]
+
+    def test_empty_rows(self):
+        data = extract_metrics([])
+        assert len(data) == 0
+
+    def test_unknown_metric_ignored(self):
+        rows = [_row(value=42.0, metric="custom_metric")]
+        data = extract_metrics(rows)
+        key = ("rk3588-t3_big", "4B", "fp32")
+        assert data[key]["tok_per_sec"] == []
+        assert data[key]["ttft"] == []
+
+
+# ---------------------------------------------------------------------------
+# generate_table()
+# ---------------------------------------------------------------------------
+
+
+class TestGenerateTable:
+    """Test markdown table generation."""
+
+    def test_generates_header(self):
+        data = extract_metrics([_row()])
+        md = generate_table(data)
+        assert "# E2E Decode Fleet Comparison" in md
+
+    def test_contains_device(self):
+        data = extract_metrics([_row()])
+        md = generate_table(data)
+        assert "rk3588-t3_big" in md
+
+    def test_contains_throughput(self):
+        data = extract_metrics([_row(value=1.04)])
+        md = generate_table(data)
+        assert "1.04" in md
+
+    def test_multiple_models_separate_sections(self):
+        rows = [
+            _row(model="Qwen/Qwen3.5-4B", value=1.04),
+            _row(model="Qwen/Qwen3.5-0.8B", value=8.32, device="rk3588-t3_big"),
+        ]
+        data = extract_metrics(rows)
+        md = generate_table(data)
+        assert "Qwen3.5-4B" in md
+        assert "Qwen3.5-0.8B" in md
+
+    def test_int8_vs_fp32_speedup_section(self):
+        """When both fp32 and int8 exist, a speedup section should appear."""
+        rows = [
+            _row(quant="fp32", value=1.0, device="rk3588-t3_big"),
+            _row(quant="int8", value=2.0, device="rk3588-t3_big"),
+        ]
+        data = extract_metrics(rows)
+        md = generate_table(data)
+        assert "INT8 vs FP32" in md
+        assert "2.00×" in md
+
+    def test_q8_0_speedup_section(self):
+        rows = [
+            _row(quant="fp32", value=1.0, device="rk3588-t3_big"),
+            _row(quant="q8_0", value=3.0, device="rk3588-t3_big"),
+        ]
+        data = extract_metrics(rows)
+        md = generate_table(data)
+        assert "Q8_0 vs FP32" in md
+
+    def test_matched_commit_message(self):
+        """With base_commit and matching commit_info, show matched-commit message."""
+        rows = [_row(git_sha="abc12345")]
+        data = extract_metrics(rows)
+        commit_info = {"abc12345": {"status": "matched", "behind": 0, "ahead": 0}}
+        md = generate_table(data, base_commit="abc12345", commit_info=commit_info)
+        assert "Matched-commit" in md
+
+    def test_empty_data(self):
+        md = generate_table({})
+        assert "# E2E Decode Fleet Comparison" in md
+
+    def test_table_has_separator_row(self):
+        data = extract_metrics([_row()])
+        md = generate_table(data)
+        assert "|--------|" in md

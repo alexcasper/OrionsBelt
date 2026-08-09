@@ -1198,6 +1198,23 @@ def main():
             print(f"  {len(errors)} error(s)")
         if warnings:
             print(f"  {len(warnings)} warning(s)")
+            # Category breakdown for quick triage
+            _warn_categories: dict[str, int] = {}
+            for w in warnings:
+                msg = w.message.lower()
+                if "dirty" in msg:
+                    cat = "dirty-tree (retroactive/expected)"
+                elif "extreme spread" in msg:
+                    cat = "extreme spread (high variance)"
+                elif "thermal" in msg:
+                    cat = "thermal"
+                elif "p95" in msg:
+                    cat = "p95 < p50 anomaly"
+                else:
+                    cat = "other"
+                _warn_categories[cat] = _warn_categories.get(cat, 0) + 1
+            for cat, count in sorted(_warn_categories.items(), key=lambda x: -x[1]):
+                print(f"    {count:>3}  {cat}")
         if notes:
             print(f"  {len(notes)} note(s) (informational, not counted as issues)")
 

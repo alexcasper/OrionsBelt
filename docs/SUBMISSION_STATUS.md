@@ -38,7 +38,7 @@ ADR 0007 — the submission framing is locked to Edge AI.
 | Submission prep (README, write-up, repro) | ✓ All beads closed | ob-fnq, ob-f7k, ob-kdi, ob-9e2 |
 | Compliance checklist | ✓ ob-9e2 closed | Apache-2.0, no credentials at tip of main/t4 |
 
-**Submission readiness:** 15/15 checks pass, 1884 tests, Ruff clean, CI green.
+**Submission readiness:** 15/15 checks pass, 1997 tests, Ruff clean, CI green.
 
 ---
 
@@ -91,7 +91,7 @@ cutoff has passed with no board; any future arrival is additive bonus per ADR 00
 | Date | Trigger | Status | Action if fires |
 |---|---|---|---|
 | **Aug 8** | Last useful board arrival | **FIRED** — board not arrived; Edge AI committed (ADR 0007) | Submission locked to Edge AI |
-| **Aug 10** (T-4) | No board by this date | Pre-committed (ADR 0007) | Cut on-device NPU execution; keep NOE audit + CPU+GPU design |
+| **Aug 10** (T-4) | No board by this date | Pre-committed (ADR 0007) | Cut on-device NPU execution; keep NOE audit + CPU+GPU design. **NPU offload design documented** in [`NPU_OFFLOAD_DESIGN.md`](NPU_OFFLOAD_DESIGN.md) |
 | **Aug 11** (T-3) | No board booted | Pre-committed (ADR 0007) | Physical AI framing already cut; Edge AI locked |
 | **Aug 12** (T-2) | Insufficient slack for GDN-2 swap | Check schedule | Cut layer swap; keep microbenchmark |
 | **Aug 13** (T-1) | Time running out | — | Cut demo video + 262K point if needed |
@@ -206,9 +206,12 @@ The Edge AI submission's strengths:
 - **Honest negative results** (NPU compilers reject the recurrence)
 
 The one weakness: no heterogeneous NPU/GPU/CPU dispatch on target
-silicon. But the O6 onboarding checklist (`docs/O6_ONBOARDING.md`) and
-baseline script (`scripts/o6_system_baseline.sh`) mean any late board
-arrival can produce numbers within hours, not days.
+silicon. However, the complete NPU offload design — operator-level mapping,
+subgraph boundaries, phase-dependent routing, and quantization policy — is
+documented in [`NPU_OFFLOAD_DESIGN.md`](NPU_OFFLOAD_DESIGN.md). The O6
+onboarding checklist (`docs/O6_ONBOARDING.md`) and baseline script
+(`scripts/o6_system_baseline.sh`) mean any late board arrival can produce
+numbers within hours, not days.
 
 ---
 

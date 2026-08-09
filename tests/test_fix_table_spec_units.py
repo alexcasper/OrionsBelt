@@ -190,3 +190,69 @@ class TestFixTableFile:
         assert "31.7 GiB/s" in text
         # Old % = 10.0 / 34.0 * 100 = 29.4% → New % = 10.0 / 31.7 * 100 = 31.5%
         assert "31.5%" in text
+
+
+class TestFixTableFileEdgeCases:
+    """Cover the ValueError exception path and other edge cases."""
+
+    def test_non_numeric_achieved_value_skipped(self, tmp_path):
+        """A data row with non-numeric achieved value doesn't crash."""
+        fpath = tmp_path / "rk3588_table.md"
+        fpath.write_text(
+            "# rk3588 Table\n\n"
+            "**Device spec bandwidth:** 34.0 GiB/s\n\n"
+            "## Achieved vs Spec Bandwidth\n\n"
+            "| Kernel | Achieved (GiB/s) | % of Spec | p50 | Spread |\n"
+            "|--------|------------------|-----------|-----|--------|\n"
+            "| scan | N/A | 29.4% | 5.0 | 1.1× |\n"
+        )
+        ok, msg = fix_table_file(str(fpath))
+        assert ok  # spec line was still fixed
+        text = fpath.read_text()
+        assert "31.7 GiB/s" in text
+        # The N/A row should be preserved (not crashed)
+        assert "N/A" in text
+
+    def test_separator_row_not_crashed(self, tmp_path):
+        """The markdown separator row should not crash the parser."""
+        fpath = tmp_path / "rk3588_table.md"
+        fpath.write_text(
+            "# rk3588 Table\n\n"
+            "**Device spec bandwidth:** 34.0 GiB/s\n\n"
+            "## Achieved vs Spec Bandwidth\n\n"
+            "| Kernel | Achieved (GiB/s) | % of Spec | p50 | Spread |\n"
+            "|--------|------------------|-----------|-----|--------|\n"
+        )
+        ok, _ = fix_table_file(str(fpath))
+        assert ok  # spec line still fixed
+
+
+class TestMain:
+    """Test the main() entry point."""
+
+    def test_main_fixes_files(self, monkeypatch, tmp_path, capsys):
+        import scripts.fix_table_spec_units as ftsu
+
+        # Create a table file that needs fixing
+        fpath = tmp_path / "rk3588_table.md"
+        fpath.write_text(
+            "# rk3588 Table\n\n"
+            "**Device spec bandwidth:** 34.0 GiB/s\n\n"
+            "## Achieved vs Spec Bandwidth\n\n"
+            "| Kernel | Achieved (GiB/s) | % of Spec | p50 | Spread |\n"
+            "|--------|------------------|-----------|-----|--------|\n"
+            "| scan | 10.00 | 29.4% | 5.0 | 1.1× |\n"
+        )
+
+        def patched_glob(pattern):
+            if "*_table.md" in pattern:
+                return [str(fpath)]
+            return []
+
+        monkeypatch.setattr(ftsu.glob, "glob", patched_glob)
+
+        ftsu.main()
+
+        captured = capsys.readouterr()
+        assert "FIXED" in captured.out
+        assert "1 files fixed" in captured.out

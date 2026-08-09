@@ -114,6 +114,10 @@ The mapping hypothesis in `docs/archive/PLAN.md` §3.1 was argued from workload 
 - **The open cost question is dispatch latency**, not operator support — 16 boundary crossings per
   token in a 3:1 stack (`ob-t3b.3`).
 
+> **Full design:** the complete NPU offload plan — operator-level mapping, subgraph boundaries,
+> phase-dependent routing, and quantization policy — is documented in
+> [`NPU_OFFLOAD_DESIGN.md`](NPU_OFFLOAD_DESIGN.md).
+
 ### Reproducing
 
 ```bash

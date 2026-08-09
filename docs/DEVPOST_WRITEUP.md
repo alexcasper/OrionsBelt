@@ -376,6 +376,7 @@ ORIONS_FORCE_FP32=1 python3 bench/harness.py \
 | [`docs/SETUP_PORTABLE.md`](./SETUP_PORTABLE.md) | Step-by-step device setup |
 | [`docs/adr/`](./adr/) | 8 architecture decision records |
 | [`docs/CLAIM_VERIFICATION.md`](./CLAIM_VERIFICATION.md) | Every quantitative claim traced to primary source |
+| [`docs/NPU_OFFLOAD_DESIGN.md`](./NPU_OFFLOAD_DESIGN.md) | Complete NPU offload design (designed, not executed — board-gated) |
 | [`results/raw/`](../results/raw/) | Committed benchmark CSVs |
 | [`results/manifests/`](../results/manifests/) | Provenance manifests |
 
@@ -423,7 +424,10 @@ ORIONS_FORCE_FP32=1 python3 bench/harness.py \
 
 - **Orion O6 results:** board has not arrived (externally gated procurement
   since project start). All NPU/GPU results are from toolchain analysis, not
-  silicon measurement.
+  silicon measurement. The complete NPU offload design — operator-level
+  mapping, subgraph boundaries, phase-dependent routing, and quantization
+  policy — is documented in
+  [`NPU_OFFLOAD_DESIGN.md`](./NPU_OFFLOAD_DESIGN.md).
 - **Decode throughput optimized ~63× from naive baseline:** the Python/transformers
   baseline ran at ~0.68 tok/s (bandwidth-bound). Our C decode loop with
   row-sweep NEON GEMV + INT8 weight-only quantization + SDOT INT8×INT8→int32
@@ -437,7 +441,8 @@ ORIONS_FORCE_FP32=1 python3 bench/harness.py \
 - **GDN-2 layer swap into a live checkpoint:** stretch goal not reached.
   NumPy reference and microbenchmark are done; full model swap is future work.
 - **Dynamic heterogeneous dispatcher:** designed but not implemented (requires
-  the O6's GPU+NPU for a meaningful test).
+  the O6's GPU+NPU for a meaningful test). The phase-dependent routing policy
+  is described in [`NPU_OFFLOAD_DESIGN.md`](./NPU_OFFLOAD_DESIGN.md) §4.4.
 
 ---
 

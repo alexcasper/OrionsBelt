@@ -12,6 +12,7 @@ import json
 from datetime import datetime, timezone
 
 TEMPLATE = "results/manifests/rk3588-t4_big_singlethread.json"
+OUTPUT_DIR = "results/manifests"
 
 # (csv_name, first_commit_sha) pairs
 CSV_TO_SHA = {
@@ -52,7 +53,7 @@ def main():
         manifest["run_id"] = "t4_retroactive_" + sha[:7]
         manifest["timestamp_utc"] = now
 
-        out_path = "results/manifests/" + csv_name + ".json"
+        out_path = OUTPUT_DIR + "/" + csv_name + ".json"
         with open(out_path, "w") as f:
             json.dump(manifest, f, indent=2)
             f.write("\n")
