@@ -258,19 +258,15 @@ The microbenchmark shows the compute cost is comparable. We then attempted
 the retrieval-quality test directly: swapping GDN-1's layer-0 for a GDN-2
 module in a live Qwen3.5-0.8B checkpoint and running 30-step isolated MSE
 distillation (see [`gdn2_swap_findings.md`](./gdn2_swap_findings.md)).
-MSE dropped 94%, but cross-entropy loss recovered only ~18% of the gap.
-We then tested two interventions: **smart gate initialization** (broadcasting
-GDN-1's learned β values to GDN-2's per-channel gates) improved CE recovery
-modestly (+2.8 pp to 19.9%), and a **100-step adaptation depth sweep** (3×
-more steps) also barely helped (+2.5 pp to 19.6%). Both converge at the same
-~20% CE recovery ceiling — the gap is structural (downstream layers amplify
-residual mismatches), not an optimization problem.
+MSE dropped 94%, but cross-entropy loss recovered only 18% of the gap.
 A 10-prompt RULER multi-key retrieval evaluation
 ([`gdn2_ruler_findings.md`](./gdn2_ruler_findings.md)) showed GDN-2 at 10%
 accuracy vs GDN-1's 30% (below the 20% random baseline), with 5× worse
-log-probabilities. This is an honest negative result: isolated single-layer
-adaptation cannot test whether decoupled gating improves retrieval — full
-end-to-end fine-tuning is needed for a meaningful comparison.
+log-probabilities. This is an honest negative result: the 30-step
+single-layer adaptation is insufficient to test whether decoupled gating
+improves retrieval, not evidence against the GDN-2 architecture itself.
+Full fine-tuning or smart gate initialization from GDN-1's β values is
+needed for a meaningful comparison.
 
 ### Potential impact (20 pts)
 
@@ -454,11 +450,9 @@ ORIONS_FORCE_FP32=1 python3 bench/harness.py \
 - **bf16/fp16 model inference on RK3588:** OneDNN's bf16 path hangs on
   Cortex-A76. Model inference runs in fp32 only on this platform.
 - **GDN-2 layer swap into a live checkpoint:** completed on RK3588 (t3).
-  Layer 0 swapped, isolated MSE distillation achieved 94% MSE reduction
-  but only ~20% CE recovery. Smart gate initialization (+2.8 pp) and 3×
-  adaptation depth (+2.5 pp) each hit the same ~20% CE ceiling — the gap
-  is structural, not optimization-limited. RULER retrieval: 10% vs 30%
-  baseline (below random). Full end-to-end fine-tuning needed.
+  Layer 0 swapped, 30-step isolated MSE distillation achieved 94% MSE
+  reduction but only 18% CE recovery. RULER retrieval: 10% vs 30% baseline
+  (below random) — insufficient adaptation, not architectural failure.
   See [`gdn2_swap_findings.md`](./gdn2_swap_findings.md) and
   [`gdn2_ruler_findings.md`](./gdn2_ruler_findings.md).
 - **Dynamic heterogeneous dispatcher:** designed but not implemented (requires
