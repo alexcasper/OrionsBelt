@@ -144,7 +144,7 @@ the real-world impact of the optimization track (beads ob-8qt.5/6/7):
 | Gated Delta-Rule Scan | 1.13 | 2.96 | 2.6x |
 | Causal DWConv1D | 1.20 | 3.66 | 3.1x |
 
-The 2.5-2.8x speedup from 4 cores (not the theoretical 4x) confirms the
+The 2.6-3.1x speedup from 4 cores (not the theoretical 4x) confirms the
 kernels are partially bandwidth-limited even at seq=64 — the instruction-bound
 finding means single-thread performance is IPC-limited, but multi-threaded
 scaling reveals a bandwidth component that the single-thread comparison

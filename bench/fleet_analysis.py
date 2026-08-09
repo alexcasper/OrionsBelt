@@ -733,16 +733,23 @@ def generate_report(output_path):
 
     j2_single = load_device_csv("results/raw/jetson-j2_single.csv")
     j2_opt = load_device_csv(J2_OPTIMIZED_CSV)
+    j2_speedups = []
     for kern in ["gdn_cumdecay", "gdn_gated_scan", "gdn_causal_dwconv1d"]:
         st = get_gibs(j2_single, "Qwen3.5-4B", kern)
         opt = get_gibs(j2_opt, "Qwen3.5-4B", kern)
         if st and opt:
             speedup = opt / st
+            j2_speedups.append(speedup)
             label = KERNEL_LABELS.get(kern, kern)
             lines.append(f"| {label} | {st:.2f} | {opt:.2f} | {speedup:.1f}x |")
 
     lines.append("")
-    lines.append("The 2.5-2.8x speedup from 4 cores (not the theoretical 4x) confirms the")
+    if j2_speedups:
+        sp_lo = min(j2_speedups)
+        sp_hi = max(j2_speedups)
+        lines.append(f"The {sp_lo:.1f}-{sp_hi:.1f}x speedup from 4 cores (not the theoretical 4x) confirms the")
+    else:
+        lines.append("The speedup from 4 cores (not the theoretical 4x) confirms the")
     lines.append("kernels are partially bandwidth-limited even at seq=64 — the instruction-bound")
     lines.append("finding means single-thread performance is IPC-limited, but multi-threaded")
     lines.append("scaling reveals a bandwidth component that the single-thread comparison")
