@@ -18,10 +18,14 @@ if _ROOT not in sys.path:
 
 from bench.harness import QWEN35_08B, QWEN35_4B  # noqa: E402
 from bench.memory import (  # noqa: E402
+    MemoryBreakdown,
+    ModelConfig,
     _fmt_bytes,
     cross_check,
     decomposition,
     kv_cache_bytes,
+    context_sweep,
+    memory_breakdown,
     print_decomposition,
     recurrent_state_bytes,
     weights_bytes,
@@ -230,3 +234,216 @@ class TestPrintDecomposition:
         print_decomposition(QWEN35_4B, [131072])
         captured = capsys.readouterr()
         assert "131,072" in captured.out
+
+
+# ---------------------------------------------------------------------------
+# ModelConfig.from_hf_config
+# ---------------------------------------------------------------------------
+
+
+class TestFromHfConfig:
+    """Test config-driven ModelConfig construction."""
+
+    def test_explicit_layer_types_derives_interval(self):
+        """When layer_types is present, interval is derived from first FA index."""
+        cfg = ModelConfig.from_hf_config({
+            "hidden_size": 256,
+            "num_attention_heads": 8,
+            "layer_types": [
+                "linear_attention", "linear_attention", "linear_attention",
+                "full_attention",
+            ],
+            "vocab_size": 1000,
+        })
+        assert cfg.num_hidden_layers == 4
+        assert cfg.full_attention_interval == 4
+        assert cfg.layer_types.count("full_attention") == 1
+        assert cfg.layer_types.count("linear_attention") == 3
+
+    def test_implicit_interval_from_num_hidden_layers(self):
+        """Without layer_types, reads num_hidden_layers + full_attention_interval."""
+        cfg = ModelConfig.from_hf_config({
+            "num_hidden_layers": 32,
+            "full_attention_interval": 4,
+            "hidden_size": 2560,
+            "num_attention_heads": 32,
+        })
+        assert cfg.num_hidden_layers == 32
+        assert cfg.full_attention_interval == 4
+
+    def test_head_dim_explicit(self):
+        """When head_dim is in config, it's used directly."""
+        cfg = ModelConfig.from_hf_config({
+            "num_hidden_layers": 4,
+            "hidden_size": 256,
+            "num_attention_heads": 8,
+            "head_dim": 128,
+        })
+        assert cfg.full_attn_head_dim == 128
+
+    def test_head_dim_derived(self):
+        """When head_dim is absent, derived from hidden_size // num_attention_heads."""
+        cfg = ModelConfig.from_hf_config({
+            "num_hidden_layers": 4,
+            "hidden_size": 256,
+            "num_attention_heads": 8,
+        })
+        assert cfg.full_attn_head_dim == 32  # 256 // 8
+
+    def test_head_dim_zero_when_no_heads(self):
+        """Division guarded when num_attention_heads is 0."""
+        cfg = ModelConfig.from_hf_config({
+            "num_hidden_layers": 4,
+            "hidden_size": 256,
+            "num_attention_heads": 0,
+        })
+        assert cfg.full_attn_head_dim == 0
+
+    def test_text_config_nesting(self):
+        """Config nested under 'text_config' is read correctly."""
+        cfg = ModelConfig.from_hf_config({
+            "text_config": {
+                "num_hidden_layers": 16,
+                "hidden_size": 512,
+                "num_attention_heads": 8,
+                "model_type": "qwen3",
+            },
+        })
+        assert cfg.num_hidden_layers == 16
+        assert cfg.hidden_size == 512
+
+    def test_state_dtype_mapping(self):
+        """mamba_ssm_dtype maps to state_dtype_bytes."""
+        cfg = ModelConfig.from_hf_config({
+            "num_hidden_layers": 4,
+            "mamba_ssm_dtype": "bfloat16",
+        })
+        assert cfg.state_dtype_bytes == 2
+
+    def test_untied_embeddings(self):
+        """tie_word_embeddings=False is read from config."""
+        cfg = ModelConfig.from_hf_config({
+            "num_hidden_layers": 4,
+            "tie_word_embeddings": False,
+        })
+        assert cfg.tie_word_embeddings is False
+
+    def test_name_from_model_type(self):
+        """Name defaults to model_type when not provided."""
+        cfg = ModelConfig.from_hf_config({
+            "model_type": "qwen3",
+            "num_hidden_layers": 4,
+        })
+        assert cfg.name == "qwen3"
+
+    def test_no_fa_layers_in_explicit_list(self):
+        """When layer_types has no full_attention, interval is large (all GDN)."""
+        cfg = ModelConfig.from_hf_config({
+            "layer_types": ["linear_attention"] * 4,
+        })
+        assert cfg.full_attention_interval == 5  # num_hidden_layers + 1
+        assert cfg.layer_types.count("linear_attention") == 4
+
+
+# ---------------------------------------------------------------------------
+# Untied embeddings branch in weights_bytes
+# ---------------------------------------------------------------------------
+
+
+class TestUntiedWeights:
+    def test_untied_doubles_embedding(self):
+        """Untied embeddings: weights ≈ 2× the embedding portion."""
+        base = ModelConfig(
+            name="test",
+            hidden_size=256,
+            num_hidden_layers=4,
+            vocab_size=1000,
+            full_attention_interval=4,
+            weight_dtype_bytes=2,
+        )
+        tied = weights_bytes(base)
+        untied = ModelConfig(
+            name="test",
+            hidden_size=256,
+            num_hidden_layers=4,
+            vocab_size=1000,
+            full_attention_interval=4,
+            weight_dtype_bytes=2,
+            tie_word_embeddings=False,
+        )
+        untied_w = weights_bytes(untied)
+        # The difference is exactly vocab_size * hidden_size * dtype_bytes
+        diff = untied_w - tied
+        assert diff == 1000 * 256 * 2
+
+
+# ---------------------------------------------------------------------------
+# MemoryBreakdown dataclass
+# ---------------------------------------------------------------------------
+
+
+class TestMemoryBreakdown:
+    def test_total_property(self):
+        """MemoryBreakdown.total sums the three components."""
+        mb = MemoryBreakdown(weights=1000, kv_cache=500, recurrent_state=200)
+        assert mb.total == 1700
+
+    def test_total_with_zero_kv(self):
+        """At seq_len=0, kv_cache is 0 but total still sums."""
+        mb = MemoryBreakdown(weights=1000, kv_cache=0, recurrent_state=200)
+        assert mb.total == 1200
+
+    def test_memory_breakdown_function(self):
+        """memory_breakdown() returns a MemoryBreakdown at a given context."""
+        mb = memory_breakdown(QWEN35_4B, seq_len=4096)
+        assert isinstance(mb, MemoryBreakdown)
+        assert mb.weights == weights_bytes(QWEN35_4B)
+        assert mb.kv_cache == kv_cache_bytes(QWEN35_4B, 4096)
+        assert mb.recurrent_state == recurrent_state_bytes(QWEN35_4B)
+        assert mb.total == mb.weights + mb.kv_cache + mb.recurrent_state
+
+
+# ---------------------------------------------------------------------------
+# context_sweep
+# ---------------------------------------------------------------------------
+
+
+class TestContextSweep:
+    def test_returns_list_of_dicts(self):
+        """context_sweep returns a list of dicts with expected keys."""
+        data = context_sweep(QWEN35_4B, [4096, 32768])
+        assert len(data) == 2
+        for entry in data:
+            assert "context_length" in entry
+            assert "weights_gib" in entry
+            assert "kv_cache_gib" in entry
+            assert "recurrent_state_mib" in entry
+            assert "total_gib" in entry
+
+    def test_weights_constant_across_contexts(self):
+        """Weights are the same at every context length."""
+        data = context_sweep(QWEN35_4B, [4096, 32768, 131072])
+        weights = {entry["weights_gib"] for entry in data}
+        assert len(weights) == 1
+
+    def test_kv_cache_grows(self):
+        """KV cache GiB increases with context length."""
+        data = context_sweep(QWEN35_4B, [4096, 32768])
+        assert data[1]["kv_cache_gib"] > data[0]["kv_cache_gib"]
+
+    def test_recurrent_state_constant(self):
+        """Recurrent state MiB is the same at every context length."""
+        data = context_sweep(QWEN35_4B, [4096, 131072])
+        rs = {entry["recurrent_state_mib"] for entry in data}
+        assert len(rs) == 1
+
+    def test_total_increases(self):
+        """Total GiB increases with context (dominated by KV cache growth)."""
+        data = context_sweep(QWEN35_4B, [4096, 32768])
+        assert data[1]["total_gib"] > data[0]["total_gib"]
+
+    def test_single_context(self):
+        """Works with a single context length."""
+        data = context_sweep(QWEN35_4B, [4096])
+        assert len(data) == 1
+        assert data[0]["context_length"] == 4096
