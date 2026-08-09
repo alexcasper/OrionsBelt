@@ -247,6 +247,14 @@ QUANT_ACCURACY_COLS = [
     "cos_sim",
 ]
 
+THERMAL_STRESS_COLS = [
+    "iteration",
+    "tok_per_sec",
+    "thermal_zone1_C",
+    "thermal_zone2_C",
+    "elapsed_s",
+]
+
 # Device spec bandwidth (GiB/s) for sanity-check upper bounds.
 # Vendor datasheets quote GB/s; converted to GiB/s for unit-consistency
 # with the bench binary (÷2^30).  See ADR 0005 for GB/s originals.
@@ -298,6 +306,8 @@ def detect_csv_type(header):
         return "cross_tool_comparison"
     if cols >= {"quant_variant", "matrix", "cos_sim", "rel_err_pct"}:
         return "quant_accuracy"
+    if cols >= {"iteration", "tok_per_sec", "thermal_zone1_C", "elapsed_s"}:
+        return "thermal_stress"
     return None
 
 
@@ -336,6 +346,8 @@ def expected_columns(csv_type):
         return CROSS_TOOL_COMPARISON_COLS
     if csv_type == "quant_accuracy":
         return QUANT_ACCURACY_COLS
+    if csv_type == "thermal_stress":
+        return THERMAL_STRESS_COLS
     return []
 
 
@@ -389,20 +401,18 @@ def check_manifest_exists(csv_name, manifest_dir):
         base + ".json",
         base.replace("_", "-") + ".json",
     ]
-    # Strip only the documented cluster suffix (DEVICE_RUNBOOK.md's naming
-    # convention) before falling back to the crude device-name-only match
-    # below -- otherwise a per-variant manifest (e.g. rk3588-t4_sdot_08b.json)
-    # is skipped in favor of an unrelated shared device manifest that happens
-    # to match on the first underscore-segment alone. Discovered while
-    # reviewing PR #175: refreshing the shared rk3588-t4.json manifest
-    # retroactively flagged ~15 unrelated dedicated-manifest CSVs as dirty.
-    for suffix in ("_big", "_little", "_singlethread"):
-        if base.endswith(suffix):
-            candidates.append(base[: -len(suffix)] + ".json")
-    # Also try without suffixes like _big, _little, _sustained_*, etc.
+    # Progressively strip trailing underscore-segments, most specific first,
+    # so a dedicated per-variant manifest (e.g. rk3588-t4_thermal.json for
+    # rk3588-t4_thermal_stress_fp32.csv, or rk3588-t4_sdot_08b.json for
+    # rk3588-t4_sdot_08b_big.csv) is preferred over the crude device-name-
+    # only fallback (the last candidate this loop produces, parts[0]).
+    # Discovered while reviewing PR #175/#178: a shared device manifest
+    # matching on the first segment alone was masking dedicated manifests
+    # with more specific names, and no single fixed suffix list (_big/
+    # _little/_singlethread) covers every naming pattern in use.
     parts = base.split("_")
-    if len(parts) > 1:
-        candidates.append(parts[0] + ".json")
+    for n in range(len(parts) - 1, 0, -1):
+        candidates.append("_".join(parts[:n]) + ".json")
 
     for candidate in candidates:
         path = os.path.join(manifest_dir, candidate)
