@@ -361,7 +361,7 @@ int main(int argc, char **argv) {
             sus_kernel = parse_kernel(argv[++i]);
             if (sus_kernel == K_LAST) {
                 fprintf(stderr, "unknown kernel: %s\n  valid: cumdecay gated_scan dwconv1d "
-                        "cumdecay_f16 gated_scan_f16 cumdecay_bf16 gated_scan_bf16\n", argv[i]);
+                        "cumdecay_f16 gated_scan_f16 cumdecay_bf16 gated_scan_bf16 gdn2_gated_scan\n", argv[i]);
                 return 1;
             }
         }
@@ -382,7 +382,7 @@ int main(int argc, char **argv) {
             printf("  --sustained-kernel  Kernel for sustained mode (default: gated_scan)\n");
             printf("                      Valid: cumdecay gated_scan dwconv1d\n");
             printf("                             cumdecay_f16 gated_scan_f16\n");
-            printf("                             cumdecay_bf16 gated_scan_bf16\n");
+            printf("                             cumdecay_bf16 gated_scan_bf16 gdn2_gated_scan\n");
             printf("  --sustained-model   Model config: 4B or 0.8B (default: 4B)\n");
             printf("  --sustained-seq     Sequence length: 64=prefill, 1=decode (default: 64)\n");
             return 0;
