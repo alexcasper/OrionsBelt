@@ -5561,3 +5561,34 @@ not single points. Memory-bound kernels (f16 cumdecay) are reproducible to
 |--------|--------|----------|
 | rk3588-t4 | `8227e98` | `results/manifests/rk3588-t4.json` |
 | rk3588-t3 | `47efdf8` | `results/manifests/rk3588-t3.json` |
+
+### SDOT context-length scaling on t4: O(1) GDN decode confirmed (ob-8ms.3)
+
+INT4 and INT8 SDOT context sweeps (ctx 1–8192) on rk3588-t4 big cluster
+validate the GDN O(1) decode scaling claim on independent hardware (t3
+previously reported the same pattern at commit `a6d21df`).
+
+**Pure-GDN mode (all 32 layers GDN, no attention):**
+
+| Config | ctx=1 tok/s | ctx=8192 tok/s | Spread |
+|--------|------------|---------------|--------|
+| INT4 SDOT 4B | 4.45 | 4.44 | 0.2% |
+| INT8 SDOT 4B | 3.41 | 3.39 | 0.6% |
+
+Perfectly flat — zero KV cache growth, zero decode-time growth. This is the
+O(1) recurrent-state advantage in its purest form.
+
+**Hybrid mode (24 GDN + 8 full-attention):**
+
+| Config | ctx=1 tok/s | ctx=8192 tok/s | GDN layer (flat) | Attn at 8192 |
+|--------|------------|---------------|-------------------|-------------|
+| INT4 SDOT 4B | 4.50 | 2.45 | 49 ms | 200 ms |
+| INT8 SDOT 4B | 3.45 | 2.10 | 68 ms | 203 ms |
+
+GDN layer time is constant at all context lengths; decode slowdown is entirely
+from the 8 full-attention layers' O(n) KV scan. At ctx=8192 the INT4 SDOT
+hybrid still delivers 2.45 tok/s vs FP32's 1.11 tok/s baseline — a 2.2× win
+that grows with context length.
+
+**Provenance:** commit `fc30214`, governor=performance, manifest
+`results/manifests/rk3588-t4_sdot_ctxsweep.json`.
