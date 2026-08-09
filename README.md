@@ -148,6 +148,7 @@ All figures above are verified against primary sources (Radxa product page and d
 - KleidiAI packed GEMM wins 1.7–3.6× on matmul but packing cost dominates at decode; dual-path strategy recommended (§8)
 - big.LITTLE affinity: pinning to A76 big cores is 2–3× faster than default scheduler placement (§9)
 - GDN-2 vs GDN-1: decoupled gating costs 2.2–2.7× at prefill (bandwidth-bound), 1.2–1.5× at decode on big cores but 2.2–2.4× on A55 little cores (compute-bound); clean-tree re-run, single-thread (§10)
+- INA3221 power/energy: all three GDN kernels draw ~900–925 mW over idle on the Jetson A57 — power is constant, energy-per-GiB tracks 1/throughput (874–1250 mJ/GiB board-wide). `performance` governor is both faster and 28% more energy-efficient than `ondemand` (ob-agf.1)
 
 | Item | Status |
 |---|---|
@@ -175,6 +176,7 @@ All figures above are verified against primary sources (Radxa product page and d
 | Context-length scaling (GDN O(1) vs full-attn O(n)) | Done — pure-GDN flat to 0.3% across ctx=1–4096, cross-validated A57+A76. [§17](./docs/FINDINGS.md) |
 | INT8 KV cache quantization | Done — 1.7–2.6× full-attn speedup at long context, 4× KV memory reduction. [§20](./docs/FINDINGS.md) |
 | Sustained-load thermal characterization | Done — 0.3% throughput decay over 94s on RK3588 (§18) |
+| INA3221 power/energy profiling | Done — 874–1250 mJ/GiB board-wide on Jetson A57; power constant across kernels, energy tracks 1/throughput (ob-agf.1) |
 | Track decision: Edge AI | Done — [ADR 0007](./docs/adr/0007-commit-to-edge-ai-track.md) |
 | Model survey / selection (`docs/MODEL_SURVEY.md`) | Done |
 | Orion O6 board bring-up | **Pending** — board not yet in hand |
@@ -182,7 +184,7 @@ All figures above are verified against primary sources (Radxa product page and d
 | Per-layer engine mapping (NPU/GPU/CPU) | Hypothesis only — pending measurements |
 | Full inference results (tokens/sec, TTFT, memory) | Done — C decode loop (FP32+INT8+Q8_0), ctx-length scaling (§17–20), quantization accuracy (§30), cross-device (A57+A76), sustained-load thermal stability (§18). [e2e comparison](./results/figures/e2e_fleet_comparison.md) |
 
-> **Results so far:** 156 CSVs from the device fleet, 138 provenance manifests, 88 generated figures/tables, 46 FINDINGS sections.
+> **Results so far:** 156 CSVs from the device fleet, 142 provenance manifests, 88 generated figures/tables, 46 FINDINGS sections.
 > (Counted recursively — `results/raw/` and `results/manifests/` include
 > subdirectories `ablation/`, `affinity/`, and `kleidiai/`, which hold real
 > fleet benchmark data, not scratch files. A non-recursive `ls *.csv` count
@@ -197,7 +199,7 @@ All figures above are verified against primary sources (Radxa product page and d
 > ```
 > results/
 >   raw/         <- 156 per-run CSVs across 5 devices (incl. ablation/, affinity/, kleidiai/ subdirs)
->   manifests/   <- 138 provenance manifests (git SHA, governor, thermals)
+>   manifests/   <- 142 provenance manifests (git SHA, governor, thermals)
 >   figures/     <- fleet analysis, comparison table, kernel/memory plots> ```
 >
 > See [`results/README.md`](./results/README.md) for the layout, [`docs/FINDINGS.md`](./docs/FINDINGS.md) for findings, and [`results/figures/fleet_bandwidth_scaling.md`](./results/figures/fleet_bandwidth_scaling.md) for the headline cross-device analysis.
