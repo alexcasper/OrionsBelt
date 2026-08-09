@@ -665,6 +665,7 @@ def generate_report(output_path):
     # Better prediction: scale by core performance, not bandwidth.
     # RK3588 A76 is the newest core in the fleet comparison and closest to the O6's A720.
     rk_scan = get_gibs(device_data["RK3588 big"]["rows"], "Qwen3.5-4B", "gdn_gated_scan")
+    rk_t4_opt = None  # may be populated inside the if-rk_scan block below
     if rk_scan:
         # A720 @ 2.8 GHz vs A76 @ 2.3 GHz: ~1.22x clock, wider pipeline, SVE2, i8mm
         conservative_low = rk_scan * 3.0
@@ -763,8 +764,12 @@ def generate_report(output_path):
     lines.append("")
     lines.append(
         "**Optimization impact on A76.** The multi-threaded optimized run (4-core OpenMP + "
-        "NEON unrolling + bf16) on t4 reads 11.56 GiB/s scan vs 5.75 single-threaded — "
-        "a **2.0x speedup** from parallelization alone. See the optimization-impact table below."
+        "NEON unrolling + bf16) on t4"
+        + (f" reads {rk_t4_opt:.2f} GiB/s scan vs {rk_scan:.2f} single-threaded — "
+           f"a **{rk_t4_opt / rk_scan:.1f}x speedup** from parallelization alone"
+           if rk_t4_opt and rk_scan
+           else " achieves a ~2x speedup from parallelization alone")
+        + ". See the optimization-impact table below."
     )
     lines.append("")
     j2_opt_all = []
