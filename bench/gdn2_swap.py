@@ -39,12 +39,12 @@ import torch.nn.functional as F
 
 
 def gdn2_recurrent(
-    query,    # [B, H, T, K_dim]
-    key,      # [B, H, T, K_dim]
-    value,    # [B, H, T, V_dim]
-    g,        # [B, H, T]  pre-computed log-decay (already negative)
-    b_gate,   # [B, H, T, K_dim]  erase gate (already sigmoid'd, in [0,1])
-    w_gate,   # [B, H, T, V_dim]  write gate (already sigmoid'd, in [0,1])
+    query,  # [B, H, T, K_dim]
+    key,  # [B, H, T, K_dim]
+    value,  # [B, H, T, V_dim]
+    g,  # [B, H, T]  pre-computed log-decay (already negative)
+    b_gate,  # [B, H, T, K_dim]  erase gate (already sigmoid'd, in [0,1])
+    w_gate,  # [B, H, T, V_dim]  write gate (already sigmoid'd, in [0,1])
     use_qk_l2norm=True,
 ):
     """Token-by-token GDN-2 recurrence. Returns [B, T, H, V_dim]."""
@@ -54,25 +54,24 @@ def gdn2_recurrent(
         key = F.normalize(key, dim=-1, eps=1e-6)
 
     query, key, value, g, b_gate, w_gate = [
-        x.transpose(1, 2).contiguous().float()
-        for x in (query, key, value, g, b_gate, w_gate)
+        x.transpose(1, 2).contiguous().float() for x in (query, key, value, g, b_gate, w_gate)
     ]
 
     B, H, T, K_dim = key.shape
     V_dim = value.shape[-1]
-    scale = 1.0 / (K_dim ** 0.5)
+    scale = 1.0 / (K_dim**0.5)
     query = query * scale
 
     state = torch.zeros(B, H, K_dim, V_dim, dtype=torch.float32, device=query.device)
     output = torch.zeros(B, H, T, V_dim, dtype=torch.float32, device=query.device)
 
     for i in range(T):
-        q_t = query[:, :, i]      # [B, H, K]
-        k_t = key[:, :, i]        # [B, H, K]
-        v_t = value[:, :, i]      # [B, H, V]
+        q_t = query[:, :, i]  # [B, H, K]
+        k_t = key[:, :, i]  # [B, H, K]
+        v_t = value[:, :, i]  # [B, H, V]
         g_t = g[:, :, i].exp().unsqueeze(-1).unsqueeze(-1)  # [B, H, 1, 1]
-        b_t = b_gate[:, :, i]     # [B, H, K]
-        w_t = w_gate[:, :, i]     # [B, H, V]
+        b_t = b_gate[:, :, i]  # [B, H, K]
+        w_t = w_gate[:, :, i]  # [B, H, V]
 
         # Decay
         state = state * g_t
@@ -165,7 +164,7 @@ class Qwen3_5GDN2(nn.Module):
 
         # ── Projections (same as GDN-1) ──
         mixed_qkv = self.in_proj_qkv(hidden_states)  # [B, T, key_dim*2 + value_dim]
-        mixed_qkv_t = mixed_qkv.transpose(1, 2)      # [B, conv_dim, T]
+        mixed_qkv_t = mixed_qkv.transpose(1, 2)  # [B, conv_dim, T]
 
         z = self.in_proj_z(hidden_states)
         z = z.reshape(batch_size, seq_len, -1, self.head_v_dim)
@@ -173,10 +172,10 @@ class Qwen3_5GDN2(nn.Module):
         a = self.in_proj_a(hidden_states)  # [B, T, num_v_heads]
 
         # ── Causal Conv1d (depthwise, SiLU activation) ──
-        conv_out = self.conv1d(mixed_qkv_t)          # [B, conv_dim, T + k - 1]
-        conv_out = conv_out[:, :, :seq_len]            # causal slice
+        conv_out = self.conv1d(mixed_qkv_t)  # [B, conv_dim, T + k - 1]
+        conv_out = conv_out[:, :, :seq_len]  # causal slice
         conv_out = F.silu(conv_out)
-        mixed_qkv = conv_out.transpose(1, 2)           # [B, T, conv_dim]
+        mixed_qkv = conv_out.transpose(1, 2)  # [B, T, conv_dim]
 
         # ── Split QKV ──
         query, key, value = torch.split(
@@ -213,7 +212,7 @@ class Qwen3_5GDN2(nn.Module):
         query = query.transpose(1, 2)  # [B, H, T, K]
         key = key.transpose(1, 2)
         value = value.transpose(1, 2)
-        g_expanded = g.unsqueeze(-1)   # [B, T, H, 1] → need [B, H, T]
+        g.unsqueeze(-1)  # [B, T, H, 1] → need [B, H, T]
         # g is [B, T, H], reshape for recurrence: [B, H, T]
         g_for_rec = g.permute(0, 2, 1).contiguous()  # [B, H, T]
         b_gate = b_gate.transpose(1, 2)  # [B, H, T, K]
@@ -221,7 +220,12 @@ class Qwen3_5GDN2(nn.Module):
 
         # ── GDN-2 recurrence ──
         core_attn_out = gdn2_recurrent(
-            query, key, value, g_for_rec, b_gate, w_gate,
+            query,
+            key,
+            value,
+            g_for_rec,
+            b_gate,
+            w_gate,
             use_qk_l2norm=True,
         )  # [B, T, H, V]
 
@@ -316,9 +320,7 @@ def capture_manifest():
 
 def main():
     parser = argparse.ArgumentParser(description="GDN-2 layer swap experiment (ob-68l)")
-    parser.add_argument(
-        "--model", default="models/Qwen3.5-0.8B", help="Model path"
-    )
+    parser.add_argument("--model", default="models/Qwen3.5-0.8B", help="Model path")
     parser.add_argument(
         "--layers",
         default="0,1,2",
@@ -331,24 +333,27 @@ def main():
     args = parser.parse_args()
 
     layer_indices = [int(x) for x in args.layers.split(",")]
-    print(f"=== GDN-2 Layer Swap Experiment (ob-68l) ===", flush=True)
+    print("=== GDN-2 Layer Swap Experiment (ob-68l) ===", flush=True)
     print(f"Model: {args.model}", flush=True)
     print(f"Layers to swap: {layer_indices}", flush=True)
     print(f"Adaptation steps: {args.steps}, seq_len: {args.seq_len}, lr: {args.lr}", flush=True)
 
     # ── Load model ──
     print("\n--- Loading model ---", flush=True)
-    from transformers import AutoTokenizer, AutoModelForCausalLM
+    from transformers import AutoModelForCausalLM, AutoTokenizer
 
     tokenizer = AutoTokenizer.from_pretrained(args.model)
     model = AutoModelForCausalLM.from_pretrained(
-        args.model, dtype=torch.bfloat16, device_map="cpu",
+        args.model,
+        dtype=torch.bfloat16,
+        device_map="cpu",
     )
     model.eval()
 
     # ── Prepare data ──
-    text_ids = tokenizer(ADAPTATION_TEXT, return_tensors="pt", truncation=True,
-                         max_length=args.seq_len)["input_ids"]
+    text_ids = tokenizer(
+        ADAPTATION_TEXT, return_tensors="pt", truncation=True, max_length=args.seq_len
+    )["input_ids"]
     actual_seq_len = text_ids.shape[1]
     labels = text_ids.clone()
     print(f"Input tokens: {actual_seq_len}", flush=True)
@@ -372,11 +377,13 @@ def main():
             # hidden_states is first arg or in kwargs
             hs = args[0] if args else kwargs.get("hidden_states")
             captured.setdefault(layer_idx, {})["input"] = hs.detach().clone()
+
         return pre_hook_fn
 
     def make_post_hook(layer_idx):
         def post_hook_fn(module, args, kwargs, output):
             captured.setdefault(layer_idx, {})["output"] = output.detach().clone()
+
         return post_hook_fn
 
     handles = []
@@ -394,8 +401,11 @@ def main():
 
     for h in handles:
         h.remove()
-    print(f"Captured I/O for layers {layer_indices} "
-          f"(input shape: {captured[layer_indices[0]]['input'].shape})", flush=True)
+    print(
+        f"Captured I/O for layers {layer_indices} "
+        f"(input shape: {captured[layer_indices[0]]['input'].shape})",
+        flush=True,
+    )
 
     # ── Swap layers ──
     print(f"\n--- Swapping layers {layer_indices} to GDN-2 ---", flush=True)
@@ -405,8 +415,11 @@ def main():
         old_module = model.model.layers[idx].linear_attn
         new_params = old_module.hidden_size * (old_module.key_dim + old_module.value_dim)
         total_new_params += new_params
-    print(f"New GDN-2 gate parameters: {total_new_params} "
-          f"({total_new_params * 4 / 1024 / 1024:.1f} MB in fp32)", flush=True)
+    print(
+        f"New GDN-2 gate parameters: {total_new_params} "
+        f"({total_new_params * 4 / 1024 / 1024:.1f} MB in fp32)",
+        flush=True,
+    )
 
     swap_gdn1_to_gdn2(model, layer_indices)
     model.train()
@@ -440,8 +453,14 @@ def main():
                 p.requires_grad = True
                 trainable_count += p.numel()
                 trainable_params.append(p)
-    print(f"Trainable parameters: {trainable_count} ({trainable_count * 4 / 1024 / 1024:.1f} MB)", flush=True)
-    print(f"Strategy: MSE distillation against cached GDN-1 output (isolated, no full-model backprop)", flush=True)
+    print(
+        f"Trainable parameters: {trainable_count} ({trainable_count * 4 / 1024 / 1024:.1f} MB)",
+        flush=True,
+    )
+    print(
+        "Strategy: MSE distillation against cached GDN-1 output (isolated, no full-model backprop)",
+        flush=True,
+    )
 
     optimizer = torch.optim.AdamW(trainable_params, lr=args.lr)
 
@@ -464,7 +483,7 @@ def main():
         if step == 0 or (step + 1) % 5 == 0 or step == args.steps - 1:
             elapsed = time.time() - t0
             print(
-                f"  Step {step+1:3d}/{args.steps}: mse={step_loss / len(layer_indices):.6f}  "
+                f"  Step {step + 1:3d}/{args.steps}: mse={step_loss / len(layer_indices):.6f}  "
                 f"grad_norm={grad_norm.item():.2f}  ({elapsed:.1f}s elapsed)",
                 flush=True,
             )
@@ -474,10 +493,15 @@ def main():
     model.eval()
     final_loss = evaluate_loss(model, text_ids, labels)
     print(f"Final CE loss: {final_loss:.4f}", flush=True)
-    print(f"CE recovery: {post_swap_loss:.4f} → {final_loss:.4f} "
-          f"({final_loss - post_swap_loss:+.4f})", flush=True)
-    print(f"vs Baseline: {baseline_loss:.4f} → {final_loss:.4f} "
-          f"({final_loss - baseline_loss:+.4f})", flush=True)
+    print(
+        f"CE recovery: {post_swap_loss:.4f} → {final_loss:.4f} "
+        f"({final_loss - post_swap_loss:+.4f})",
+        flush=True,
+    )
+    print(
+        f"vs Baseline: {baseline_loss:.4f} → {final_loss:.4f} ({final_loss - baseline_loss:+.4f})",
+        flush=True,
+    )
     print(f"Isolated MSE (final step): {losses[-1]:.6f}", flush=True)
 
     # ── Results ──
@@ -513,7 +537,7 @@ def main():
         with open(csv_path, "w") as f:
             f.write("step,mse_loss\n")
             for i, loss in enumerate(losses):
-                f.write(f"{i+1},{loss:.6f}\n")
+                f.write(f"{i + 1},{loss:.6f}\n")
         print(f"\nCSV written to {csv_path}", flush=True)
 
         # Write manifest

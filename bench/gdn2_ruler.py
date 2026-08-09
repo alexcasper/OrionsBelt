@@ -46,6 +46,7 @@ def generate_prompts(num_prompts, context_length, num_keys, seed_base=100):
     if repo_root not in sys.path:
         sys.path.insert(0, repo_root)
     import bench.corpus as corpus
+
     prompts = []
     for i in range(num_prompts):
         item = corpus.generate_niah_multikey(
@@ -63,16 +64,18 @@ def generate_prompts(num_prompts, context_length, num_keys, seed_base=100):
         correct = item.metadata["query_value"]
         distractors = [v for k, v in pairs.items() if k != query_key]
 
-        prompts.append({
-            "prompt": item.prompt,
-            "query_key": query_key,
-            "correct_answer": correct,
-            "distractor_answers": distractors,
-            "est_tokens": item.metadata["est_tokens"],
-            "num_keys": item.metadata["num_keys"],
-            "needle_depth": item.needle_depth,
-            "seed": seed_base + i,
-        })
+        prompts.append(
+            {
+                "prompt": item.prompt,
+                "query_key": query_key,
+                "correct_answer": correct,
+                "distractor_answers": distractors,
+                "est_tokens": item.metadata["est_tokens"],
+                "num_keys": item.metadata["num_keys"],
+                "needle_depth": item.needle_depth,
+                "seed": seed_base + i,
+            }
+        )
     return prompts
 
 
@@ -96,7 +99,9 @@ def score_answer_logprob(model, tokenizer, prompt, answer):
     # Logits at position i predict token i+1
     # Answer tokens are at positions [prompt_len, prompt_len+1, ..., prompt_len+answer_len-1]
     # They are predicted by logits at positions [prompt_len-1, ..., prompt_len+answer_len-2]
-    answer_logits = logits[0, prompt_len - 1:prompt_len + answer_len - 1, :]  # [answer_len, vocab]
+    answer_logits = logits[
+        0, prompt_len - 1 : prompt_len + answer_len - 1, :
+    ]  # [answer_len, vocab]
     log_probs = F.log_softmax(answer_logits.float(), dim=-1)  # [answer_len, vocab]
 
     # Gather log-probs for actual answer tokens
@@ -126,15 +131,15 @@ def evaluate_retrieval(model, tokenizer, prompts, max_time_secs=None):
         candidates = [p["correct_answer"]] + p["distractor_answers"]
         scores = []
         for cand in candidates:
-            total_lp, avg_lp = score_answer_logprob(
-                model, tokenizer, p["prompt"], cand
+            total_lp, avg_lp = score_answer_logprob(model, tokenizer, p["prompt"], cand)
+            scores.append(
+                {
+                    "answer": cand,
+                    "total_logprob": total_lp,
+                    "avg_logprob": avg_lp,
+                    "is_correct": cand == p["correct_answer"],
+                }
             )
-            scores.append({
-                "answer": cand,
-                "total_logprob": total_lp,
-                "avg_logprob": avg_lp,
-                "is_correct": cand == p["correct_answer"],
-            })
 
         # Sort by total log-prob (higher = better)
         scores.sort(key=lambda x: x["total_logprob"], reverse=True)
@@ -148,23 +153,25 @@ def evaluate_retrieval(model, tokenizer, prompts, max_time_secs=None):
 
         prompt_elapsed = time.time() - t0
         print(
-            f"  Prompt {i+1}/{len(prompts)}: {'✓' if hit else '✗'} "
+            f"  Prompt {i + 1}/{len(prompts)}: {'✓' if hit else '✗'} "
             f"query={p['query_key'][:20]:20s} "
             f"correct_lp={correct_score:.2f} margin={margin:+.2f} "
             f"({prompt_elapsed:.0f}s elapsed)",
             flush=True,
         )
 
-        results.append({
-            "seed": p["seed"],
-            "query_key": p["query_key"],
-            "correct_answer": p["correct_answer"],
-            "hit": hit,
-            "correct_logprob": correct_score,
-            "margin": margin,
-            "num_candidates": len(candidates),
-            "scores": scores,
-        })
+        results.append(
+            {
+                "seed": p["seed"],
+                "query_key": p["query_key"],
+                "correct_answer": p["correct_answer"],
+                "hit": hit,
+                "correct_logprob": correct_score,
+                "margin": margin,
+                "num_candidates": len(candidates),
+                "scores": scores,
+            }
+        )
 
     accuracy = correct_count / len(results) if results else 0.0
     total_time = time.time() - t0
@@ -180,13 +187,16 @@ def evaluate_retrieval(model, tokenizer, prompts, max_time_secs=None):
 def capture_manifest():
     """Capture provenance metadata."""
     import platform
+
     try:
         sha = subprocess.check_output(
             ["git", "rev-parse", "HEAD"], stderr=subprocess.DEVNULL, text=True
         ).strip()
-        dirty = bool(subprocess.check_output(
-            ["git", "status", "--porcelain"], stderr=subprocess.DEVNULL, text=True
-        ).strip())
+        dirty = bool(
+            subprocess.check_output(
+                ["git", "status", "--porcelain"], stderr=subprocess.DEVNULL, text=True
+            ).strip()
+        )
     except Exception:
         sha, dirty = "unknown", False
     return {
@@ -207,12 +217,11 @@ def main():
     parser.add_argument("--num-prompts", type=int, default=10)
     parser.add_argument("--context-length", type=int, default=256)
     parser.add_argument("--num-keys", type=int, default=5)
-    parser.add_argument("--gdn2", action="store_true",
-                        help="Swap layer 0 to GDN-2 + adapt before eval")
-    parser.add_argument("--layers", default="0",
-                        help="Layers to swap (GDN-2 mode)")
-    parser.add_argument("--steps", type=int, default=30,
-                        help="Adaptation steps (GDN-2 mode)")
+    parser.add_argument(
+        "--gdn2", action="store_true", help="Swap layer 0 to GDN-2 + adapt before eval"
+    )
+    parser.add_argument("--layers", default="0", help="Layers to swap (GDN-2 mode)")
+    parser.add_argument("--steps", type=int, default=30, help="Adaptation steps (GDN-2 mode)")
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--csv", action="store_true")
     args = parser.parse_args()
@@ -222,58 +231,72 @@ def main():
 
     print(f"=== RULER Multi-Key Retrieval ({tag}) ===", flush=True)
     print(f"Model: {args.model}", flush=True)
-    print(f"Prompts: {args.num_prompts}, ctx: {args.context_length}, keys: {args.num_keys}", flush=True)
+    print(
+        f"Prompts: {args.num_prompts}, ctx: {args.context_length}, keys: {args.num_keys}",
+        flush=True,
+    )
     if args.gdn2:
         print(f"GDN-2 swap: layers {layer_indices}, {args.steps} steps, lr={args.lr}", flush=True)
 
     # ── Generate prompts ──
     print("\n--- Generating prompts ---", flush=True)
-    prompts = generate_prompts(
-        args.num_prompts, args.context_length, args.num_keys
-    )
+    prompts = generate_prompts(args.num_prompts, args.context_length, args.num_keys)
 
-    print(f"Generated {len(prompts)} prompts "
-          f"(~{prompts[0]['est_tokens']} tokens each, {prompts[0]['num_keys']} keys)",
-          flush=True)
+    print(
+        f"Generated {len(prompts)} prompts "
+        f"(~{prompts[0]['est_tokens']} tokens each, {prompts[0]['num_keys']} keys)",
+        flush=True,
+    )
 
     # ── Load model ──
     print("\n--- Loading model ---", flush=True)
-    from transformers import AutoTokenizer, AutoModelForCausalLM
+    from transformers import AutoModelForCausalLM, AutoTokenizer
+
     tokenizer = AutoTokenizer.from_pretrained(args.model)
     model = AutoModelForCausalLM.from_pretrained(
-        args.model, dtype=torch.bfloat16, device_map="cpu",
+        args.model,
+        dtype=torch.bfloat16,
+        device_map="cpu",
     )
     model.eval()
 
     # ── GDN-2 swap + adaptation ──
     if args.gdn2:
-        print(f"\n--- GDN-2 swap + isolated adaptation ---", flush=True)
+        print("\n--- GDN-2 swap + isolated adaptation ---", flush=True)
 
         # Capture GDN-1 reference I/O for isolated training
         from gdn2_swap import ADAPTATION_TEXT
-        adapt_ids = tokenizer(ADAPTATION_TEXT, return_tensors="pt",
-                              truncation=True, max_length=64)["input_ids"]
+
+        adapt_ids = tokenizer(ADAPTATION_TEXT, return_tensors="pt", truncation=True, max_length=64)[
+            "input_ids"
+        ]
         captured = {}
 
         def make_pre_hook(idx):
             def pre_fn(mod, fn_args, fn_kwargs):
                 hs = fn_args[0] if fn_args else fn_kwargs.get("hidden_states")
                 captured.setdefault(idx, {})["input"] = hs.detach().clone()
+
             return pre_fn
 
         def make_post_hook(idx):
             def post_fn(mod, fn_args, fn_kwargs, out):
                 captured.setdefault(idx, {})["output"] = out.detach().clone()
+
             return post_fn
 
         handles = []
         for idx in layer_indices:
             handles.append(
                 model.model.layers[idx].linear_attn.register_forward_pre_hook(
-                    make_pre_hook(idx), with_kwargs=True))
+                    make_pre_hook(idx), with_kwargs=True
+                )
+            )
             handles.append(
                 model.model.layers[idx].linear_attn.register_forward_hook(
-                    make_post_hook(idx), with_kwargs=True))
+                    make_post_hook(idx), with_kwargs=True
+                )
+            )
 
         with torch.no_grad():
             model(input_ids=adapt_ids, use_cache=False)
@@ -308,19 +331,24 @@ def main():
             torch.nn.utils.clip_grad_norm_(trainable, max_norm=1.0)
             optimizer.step()
             if step == 0 or (step + 1) % 10 == 0:
-                print(f"  Adapt step {step+1}/{args.steps}: "
-                      f"mse={loss.item():.6f} ({time.time()-t0:.1f}s)", flush=True)
+                print(
+                    f"  Adapt step {step + 1}/{args.steps}: "
+                    f"mse={loss.item():.6f} ({time.time() - t0:.1f}s)",
+                    flush=True,
+                )
 
         model.eval()
-        print(f"Adaptation complete ({time.time()-t0:.1f}s)", flush=True)
+        print(f"Adaptation complete ({time.time() - t0:.1f}s)", flush=True)
 
     # ── Run retrieval evaluation ──
     print(f"\n--- Retrieval evaluation ({tag}) ---", flush=True)
     results = evaluate_retrieval(model, tokenizer, prompts, max_time_secs=2400)
 
     print(f"\n=== {tag.upper()} Results ===", flush=True)
-    print(f"Accuracy: {results['accuracy']:.1%} "
-          f"({results['num_correct']}/{results['num_prompts']})", flush=True)
+    print(
+        f"Accuracy: {results['accuracy']:.1%} ({results['num_correct']}/{results['num_prompts']})",
+        flush=True,
+    )
     print(f"Total time: {results['total_time_s']:.0f}s", flush=True)
 
     # ── Output results JSON ──
@@ -340,7 +368,9 @@ def main():
             "layers": layer_indices,
             "steps": args.steps,
             "lr": args.lr,
-        } if args.gdn2 else None,
+        }
+        if args.gdn2
+        else None,
         "details": results["details"],
         "manifest": manifest,
     }
@@ -356,9 +386,11 @@ def main():
         with open(csv_path, "w") as f:
             f.write("prompt_idx,seed,query_key,correct_answer,hit,correct_logprob,margin\n")
             for i, d in enumerate(results["details"]):
-                f.write(f"{i+1},{d['seed']},{d['query_key']},"
-                        f"{d['correct_answer']},{int(d['hit'])},"
-                        f"{d['correct_logprob']:.4f},{d['margin']:.4f}\n")
+                f.write(
+                    f"{i + 1},{d['seed']},{d['query_key']},"
+                    f"{d['correct_answer']},{int(d['hit'])},"
+                    f"{d['correct_logprob']:.4f},{d['margin']:.4f}\n"
+                )
         print(f"\nCSV: {csv_path}", flush=True)
 
         manifest_dir = "results/manifests"

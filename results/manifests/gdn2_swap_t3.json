@@ -1,10 +1,18 @@
 {
-  "git_sha": "06f3a9fd805240fdaf216c49917e9d05d9d82526",
-  "git_dirty": true,
-  "device": "t3",
-  "machine": "aarch64",
-  "processor": "aarch64",
+  "manifest_version": 1,
+  "run_id": "gdn2_swap_t3_06f3a9f",
+  "timestamp_utc": "2026-08-09T19:43:13Z",
+  "source": "bench/gdn2_swap.py",
+  "git": {
+    "sha": "06f3a9fd805240fdaf216c49917e9d05d9d82526",
+    "dirty": true
+  },
+  "host": {
+    "hostname": "t3",
+    "machine": "aarch64",
+    "processor": "aarch64"
+  },
   "python": "3.10.12",
   "torch": "2.5.0",
-  "timestamp": "20260809T194313Z"
+  "device": "t3"
 }

@@ -1,10 +1,18 @@
 {
-  "git_sha": "1743c3e0fd5efbba615e50718465ea9d7d7b9c66",
-  "git_dirty": true,
-  "device": "t3",
-  "machine": "aarch64",
-  "processor": "aarch64",
+  "manifest_version": 1,
+  "run_id": "ruler_gdn1_t3_1743c3e",
+  "timestamp_utc": "2026-08-09T20:19:05Z",
+  "source": "bench/gdn2_ruler.py",
+  "git": {
+    "sha": "1743c3e0fd5efbba615e50718465ea9d7d7b9c66",
+    "dirty": true
+  },
+  "host": {
+    "hostname": "t3",
+    "machine": "aarch64",
+    "processor": "aarch64"
+  },
   "python": "3.10.12",
   "torch": "2.5.0",
-  "timestamp": "20260809T201905Z"
+  "device": "t3"
 }
