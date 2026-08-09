@@ -227,6 +227,51 @@ class TestDetectCsvType:
         cols = ["kernel", "shape", "p50_us", "gib_per_s_p50"]
         assert detect_csv_type(cols) == "kleidiai_gdn_kernel"
 
+    def test_ctx_sweep_detected(self):
+        """Context-length sweep CSV should be detected (most common CSV type)."""
+        cols = ["model", "ctx_len", "gdn_layer_us", "full_attn_us", "kv_cache_mb"]
+        assert detect_csv_type(cols) == "ctx_sweep"
+
+    def test_ctx_sweep_minimal_cols(self):
+        """Detection only needs the four key columns."""
+        cols = ["ctx_len", "gdn_layer_us", "full_attn_us", "kv_cache_mb"]
+        assert detect_csv_type(cols) == "ctx_sweep"
+
+    def test_e2e_decode_detected(self):
+        """E2E decode CSV should be detected."""
+        cols = ["tok_per_sec_mean", "gdn_proj_pct", "ffn_pct"]
+        assert detect_csv_type(cols) == "e2e_decode"
+
+    def test_thermal_stress_detected(self):
+        """Thermal stress test CSV should be detected."""
+        cols = ["iteration", "tok_per_sec", "thermal_zone1_C", "elapsed_s"]
+        assert detect_csv_type(cols) == "thermal_stress"
+
+    def test_prefill_gemm_detected(self):
+        """Prefill GEMM CSV should be detected."""
+        cols = ["prefill_M", "ttft_ms", "tok_per_sec_prefill"]
+        assert detect_csv_type(cols) == "prefill_gemm"
+
+    def test_prefill_ab_detected(self):
+        """Prefill A/B comparison CSV should be detected."""
+        cols = ["variant", "prefill_len", "ttft_s", "prefill_tps"]
+        assert detect_csv_type(cols) == "prefill_ab"
+
+    def test_quant_comparison_detected(self):
+        """Quantization comparison CSV should be detected."""
+        cols = ["variant", "tok_per_sec", "ffn_pct", "gdn_proj_pct"]
+        assert detect_csv_type(cols) == "quant_comparison"
+
+    def test_quant_accuracy_detected(self):
+        """Quantization accuracy CSV should be detected."""
+        cols = ["quant_variant", "matrix", "cos_sim", "rel_err_pct"]
+        assert detect_csv_type(cols) == "quant_accuracy"
+
+    def test_cross_tool_comparison_detected(self):
+        """Cross-tool comparison CSV should be detected."""
+        cols = ["engine", "quant", "test", "n_tokens", "avg_ts"]
+        assert detect_csv_type(cols) == "cross_tool_comparison"
+
 
 # ---------------------------------------------------------------------------
 # expected_columns
