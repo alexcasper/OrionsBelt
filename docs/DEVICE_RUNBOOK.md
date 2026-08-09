@@ -150,6 +150,13 @@ scp scripts/capture_manifest.sh <device>:/tmp/
 ssh <device> 'bash /tmp/capture_manifest.sh' > results/manifests/<device>.json
 ```
 
+> **Naming:** When running multiple kernel variants from the same device
+> (e.g. SDOT, NEON, INT4+SDOT), each variant's manifest must be named to match
+> the CSV base name so `validate_bench_csvs.sh` can find it. The validator strips
+> `_big`/`_little`/`_singlethread` suffixes, so `rk3588-t4_sdot_08b_big.csv`
+> looks for `rk3588-t4_sdot_08b.json`. Use the CSV's base name (minus the cluster
+> suffix) as the manifest filename, not a descriptive name like `sdot_int8.json`.
+
 If there is no Python at all and no bash, capture the equivalent by hand:
 
 ```bash
