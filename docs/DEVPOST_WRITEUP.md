@@ -166,6 +166,8 @@ INT8×INT8→int32 dot-product acceleration on dotprod-capable cores) yields a
 | C: + SDOT INT8 GEMV | **28.9** | **3.34** | — | — |
 | C: + INT4+SDOT hybrid | **37.21** | **4.43** | — | — |
 
+![Decode optimization stack on RK3588 Cortex-A76](../results/figures/optimization_stack.png)
+
 The optimization stack is pure memory-system engineering — no algorithmic
 changes to the model. GDN's novel recurrent kernels (conv, decay, scan)
 remain <1% of decode time; the bottleneck is weight-loading matmuls (FFN

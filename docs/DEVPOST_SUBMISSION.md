@@ -112,6 +112,8 @@ On dotprod-capable cores (A76, A720), the Arm `vdotq_lane_s32` instruction compu
 
 > SDOT nearly doubles 4B throughput (83% of the 4.5 tok/s theoretical ceiling) and triples 0.8B throughput. The speedup is larger for 0.8B because its smaller weight set (~0.41 GiB INT8) partially fits in the A76 cluster's shared L3, making it more compute-bound — where SDOT's 5× instruction reduction has the most leverage. **INT4+SDOT** pushes further by halving weight memory traffic (4-bit packing with on-the-fly nibble unpack into SDOT's int8 pipeline), adding 1.27× on A76 big cores — but is slightly slower on A55 little cores where the unpack overhead exceeds the bandwidth savings. Cross-validated on two independent RK3588 nodes (t3, t4): agreement within 5%. Full analysis: [FINDINGS §33, §34](../docs/FINDINGS.md), data: `results/raw/rk3588-t4_sdot_*.csv`, `results/raw/rk3588-t4_int4sdot_*.csv`.
 
+![Decode optimization stack — RK3588 Cortex-A76](../results/figures/optimization_stack.png)
+
 ### Memory: the architectural advantage
 
 | Context | Weights (fp16) | KV cache | GDN state | Total | If all-attn | **Savings** |
