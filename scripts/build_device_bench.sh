@@ -93,7 +93,6 @@ build_matmul orion_a720  "-mcpu=cortex-a720"
 build_e2e() {
     local name="$1" flags="$2"
     if $CC -O3 -fopenmp $flags -static \
-        -Wno-aggressive-loop-optimizations \
         "$K/gdn_sve.c" "$K/gdn_delta_matmul.c" "$K/gdn_e2e_decode.c" \
         -I"$K" -o "$OUT/bench_gdn_e2e_decode_$name" -lm 2>/dev/null; then
         printf "  %-14s %-40s %s bytes\n" "e2e_$name" "$flags" \
@@ -119,7 +118,6 @@ build_e2e orion_a720  "-mcpu=cortex-a720"
 build_e2e_08b() {
     local name="$1" flags="$2"
     if $CC -O3 -fopenmp $flags -static -DMODEL_08B \
-        -Wno-aggressive-loop-optimizations \
         "$K/gdn_sve.c" "$K/gdn_delta_matmul.c" "$K/gdn_e2e_decode.c" \
         -I"$K" -o "$OUT/bench_gdn_e2e_decode_08b_$name" -lm 2>/dev/null; then
         printf "  %-14s %-40s %s bytes\n" "e2e_08b_$name" "$flags" \
@@ -143,7 +141,6 @@ build_e2e_08b orion_a720  "-mcpu=cortex-a720"
 build_e2e_int8() {
     local name="$1" flags="$2"
     if $CC -O3 -fopenmp $flags -static -DINT8_WEIGHTS \
-        -Wno-aggressive-loop-optimizations \
         "$K/gdn_sve.c" "$K/gdn_delta_matmul.c" "$K/gdn_e2e_decode.c" \
         -I"$K" -o "$OUT/bench_gdn_e2e_decode_${name}_int8" -lm 2>/dev/null; then
         printf "  %-14s %-40s %s bytes\n" "e2e_${name}_int8" "$flags" \
@@ -157,7 +154,6 @@ build_e2e_int8() {
 build_e2e_08b_int8() {
     local name="$1" flags="$2"
     if $CC -O3 -fopenmp $flags -static -DMODEL_08B -DINT8_WEIGHTS \
-        -Wno-aggressive-loop-optimizations \
         "$K/gdn_sve.c" "$K/gdn_delta_matmul.c" "$K/gdn_e2e_decode.c" \
         -I"$K" -o "$OUT/bench_gdn_e2e_decode_08b_${name}_int8" -lm 2>/dev/null; then
         printf "  %-14s %-40s %s bytes\n" "e2e_08b_${name}_int8" "$flags" \
