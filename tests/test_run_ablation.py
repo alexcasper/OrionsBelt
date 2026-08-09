@@ -196,3 +196,47 @@ class TestMain:
             ]
         )
         assert rc == 0
+
+
+# ---------------------------------------------------------------------------
+# Coverage gap tests (ob-eek)
+# ---------------------------------------------------------------------------
+
+
+class TestWriteManifestForRows:
+    def test_empty_rows_returns_none(self):
+        """_write_manifest_for_rows returns None for empty rows list."""
+        from scripts.run_ablation import _write_manifest_for_rows
+        from bench.harness import SweepConfig
+
+        config = SweepConfig(
+            context_lengths=[4096],
+            warmup_count=1,
+            repeat_count=5,
+            decode_length=20,
+        )
+        result = _write_manifest_for_rows([], config)
+        assert result is None
+
+
+class TestMainEntryRunpy:
+    def test_main_via_runpy(self, tmp_path, monkeypatch):
+        """Running as __main__ via runpy covers the __main__ guard."""
+        import runpy
+
+        monkeypatch.setattr(
+            "sys.argv",
+            [
+                "run_ablation.py",
+                "--context", "4096",
+                "--warmup", "1",
+                "--repeats", "5",
+                "--output-dir", str(tmp_path / "ablation"),
+                "--table-output", str(tmp_path / "table.md"),
+            ],
+        )
+        script_path = str(Path(__file__).resolve().parent.parent / "scripts" / "run_ablation.py")
+        import pytest as _pt
+        with _pt.raises(SystemExit) as exc_info:
+            runpy.run_path(script_path, run_name="__main__")
+        assert exc_info.value.code == 0
