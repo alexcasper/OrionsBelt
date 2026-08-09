@@ -958,7 +958,7 @@ timing should ever appear in a result table. QEMU's legitimate role in this proj
 | **NEON kernel throughput** — the path most deployed Arm devices actually run | SVE/SVE2 throughput (absent on most Armv8; needs Armv9 or an SVE-capable Armv8) |
 | **Achieved memory bandwidth** vs device spec — the bandwidth-bound thesis | i8mm int8 matmul (Armv8.6-A and later only) |
 | **The memory decomposition** — KV cache vs recurrent state, which is architecture-independent and is the project's central claim | CIX NPU operator execution, Immortalis GPU compute |
-| **Prefill vs decode asymmetry** | Engine-boundary dispatch latency (`ob-t3b.3`) |
+| **Prefill vs decode asymmetry** | O6-specific engine-boundary dispatch latency (portable proxy measured on Mali-G610, see [§39](#39-engine-boundary-crossing-cost-portable-proxy-measurement-on-mali-g610-2026-08-09-ob-t3b6)) |
 | **big.LITTLE affinity effects**, where the device has asymmetric clusters | Arm Performix standardised reporting on the O6 |
 
 The middle row is the important one: the KV-cache-versus-recurrent-state result does not depend on
@@ -5351,3 +5351,89 @@ absent), not hardware. With SDOT enabled on both devices, the pure-GDN
 cross-device agreement is 3–5%, matching the FP32 baseline. The headline
 comparison table and cross-device figures should use the SDOT INT8 data
 (`rk3588-t3_big_int8_sdot_*` CSVs) for t3.
+
+## 39. Engine boundary-crossing cost: portable proxy measurement on Mali-G610 (2026-08-09, ob-t3b.6)
+
+### Motivation
+
+In a 3:1 hybrid GDN deployment (24 GDN layers on CPU, 8 full-attention layers on
+GPU/NPU), the hidden state crosses the CPU↔GPU boundary at every layer handoff —
+up to 16 times per decoded token. The cost of these crossings was previously
+listed as "not measurable without newer/other hardware" (§what-we-can/can't-measure
+table above). ADR 0005 designates the RK3588 Mali-G610 as a valid development proxy
+for the O6's Immortalis-G720 (same Arm GPU vendor family, different generation), so
+the measurement methodology and relative cost structure can be established now.
+
+### Setup
+
+OpenCL micro-benchmark (`gpu/boundary_crossing_bench.c`) using the RustiCL/Panfrost
+open-source driver stack on RK3588 t4. Governor: performance. Thermals: ~40°C.
+Payloads span 512B to 1MB, with targeted sizes matching decode-time tensors:
+- **5KB** = hidden_size 2560 × fp16 (the per-layer hidden state)
+- **10KB** = hidden_size 2560 × fp32 (double-precision variant)
+
+Each measurement is the p50 of 100 repeats. Three transfer modes measured:
+blocking write (host→device), blocking read (device→host), and round-trip
+(write + read + clFinish).
+
+### Results
+
+| Payload | Write p50 (ms) | Read p50 (ms) | Round-trip p50 (ms) | Write BW (MiB/s) |
+|---|---:|---:|---:|---:|
+| 512B | 0.258 | 0.250 | 0.207 | 1.9 |
+| 1KB | 0.102 | 0.103 | 0.205 | 9.6 |
+| **5KB (hidden fp16)** | **0.102** | **0.105** | **0.207** | **48.1** |
+| 10KB (hidden fp32) | 0.103 | 0.109 | 0.212 | 95.1 |
+| 50KB | 0.108 | 0.137 | 0.246 | 453.7 |
+| 100KB | 0.112 | 0.169 | 0.284 | 871.9 |
+| 1MB | 0.217 | 0.838 | 1.165 | 4601.8 |
+
+**16 crossings (5KB round-trip simulation): 3.36 ms total.**
+
+### Analysis: latency-dominated, not bandwidth-dominated
+
+The dominant cost for decode-sized payloads is **per-call dispatch overhead (~0.1 ms)**,
+not data transfer. Evidence:
+
+1. **Flat latency floor**: Write latency is ~0.10 ms from 1KB through 100KB — a 100×
+   payload increase adds only ~10% more time. The ~0.1 ms is the OpenCL dispatch +
+   `clFinish` overhead, independent of payload size.
+
+2. **Tiny achieved bandwidth at decode payloads**: For the 5KB hidden state, achieved
+   write bandwidth is only 48 MiB/s — less than 1% of the Mali-G610's theoretical
+   memory bandwidth. The bottleneck is dispatch latency, not the memory bus.
+
+3. **Read/write asymmetry emerges at scale**: Below 50KB, read and write latencies are
+   nearly identical (~0.1 ms). At 1MB, read (0.84 ms) is 4× slower than write (0.22 ms),
+   suggesting write buffering pipelines the transfer while read must wait for completion.
+
+4. **Round-trip ≈ write + read**: Round-trip times closely match the sum of individual
+   write + read times, confirming no hidden pipelining benefit when crossings are sequential.
+
+### Impact on the heterogeneous dispatch budget
+
+At the project's 30 tokens/s decode target (33.3 ms/token budget):
+
+| Cost component | Time | % of token budget |
+|---|---|---|
+| 16 boundary crossings (5KB each) | 3.36 ms | 10.1% |
+| Remaining for compute | 29.9 ms | 89.9% |
+
+The 10% crossing tax is **significant but not prohibitive**. It means a heterogeneous
+deployment must deliver >11% speedup from GPU/NPU offload just to break even against
+the crossing overhead. The optimization implication is to **minimize crossing count**
+(structural: fewer layer handoffs) rather than payload size (each crossing costs ~0.1 ms
+regardless of whether the tensor is 1KB or 100KB).
+
+### Caveats and transferability
+
+- **Driver stack matters**: These numbers are from the open-source RustiCL/Panfrost
+  stack, not a vendor blob. The O6's Immortalis-G720 will use a different driver, so
+  absolute latency will differ. The *cost structure* (latency-dominated for small
+  payloads, dispatch overhead as the floor) is expected to transfer.
+- **O6 re-run needed**: ob-t3b.3 on the O6 will measure the same metrics on the actual
+  target hardware. The methodology and benchmark code transfer directly — it is a
+  re-run, not a from-scratch effort.
+- **No profiling events**: The RustiCL/Panfrost stack does not expose OpenCL profiling
+  events (CL_PROFILING), so GPU-side timing was unavailable. All measurements are
+  host-side wall-clock with blocking calls.
