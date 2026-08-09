@@ -27,6 +27,7 @@ from scripts.validate_results import (  # noqa: E402
     STANDARD_COLS,
     SUSTAINED_COLS,
     Issue,
+    check_ablation_manifests,
     check_manifest_exists,
     check_readme_counts,
     detect_csv_type,
@@ -1529,3 +1530,69 @@ class TestValidateCtxSweepRow:
         issues = []
         validate_ctx_sweep_row(_ctx_sweep_row(gdn_layer_us="not_a_number"), "test.csv", issues, 2)
         assert any("cannot parse" in i.message for i in issues)
+
+
+# ---------------------------------------------------------------------------
+# check_ablation_manifests
+# ---------------------------------------------------------------------------
+
+
+class TestCheckAblationManifests:
+    """Tests for ablation CSV manifest_ref validation."""
+
+    def test_valid_manifest_ref(self, tmp_path):
+        """An existing manifest_ref file should produce a NOTE, not a WARNING."""
+        ablation_dir = tmp_path / "ablation"
+        ablation_dir.mkdir()
+        manifest = tmp_path / "manifest.json"
+        manifest.write_text("{}")
+
+        csv_path = ablation_dir / "ablation_test.csv"
+        csv_path.write_text(f"metric_name,manifest_ref\nfoo,{manifest}\n")
+
+        issues = []
+        check_ablation_manifests(str(ablation_dir), issues)
+        assert any("manifest_ref OK" in i.message and i.severity == "NOTE" for i in issues)
+        assert not any(i.severity == "WARNING" for i in issues)
+
+    def test_missing_manifest_ref(self, tmp_path):
+        """A manifest_ref pointing to a non-existent file should produce a WARNING."""
+        ablation_dir = tmp_path / "ablation"
+        ablation_dir.mkdir()
+
+        csv_path = ablation_dir / "ablation_test.csv"
+        csv_path.write_text("metric_name,manifest_ref\nfoo,/nonexistent/manifest.json\n")
+
+        issues = []
+        check_ablation_manifests(str(ablation_dir), issues)
+        assert any("MISSING" in i.message and i.severity == "WARNING" for i in issues)
+
+    def test_no_manifest_ref_column(self, tmp_path):
+        """A CSV without manifest_ref column should produce no issues."""
+        ablation_dir = tmp_path / "ablation"
+        ablation_dir.mkdir()
+
+        csv_path = ablation_dir / "ablation_test.csv"
+        csv_path.write_text("metric_name,value\nfoo,42\n")
+
+        issues = []
+        check_ablation_manifests(str(ablation_dir), issues)
+        assert issues == []
+
+    def test_nonexistent_dir(self):
+        """A non-existent directory should return without error."""
+        issues = []
+        check_ablation_manifests("/nonexistent/path/xyz", issues)
+        assert issues == []
+
+    def test_empty_manifest_ref_skipped(self, tmp_path):
+        """Empty manifest_ref values should be skipped (no issue)."""
+        ablation_dir = tmp_path / "ablation"
+        ablation_dir.mkdir()
+
+        csv_path = ablation_dir / "ablation_test.csv"
+        csv_path.write_text("metric_name,manifest_ref\nfoo,\n")
+
+        issues = []
+        check_ablation_manifests(str(ablation_dir), issues)
+        assert issues == []
