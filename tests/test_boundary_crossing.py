@@ -7,6 +7,7 @@ Validates:
 - Result plausibility (latency floor, scaling, 16-crossing total)
 - Manifest presence
 """
+
 import csv
 import json
 import os
@@ -16,9 +17,7 @@ import pytest
 RESULTS_DIR = os.path.join(os.path.dirname(__file__), "..", "results", "raw")
 MANIFEST_DIR = os.path.join(os.path.dirname(__file__), "..", "results", "manifests")
 CSV_PATH = os.path.join(RESULTS_DIR, "rk3588-t4_gpu_boundary_crossing.csv")
-MANIFEST_PATH = os.path.join(
-    MANIFEST_DIR, "rk3588-t4_gpu_boundary_crossing.json"
-)
+MANIFEST_PATH = os.path.join(MANIFEST_DIR, "rk3588-t4_gpu_boundary_crossing.json")
 
 _HAS_CSV = os.path.isfile(CSV_PATH)
 
@@ -54,9 +53,7 @@ class TestBoundaryCrossingCSV:
         rows = _load_csv()
         expected_cols = {"kernel", "dim1", "dim2", "dim3", "p50_ms", "p95_ms", "bw_mibs"}
         actual_cols = set(rows[0].keys())
-        assert expected_cols <= actual_cols, (
-            f"Missing columns: {expected_cols - actual_cols}"
-        )
+        assert expected_cols <= actual_cols, f"Missing columns: {expected_cols - actual_cols}"
 
     def test_has_write_blocking_rows(self):
         rows = _load_csv()
@@ -76,18 +73,14 @@ class TestBoundaryCrossingCSV:
     def test_has_n_crossings_row(self):
         rows = _load_csv()
         crossing_rows = _find_rows(rows, "n_crossings")
-        assert len(crossing_rows) == 1, (
-            f"Expected 1 n_crossings row, got {len(crossing_rows)}"
-        )
+        assert len(crossing_rows) == 1, f"Expected 1 n_crossings row, got {len(crossing_rows)}"
         assert crossing_rows[0]["dim1"] == "16"
 
     def test_has_5kb_payload(self):
         """The critical decode-time payload (hidden_size=2560 fp16 = 5KB)."""
         rows = _load_csv()
         payload_rows = [r for r in rows if "5KB" in r.get("dim1", "")]
-        assert len(payload_rows) >= 3, (
-            f"Expected ≥3 rows for 5KB payload, got {len(payload_rows)}"
-        )
+        assert len(payload_rows) >= 3, f"Expected ≥3 rows for 5KB payload, got {len(payload_rows)}"
 
 
 # ---------------------------------------------------------------------------
@@ -128,8 +121,7 @@ class TestBoundaryCrossingPlausibility:
         crossing_rows = _find_rows(rows, "n_crossings")
         total_ms = self._ms(crossing_rows[0])
         assert total_ms < 50.0, (
-            f"16 crossings total {total_ms:.1f}ms exceeds 50ms — "
-            "suspicious for 5KB payloads"
+            f"16 crossings total {total_ms:.1f}ms exceeds 50ms — suspicious for 5KB payloads"
         )
 
     def test_16_crossings_total_over_1ms(self):
@@ -137,22 +129,14 @@ class TestBoundaryCrossingPlausibility:
         rows = _load_csv()
         crossing_rows = _find_rows(rows, "n_crossings")
         total_ms = self._ms(crossing_rows[0])
-        assert total_ms > 1.0, (
-            f"16 crossings total {total_ms:.3f}ms unexpectedly low"
-        )
+        assert total_ms > 1.0, f"16 crossings total {total_ms:.3f}ms unexpectedly low"
 
     def test_5kb_write_under_1ms(self):
         """5KB write should be sub-millisecond (dispatch-overhead dominated)."""
         rows = _load_csv()
-        wr_5kb = [
-            self._ms(r)
-            for r in _find_rows(rows, "write_blocking")
-            if "5KB" in r["dim1"]
-        ]
+        wr_5kb = [self._ms(r) for r in _find_rows(rows, "write_blocking") if "5KB" in r["dim1"]]
         assert wr_5kb, "No 5KB write_blocking row found"
-        assert wr_5kb[0] < 1.0, (
-            f"5KB write {wr_5kb[0]:.3f}ms exceeds 1ms — unexpectedly high"
-        )
+        assert wr_5kb[0] < 1.0, f"5KB write {wr_5kb[0]:.3f}ms exceeds 1ms — unexpectedly high"
 
 
 # ---------------------------------------------------------------------------
@@ -165,9 +149,7 @@ class TestBoundaryCrossingManifest:
     """Validate provenance manifest."""
 
     def test_manifest_exists(self):
-        assert os.path.isfile(MANIFEST_PATH), (
-            f"Manifest not found at {MANIFEST_PATH}"
-        )
+        assert os.path.isfile(MANIFEST_PATH), f"Manifest not found at {MANIFEST_PATH}"
 
     def test_manifest_has_git_sha(self):
         with open(MANIFEST_PATH) as f:
@@ -180,9 +162,7 @@ class TestBoundaryCrossingManifest:
         with open(MANIFEST_PATH) as f:
             manifest = json.load(f)
         host = manifest.get("host", {})
-        assert "core_count" in host or "cpu_model" in host, (
-            "Manifest missing host information"
-        )
+        assert "core_count" in host or "cpu_model" in host, "Manifest missing host information"
 
     def test_manifest_device_is_rk3588(self):
         """The manifest should reflect the RK3588-t4 device."""
@@ -194,6 +174,4 @@ class TestBoundaryCrossingManifest:
         cpu_top = host.get("cpu_topology", [])
         if cpu_top:
             # RK3588 has 8 cores
-            assert len(cpu_top) == 8, (
-                f"Expected 8 CPU cores for RK3588, got {len(cpu_top)}"
-            )
+            assert len(cpu_top) == 8, f"Expected 8 CPU cores for RK3588, got {len(cpu_top)}"
