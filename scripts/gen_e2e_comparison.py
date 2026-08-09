@@ -307,8 +307,9 @@ def generate_table(data, base_commit=None, commit_info=None):
         # Fallback (no --base-commit given): cross-reference manifests for dirty status
         any_dirty, all_checked = _check_manifest_dirty(all_manifests)
         if any_dirty:
-            lines.append("> ⚠️ **Commit mismatch with dirty manifests.** Some runs had")
-            lines.append("> uncommitted changes — data is NOT comparable (RESULTS DISCIPLINE).")
+            lines.append("> ⚠️ **Multiple commits with some dirty manifests.** Some runs had")
+            lines.append("> uncommitted changes (marked ⚠ dirty per-row below) — typically result")
+            lines.append("> files written before commit, not kernel code changes. Verify per-entry.")
         elif all_checked:
             lines.append("> ℹ️ **Multiple commits in play**, but all manifests show `dirty=false`.")
             lines.append("> SHAs differ only due to result-file commits between runs — the")

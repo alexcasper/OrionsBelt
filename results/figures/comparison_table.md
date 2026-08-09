@@ -217,6 +217,21 @@ t4 = 8 tokens (re-run, see per-row manifest for details).
 > sensitive to board-level compute differences.
 > See FINDINGS.md "INT8 weight-only quantization" section for full analysis.
 
+**After SDOT INT8 GEMV kernel (commit `dccee52`, §33/§38):**
+
+| Device | Model | Quant | tok/s | TTFT (ms) | Git SHA | Manifest |
+|---|---|---|---:|---:|---|---|
+| rk3588-t3 | 4B   | INT8+SDOT | 3.34 | 300 | `a6d21df` | `rk3588-t3_big_int8_sdot_e2e.json` |
+| rk3588-t4 | 4B   | INT8+SDOT | 3.37 | 296 | `be4d3ca` | `rk3588-t4_e2e_ctxsweep_int8_puregdn_4t.json` |
+| rk3588-t3 | 0.8B | INT8+SDOT | 28.94 | 35 | `a6d21df` | `rk3588-t3_08b_big_int8_sdot_e2e.json` |
+| rk3588-t4 | 0.8B | INT8+SDOT | 29.25 | 34 | `be4d3ca` | `rk3588-t4_e2e_ctxsweep_08b_int8_puregdn_4t.json` |
+
+> The SDOT (`vdotq_s32`) INT8×INT8→int32 dot-product kernel replaces the NEON
+> dequant→float32 FMA path, cutting GDN projection and FFN decode time by
+> 1.63× and 1.85× respectively. t3's pre-SDOT INT8 was 1.84 tok/s (4B) / 10.58
+> tok/s (0.8B); with SDOT, 3.34 / 28.94 — a 1.82× and 2.74× speedup. Cross-device
+> agreement tightens to 0.9% (4B) and 1.1% (0.8B). See FINDINGS §33 and §38.
+
 ## 8. OpenMP multi-threading scaling (t4)
 
 Qwen3.5-4B, prefill (seq=64), fp32, A76 big cluster.

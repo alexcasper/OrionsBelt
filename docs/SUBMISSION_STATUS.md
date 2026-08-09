@@ -26,6 +26,7 @@ ADR 0007 — the submission framing is locked to Edge AI.
 | E2E decode (matched commit) | ✓ 3 devices, 3 runs each | 4B INT8: 1.84 tok/s (t3), 0.51 (Jetson); 0.8B INT8: 10.6 (t3), 2.45 (Jetson) |
 | GEMV optimization | ✓ 14.9× speedup | 0.07→1.04 tok/s (4B FP32), dirty=false manifests |
 | INT8 weight-only quant | ✓ 1.65–1.77× on big cores | KV cache context sweep on t3+t4, <6% divergence |
+| SDOT INT8 GEMV (dotprod cores) | ✓ 1.92–3.06× over NEON INT8 | 4B: 3.34 tok/s (83% of theoretical); 0.8B: 28.9 tok/s |
 | Mixed-precision (fp16/bf16) | ✓ fp16 gives 1.77× on decay | scan compute-bound, flat under fp16 |
 | GDN-2 vs GDN-1 comparison | ✓ Microbenchmark | 1.2–1.5× decode cost on big, 2.2–2.4× on little |
 | NOE op-coverage audit | ✓ Hardware-independent | Scan rejected, Loop trap documented (both CIX NOE + RKNN) |
@@ -53,7 +54,9 @@ ADR 0007 — the submission framing is locked to Edge AI.
 | 0.8B INT8: 10.61 tok/s (t3) | same | ✓ |
 | 0.8B INT8: 2.45 tok/s (Jetson) | same | ✓ |
 | 4B INT8: 0.51 tok/s (Jetson) | same | ✓ |
-| ~26× cumulative speedup | 0.07 → 1.84 tok/s = 26.3× | ✓ |
+| 4B INT8+SDOT: 3.34 tok/s (t3) | rk3588-t3_big_int8_sdot_e2e.json | ✓ |
+| 0.8B INT8+SDOT: 28.9 tok/s (t3) | rk3588-t3_08b_big_int8_sdot_e2e.json | ✓ |
+| ~48× cumulative speedup (with SDOT) | 0.07 → 3.34 tok/s = 47.7× | ✓ |
 
 All manifests: dirty=false, governor=performance, 30 repeats (kernel) /
 3 runs (e2e), git_sha recorded.
