@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: Copyright (c) 2024-2026 OrionsBelt / Agentic AI Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 """Generate a bar chart showing the cumulative decode optimization stack on RK3588 A76.
 
 Data sourced from results/figures/comparison_table.md §7 and FINDINGS.md §33-34.
