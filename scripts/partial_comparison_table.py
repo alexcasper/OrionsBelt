@@ -113,17 +113,20 @@ PROV = {
     "jetson-j2-omp-unroll.csv": ("jetson-j2-omp-unroll_reconstructed", "152808b", True),
     "pi5-r5.csv": ("r5_20260802T201237Z_28729f3", "28729f3", True),
     "pi5-j1.csv": ("r5_20260803T083154Z_f127a11", "f127a11", True),
-    "rk3588-t3_big.csv": ("t3_20260806T053612Z_553a96e", "553a96e", False),
-    "rk3588-t3_little.csv": ("t3_20260806T053612Z_553a96e", "553a96e", False),
-    "rk3588-t4_big.csv": ("t4_20260802T211249Z_28729f3", "28729f3", True),
-    "rk3588-t4_little.csv": ("t4_20260802T211249Z_28729f3", "28729f3", True),
-    # Fleet sweep (ob-bf7): commit-matched, clean-tree, single-threaded
-    "jetson-j1-clean.csv": ("jetson-j1-clean_sweep_234807d", "234807d", False),
+    "rk3588-t3_big.csv": ("t3_20260806T163210Z_47efdf8", "47efdf8", False),
+    "rk3588-t3_little.csv": ("t3_20260806T163210Z_47efdf8", "47efdf8", False),
+    "rk3588-t4_big.csv": ("t4_20260809T141810Z_8227e98", "8227e98", True),
+    "rk3588-t4_little.csv": ("t4_20260809T141810Z_8227e98", "8227e98", True),
+    # Fleet sweep (ob-bf7): originally all at commit 234807d, clean-tree, single-thread.
+    # Some CSVs have since been re-run at later commits (GDN-2 aliasing fix,
+    # adaptive batched timing).  PROV entries below match the CURRENT manifest
+    # for each file — the "matched-commit" property is broken for j1/t3.
+    "jetson-j1-clean.csv": ("j1_20260807T230522Z_5ea3d24", "5ea3d24", True),
     "jetson-j2-clean.csv": ("jetson-j2-clean_sweep_234807d", "234807d", False),
-    "rk3588-t3-clean.csv": ("rk3588-t3-clean_sweep_234807d", "234807d", False),
+    "rk3588-t3-clean.csv": ("t3_20260810T004752Z_686fdfd", "686fdfd", True),
     "rk3588-t3-little-clean.csv": ("rk3588-t3-little-clean_sweep_234807d", "234807d", False),
-    "rk3588-t4-clean.csv": ("rk3588-t4-clean_sweep_234807d", "234807d", False),
-    "rk3588-t4-little-clean.csv": ("rk3588-t4-little-clean_sweep_234807d", "234807d", False),
+    "rk3588-t4-clean.csv": ("rk3588-t4-big_sweep_1ca4d6d", "1ca4d6d", False),
+    "rk3588-t4-little-clean.csv": ("rk3588-t4-little_sweep_f2658cc", "f2658cc", False),
 }
 
 
@@ -193,7 +196,8 @@ def main() -> int:
         print(f"  {label:<16} {sha:<20} {ds:<6}  {cd_s}  {sc_s}  {cv_s}  {g2_s}")
     print("  (t4 preferred over t3 per ob-bf7: t3 scan spread=153% contaminated; t4 spread=17%)")
 
-    print("\n  --- Fleet sweep (ob-bf7): commit 234807d, clean tree, single-thread ---")
+    print("\n  --- Fleet sweep (ob-bf7): single-thread, governor=performance ---")
+    print("  (originally all at 234807d/clean; j1 + t3-clean re-run later — see per-row sha)")
     sweep = [
         ("RK3588 t4 big (clean)", "rk3588-t4-clean.csv"),
         ("RK3588 t3 big (clean)", "rk3588-t3-clean.csv"),
@@ -204,16 +208,17 @@ def main() -> int:
     ]
     for label, fname in sweep:
         rows = load_kernel(fname)
+        _, sha, dirty = PROV[fname]
         cd = kv(rows, "Qwen3.5-4B", "gdn_cumdecay", 64)
         sc = kv(rows, "Qwen3.5-4B", "gdn_gated_scan", 64)
         cv = kv(rows, "Qwen3.5-4B", "gdn_causal_dwconv1d", 64)
         g2 = kv(rows, "Qwen3.5-4B", "gdn2_gated_scan", 64)
+        ds = "dirty" if dirty else "CLEAN"
         cd_s = f"{cd[0]:<5.2f}" if cd else "  —  "
         sc_s = f"{sc[0]:<5.2f}" if sc else "  —  "
         cv_s = f"{cv[0]:<5.2f}" if cv else "  —  "
         g2_s = f"{g2[0]:<5.2f}" if g2 else "  —  "
-        print(f"  {label:<20} 234807d             CLEAN  {cd_s}  {sc_s}  {cv_s}  {g2_s}")
-    print("  (All at commit 234807d, dirty=false, OMP_NUM_THREADS=1, governor=performance)")
+        print(f"  {label:<20} {sha:<20} {ds:<6} {cd_s}  {sc_s}  {cv_s}  {g2_s}")
 
     print("\n" + "=" * 90)
     print("OPTIMIZATION LADDER on Jetson (Qwen3.5-4B, seq=64) — GiB/s @ p50 / p50 µs")
