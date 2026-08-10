@@ -762,6 +762,34 @@ class TestPlotCrossDevice:
         result = fa.plot_cross_device(device_data, str(tmp_path / "plot.png"))
         assert result is True
 
+    def test_deterministic_rcparams_pinned(self, tmp_path, monkeypatch):
+        """plot_cross_device pins matplotlib rcParams for determinism (ob-6ay).
+
+        After calling the function, font family, DPI, and other rendering
+        knobs must be set to fixed values so the same data produces the
+        same pixels across devices (to the extent matplotlib can control).
+        """
+        import matplotlib
+
+        pytest.importorskip("matplotlib")
+        setup_fleet_data(tmp_path)
+        monkeypatch.chdir(tmp_path)
+
+        device_data = {}
+        for name, path, spec, cores, isa in fa.DEVICES:
+            device_data[name] = {
+                "rows": fa.load_device_csv(path),
+                "spec": spec,
+                "cores": cores,
+                "isa": isa,
+            }
+        fa.plot_cross_device(device_data, str(tmp_path / "plot.png"))
+
+        assert "DejaVu Sans" in matplotlib.rcParams["font.family"]
+        assert matplotlib.rcParams["savefig.dpi"] == 150.0
+        assert matplotlib.rcParams["text.usetex"] is False
+        assert matplotlib.rcParams["axes.unicode_minus"] is False
+
 
 # Integration: full pipeline with real committed CSVs (if present)
 # ---------------------------------------------------------------------------

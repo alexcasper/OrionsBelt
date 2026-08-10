@@ -228,6 +228,25 @@ def plot_cross_device(device_data, output_path):
     Shows the scan kernel achieved GiB/s for each device alongside its
     spec bandwidth, making the instruction-bound (not bandwidth-bound)
     finding visually obvious.
+
+    .. note::
+
+        **Cross-device PNG nondeterminism (bead ob-6ay).** The Agg backend
+        is deterministic for a *given* matplotlib+freetype version, but
+        different devices in the fleet have different system freetype
+        libraries, which produces different byte-level PNG output from
+        identical input data. This caused PR #231 to be closed (the
+        branch had an older render than main).
+
+        Do NOT commit PNGs as if they were deterministic artifacts.
+        If the underlying CSVs have not changed, the PNG on main is
+        authoritative — do not regenerate-and-commit from a different
+        device.  When CSVs *do* change, regenerate on one designated
+        device and push once.
+
+        The rcParams below pin the rendering knobs that matplotlib
+        controls.  They cannot pin the system freetype, but they reduce
+        the surface area of nondeterminism.
     """
     try:
         import matplotlib
@@ -238,6 +257,23 @@ def plot_cross_device(device_data, output_path):
     except ImportError:
         print("matplotlib/numpy not available — skipping plot generation")
         return False
+
+    # Pin rendering parameters to reduce cross-device byte differences (ob-6ay).
+    # These control everything matplotlib can control; system freetype version
+    # drift remains outside our reach without containerising the render step.
+    matplotlib.rcParams.update(
+        {
+            "font.family": "DejaVu Sans",  # bundled with matplotlib, always available
+            "font.size": 10,
+            "figure.dpi": 100,
+            "savefig.dpi": 150,
+            "savefig.format": "png",
+            "text.usetex": False,
+            "axes.unicode_minus": False,
+            "pdf.fonttype": 42,  # TrueType embedding (also for Agg)
+            "ps.fonttype": 42,
+        }
+    )
 
     # Collect 4B scan data for plotting
     devices = []
@@ -331,7 +367,8 @@ def plot_cross_device(device_data, output_path):
         fontsize=11,
         fontweight="bold",
     )
-    fig.savefig(output_path, dpi=150)
+    # Strip metadata (creation time, software version) for byte-stability (ob-6ay).
+    fig.savefig(output_path, dpi=150, metadata={"Software": None, "Creation Time": None})
     plt.close(fig)
     print(f"Cross-device plot written to {output_path}")
     return True

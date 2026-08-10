@@ -104,7 +104,9 @@ fi
 # 5. Fleet analysis
 # -------------------------------------------------------------------
 echo "[5/8] Fleet analysis"
-if python3 bench/fleet_analysis.py > /dev/null 2>&1; then
+# Use a temp dir so the check doesn't clobber the committed PNG with a
+# device-local render (cross-device freetype nondeterminism, bead ob-6ay).
+if python3 bench/fleet_analysis.py --output-dir "$(mktemp -d)" > /dev/null 2>&1; then
     ok "Fleet analysis runs cleanly"
 else
     warn "Fleet analysis has warnings (may be expected with dirty-tree data)"
