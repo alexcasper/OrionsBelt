@@ -40,7 +40,7 @@ locked to Edge AI.
 | Submission prep (README, write-up, repro) | ✓ All beads closed | ob-fnq, ob-f7k, ob-kdi, ob-9e2 |
 | Compliance checklist | ✓ ob-9e2 closed | Apache-2.0, no credentials at tip of main/t4 |
 
-**Submission readiness:** 15/15 checks pass, 2315 tests, Ruff clean, CI green.
+**Submission readiness:** 15/15 checks pass, 2257 tests, Ruff clean, CI green.
 
 ---
 
@@ -222,6 +222,7 @@ cutoff has passed with no board; any future arrival is additive bonus per ADR 00
 | #224 | t3 | Deterministic PNG output (constrained_layout) + docs provenance corrections | MERGED |
 | #225 | t3 | SUBMISSION_STATUS T-4 update — trigger fired, PR table backfill, provenance cleaned | MERGED |
 | #226 | t3 | Submission doc polish — FINDINGS line count + WRITEUP table t3/t4 fix | MERGED |
+| #227 | t3 | Mark PR #226 as MERGED in SUBMISSION_STATUS table | MERGED |
 
 > **PRs #190, #198, #207:** closed (not merged). No gaps in numbering.
 
