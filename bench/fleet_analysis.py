@@ -263,14 +263,14 @@ def plot_cross_device(device_data, output_path):
     # drift remains outside our reach without containerising the render step.
     matplotlib.rcParams.update(
         {
-            "font.family": "DejaVu Sans",      # bundled with matplotlib, always available
+            "font.family": "DejaVu Sans",  # bundled with matplotlib, always available
             "font.size": 10,
             "figure.dpi": 100,
             "savefig.dpi": 150,
             "savefig.format": "png",
             "text.usetex": False,
             "axes.unicode_minus": False,
-            "pdf.fonttype": 42,                 # TrueType embedding (also for Agg)
+            "pdf.fonttype": 42,  # TrueType embedding (also for Agg)
             "ps.fonttype": 42,
         }
     )
