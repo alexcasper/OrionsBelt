@@ -39,7 +39,8 @@ dev = [
     "pytest>=7.0",
     "ruff>=0.5",
     "pre-commit>=3.5",
-    "onnx>=1.15",  # unit tests for npu_op_probe.py probe graph generation
+    "onnx>=1.15",       # unit tests for npu_op_probe.py probe graph generation
+    "matplotlib>=3.5",  # unit tests for fleet_analysis.py plot_cross_device determinism (ob-mrd.20)
 ]
 # Benchmark harness and reference inference stack: modern Python, heavier
 # numerical/plotting stack. Also not required on the NPU side.
