@@ -260,8 +260,8 @@ module in a live Qwen3.5-0.8B checkpoint and running 30-step isolated MSE
 distillation (see [`gdn2_swap_findings.md`](./gdn2_swap_findings.md)).
 MSE dropped 94%, but cross-entropy loss recovered only 17% of the gap
 (matched hyperparameters). A 10-prompt RULER multi-key retrieval evaluation
-([`gdn2_ruler_findings.md`](./gdn2_ruler_findings.md)) showed GDN-2 at 10%
-accuracy vs GDN-1's 30% (below the 20% random baseline), with 5× worse
+([`gdn2_ruler_findings.md`](./gdn2_ruler_findings.md)) showed GDN-2 at 20%
+accuracy vs GDN-1's 30% (at the 20% random baseline), with ~5× worse
 log-probabilities.
 
 Two follow-up experiments confirmed this is a **structural ceiling**, not
@@ -459,8 +459,8 @@ ORIONS_FORCE_FP32=1 python3 bench/harness.py \
   reduction but only 17% CE recovery (matched params). Smart gate
   initialization from GDN-1 β (+2.8 pp) and 100-step adaptation (+2.5 pp)
   each confirm a ~20% structural CE ceiling — isolated-layer distillation
-  cannot compensate for downstream amplification. RULER retrieval: 10% vs
-  30% baseline (below random) — insufficient adaptation, not architectural
+  cannot compensate for downstream amplification. RULER retrieval: 20% vs
+  30% baseline (at random) — insufficient adaptation, not architectural
   failure. See [`gdn2_swap_findings.md`](./gdn2_swap_findings.md) and
   [`gdn2_ruler_findings.md`](./gdn2_ruler_findings.md).
 - **Dynamic heterogeneous dispatcher:** designed but not implemented (requires

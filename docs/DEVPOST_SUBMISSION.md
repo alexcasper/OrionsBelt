@@ -161,7 +161,7 @@ Full characterization with provenance: FINDINGS §"INA3221 power/energy characte
 
 GDN-2's decoupled erase/write gating costs **1.2–1.5× at decode** on big cores (**2.2–2.4× on A55 little cores** where the in-order pipeline cannot hide extra arithmetic) and **2.2–2.7× at prefill** due to extra bandwidth streams. Full analysis: [`docs/research/ob-7b5-gdn2-edge-cost-research-note.md`](./research/ob-7b5-gdn2-edge-cost-research-note.md).
 
-We also went beyond cost modeling: we **swapped GDN-1 layer 0 for GDN-2** in a live Qwen3.5-0.8B checkpoint and ran isolated MSE distillation on-device (6.6 s/step, 66× faster than full-model backprop). The gates learn to approximate GDN-1's behavior (94% MSE reduction in 30 steps), but CE recovery plateaus at ~20% — downstream layers amplify residual mismatches. A 10-prompt RULER multi-key retrieval evaluation confirmed the model is too under-adapted for a fair architectural comparison (10% vs GDN-1's 30%, below the 20% random baseline). This is an honest negative result: the hypothesis that decoupled gating improves retrieval remains untested without full fine-tuning. Full details: [`gdn2_swap_findings.md`](./gdn2_swap_findings.md), [`gdn2_ruler_findings.md`](./gdn2_ruler_findings.md), FINDINGS §40.
+We also went beyond cost modeling: we **swapped GDN-1 layer 0 for GDN-2** in a live Qwen3.5-0.8B checkpoint and ran isolated MSE distillation on-device (6.6 s/step, 66× faster than full-model backprop). The gates learn to approximate GDN-1's behavior (94% MSE reduction in 30 steps), but CE recovery plateaus at ~20% — downstream layers amplify residual mismatches. A 10-prompt RULER multi-key retrieval evaluation confirmed the model is too under-adapted for a fair architectural comparison (20% vs GDN-1's 30%, at the 20% random baseline). This is an honest negative result: the hypothesis that decoupled gating improves retrieval remains untested without full fine-tuning. Full details: [`gdn2_swap_findings.md`](./gdn2_swap_findings.md), [`gdn2_ruler_findings.md`](./gdn2_ruler_findings.md), FINDINGS §40.
 
 ---
 
@@ -204,7 +204,7 @@ No GPU, NPU, or proprietary SDK required. Full setup guide: [`docs/SETUP_PORTABL
 ### Reproducibility
 
 - Every measurement has a **provenance manifest** (git SHA, governor state, CPU topology, thermals)
-- 2294 unit tests covering kernel correctness and schema conformance
+- 2315 unit tests covering kernel correctness and schema conformance
 - All figures are **regenerable** from committed CSVs (`bench/plots.py`, `scripts/generate_memory_plots.py`)
 - t3 benchmark data: manifest git_sha `854c6f1`, dirty=false, governor=performance, 30 repeats per kernel
 
@@ -229,7 +229,7 @@ Specifically:
 
 - **Repository:** https://github.com/alexcasper/OrionsBelt
 - **License:** Apache-2.0
-- **Findings (54 sections, 5524 lines):** [`docs/FINDINGS.md`](../docs/FINDINGS.md)
+- **Findings (54 sections, 5652 lines):** [`docs/FINDINGS.md`](../docs/FINDINGS.md)
 - **Comparison table:** [`results/figures/comparison_table.md`](../results/figures/comparison_table.md)
 - **Fleet bandwidth analysis:** [`results/figures/fleet_bandwidth_scaling.md`](../results/figures/fleet_bandwidth_scaling.md)
 - **Memory scaling figures:** [`results/figures/memory_comparison.md`](../results/figures/memory_comparison.md)

@@ -185,7 +185,13 @@ def evaluate_retrieval(model, tokenizer, prompts, max_time_secs=None):
 
 
 def capture_manifest():
-    """Capture provenance metadata."""
+    """Capture provenance metadata matching the canonical manifest schema.
+
+    Uses the nested ``git: {sha, dirty}`` structure expected by
+    ``bench/manifest.py`` and ``tests/test_manifest_sha_provenance.py``,
+    so every RULER manifest passes the same provenance checks as all
+    other committed manifests.
+    """
     import platform
 
     try:
@@ -200,14 +206,21 @@ def capture_manifest():
     except Exception:
         sha, dirty = "unknown", False
     return {
-        "git_sha": sha,
-        "git_dirty": dirty,
-        "device": platform.node(),
-        "machine": platform.machine(),
-        "processor": platform.processor() or "unknown",
-        "python": platform.python_version(),
-        "torch": torch.__version__,
-        "timestamp": time.strftime("%Y%m%dT%H%M%SZ", time.gmtime()),
+        "manifest_version": 1,
+        "git": {
+            "sha": sha,
+            "dirty": dirty,
+        },
+        "host": {
+            "hostname": platform.node(),
+            "machine": platform.machine(),
+            "processor": platform.processor() or "unknown",
+        },
+        "software": {
+            "python_version": platform.python_version(),
+            "torch": torch.__version__,
+        },
+        "timestamp_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     }
 
 
@@ -224,6 +237,12 @@ def main():
     parser.add_argument("--steps", type=int, default=30, help="Adaptation steps (GDN-2 mode)")
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--csv", action="store_true")
+    parser.add_argument(
+        "--max-time",
+        type=int,
+        default=2400,
+        help="Max evaluation time in seconds (default 2400; increase for slow devices)",
+    )
     args = parser.parse_args()
 
     layer_indices = [int(x) for x in args.layers.split(",")]
@@ -342,7 +361,7 @@ def main():
 
     # ── Run retrieval evaluation ──
     print(f"\n--- Retrieval evaluation ({tag}) ---", flush=True)
-    results = evaluate_retrieval(model, tokenizer, prompts, max_time_secs=2400)
+    results = evaluate_retrieval(model, tokenizer, prompts, max_time_secs=args.max_time)
 
     print(f"\n=== {tag.upper()} Results ===", flush=True)
     print(

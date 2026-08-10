@@ -281,19 +281,23 @@ class TestCaptureManifest:
     def test_returns_dict_with_required_fields(self):
         m = capture_manifest()
         assert isinstance(m, dict)
-        for field in ("git_sha", "git_dirty", "device", "machine", "python"):
-            assert field in m
+        assert "git" in m
+        assert "sha" in m["git"]
+        assert "dirty" in m["git"]
+        assert "host" in m
+        assert "machine" in m["host"]
+        assert "software" in m
 
     def test_git_sha_is_string(self):
         m = capture_manifest()
-        assert isinstance(m["git_sha"], str)
+        assert isinstance(m["git"]["sha"], str)
 
     def test_git_dirty_is_bool(self):
         m = capture_manifest()
-        assert isinstance(m["git_dirty"], bool)
+        assert isinstance(m["git"]["dirty"], bool)
 
     def test_timestamp_format(self):
         m = capture_manifest()
-        ts = m["timestamp"]
+        ts = m["timestamp_utc"]
         assert ts.endswith("Z")
         assert "T" in ts

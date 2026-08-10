@@ -5555,19 +5555,21 @@ yields diminishing CE returns — the ~80% residual gap is **structural**
 
 ### RULER multi-key retrieval (ob-zak)
 
-Log-likelihood scoring on 10 prompts × 5 keys each (commit `1743c3e`):
+Log-likelihood scoring on 10 prompts × 5 keys each (commit `4b5e000`):
 
 | Metric | GDN-1 | GDN-2 (30-step adapted) |
 |--------|-------|--------------------------|
-| Accuracy | 30% (3/10) | 10% (1/10) |
-| Avg correct log-prob | −14.6 | −71.2 |
+| Accuracy | 30% (3/10) | 20% (2/10) |
+| Avg correct log-prob | −14.6 | −72.8 |
 | Random baseline | 20% | 20% |
 
-GDN-2 at 30-step adaptation falls below random baseline — the model is too
-degraded to test the retrieval hypothesis. The 5× log-prob degradation is
-consistent across all prompts. This negative result reflects **insufficient
-adaptation** (only 1 layer, isolated training), not a flaw in the GDN-2
-architecture. Full end-to-end fine-tuning is needed for a fair comparison.
+GDN-2 at 30-step adaptation lands exactly at random baseline — the model is
+too degraded to test the retrieval hypothesis. The ~5× log-prob degradation
+is consistent across all prompts and is the stronger signal (the accuracy
+figure alone is not statistically significant at this sample size, Fisher's
+exact p ≈ 1.0). This negative result reflects **insufficient adaptation**
+(only 1 layer, isolated training), not a flaw in the GDN-2 architecture.
+Full end-to-end fine-tuning is needed for a fair comparison.
 
 ### Provenance
 
@@ -5576,8 +5578,8 @@ architecture. Full end-to-end fine-tuning is needed for a fair comparison.
 | 30-step random | `f5ae5e2` | rk3588-t3 A76 | `gdn2_swap_t3.json` |
 | 30-step smart init | `8faec1e` (unrecoverable, see manifest `sha_note`) | rk3588-t3 A76 | `gdn2_swap_smart_init_t3.json` |
 | 100-step random | `937ba25` | rk3588-t3 A76 | `gdn2_swap_100step_t3.json` |
-| RULER GDN-1 | `1743c3e` | rk3588-t3 A76 | `ruler_gdn1_t3.json` |
-| RULER GDN-2 | `1743c3e` | rk3588-t3 A76 | `ruler_gdn2_t3.json` |
+| RULER GDN-1 | `4b5e000` | rk3588-t3 A76 | `ruler_gdn1_t3.json` |
+| RULER GDN-2 | `4b5e000` | rk3588-t3 A76 | `ruler_gdn2_t3.json` |
 
 ### RK3588 unit-to-unit cross-check: t3 vs t4 (ob-8ms.3)
 
