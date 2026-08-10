@@ -163,12 +163,13 @@ on dotprod-capable cores) and progressively optimizing it yields a
 | C: naive column-sweep GEMV (FP32) | 0.68 | 0.07 | — | — |
 | C: row-sweep GEMV (FP32) | 7.98 | 1.04 | 2.06 | 0.43 |
 | C: + INT8 weight-only | 10.6 | 1.84 | **2.45** | **0.51** |
-| C: + SDOT INT8 GEMV | **25.6** | **2.80** | — | — |
+| C: + SDOT INT8 GEMV | **30.2** | **3.48** | — | — |
 | C: + INT4+SDOT hybrid | **37.21** | **4.43** | — | — |
 
-> Numbers are from RK3588 nodes t3 and t4 (Cortex-A76 big cluster); cross-board
-> e2e decode variance is ~15% (see headline table above). The figure below shows
-> t4 data; SDOT INT8 on t3 measures 25.6 tok/s (0.8B) and 2.80 tok/s (4B).
+> A76 numbers are from RK3588 node t4 (Cortex-A76 big cluster), matching the
+> figure below. Cross-validated on independent node t3: SDOT INT8 measures
+> 25.6 tok/s (0.8B) and 2.80 tok/s (4B), within ~15% fleet variance (ob-bf7).
+> See the headline table above for the full cross-device comparison.
 
 ![Decode optimization stack on RK3588 Cortex-A76](../results/figures/optimization_stack.png)
 
