@@ -769,9 +769,9 @@ class TestPlotCrossDevice:
         knobs must be set to fixed values so the same data produces the
         same pixels across devices (to the extent matplotlib can control).
         """
+        pytest.importorskip("matplotlib")
         import matplotlib
 
-        pytest.importorskip("matplotlib")
         setup_fleet_data(tmp_path)
         monkeypatch.chdir(tmp_path)
 
