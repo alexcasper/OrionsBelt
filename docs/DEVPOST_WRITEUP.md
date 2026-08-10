@@ -450,7 +450,7 @@ ORIONS_FORCE_FP32=1 python3 bench/harness.py \
   mapping, subgraph boundaries, phase-dependent routing, and quantization
   policy — is documented in
   [`NPU_OFFLOAD_DESIGN.md`](./NPU_OFFLOAD_DESIGN.md).
-- **Decode throughput optimized ~63× from naive baseline:** the naive FP32 C
+- **Decode throughput optimized ~65× from naive baseline:** the naive FP32 C
   GEMV (column-sweep, 0.17% cache-line utilization) ran at 0.68 tok/s (0.8B)
   and 0.07 tok/s (4B). Our C decode loop with
   row-sweep NEON GEMV + INT8 weight-only quantization + SDOT INT8×INT8→int32
