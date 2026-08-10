@@ -152,15 +152,15 @@ recurrent state update is memory-bandwidth-bound, and the KV cache at these
 sizes (≤6 MiB) is negligible compared to 2.8 GiB of weight traffic.
 
 **Optimized C decode loop delivers 37.21 tok/s (INT4+SDOT) on the same SoC.**
-Replacing the Python/transformers backend with a hand-tuned C decode loop
-(row-sweep NEON GEMV + OpenMP + INT8 weight-only quantization, with SDOT
-INT8×INT8→int32 dot-product acceleration on dotprod-capable cores) yields a
-**~63× cumulative speedup** over the naive FP32 baseline
+Building a hand-tuned C decode loop (row-sweep NEON GEMV + OpenMP + INT8
+weight-only quantization, with SDOT INT8×INT8→int32 dot-product acceleration
+on dotprod-capable cores) and progressively optimizing it yields a
+**~63× cumulative speedup** over the naive FP32 C baseline
 (0.07 → 4.43 tok/s on the 4B model):
 
 | Implementation | 0.8B tok/s (A76) | 4B tok/s (A76) | 0.8B tok/s (A57) | 4B tok/s (A57) |
 |----------------|-----------------:|---------------:|-----------------:|---------------:|
-| Python/transformers (baseline) | ~0.68 | — | — | — |
+| C: naive column-sweep GEMV (FP32) | 0.68 | 0.07 | — | — |
 | C: row-sweep GEMV (FP32) | 7.98 | 1.04 | 2.06 | 0.43 |
 | C: + INT8 weight-only | 10.6 | 1.84 | **2.45** | **0.51** |
 | C: + SDOT INT8 GEMV | **25.6** | **2.80** | — | — |
@@ -449,8 +449,9 @@ ORIONS_FORCE_FP32=1 python3 bench/harness.py \
   mapping, subgraph boundaries, phase-dependent routing, and quantization
   policy — is documented in
   [`NPU_OFFLOAD_DESIGN.md`](./NPU_OFFLOAD_DESIGN.md).
-- **Decode throughput optimized ~63× from naive baseline:** the Python/transformers
-  baseline ran at ~0.68 tok/s (bandwidth-bound). Our C decode loop with
+- **Decode throughput optimized ~63× from naive baseline:** the naive FP32 C
+  GEMV (column-sweep, 0.17% cache-line utilization) ran at 0.68 tok/s (0.8B)
+  and 0.07 tok/s (4B). Our C decode loop with
   row-sweep NEON GEMV + INT8 weight-only quantization + SDOT INT8×INT8→int32
   dot-product kernel + INT4+SDOT hybrid repack achieves 37.21 tok/s (0.8B, A76
   INT4+SDOT) and 4.43 tok/s (4B, A76 INT4+SDOT). Decode remains bandwidth-bound
