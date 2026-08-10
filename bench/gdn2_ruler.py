@@ -224,6 +224,12 @@ def main():
     parser.add_argument("--steps", type=int, default=30, help="Adaptation steps (GDN-2 mode)")
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--csv", action="store_true")
+    parser.add_argument(
+        "--max-time",
+        type=int,
+        default=2400,
+        help="Max evaluation time in seconds (default 2400; increase for slow devices)",
+    )
     args = parser.parse_args()
 
     layer_indices = [int(x) for x in args.layers.split(",")]
@@ -342,7 +348,7 @@ def main():
 
     # ── Run retrieval evaluation ──
     print(f"\n--- Retrieval evaluation ({tag}) ---", flush=True)
-    results = evaluate_retrieval(model, tokenizer, prompts, max_time_secs=2400)
+    results = evaluate_retrieval(model, tokenizer, prompts, max_time_secs=args.max_time)
 
     print(f"\n=== {tag.upper()} Results ===", flush=True)
     print(
