@@ -5092,6 +5092,12 @@ once, while NEON uses float FMA directly).
 | + SDOT INT8 (§33) | 3.48 | ~50× |
 | + **INT4+SDOT** (this section) | **4.43** | **~63×** |
 
+**Cross-device validation (t3, commit `cec1aea`):** INT4+SDOT on the second
+RK3588 board achieves 4.28 tok/s (4B) and 36.69 tok/s (0.8B) — within **3.5%**
+(4B) and **1.4%** (0.8B) of t4's 4.43 / 37.21. This is the tightest
+cross-device agreement of any quantization method, confirming the INT4+SDOT
+kernel is deterministic and portable across A76 silicon.
+
 ## 35. NEON+SDOT full-attention scoring: 25–35% faster full-attention layer at long context (2026-08-09, ob-8qt.21)
 
 ### Motivation
