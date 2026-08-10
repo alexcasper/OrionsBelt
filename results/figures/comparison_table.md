@@ -236,17 +236,21 @@ t4 = 8 tokens (re-run, see per-row manifest for details).
 
 | Device | Model | Quant | tok/s | TTFT (ms) | Git SHA | Manifest |
 |---|---|---|---:|---:|---|---|
+| rk3588-t3 | 4B   | INT4+SDOT | 4.28 | 233 | `cec1aea` | `rk3588-t3_big_int4_sdot_e2e.json` |
 | rk3588-t4 | 4B   | INT4+SDOT | 4.43 | 226 | `3bff376` | `rk3588-t4_int4sdot_4b.json` |
+| rk3588-t3 | 0.8B | INT4+SDOT | 36.69 | 27 | `cec1aea` | `rk3588-t3_08b_big_int4_sdot_e2e.json` |
 | rk3588-t4 | 0.8B | INT4+SDOT | 37.21 | 27 | `3bff376` | `rk3588-t4_int4sdot_08b.json` |
 
 > INT4+SDOT combines K-grouped nibble repack with `vdotq_lane_s32` integer
 > dot-product, achieving 2× memory advantage of INT4 with the compute efficiency
-> of SDOT. vs INT8+SDOT: **1.27×** (4B) and **1.23×** (0.8B) on A76. The A55
+> of SDOT. vs INT8+SDOT: **1.28×** (4B) and **1.27×** (0.8B) on A76. The A55
 > little cluster does NOT benefit (0.96× — compute-bound, nibble-unpack overhead
-> dominates). t3 INT4+SDOT data not yet captured. See FINDINGS §34.
+> dominates). Cross-device agreement tightens further: 4B at **3.5%** gap
+> (4.28 vs 4.43), 0.8B at **1.4%** gap (36.69 vs 37.21) — the tightest of any
+> quantization method. See FINDINGS §34.
 >
-> **Cumulative optimization stack (4B A76):** 0.07 → 1.04 → 1.84 → 3.37 → **4.43 tok/s**
-> (~63× over naive FP32 baseline).
+> **Cumulative optimization stack (4B A76):** 0.07 → 1.04 → 1.84 → 3.34 → **4.28 tok/s**
+> (~61× over naive FP32 baseline). t4 confirms at 4.43 tok/s (~63×).
 
 ## 8. OpenMP multi-threading scaling (t4)
 
