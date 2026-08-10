@@ -1658,9 +1658,10 @@ variable is thread count.
 
    > ⚠ **Prefill numbers are inflated by the GDN-2 aliasing bug** (w_gate == x,
    > §10 correction). Corrected t3/t4 data shows GDN2 prefill is actually ~2.7×
-   > *slower* than GDN1, not equal. Jetson J2 still has uncorrected GDN-2 data
-   > (needs re-run when accessible). The decode comparison may be less affected
-   > since seq=1 working set is cache-resident.
+   > *slower* than GDN1, not equal. Jetson J1 has been re-run post-fix (0.86 GiB/s,
+   > confirming the slowdown). Jetson J2 still has uncorrected GDN-2 data (needs
+   > re-run when accessible). The decode comparison may be less affected since
+   > seq=1 working set is cache-resident.
 
 5. **Cross-device consistency.** J2's current run matches the earlier
    `jetson-j2-full-optimized.csv` (3.82 vs 3.85 GiB/s on cumdecay — within 1%),
@@ -2294,11 +2295,16 @@ memory bandwidth.
   bandwidth-bound at prefill.
 
 **Fleet-wide note:** All existing fleet CSVs initially contained inflated GDN-2
-numbers from the aliasing bug. t4 has been re-run with the fix (commit `20b50c7`).
-t3 has been re-run with the fix (`rk3588-t3-clean.csv` at commit `686fdfd`,
-3×30-repeat run). Jetson and Pi5 still have inflated GDN-2 numbers and should be
-re-run when accessible. The `partial_comparison_table.py` GDN-2 column now shows
-corrected numbers for both t3 and t4.
+numbers from the aliasing bug. Corrected status by device:
+- **t3** ✅ (`rk3588-t3-clean.csv` at `686fdfd`, 3×30-repeat run)
+- **t4** ✅ (`rk3588-t4-clean.csv` at `20b50c7`)
+- **Jetson J1** ✅ (`jetson-j1-clean.csv` re-run at `414b622`, post-fix;
+  GDN-2 4B prefill: 1.13→0.86 GiB/s)
+- **Jetson J2** ❌ still inflated (`jetson-j2-clean.csv` at `6a4d8ab`, pre-fix;
+  needs re-run when accessible)
+- **Pi5** — no GDN-2 data in either CSV
+The `partial_comparison_table.py` GDN-2 column now shows corrected numbers for
+t3, t4, and J1.
 
 ### Correctness verification
 
