@@ -229,36 +229,41 @@ t4 = 8 tokens (re-run, see per-row manifest for details).
 
 | Device | Model | Quant | tok/s | TTFT (ms) | Git SHA | Manifest |
 |---|---|---|---:|---:|---|---|
-| rk3588-t3 | 4B   | INT8+SDOT | 3.34 | 300 | `a6d21df` | `rk3588-t3_big_int8_sdot_e2e.json` |
+| rk3588-t3 | 4B   | INT8+SDOT | 2.80 | 357 | `c880887` | `rk3588-t3_big_int8_sdot_e2e.json` |
 | rk3588-t4 | 4B   | INT8+SDOT | 3.37 | 296 | `be4d3ca` | `rk3588-t4_e2e_ctxsweep_int8_puregdn_4t.json` |
-| rk3588-t3 | 0.8B | INT8+SDOT | 28.94 | 35 | `a6d21df` | `rk3588-t3_08b_big_int8_sdot_e2e.json` |
+| rk3588-t3 | 0.8B | INT8+SDOT | 25.60 | 39 | `c880887` | `rk3588-t3_08b_big_int8_sdot_e2e.json` |
 | rk3588-t4 | 0.8B | INT8+SDOT | 29.25 | 34 | `be4d3ca` | `rk3588-t4_e2e_ctxsweep_08b_int8_puregdn_4t.json` |
 
 > The SDOT (`vdotq_s32`) INT8×INT8→int32 dot-product kernel replaces the NEON
 > dequant→float32 FMA path, cutting GDN projection and FFN decode time by
 > 1.63× and 1.85× respectively. t3's pre-SDOT INT8 was 1.84 tok/s (4B) / 10.58
-> tok/s (0.8B); with SDOT, 3.34 / 28.94 — a 1.82× and 2.74× speedup. Cross-device
-> agreement tightens to 0.9% (4B) and 1.1% (0.8B). See FINDINGS §33 and §38.
+> tok/s (0.8B); with SDOT, 2.80 / 25.60 — a 1.52× and 2.42× speedup. **Provenance
+> note (t3 re-run at clean HEAD `c880887`, 2026-08-10):** t3's previous SDOT
+> manifests were dirty=true (binary built from uncommitted tree). Re-running at
+> clean HEAD yields ~15% lower INT8 numbers; 4 runs agree within 1.8%. INT4
+> numbers are within 2-5% of the dirty values. The t4 SDOT manifests are also
+> dirty=true; t3 clean numbers now diverge from t4 by ~20% (4B INT8) — likely
+> the same lost-optimization effect. t4 re-run recommended. See FINDINGS §33
+> and §38.
 
 **After INT4+SDOT hybrid GEMV kernel (commit `3bff376`, §34):**
 
 | Device | Model | Quant | tok/s | TTFT (ms) | Git SHA | Manifest |
 |---|---|---|---:|---:|---|---|
-| rk3588-t3 | 4B   | INT4+SDOT | 4.28 | 233 | `cec1aea` | `rk3588-t3_big_int4_sdot_e2e.json` |
+| rk3588-t3 | 4B   | INT4+SDOT | 4.21 | 238 | `c880887` | `rk3588-t3_big_int4_sdot_e2e.json` |
 | rk3588-t4 | 4B   | INT4+SDOT | 4.43 | 226 | `3bff376` | `rk3588-t4_int4sdot_4b.json` |
-| rk3588-t3 | 0.8B | INT4+SDOT | 36.69 | 27 | `cec1aea` | `rk3588-t3_08b_big_int4_sdot_e2e.json` |
+| rk3588-t3 | 0.8B | INT4+SDOT | 35.05 | 28 | `c880887` | `rk3588-t3_08b_big_int4_sdot_e2e.json` |
 | rk3588-t4 | 0.8B | INT4+SDOT | 37.21 | 27 | `3bff376` | `rk3588-t4_int4sdot_08b.json` |
 
 > INT4+SDOT combines K-grouped nibble repack with `vdotq_lane_s32` integer
 > dot-product, achieving 2× memory advantage of INT4 with the compute efficiency
-> of SDOT. vs INT8+SDOT: **1.28×** (4B) and **1.27×** (0.8B) on A76. The A55
-> little cluster does NOT benefit (0.96× — compute-bound, nibble-unpack overhead
-> dominates). Cross-device agreement tightens further: 4B at **3.5%** gap
-> (4.28 vs 4.43), 0.8B at **1.4%** gap (36.69 vs 37.21) — the tightest of any
-> quantization method. See FINDINGS §34.
+> of SDOT. vs INT8+SDOT (t3 clean): **1.50×** (4B) and **1.37×** (0.8B) on A76.
+> The A55 little cluster does NOT benefit (0.96× — compute-bound, nibble-unpack
+> overhead dominates). Cross-device agreement: 4B at **5.2%** gap (4.21 vs 4.43),
+> 0.8B at **6.2%** gap (35.05 vs 37.21). See FINDINGS §34.
 >
-> **Cumulative optimization stack (4B A76):** 0.07 → 1.04 → 1.84 → 3.34 → **4.28 tok/s**
-> (~61× over naive FP32 baseline). t4 confirms at 4.43 tok/s (~63×).
+> **Cumulative optimization stack (4B A76, t3 clean):** 0.07 → 1.04 → 1.84 → 2.80 → **4.21 tok/s**
+> (~60× over naive FP32 baseline). t4 confirms at 4.43 tok/s (~63×, dirty manifest).
 
 ## 8. OpenMP multi-threading scaling (t4)
 

@@ -163,7 +163,7 @@ INT8×INT8→int32 dot-product acceleration on dotprod-capable cores) yields a
 | Python/transformers (baseline) | ~0.68 | — | — | — |
 | C: row-sweep GEMV (FP32) | 7.98 | 1.04 | 2.06 | 0.43 |
 | C: + INT8 weight-only | 10.6 | 1.84 | **2.45** | **0.51** |
-| C: + SDOT INT8 GEMV | **28.9** | **3.34** | — | — |
+| C: + SDOT INT8 GEMV | **25.6** | **2.80** | — | — |
 | C: + INT4+SDOT hybrid | **37.21** | **4.43** | — | — |
 
 ![Decode optimization stack on RK3588 Cortex-A76](../results/figures/optimization_stack.png)
