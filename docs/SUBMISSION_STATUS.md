@@ -40,7 +40,7 @@ locked to Edge AI.
 | Submission prep (README, write-up, repro) | ✓ All beads closed | ob-fnq, ob-f7k, ob-kdi, ob-9e2 |
 | Compliance checklist | ✓ ob-9e2 closed | Apache-2.0, no credentials at tip of main/t4 |
 
-**Submission readiness:** 15/15 checks pass, 2229 tests passed (20 skipped on optional deps), Ruff clean, CI green.
+**Submission readiness:** 15/15 checks pass, 2256 tests passed (2 skipped on optional deps), Ruff clean, CI green.
 
 ---
 

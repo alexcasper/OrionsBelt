@@ -111,7 +111,7 @@ Confirmed by t3 agent on 2026-08-10 (T-4, 4 days to deadline).
   referencing `ob-onz`, `ob-huw`, ADR 0004, and this ADR.
 - **T-3 trigger (Aug 11)** is pre-committed by this ADR: Physical AI framing is already dropped;
   the submission is locked to Edge AI. No reversal is expected.
-- The Edge AI submission remains complete and submission-ready (15/15 readiness checks, 2316
+- The Edge AI submission remains complete and submission-ready (15/15 readiness checks, 2256
   tests, ruff clean, all numbers provenance-backed).
 
 **Reversal cost.**

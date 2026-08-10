@@ -160,7 +160,7 @@ All figures above are verified against primary sources (Radxa product page and d
 | Repository skeleton, Apache-2.0 license | Done |
 | Results schema (`docs/RESULTS_SCHEMA.md`) | Done |
 | Benchmark harness (`bench/`) + device microbenchmark (`bench_gdn.c`) | Producing data |
-| CI: lint + unit tests (2229 passed, 20 skipped on optional deps) | Done — `.github/workflows/ci.yaml` |
+| CI: lint + unit tests (2256 passed, 2 skipped on optional deps) | Done — `.github/workflows/ci.yaml` |
 | Device-fleet microbenchmarks (5 devices) | Done — [fleet analysis](./results/figures/fleet_bandwidth_scaling.md) |
 | Ablation matrix (6 configs, synthetic) | Done — [comparison table](./results/figures/ablation_comparison.md) |
 | Memory decomposition (analytical) | Done — [figures](./results/figures/) |
