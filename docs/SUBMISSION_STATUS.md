@@ -1,6 +1,6 @@
 # T-4 Submission Status Brief
 
-_Generated 2026-08-07 by t4. Updated 2026-08-08 by j1 (ADR 0007). Updated 2026-08-10 by t3 (T-4 fired, SDOT e2e provenance cleaned, PR table backfill, submission doc polish, PR #226/#227 merged). Updated 2026-08-10 by t4 (PR #228 merged, PR table backfill #228 + closed #229)._
+_Generated 2026-08-07 by t4. Updated 2026-08-08 by j1 (ADR 0007). Updated 2026-08-10 by t3 (T-4 fired, SDOT e2e provenance cleaned, PR table backfill, submission doc polish, PR #226/#227 merged). Updated 2026-08-10 by t4 (PR #228 merged, PR table backfill #228 + closed #229). Updated 2026-08-10 by t3 (PR #232 merged — ob-6ay closed, PR table backfill #230 + #232)._
 _All numbers below are validated against committed CSVs with manifests._
 
 ---
@@ -40,7 +40,7 @@ locked to Edge AI.
 | Submission prep (README, write-up, repro) | ✓ All beads closed | ob-fnq, ob-f7k, ob-kdi, ob-9e2 |
 | Compliance checklist | ✓ ob-9e2 closed | Apache-2.0, no credentials at tip of main/t4 |
 
-**Submission readiness:** 15/15 checks pass, 2176 tests passed (51 skipped on optional deps), Ruff clean, CI green.
+**Submission readiness:** 15/15 checks pass, 2176 tests passed (52 skipped on optional deps), Ruff clean, CI green.
 
 ---
 
@@ -224,6 +224,8 @@ cutoff has passed with no board; any future arrival is additive bonus per ADR 00
 | #226 | t3 | Submission doc polish — FINDINGS line count + WRITEUP table t3/t4 fix | MERGED |
 | #227 | t3 | Mark PR #226 as MERGED in SUBMISSION_STATUS table | MERGED |
 | #228 | t4 | Fix stale test count to CI-authoritative 2176 passed (2257 was non-reproducible partial-deps artifact) + backfill PR table #191–#227 + SDOT provenance citations in §2 + close ob-9t0.11 (t4 rebased onto corrected main) | MERGED |
+| #230 | t4 | Backfill PR #228 (merged) + #229 (closed) into SUBMISSION_STATUS table | MERGED |
+| #232 | t3 | Pin matplotlib rcParams for cross-device PNG determinism (ob-6ay) + isolate readiness check from committed PNG + regression test | MERGED |
 
 > **PRs #190, #198, #207, #229:** closed (not merged). No gaps in numbering.
 

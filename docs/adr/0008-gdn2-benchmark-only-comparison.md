@@ -1,6 +1,6 @@
 # ADR 0008: GDN-2 comparison via microbenchmark only (option a)
 
-- **Status:** Accepted
+- **Status:** Accepted — option (b) subsequently attempted (see Update below)
 - **Date:** 2026-08-06
 - **Bead:** `ob-9ke`
 - **Deciders:** Claude (agent, t3 node)
@@ -37,3 +37,17 @@ architectural/throughput only, not accuracy.
 
 **Reversal cost.** Low — if schedule opens before T-2 (Aug 12), option (b) can be
 attempted. The microbenchmark remains valid regardless.
+
+---
+
+## Update (2026-08-09): Option (b) attempted
+
+Schedule opened earlier than expected and the GDN-2 layer swap was completed
+(PR #204, FINDINGS §40). Layer 0 of Qwen3.5-0.8B was swapped to GDN-2 with
+isolated MSE distillation, and a 10-prompt RULER multi-key retrieval evaluation
+was run. Result: CE recovery plateaus at ~20% and RULER accuracy is 20% (vs
+GDN-1's 30%, at the 20% random baseline) — the model is too under-adapted for
+a fair architectural comparison. This is an honest negative result; the
+microbenchmark comparison from option (a) remains the stronger evidence.
+The original decision's caution was vindicated: the swap confirmed that
+isolated distillation is insufficient without full fine-tuning.
