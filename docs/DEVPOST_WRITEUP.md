@@ -166,6 +166,10 @@ INT8×INT8→int32 dot-product acceleration on dotprod-capable cores) yields a
 | C: + SDOT INT8 GEMV | **25.6** | **2.80** | — | — |
 | C: + INT4+SDOT hybrid | **37.21** | **4.43** | — | — |
 
+> Numbers are from RK3588 nodes t3 and t4 (Cortex-A76 big cluster); cross-board
+> e2e decode variance is ~15% (see headline table above). The figure below shows
+> t4 data; SDOT INT8 on t3 measures 25.6 tok/s (0.8B) and 2.80 tok/s (4B).
+
 ![Decode optimization stack on RK3588 Cortex-A76](../results/figures/optimization_stack.png)
 
 The optimization stack is pure memory-system engineering — no algorithmic
