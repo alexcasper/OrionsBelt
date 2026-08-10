@@ -5522,3 +5522,73 @@ architecture. Full end-to-end fine-tuning is needed for a fair comparison.
 | 100-step random | `937ba25` | rk3588-t3 A76 | `gdn2_swap_100step_t3.json` |
 | RULER GDN-1 | `1743c3e` | rk3588-t3 A76 | `ruler_gdn1_t3.json` |
 | RULER GDN-2 | `1743c3e` | rk3588-t3 A76 | `ruler_gdn2_t3.json` |
+
+### RK3588 unit-to-unit cross-check: t3 vs t4 (ob-8ms.3)
+
+Both boards are RK3588 (Cortex-A76 big @ cores 4-7, Cortex-A55 little @ cores 0-3).
+Governor = performance, --repeats 30, manifest provenance on both runs.
+
+**DRAM-bandwidth ceiling is identical across units.** gdn_cumdecay_f16 on big
+cores gives exactly 36.13 GiB/s (40.544 µs) on both t3 and t4 — the kernel is
+purely memory-bound and both boards share the same LPDDR4X subsystem.
+
+**Compute-bound scan kernels diverge ±20-30%, asymmetrically by model size:**
+
+| Kernel (big cores, fp32) | Model | T4 GiB/s | T3 GiB/s | Δ |
+|--------------------------|-------|----------|----------|------|
+| gdn_gated_scan | 4B (4096ch) | 11.53 | 10.33 | +11.6% |
+| gdn_gated_scan | 0.8B (2048ch) | 11.28 | 15.42 | -26.9% |
+| gdn2_gated_scan | 4B (4096ch) | 7.14 | 9.04 | -21.0% |
+| gdn2_gated_scan | 0.8B (2048ch) | 8.26 | 10.35 | -20.2% |
+
+T4 is faster on the larger working set (4096ch) but slower on the smaller one
+(2048ch). The 0.8B scan timings on t3 are suspiciously uniform across
+precisions (~96 µs for fp32/f16/bf16), suggesting the kernel is L2-resident on
+t3 at that size. T4 shows more precision sensitivity (~129-131 µs).
+
+**Little-core scans: t4 generally faster, t3 showed thermal instability.**
+T3's gdn_gated_scan on little cores had 40.9% p50/p95 spread (vs t4's 18.0%),
+indicating throttling or background interference during t3's run.
+
+**Implication for fleet methodology:** single-device numbers carry ±20-30%
+unit-to-unit noise on compute-bound kernels. Report ranges across the fleet,
+not single points. Memory-bound kernels (f16 cumdecay) are reproducible to
+<1%.
+
+### Provenance (cross-check)
+
+| Device | Commit | Manifest |
+|--------|--------|----------|
+| rk3588-t4 | `8227e98` | `results/manifests/rk3588-t4.json` |
+| rk3588-t3 | `47efdf8` | `results/manifests/rk3588-t3.json` |
+
+### SDOT context-length scaling on t4: O(1) GDN decode confirmed (ob-8ms.3)
+
+INT4 and INT8 SDOT context sweeps (ctx 1–8192) on rk3588-t4 big cluster
+validate the GDN O(1) decode scaling claim on independent hardware (t3
+previously reported the same pattern at commit `a6d21df`).
+
+**Pure-GDN mode (all 32 layers GDN, no attention):**
+
+| Config | ctx=1 tok/s | ctx=8192 tok/s | Spread |
+|--------|------------|---------------|--------|
+| INT4 SDOT 4B | 4.51 | 4.50 | 0.2% |
+| INT8 SDOT 4B | 3.42 | 3.40 | 0.6% |
+
+Perfectly flat — zero KV cache growth, zero decode-time growth. This is the
+O(1) recurrent-state advantage in its purest form.
+
+**Hybrid mode (24 GDN + 8 full-attention):**
+
+| Config | ctx=1 tok/s | ctx=8192 tok/s | GDN layer (flat) | Attn at 8192 |
+|--------|------------|---------------|-------------------|-------------|
+| INT4 SDOT 4B | 4.52 | 2.41 | 49 ms | 208 ms |
+| INT8 SDOT 4B | 3.46 | 2.07 | 68 ms | 213 ms |
+
+GDN layer time is constant at all context lengths; decode slowdown is entirely
+from the 8 full-attention layers' O(n) KV scan. At ctx=8192 the INT4 SDOT
+hybrid still delivers 2.41 tok/s vs FP32's 1.11 tok/s baseline — a 2.2× win
+that grows with context length.
+
+**Provenance:** commit `fc30214`, governor=performance, manifest
+`results/manifests/rk3588-t4_sdot_ctxsweep.json`.
