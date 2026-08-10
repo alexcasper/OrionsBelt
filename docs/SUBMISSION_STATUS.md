@@ -94,7 +94,7 @@ cutoff has passed with no board; any future arrival is additive bonus per ADR 00
 | **Aug 8** | Last useful board arrival | **FIRED** — board not arrived; Edge AI committed (ADR 0007) | Submission locked to Edge AI |
 | **Aug 10** (T-4) | No board by this date | **FIRED** — `ob-axq` still OPEN; follow-up `ob-9t0.10` filed | Cut on-device NPU execution; keep NOE audit + CPU+GPU design. **NPU offload design documented** in [`NPU_OFFLOAD_DESIGN.md`](NPU_OFFLOAD_DESIGN.md) |
 | **Aug 11** (T-3) | No board booted | Pre-committed (ADR 0007) | Physical AI framing already cut; Edge AI locked |
-| **Aug 12** (T-2) | Insufficient slack for GDN-2 swap | Check schedule | Cut layer swap; keep microbenchmark |
+| **Aug 12** (T-2) | Insufficient slack for GDN-2 swap | GDN-2 swap **done** (§40, PR #204) — trigger moot | Cut layer swap; keep microbenchmark — **not needed: swap completed** |
 | **Aug 13** (T-1) | Time running out | — | Cut demo video + 262K point if needed |
 | **Aug 14 16:00 PT** | Deadline | — | Submit |
 
