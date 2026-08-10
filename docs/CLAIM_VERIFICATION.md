@@ -195,24 +195,23 @@ Source: our own measurements on RK3588 (Cortex-A76 big cluster, 4×2.4 GHz, gove
 
 | Claim | Status |
 |---|---|
-| SDOT INT8 GEMV: 3.48 tok/s on 4B model (A76) | ✅ Confirmed — FINDINGS §33, manifest `rk3588-t4_e2e_ctxsweep_int8_puregdn_4t.json` (sha `be4d3ca`) |
-| SDOT INT8 GEMV: 30.17 tok/s on 0.8B model (A76) | ✅ Confirmed — FINDINGS §33, manifest `rk3588-t4_e2e_ctxsweep_08b_int8_puregdn_4t.json` (sha `be4d3ca`) |
+| SDOT INT8 GEMV: 3.48 tok/s on 4B model (A76) | ✅ Confirmed — FINDINGS §33, manifest `rk3588-t4_sdot_4b.json` (sha `d6b77b2`, clean re-run) |
+| SDOT INT8 GEMV: 30.51 tok/s on 0.8B model (A76) | ✅ Confirmed — FINDINGS §33, manifest `rk3588-t4_sdot_08b.json` (sha `d6b77b2`, clean re-run) |
 | SDOT is 1.92× over NEON INT8 (4B A76) | ✅ Confirmed — FINDINGS §33, 1.82→3.48 tok/s A/B comparison |
-| SDOT is 3.06× over NEON INT8 (0.8B A76) | ✅ Confirmed — FINDINGS §33, 9.86→30.17 tok/s |
+| SDOT is 3.09× over NEON INT8 (0.8B A76) | ✅ Confirmed — FINDINGS §33, 9.86→30.51 tok/s |
 | SDOT reaches 83% of theoretical bandwidth ceiling (4B) | ✅ Confirmed — FINDINGS §33, 3.48/4.20 tok/s |
 | SDOT SNR: 46.7–49.7 dB vs FP32 oracle | ✅ Confirmed — FINDINGS §33, `--verify-int4` extended test suite |
-| INT4+SDOT hybrid: 4.43 tok/s on 4B model (A76) | ✅ Confirmed — FINDINGS §34, manifest `rk3588-t4_int4sdot_4b.json` (sha `3bff376`) |
-| INT4+SDOT hybrid: 37.21 tok/s on 0.8B model (A76) | ✅ Confirmed — FINDINGS §34, manifest `rk3588-t4_int4sdot_08b.json` (sha `3bff376`) |
-| INT4+SDOT is 1.27× over INT8+SDOT (4B A76) | ✅ Confirmed — FINDINGS §34, 3.48→4.43 tok/s |
-| INT4+SDOT is 1.23× over INT8+SDOT (0.8B A76) | ✅ Confirmed — FINDINGS §34, 30.17→37.21 tok/s |
+| INT4+SDOT hybrid: 4.52 tok/s on 4B model (A76) | ✅ Confirmed — FINDINGS §34, manifest `rk3588-t4_int4sdot_4b.json` (sha `d6b77b2`, clean re-run) |
+| INT4+SDOT hybrid: 36.36 tok/s on 0.8B model (A76) | ✅ Confirmed — FINDINGS §34, manifest `rk3588-t4_int4sdot_08b.json` (sha `d6b77b2`, clean re-run) |
+| INT4+SDOT is 1.30× over INT8+SDOT (4B A76) | ✅ Confirmed — FINDINGS §34, 3.48→4.52 tok/s |
+| INT4+SDOT is 1.19× over INT8+SDOT (0.8B A76) | ✅ Confirmed — FINDINGS §34, 30.51→36.36 tok/s |
 | INT4+SDOT slower on A55 (0.96× vs INT8 SDOT) | ✅ Confirmed — FINDINGS §34, 1.30 vs 1.36 tok/s — compute-bound on little cluster |
-| Cumulative optimization stack: ~63× over naive FP32 baseline (4B) | ✅ Confirmed — FINDINGS §34, 0.07→4.43 tok/s |
+| Cumulative optimization stack: ~65× over naive FP32 baseline (4B) | ✅ Confirmed — FINDINGS §34, 0.07→4.52 tok/s |
 | INT4+SDOT SNR: 46.7–49.7 dB, identical to NEON | ✅ Confirmed — FINDINGS §34, 12 test cases |
 
 All SDOT/INT4+SDOT measurements on A76 use `gcc -O3 -fopenmp -mcpu=cortex-a76`
 (dotprod enabled). Cross-device agreement t3↔t4 (t3 clean re-run at `c880887`,
-2026-08-10): ~20% (4B), ~14% (0.8B) for INT8+SDOT (t4 faster — t4 manifests
-also dirty=true, re-run recommended); ~5% (4B), ~6% (0.8B) for INT4+SDOT.
+2026-08-10): ~20% (4B), ~14% (0.8B) for INT8+SDOT (t4 faster); ~7% (4B), ~4% (0.8B) for INT4+SDOT.
 Earlier tighter agreement (0.9–3.5%) was from dirty t3 manifests. Thermals
 ≤62°C; governor `performance` confirmed in every manifest.
 

@@ -3281,7 +3281,7 @@ From the naive baseline to the fully optimized INT8 path, the 4B model sees a
 access pattern and weight precision, with no algorithmic changes to the model.
 
 > **Updated in §33:** SDOT INT8 GEMV (`vdotq_lane_s32`) pushes the 4B model
-> to 3.48 tok/s (**~50×** cumulative) and 0.8B to 30.17 tok/s on dotprod-capable
+> to 3.48 tok/s (**~50×** cumulative) and 0.8B to 30.51 tok/s on dotprod-capable
 > cores (A76). See the cumulative table in §33 for the full optimization stack.
 
 ### Implication for submission
@@ -5035,7 +5035,7 @@ path uses the float activation directly). All 5 tests pass (test binary:
 | Qwen3.5-4B   | NEON INT8 (§16)  | 1.81 | 552 | 1.0× | 44% |
 | Qwen3.5-4B   | **SDOT INT8**    | **3.48** | **287** | **1.92×** | **83%** |
 | Qwen3.5-0.8B | NEON INT8 (§16)  | 9.86 | 101 | 1.0× | — |
-| Qwen3.5-0.8B | **SDOT INT8**    | **30.17** | **33** | **3.06×** | — |
+| Qwen3.5-0.8B | **SDOT INT8**    | **30.51** | **33** | **3.09×** | — |
 | Qwen3.5-4B (A55 little) | NEON INT8 (§16) | 0.49 | 2034 | 1.0× | — |
 | Qwen3.5-4B (A55 little) | **SDOT INT8**   | **1.36** | **734** | **2.78×** | — |
 
@@ -5046,7 +5046,7 @@ or `taskset -c 0-3` (A55 little), thermal 40→49 °C (no throttling). Manifests
 Raw CSVs: `results/raw/rk3588-t4_sdot_{4b,08b}_big.csv`, `results/raw/rk3588-t4_neon_{4b,08b}_big.csv`,
 `results/raw/rk3588-t4_{sdot,neon}_4b_little.csv`.
 
-### Why the speedup is larger for 0.8B (3.06×) than 4B (1.92×)
+### Why the speedup is larger for 0.8B (3.09×) than 4B (1.92×)
 
 The 0.8B model's smaller weight set (~0.41 GiB INT8) partially fits in the A76
 cluster's shared L3, making the workload more compute-bound and less
@@ -5063,12 +5063,12 @@ path from saturating bandwidth.
 | Naive column-sweep GEMV (FP32) | 0.07 | — | 1.0× |
 | Row-sweep + OpenMP (FP32, §15) | 1.04 | 7.95 | ~15× |
 | + INT8 weight-only NEON (§16) | 1.84 | 10.52 | ~26× |
-| + **SDOT INT8** (this section) | **3.48** | **30.17** | **~50× / ~3.8×** |
+| + **SDOT INT8** (this section) | **3.48** | **30.51** | **~50× / ~3.8×** |
 
 From the naive FP32 baseline to SDOT INT8, the 4B model sees a **~50×
 cumulative speedup**; over the INT8-NEON path alone, SDOT adds 1.9–3.1×.
 
-## 34. INT4+SDOT hybrid GEMV: 2.85× over INT4 NEON, 1.27× over INT8 SDOT on A76 (2026-08-09, ob-8qt.20)
+## 34. INT4+SDOT hybrid GEMV: 2.85× over INT4 NEON, 1.30× over INT8 SDOT on A76 (2026-08-09, ob-8qt.20)
 
 ### Motivation
 
@@ -5121,17 +5121,17 @@ column loads on the inside. Accumulators stay in L1 (1 KB for TILE=256).
 |---|---:|---:|---:|---:|
 | INT4 NEON (§26) | 1.55 | — | — | — |
 | INT8 NEON (§16) | 1.82 | — | — | — |
-| INT8 SDOT (§33) | 3.48 | 30.17 | 1.36 | — |
-| **INT4+SDOT** | **4.43** | **37.21** | **1.30** | **10.42** |
+| INT8 SDOT (§33) | 3.48 | 30.51 | 1.36 | — |
+| **INT4+SDOT** | **4.52** | **36.36** | **1.30** | **10.42** |
 
 **Speedups:**
 - vs INT4 NEON: **2.85×** (4B A76) — the float-widening bottleneck eliminated
-- vs INT8 SDOT: **1.27×** (4B A76), **1.23×** (0.8B A76) — halved memory traffic
+- vs INT8 SDOT: **1.30×** (4B A76), **1.19×** (0.8B A76) — halved memory traffic
 - vs INT8 SDOT on A55: **0.96×** — slightly slower, see analysis below
 
 ### Analysis: why A55 doesn't benefit
 
-On the A76 big cluster, INT4+SDOT gives a clear 1.27× win because the A76 is
+On the A76 big cluster, INT4+SDOT gives a clear 1.30× win because the A76 is
 memory-bandwidth-bound — halving weight traffic directly improves throughput
 despite the ~1.5× instruction overhead from nibble unpacking.
 
@@ -5161,18 +5161,18 @@ once, while NEON uses float FMA directly).
 | Row-sweep + OpenMP (FP32, §15) | 1.04 | ~15× |
 | + INT8 weight-only NEON (§16) | 1.84 | ~26× |
 | + SDOT INT8 (§33) | 3.48 | ~50× |
-| + **INT4+SDOT** (this section) | **4.43** | **~63×** |
+| + **INT4+SDOT** (this section) | **4.52** | **~65×** |
 
 **Cross-device validation (t3, commit `cec1aea`):** INT4+SDOT on the second
-RK3588 board achieves 4.28 tok/s (4B) and 36.69 tok/s (0.8B) — within **3.5%**
-(4B) and **1.4%** (0.8B) of t4's 4.43 / 37.21. This is the tightest
+RK3588 board achieves 4.28 tok/s (4B) and 36.69 tok/s (0.8B) — within **5.6%**
+(4B) and **0.9%** (0.8B) of t4's 4.52 / 36.36. This is the tightest
 cross-device agreement of any quantization method, confirming the INT4+SDOT
 kernel is deterministic and portable across A76 silicon.
 
 > **Correction (2026-08-10, t3 clean re-run at `c880887`):** The `cec1aea`
 > manifest was dirty=true (binary built from uncommitted tree). Re-running at
-> clean HEAD yields 4.21 tok/s (4B) and 35.05 tok/s (0.8B) — **5.2%** (4B) and
-> **6.2%** (0.8B) gap vs t4. Still the tightest cross-device agreement, but
+> clean HEAD yields 4.21 tok/s (4B) and 35.05 tok/s (0.8B) — **7.4%** (4B) and
+> **3.7%** (0.8B) gap vs t4. Still the tightest cross-device agreement, but
 > wider than the dirty-data 3.5%/1.4%. For INT8+SDOT the clean gap is ~20% (4B)
 > and ~14% (0.8B); t4 manifests are also dirty and re-run is recommended.
 > See comparison_table.md §7 and RESULTS DISCIPLINE/ob-bf7.
@@ -5250,8 +5250,8 @@ All existing test suites pass unchanged:
 | Row-sweep + OpenMP (FP32, §15) | 1.04 | ~15× |
 | + INT8 weight-only NEON (§16) | 1.84 | ~26× |
 | + SDOT INT8 (§33) | 3.48 | ~50× |
-| + INT4+SDOT (§34) | 4.43 | ~63× |
-| + **Attn NEON+SDOT** (§35) | 4.43* | ~63× |
+| + INT4+SDOT (§34) | 4.52 | ~65× |
+| + **Attn NEON+SDOT** (§35) | 4.52* | ~65× |
 
 *Decode tokens/sec at short context is unchanged (attention is a small fraction).
 The optimization improves long-context full-attention layer throughput by 33%,

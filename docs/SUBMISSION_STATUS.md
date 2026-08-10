@@ -1,6 +1,7 @@
 # T-4 Submission Status Brief
 
 _Generated 2026-08-07 by t4. Updated 2026-08-08 by j1 (ADR 0007). Updated 2026-08-10 by t3 (T-4 fired, SDOT e2e provenance cleaned, PR table backfill, submission doc polish, PR #226/#227 merged). Updated 2026-08-10 by t4 (PR #228 merged, PR table backfill #228 + closed #229). Updated 2026-08-10 by t3 (PR #232 merged — ob-6ay closed, PR table backfill #230 + #232). Updated 2026-08-10 by t4 (PR #233/#234 merged — test counts 2176→2229, skip 52→20, PR table backfill #233 + #234). Updated 2026-08-10 by t3 (ADR 0007 T-4 firing confirmation section added, PR table backfill #235/#236, PR #237 merged). Updated 2026-08-10 by t4 (PR table backfill #238 + #239). Updated 2026-08-10 by t4 (test count 2229→2256, skip 20→2, PR #239 MERGED, #240 OPEN). Updated 2026-08-10 by t4 (gdn2_reference coverage 50%→98%, test count 2256→2262). Updated 2026-08-10 by t3 (PR #240 MERGED — PR table status fix). Updated 2026-08-10 by t3 (test count 2262→2235 CI-authoritative, skip 2→20; PR #242 table backfill). Updated 2026-08-10 by t3 (PR #243 table backfill — MERGED)._
+Updated 2026-08-10 by t4 (SDOT/INT4+SDOT microbench CSVs re-run clean `d6b77b2`, dirty=false — ob-mrd.21)._
 _All numbers below are validated against committed CSVs with manifests._
 
 ---
@@ -28,8 +29,8 @@ locked to Edge AI.
 | E2E decode (matched commit) | ✓ 3 devices, 3 runs each | 4B INT8: 1.84 tok/s (t3), 0.51 (Jetson); 0.8B INT8: 10.6 (t3), 2.45 (Jetson) |
 | GEMV optimization | ✓ 14.9× speedup | 0.07→1.04 tok/s (4B FP32), dirty=false manifests |
 | INT8 weight-only quant | ✓ 1.65–1.77× on big cores | KV cache context sweep on t3+t4, <6% divergence |
-| SDOT INT8 GEMV (dotprod cores) | ✓ 1.92–3.06× over NEON INT8 | 4B: 3.48 tok/s (83% of theoretical); 0.8B: 30.2 tok/s (t4, cross-val with t3 at 25.6 — ~15% gap, within fleet variance per RESULTS DISCIPLINE/ob-bf7) |
-| INT4+SDOT hybrid GEMV | ✓ 1.27× over INT8+SDOT on A76 | 4B: 4.43 tok/s; 0.8B: 37.21 tok/s (t4, big cluster); A55: INT8+SDOT remains optimal |
+| SDOT INT8 GEMV (dotprod cores) | ✓ 1.92–3.09× over NEON INT8 | 4B: 3.48 tok/s (83% of theoretical); 0.8B: 30.51 tok/s (t4, cross-val with t3 at 25.6 — ~19% gap, within fleet variance per RESULTS DISCIPLINE/ob-bf7) |
+| INT4+SDOT hybrid GEMV | ✓ 1.30× over INT8+SDOT on A76 | 4B: 4.52 tok/s; 0.8B: 36.36 tok/s (t4, big cluster); A55: INT8+SDOT remains optimal |
 | Mixed-precision (fp16/bf16) | ✓ fp16 gives 1.64× on decay | scan compute-bound, flat under fp16 |
 | GDN-2 vs GDN-1 comparison | ✓ Microbenchmark | 1.2–1.5× decode cost on big, 2.2–2.4× on little |
 | NOE op-coverage audit | ✓ Hardware-independent | Scan rejected, Loop trap documented (both CIX NOE + RKNN) |
@@ -58,11 +59,11 @@ locked to Edge AI.
 | 0.8B INT8: 2.45 tok/s (Jetson) | same | ✓ |
 | 4B INT8: 0.51 tok/s (Jetson) | same | ✓ |
 | 4B INT8+SDOT: 3.48 tok/s (t4) | rk3588-t4_sdot_4b_big.csv | ✓ |
-| 0.8B INT8+SDOT: 30.2 tok/s (t4) | rk3588-t4_sdot_08b_big.csv (30.17→30.2) | ✓ |
-| 4B INT4+SDOT: 4.43 tok/s (t4) | rk3588-t4_int4sdot_4b_big.csv | ✓ |
-| 0.8B INT4+SDOT: 37.21 tok/s (t4) | rk3588-t4_int4sdot_08b_big.csv | ✓ |
+| 0.8B INT8+SDOT: 30.51 tok/s (t4) | rk3588-t4_sdot_08b_big.csv | ✓ |
+| 4B INT4+SDOT: 4.52 tok/s (t4) | rk3588-t4_int4sdot_4b_big.csv | ✓ |
+| 0.8B INT4+SDOT: 36.36 tok/s (t4) | rk3588-t4_int4sdot_08b_big.csv | ✓ |
 | ~50× cumulative speedup (INT8+SDOT) | 0.07 → 3.48 tok/s = 49.7× | ✓ |
-| ~63× cumulative speedup (INT4+SDOT) | 0.07 → 4.43 tok/s = 63.3× | ✓ |
+| ~65× cumulative speedup (INT4+SDOT) | 0.07 → 4.52 tok/s = 64.6× | ✓ |
 | (t3 cross-validation) | rk3588-t3_big_int8_sdot_e2e.json (2.80), rk3588-t3_08b_big_int8_sdot_e2e.json (25.6) — dirty=false, SHA `c880887` | ⚠ INT8+SDOT e2e gap ~15–20% vs t4 (board-level, per RESULTS DISCIPLINE/ob-bf7); pure-GDN ctx sweep gap closes to 3–5% (§38) |
 
 All manifests: governor=performance, 30 repeats (kernel) / 1–3 runs (e2e),
@@ -253,7 +254,7 @@ The Edge AI submission's strengths:
 - **Novel kernels** that no existing library provides for Arm
 - **5-device cross-validation** proving the bandwidth-boundedness thesis
 - **The NPU wall finding** — a genuinely novel, citable result
-- **~63× end-to-end speedup** from C kernel + GEMV + INT8 + SDOT + INT4+SDOT
+- **~65× end-to-end speedup** from C kernel + GEMV + INT8 + SDOT + INT4+SDOT
 - **Honest negative results** (NPU compilers reject the recurrence)
 
 The one weakness: no heterogeneous NPU/GPU/CPU dispatch on target

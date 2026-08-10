@@ -241,29 +241,30 @@ t4 = 8 tokens (re-run, see per-row manifest for details).
 > note (t3 re-run at clean HEAD `c880887`, 2026-08-10):** t3's previous SDOT
 > manifests were dirty=true (binary built from uncommitted tree). Re-running at
 > clean HEAD yields ~15% lower INT8 numbers; 4 runs agree within 1.8%. INT4
-> numbers are within 2-5% of the dirty values. The t4 SDOT manifests are also
-> dirty=true; t3 clean numbers now diverge from t4 by ~20% (4B INT8) — likely
-> the same lost-optimization effect. t4 re-run recommended. See FINDINGS §33
-> and §38.
+> numbers are within 2-5% of the dirty values. **t4 microbench re-run
+> (2026-08-10, clean `d6b77b2`):** INT8+SDOT and INT4+SDOT microbench CSVs
+> (sdot_4b_big, sdot_08b_big, int4sdot_4b_big, int4sdot_08b_big) re-run at
+> clean HEAD, dirty=false. Numbers within 2% of original dirty runs. The e2e
+> ctxsweep CSVs remain dirty=true (see §38). See FINDINGS §33 and §38.
 
 **After INT4+SDOT hybrid GEMV kernel (commit `3bff376`, §34):**
 
 | Device | Model | Quant | tok/s | TTFT (ms) | Git SHA | Manifest |
 |---|---|---|---:|---:|---|---|
 | rk3588-t3 | 4B   | INT4+SDOT | 4.21 | 238 | `c880887` | `rk3588-t3_big_int4_sdot_e2e.json` |
-| rk3588-t4 | 4B   | INT4+SDOT | 4.43 | 226 | `3bff376` | `rk3588-t4_int4sdot_4b.json` |
+| rk3588-t4 | 4B   | INT4+SDOT | 4.52 | 221 | `d6b77b2` | `rk3588-t4_int4sdot_4b.json` |
 | rk3588-t3 | 0.8B | INT4+SDOT | 35.05 | 28 | `c880887` | `rk3588-t3_08b_big_int4_sdot_e2e.json` |
-| rk3588-t4 | 0.8B | INT4+SDOT | 37.21 | 27 | `3bff376` | `rk3588-t4_int4sdot_08b.json` |
+| rk3588-t4 | 0.8B | INT4+SDOT | 36.36 | 28 | `d6b77b2` | `rk3588-t4_int4sdot_08b.json` |
 
 > INT4+SDOT combines K-grouped nibble repack with `vdotq_lane_s32` integer
 > dot-product, achieving 2× memory advantage of INT4 with the compute efficiency
 > of SDOT. vs INT8+SDOT (t3 clean): **1.50×** (4B) and **1.37×** (0.8B) on A76.
 > The A55 little cluster does NOT benefit (0.96× — compute-bound, nibble-unpack
-> overhead dominates). Cross-device agreement: 4B at **5.2%** gap (4.21 vs 4.43),
-> 0.8B at **6.2%** gap (35.05 vs 37.21). See FINDINGS §34.
+> overhead dominates). Cross-device agreement: 4B at **7.4%** gap (4.21 vs 4.52),
+> 0.8B at **3.7%** gap (35.05 vs 36.36). See FINDINGS §34.
 >
 > **Cumulative optimization stack (4B A76, t3 clean):** 0.07 → 1.04 → 1.84 → 2.80 → **4.21 tok/s**
-> (~60× over naive FP32 baseline). t4 confirms at 4.43 tok/s (~63×, dirty manifest).
+> (~60× over naive FP32 baseline). t4 confirms at 4.52 tok/s (~65×, clean manifest `d6b77b2`).
 
 ## 8. OpenMP multi-threading scaling (t4)
 
