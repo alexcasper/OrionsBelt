@@ -2070,26 +2070,26 @@ All measurements: Qwen3.5-4B config (seq=64, channels=4096, 24 GDN layers), 30 r
 governor=performance, thermals 38.8→41.6°C.
 
 **Data:** `results/raw/affinity/rk3588-t3_affinity.csv` + `results/manifests/rk3588-t3_affinity.json`
-(SHA `cceb04c`, dirty tree — benchmark had uncommitted affinity-study script changes; landed clean in `1940877`).
+(SHA `9038897`, clean tree — re-run at clean HEAD to fix dirty provenance, see PR resolving ob-dqu follow-up).
 
 | Config | Binary | Cores | gdn_gated_scan p50 (µs) | gdn_cumdecay p50 (µs) | gdn_causal_dwconv1d p50 (µs) |
 |---|---|---|---|---|---|
-| **big_only_a76** | A76 | 4-7 (big) | **284** | **88** | **95** |
-| all_cores_a76 | A76 | all 8 (no pin) | 586 | 193 | 218 |
-| big_on_little | A76 | 0-3 (little) | 1559 | 402 | 410 |
-| little_only_a55 | A55 | 0-3 (little) | 1464 | 343 | 356 |
-| little_on_big | A55 | 4-7 (big) | 295 | 93 | 121 |
-| simultaneous_split | both | big+A55 parallel | 308 (big) / 1428 (little) | 86 (big) / 1412 (little) | 142 (big) / 358 (little) |
+| **big_only_a76** | A76 | 4-7 (big) | **266** | **98** | **116** |
+| all_cores_a76 | A76 | all 8 (no pin) | 414 | 190 | 203 |
+| big_on_little | A76 | 0-3 (little) | 795 | 344 | 358 |
+| little_only_a55 | A55 | 0-3 (little) | 774 | 346 | 353 |
+| little_on_big | A55 | 4-7 (big) | 273 | 76 | 95 |
+| simultaneous_split | both | big+A55 parallel | 302 (big) / 1897 (little) | 87 (big) / 694 (little) | 125 (big) / 459 (little) |
 
 **Key ratios** (vs big_only_a76 baseline):
 
 | Config | gdn_gated_scan | gdn_cumdecay | gdn_causal_dwconv1d |
 |---|---|---|---|
-| all_cores (no pin) | **2.06× slower** | **2.21× slower** | **2.28× slower** |
-| big_on_little | 5.49× slower | 4.59× slower | 4.30× slower |
-| little_on_big | 1.04× slower | 1.06× slower | 1.27× slower |
+| all_cores (no pin) | **1.56× slower** | **1.94× slower** | **1.75× slower** |
+| big_on_little | 2.99× slower | 3.51× slower | 3.09× slower |
+| little_on_big | 1.03× slower | 0.78× (faster) | 0.82× (faster) |
 
-The default OS scheduler (all_cores, no pinning) is **2-2.3× slower** than pinning to big cores.
+The default OS scheduler (all_cores, no pinning) is **1.6-1.9× slower** than pinning to big cores.
 
 ### Thread-count sensitivity
 
@@ -2117,28 +2117,39 @@ Findings:
 
 Running A76 binary on big cores and A55 binary on little cores simultaneously:
 
-| Kernel | Big solo (µs) | Big concurrent (µs) | Interference | Little solo (µs) | Little concurrent (µs) |
-|---|---|---|---|---|---|
-| gdn_gated_scan | 284 | 308 | **1.09×** | 1464 | 1428 |
-| gdn_cumdecay | 88 | 86 | 0.98× (noise) | 343 | 1412* |
-| gdn_causal_dwconv1d | 95 | 142 | 1.49× | 356 | 358 |
+| Kernel | Big solo (µs) | Big concurrent (µs) | Big interference | Little solo (µs) | Little concurrent (µs) | Little interference |
+|---|---|---|---|---|---|---|
+| gdn_gated_scan | 266 | 302 | **1.14×** | 774 | 1897 | **2.45×** |
+| gdn_cumdecay | 98 | 87 | 0.89× (noise) | 346 | 694 | **2.01×** |
+| gdn_causal_dwconv1d | 116 | 125 | 1.08× | 353 | 459 | 1.30× |
 
-\* cumdecay on little shows high variance under load; gated_scan (the dominant kernel) is stable.
-
-The big cluster sees <10% interference from the little cluster's workload. This confirms that
-**big and little clusters have independent cache hierarchies and memory bandwidth** — the split
-affinity policy (big=latency-critical, little=housekeeping) is viable with negligible overhead.
+The big cluster sees minimal interference (<15%, one kernel faster within noise) from the little
+cluster's workload — consistent with the earlier finding. However, in this re-run the little
+cluster shows **substantial** interference from the big cluster's workload (1.3-2.45× slower than
+solo), with much higher run-to-run variance than any solo config (58-89% spread vs 4-10% solo —
+see raw CSV `spread_pct` column). This supersedes the previous "independent cache hierarchies,
+negligible overhead" conclusion: the two clusters do **not** appear to have fully independent
+memory bandwidth — the big cluster's higher per-core throughput seems to compete for shared DRAM
+bandwidth enough to significantly slow the little cluster's more bandwidth-bound kernels
+(gated_scan and cumdecay show the largest interference; dwconv1d, the least bandwidth-bound of the
+three, shows the smallest). The split affinity policy still protects the **big** cluster's latency
+(the goal for decode), but background/housekeeping work placed on little cores should not be
+assumed to run at solo-measured speed while the big cluster is active under load.
 
 ### Recommendation
 
 For GDN inference on RK3588 (and by analogy, Orion O6):
 
 1. **Always pin to big cores**: `taskset -c 4-7` for all latency-critical GDN kernels.
-   This is a 2-3× speedup over default scheduling — the largest single optimization available.
+   This is a ~1.6-1.9× speedup over default (no-pin) scheduling — the largest single
+   optimization available.
 2. **Do not oversubscribe**: let OpenMP auto-detect thread count from the affinity mask.
    Setting OMP_NUM_THREADS higher than physical cores hurts (1.7×).
 3. **Use little cores for background work**: tokenisation, memory management, logging can run
-   on cpu0-3 with <10% impact on big-core throughput.
+   on cpu0-3 with ~10-15% impact on big-core throughput. Note this only protects the **big**
+   cluster's latency — the little cluster itself sees substantial (1.3-2.45×) slowdown from
+   concurrent big-cluster load, so latency-sensitive work should not be placed on little cores
+   while the big cluster is busy (see "Simultaneous split workload" above).
 4. **On the O6 (A720 + i8mm)**: the same policy applies, plus i8mm-enabled GEMM kernels
    (BFMMLA for bf16, SDOT for int8) will use the dot-product path that this A76 device cannot test.
 
@@ -4244,7 +4255,7 @@ path was verified by cross-compilation in §23; the NEON path is verified
 on-silicon here. No competing KleidiAI kernel covers this range for the three
 recurrent primitives.
 
-> **Provenance:** RK3588 t3, commit `eb284b8`, governor=performance,
+> **Provenance:** RK3588 t3, commit `17df2c3`, governor=performance,
 > `taskset -c 4-7`. Batched-timing methodology: 100 calls per measurement,
 > divided by 100, to overcome the RK3588's ~291 ns `CLOCK_MONOTONIC_RAW`
 > granularity (PR #111). The t3 CSV was re-run with taskset at this commit to
@@ -4267,7 +4278,7 @@ the first benchmarked shape — cumdecay 64×160, which runs for only ~3 µs
 on an A76 — on a **little A55 core**, then migrated to a big core for all
 subsequent shapes.
 
-Verification on t4 (commit `5d8430c`) and corrected t3 (commit `eb284b8`):
+Verification on t4 (commit `5d8430c`) and corrected t3 (commit `17df2c3`):
 
 | Affinity | cumdecay 64×160 | GiB/s |
 |---|---|---|
@@ -4280,7 +4291,8 @@ The original t3 value (11.18 µs) matched t4's **little-core** measurement
 almost exactly. The corrected t3 value (2.72 µs) is within 18% of t4's
 big-core measurement (3.33 µs), consistent with t3's slightly lower clock
 (2304 vs 2400 MHz). The t3 CSV has now been re-run with `taskset -c 4-7`
-at commit `eb284b8`.
+at commit `17df2c3` (re-run again at clean HEAD to fix dirty provenance;
+measured values unchanged — cumdecay 64×160 is still 2.721 µs / 28.04 GiB/s).
 
 **Root cause:** The Linux energy-aware scheduler initially places short-lived
 tasks on little cores for energy efficiency. Cumdecay 64×160 completes in
@@ -4290,7 +4302,7 @@ process has accumulated enough CPU time to trigger migration to a big core,
 where it remains for the rest of the benchmark.
 
 **Resolution.** The t3 CSV has been re-run with `taskset -c 4-7` at commit
-`eb284b8`. The corrected cumdecay 64×160 value (2.72 µs / 28.0 GiB/s) is now
+`17df2c3`. The corrected cumdecay 64×160 value (2.72 µs / 28.0 GiB/s) is now
 consistent with t4's big-core measurement. All 15 t3 shapes now agree with
 t4 within 5–18%, and the §24 A76 table above has been updated accordingly.
 
@@ -5561,8 +5573,8 @@ architecture. Full end-to-end fine-tuning is needed for a fair comparison.
 
 | Run | Commit | Device | Manifest |
 |-----|--------|--------|----------|
-| 30-step random | `8faec1e` | rk3588-t3 A76 | `gdn2_swap_t3.json` |
-| 30-step smart init | `8faec1e` | rk3588-t3 A76 | `gdn2_swap_smart_init_t3.json` |
+| 30-step random | `f5ae5e2` | rk3588-t3 A76 | `gdn2_swap_t3.json` |
+| 30-step smart init | `8faec1e` (unrecoverable, see manifest `sha_note`) | rk3588-t3 A76 | `gdn2_swap_smart_init_t3.json` |
 | 100-step random | `937ba25` | rk3588-t3 A76 | `gdn2_swap_100step_t3.json` |
 | RULER GDN-1 | `1743c3e` | rk3588-t3 A76 | `ruler_gdn1_t3.json` |
 | RULER GDN-2 | `1743c3e` | rk3588-t3 A76 | `ruler_gdn2_t3.json` |

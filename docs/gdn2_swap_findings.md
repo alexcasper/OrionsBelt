@@ -110,7 +110,7 @@ the gates are clearly converging toward the GDN-1 reference behavior.
 
 CE loss recovers only 1.54 points out of the 9.01-point increase
 (17.1%) at matched hyperparameters (seq_len=128, lr=3e-4, commit
-`8faec1e`). Three factors explain the remaining gap:
+`f5ae5e2`). Three factors explain the remaining gap:
 
 1. **Gate initialization is not the bottleneck:** Smart init from GDN-1 β
    values lowers initial MSE by 20.6% but both strategies converge to
@@ -176,8 +176,9 @@ projections:
   averaging when `num_v_heads > num_k_heads`)
 - Write gate: direct 1:1 mapping for value heads
 
-Both runs used identical hyperparameters: seq_len=128, lr=3e-4, 30 steps,
-commit `8faec1e`.
+Both runs used identical hyperparameters: seq_len=128, lr=3e-4, 30 steps
+(random init: commit `f5ae5e2`; smart init: commit `8faec1e`, unrecoverable
+SHA — see manifest `sha_note`).
 
 ### Matched comparison
 
