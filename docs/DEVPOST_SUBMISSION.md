@@ -28,7 +28,7 @@ At 262K context on the 4B checkpoint, that difference is **23.95 GiB of RAM** �
 
 **What we built:**
 - **Three GDN CPU kernels** (gated cumulative decay, gated delta-rule scan, causal depthwise Conv1D) in C with NEON intrinsics, verified against FP32 reference implementations
-- **Mixed-precision variants** (fp16, bf16 recurrent state) — fp16 gives 1.77× on the decay chain; scan is compute-bound and shows no bandwidth benefit
+- **Mixed-precision variants** (fp16, bf16 recurrent state) — fp16 gives 1.64× on the decay chain; scan is compute-bound and shows no bandwidth benefit
 - **big.LITTLE affinity policy** — pinning to A76 big cores is 2–3× faster than default scheduler placement
 - **OpenMP parallelization + NEON double-width unrolling** — 2.6–5.1× cumulative speedup on A76
 - **Cross-vendor NPU operator-coverage audit** — both CIX NOE and Rockchip RKNN reject GDN's variable-length recurrence (the "Loop" op). This generalizes: no current edge NPU compiler handles it
@@ -79,10 +79,10 @@ Qwen3.5-4B, prefill (seq=64), fp32 baseline, 8-thread (big cluster). Two indepen
 
 | Kernel | fp32 | fp16 | Speedup |
 |---|---:|---:|---:|
-| Cumulative decay | 21.06 | 37.20 | **1.77×** |
-| Gated scan | 10.62 | 10.47 | 0.99× (flat) |
+| Cumulative decay | 21.39 | 35.12 | **1.64×** |
+| Gated scan | 10.56 | 10.43 | 0.99× (flat) |
 
-> fp16 halves memory traffic for the elementwise decay chain → 1.77× on t3. Gated scan is compute-bound on the delta-rule matmul, so halving traffic doesn't help — confirming the instruction-overhead diagnosis.
+> fp16 halves memory traffic for the elementwise decay chain → 1.64× on t3. Gated scan is compute-bound on the delta-rule matmul, so halving traffic doesn't help — confirming the instruction-overhead diagnosis.
 
 ### Q8_0 quantization: 2.97× decode speedup with zero accuracy loss
 

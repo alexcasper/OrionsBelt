@@ -21,14 +21,14 @@ ADR 0007 — the submission framing is locked to Edge AI.
 
 | Deliverable | Status | Key data |
 |---|---|---|
-| 3 GDN CPU kernels (NEON) | ✓ Verified + benchmarked | cumdecay 21.1 GiB/s, scan 10.6, conv1d 18.7 (t3, dirty=false) |
+| 3 GDN CPU kernels (NEON) | ✓ Verified + benchmarked | cumdecay 21.4 GiB/s, scan 10.6, conv1d 20.6 (t3, dirty=false) |
 | 5-device fleet benchmarks | ✓ Cross-validated | Pi5 (A76), RK3588 big+little (A76/A55), Jetson (A57), t3/t4 match |
 | E2E decode (matched commit) | ✓ 3 devices, 3 runs each | 4B INT8: 1.84 tok/s (t3), 0.51 (Jetson); 0.8B INT8: 10.6 (t3), 2.45 (Jetson) |
 | GEMV optimization | ✓ 14.9× speedup | 0.07→1.04 tok/s (4B FP32), dirty=false manifests |
 | INT8 weight-only quant | ✓ 1.65–1.77× on big cores | KV cache context sweep on t3+t4, <6% divergence |
 | SDOT INT8 GEMV (dotprod cores) | ✓ 1.92–3.06× over NEON INT8 | 4B: 3.48 tok/s (83% of theoretical); 0.8B: 30.2 tok/s (t4, cross-val with t3 within 5%) |
 | INT4+SDOT hybrid GEMV | ✓ 1.27× over INT8+SDOT on A76 | 4B: 4.43 tok/s; 0.8B: 37.21 tok/s (t4, big cluster); A55: INT8+SDOT remains optimal |
-| Mixed-precision (fp16/bf16) | ✓ fp16 gives 1.77× on decay | scan compute-bound, flat under fp16 |
+| Mixed-precision (fp16/bf16) | ✓ fp16 gives 1.64× on decay | scan compute-bound, flat under fp16 |
 | GDN-2 vs GDN-1 comparison | ✓ Microbenchmark | 1.2–1.5× decode cost on big, 2.2–2.4× on little |
 | NOE op-coverage audit | ✓ Hardware-independent | Scan rejected, Loop trap documented (both CIX NOE + RKNN) |
 | KleidiAI gap analysis + submission | ✓ Complete, 14 tests pass | No recurrence primitive; dwconv is SME2-only |
@@ -38,7 +38,7 @@ ADR 0007 — the submission framing is locked to Edge AI.
 | Submission prep (README, write-up, repro) | ✓ All beads closed | ob-fnq, ob-f7k, ob-kdi, ob-9e2 |
 | Compliance checklist | ✓ ob-9e2 closed | Apache-2.0, no credentials at tip of main/t4 |
 
-**Submission readiness:** 15/15 checks pass, 2294 tests, Ruff clean, CI green.
+**Submission readiness:** 15/15 checks pass, 2315 tests, Ruff clean, CI green.
 
 ---
 
@@ -46,11 +46,11 @@ ADR 0007 — the submission framing is locked to Edge AI.
 
 | Claim (DEVPOST_SUBMISSION.md) | Source CSV | Match? |
 |---|---|---|
-| Cumulative decay 21.06 GiB/s (t3) | rk3588-t3-clean.csv | ✓ |
+| Cumulative decay 21.39 GiB/s (t3) | rk3588-t3-clean.csv | ✓ |
 | Cumulative decay 22.25 GiB/s (t4) | rk3588-t4_big.csv | ✓ |
 | Gated scan 10.62 / 11.53 GiB/s | same CSVs | ✓ |
-| Causal Conv1D 18.73 / 19.04 GiB/s | same CSVs | ✓ |
-| fp16 decay 37.20 GiB/s (1.77×) | rk3588-t3-clean.csv | ✓ |
+| Causal Conv1D 20.59 / 19.04 GiB/s | same CSVs | ✓ |
+| fp16 decay 35.12 GiB/s (1.64×) | rk3588-t3-clean.csv | ✓ |
 | 4B INT8: 1.84 tok/s (t3) | e2e_fleet_comparison.md | ✓ |
 | 0.8B INT8: 10.61 tok/s (t3) | same | ✓ |
 | 0.8B INT8: 2.45 tok/s (Jetson) | same | ✓ |
