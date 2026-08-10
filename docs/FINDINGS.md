@@ -5169,6 +5169,14 @@ RK3588 board achieves 4.28 tok/s (4B) and 36.69 tok/s (0.8B) — within **3.5%**
 cross-device agreement of any quantization method, confirming the INT4+SDOT
 kernel is deterministic and portable across A76 silicon.
 
+> **Correction (2026-08-10, t3 clean re-run at `c880887`):** The `cec1aea`
+> manifest was dirty=true (binary built from uncommitted tree). Re-running at
+> clean HEAD yields 4.21 tok/s (4B) and 35.05 tok/s (0.8B) — **5.2%** (4B) and
+> **6.2%** (0.8B) gap vs t4. Still the tightest cross-device agreement, but
+> wider than the dirty-data 3.5%/1.4%. For INT8+SDOT the clean gap is ~20% (4B)
+> and ~14% (0.8B); t4 manifests are also dirty and re-run is recommended.
+> See comparison_table.md §7 and RESULTS DISCIPLINE/ob-bf7.
+
 ## 35. NEON+SDOT full-attention scoring: 25–35% faster full-attention layer at long context (2026-08-09, ob-8qt.21)
 
 ### Motivation
