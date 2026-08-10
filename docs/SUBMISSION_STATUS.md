@@ -57,10 +57,10 @@ locked to Edge AI.
 | 0.8B INT8: 10.61 tok/s (t3) | same | ✓ |
 | 0.8B INT8: 2.45 tok/s (Jetson) | same | ✓ |
 | 4B INT8: 0.51 tok/s (Jetson) | same | ✓ |
-| 4B INT8+SDOT: 3.48 tok/s (t4) | rk3588-t4_big_int8_sdot_e2e_schema.csv | ✓ |
-| 0.8B INT8+SDOT: 30.2 tok/s (t4) | rk3588-t4_08b_big_int8_sdot_e2e_schema.csv | ✓ |
-| 4B INT4+SDOT: 4.43 tok/s (t4) | rk3588-t4_big_int4_sdot_e2e_schema.csv | ✓ |
-| 0.8B INT4+SDOT: 37.21 tok/s (t4) | rk3588-t4_08b_big_int4_sdot_e2e_schema.csv | ✓ |
+| 4B INT8+SDOT: 3.48 tok/s (t4) | rk3588-t4_sdot_4b_big.csv | ✓ |
+| 0.8B INT8+SDOT: 30.2 tok/s (t4) | rk3588-t4_sdot_08b_big.csv (30.17→30.2) | ✓ |
+| 4B INT4+SDOT: 4.43 tok/s (t4) | rk3588-t4_int4sdot_4b_big.csv | ✓ |
+| 0.8B INT4+SDOT: 37.21 tok/s (t4) | rk3588-t4_int4sdot_08b_big.csv | ✓ |
 | ~50× cumulative speedup (INT8+SDOT) | 0.07 → 3.48 tok/s = 49.7× | ✓ |
 | ~63× cumulative speedup (INT4+SDOT) | 0.07 → 4.43 tok/s = 63.3× | ✓ |
 | (t3 cross-validation) | rk3588-t3_big_int8_sdot_e2e.json (2.80), rk3588-t3_08b_big_int8_sdot_e2e.json (25.6) — dirty=false, SHA `c880887` | ⚠ INT8+SDOT e2e gap ~15–20% vs t4 (board-level, per RESULTS DISCIPLINE/ob-bf7); pure-GDN ctx sweep gap closes to 3–5% (§38) |
