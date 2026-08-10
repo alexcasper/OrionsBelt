@@ -180,22 +180,23 @@ remain <1% of decode time; the bottleneck is weight-loading matmuls (FFN
 We implemented real grouped-query attention (GQA) with a growing KV cache in
 the full-attention layers, then swept context length from 1 to 4096 tokens
 to measure the scaling behavior of each layer type independently
-(FINDINGS.md §17, commit `c4cc9be`, RK3588-t3 A76):
+(FINDINGS.md §17, commit `f0507e7`, RK3588-t3 A76, INT8 with SDOT
+dot-product acceleration):
 
 | Context | 0.8B hybrid tok/s | 0.8B pure-GDN tok/s | 4B hybrid tok/s | 4B pure-GDN tok/s |
 |--------:|------------------:|--------------------:|----------------:|------------------:|
-|       1 |             10.70 |               10.48 |            1.84 |              1.85 |
-|    1024 |              8.42 |               10.46 |            1.62 |              1.84 |
-|    4096 |              4.99 |               10.45 |            1.19 |              1.84 |
+|       1 |             28.79 |               27.52 |            3.30 |              3.25 |
+|    1024 |             25.35 |               27.48 |            3.09 |              3.24 |
+|    4096 |             18.46 |               27.47 |            2.49 |              3.24 |
 
-**Pure-GDN throughput is flat to within 0.3%** from ctx=1 to ctx=4096 — the
+**Pure-GDN throughput is flat to within 0.2%** from ctx=1 to ctx=4096 — the
 recurrent state matrix does not grow. Meanwhile the hybrid model degrades
-1.55× (4B) to 2.14× (0.8B) at 4K context, entirely from the 6 full-attention
+1.33× (4B) to 1.56× (0.8B) at 4K context, entirely from the 6 full-attention
 layers whose KV cache reads grow linearly. At 4K context, full-attention
-consumes 58% of decode time on the 0.8B model — up from 9.5% at ctx=1.
+consumes 41% of decode time on the 0.8B model — up from 7% at ctx=1.
 
-Full-attention latency scales linearly: 9→116 ms (12.9×) on 0.8B, 37→333 ms
-(9.0×) on 4B. GDN latency is flat at 35 ms (0.8B) / 115 ms (4B) regardless
+Full-attention latency scales linearly: 2.5→22 ms (8.7×) on 0.8B, 19→116 ms
+(6.2×) on 4B. GDN latency is flat at 12 ms (0.8B) / 71 ms (4B) regardless
 of context length.
 
 **Cross-device validation:** the identical scaling shape holds on the Jetson
@@ -417,7 +418,7 @@ ORIONS_FORCE_FP32=1 python3 bench/harness.py \
   incompatible with both compilers
 - End-to-end model throughput: Qwen3.5-0.8B on RK3588, prefill + decode + TTFT
 - Context-length scaling measurement proving GDN O(1) vs full-attention O(n):
-  pure-GDN throughput flat to 0.3% across ctx=1–4096, cross-validated on A57
+  pure-GDN throughput flat to 0.2% across ctx=1–4096, cross-validated on A57
   and A76 (FINDINGS.md §17)
 - INT8 KV cache quantization: 1.7–2.6× full-attention speedup at long context,
   4× KV memory reduction, combined INT8 (weights + KV) delivers 1.8× overall

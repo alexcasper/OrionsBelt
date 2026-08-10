@@ -3349,8 +3349,10 @@ the scaling shape, not absolute attention throughput.
 GDN layers need no modification: their recurrent state is a fixed-size
 `NUM_V_HEADS × HEAD_DIM` matrix that does not grow with context.
 
-All measurements: RK3588-t3, governor=performance, commit `c4cc9be`,
-pre-thermal 38–39 °C, post-thermal 51–54 °C.
+All measurements: RK3588-t3, governor=performance. CSVs re-run at clean
+commit `f0507e7` (includes SDOT INT8 GEMV ob-8qt.14 + OpenMP attention
+parallelization ob-m2j). Original capture at `c4cc9be`; see SDOT re-run
+correction at end of this section.
 
 ### Results — 4B model (big cluster, A76, cpu4-7)
 
@@ -3358,25 +3360,25 @@ pre-thermal 38–39 °C, post-thermal 51–54 °C.
 
 | ctx | GDN (ms) | Full-attn (ms) | FFN (ms) | Total (ms) | tok/s | Full-attn share | KV cache |
 |----:|---------:|---------------:|---------:|-----------:|------:|----------------:|---------:|
-| 1 | 213 | 54 | 696 | 963 | 1.04 | 5.6% | 0.1 MB |
-| 64 | 213 | 58 | 696 | 967 | 1.03 | 6.0% | 4 MB |
-| 256 | 213 | 71 | 696 | 980 | 1.02 | 7.2% | 16 MB |
-| 512 | 213 | 89 | 696 | 998 | 1.00 | 8.9% | 32 MB |
-| 1024 | 213 | 128 | 697 | 1038 | 0.96 | 12.3% | 64 MB |
-| 2048 | 213 | 203 | 696 | 1112 | 0.90 | 18.3% | 128 MB |
-| 4096 | 213 | 352 | 696 | 1260 | 0.79 | 27.9% | 256 MB |
+| 1 | 208 | 52 | 677 | 938 | 1.07 | 5.6% | 0.1 MB |
+| 64 | 209 | 53 | 677 | 939 | 1.06 | 5.7% | 4 MB |
+| 256 | 208 | 57 | 677 | 942 | 1.06 | 6.0% | 16 MB |
+| 512 | 209 | 61 | 679 | 948 | 1.05 | 6.4% | 32 MB |
+| 1024 | 209 | 72 | 679 | 960 | 1.04 | 7.5% | 64 MB |
+| 2048 | 209 | 97 | 679 | 984 | 1.02 | 9.9% | 128 MB |
+| 4096 | 209 | 154 | 678 | 1041 | 0.96 | 14.8% | 256 MB |
 
-#### INT8
+#### INT8 (SDOT dot-product acceleration, commit `f0507e7`)
 
 | ctx | GDN (ms) | Full-attn (ms) | FFN (ms) | Total (ms) | tok/s | Full-attn share | KV cache |
 |----:|---------:|---------------:|---------:|-----------:|------:|----------------:|---------:|
-| 1 | 115 | 37 | 391 | 543 | 1.84 | 6.8% | 0.1 MB |
-| 64 | 115 | 40 | 389 | 545 | 1.84 | 7.4% | 4 MB |
-| 256 | 116 | 53 | 390 | 559 | 1.79 | 9.6% | 16 MB |
-| 512 | 116 | 72 | 390 | 577 | 1.73 | 12.5% | 32 MB |
-| 1024 | 116 | 110 | 390 | 616 | 1.62 | 17.9% | 64 MB |
-| 2048 | 116 | 185 | 390 | 690 | 1.45 | 26.8% | 128 MB |
-| 4096 | 116 | 333 | 392 | 841 | 1.19 | 39.7% | 256 MB |
+| 1 | 71 | 19 | 214 | 303 | 3.30 | 6.2% | 0.1 MB |
+| 64 | 71 | 20 | 215 | 305 | 3.28 | 6.4% | 4 MB |
+| 256 | 71 | 23 | 214 | 308 | 3.24 | 7.5% | 16 MB |
+| 512 | 71 | 27 | 215 | 313 | 3.20 | 8.7% | 32 MB |
+| 1024 | 71 | 38 | 215 | 324 | 3.09 | 11.8% | 64 MB |
+| 2048 | 71 | 63 | 215 | 348 | 2.87 | 18.0% | 128 MB |
+| 4096 | 71 | 116 | 214 | 401 | 2.49 | 28.9% | 256 MB |
 
 ### Results — 0.8B model (big cluster, A76, cpu4-7)
 
@@ -3384,25 +3386,25 @@ pre-thermal 38–39 °C, post-thermal 51–54 °C.
 
 | ctx | GDN (ms) | Full-attn (ms) | FFN (ms) | Total (ms) | tok/s | Full-attn share |
 |----:|---------:|---------------:|---------:|-----------:|------:|----------------:|
-| 1 | 48 | 9 | 68 | 125 | 8.01 | 7.5% |
-| 64 | 48 | 10 | 68 | 126 | 7.94 | 8.3% |
-| 256 | 48 | 15 | 68 | 131 | 7.64 | 11.7% |
-| 512 | 48 | 22 | 68 | 137 | 7.28 | 15.8% |
-| 1024 | 48 | 35 | 68 | 151 | 6.64 | 23.2% |
-| 2048 | 48 | 62 | 68 | 178 | 5.61 | 35.0% |
-| 4096 | 48 | 116 | 68 | 231 | 4.33 | 50.0% |
+| 1 | 47 | 9 | 66 | 122 | 8.19 | 7.4% |
+| 64 | 47 | 9 | 66 | 122 | 8.17 | 7.5% |
+| 256 | 47 | 10 | 66 | 123 | 8.12 | 8.2% |
+| 512 | 47 | 11 | 66 | 124 | 8.04 | 9.1% |
+| 1024 | 47 | 14 | 66 | 127 | 7.88 | 10.9% |
+| 2048 | 47 | 19 | 66 | 132 | 7.57 | 14.3% |
+| 4096 | 47 | 29 | 66 | 142 | 7.06 | 20.3% |
 
-#### INT8
+#### INT8 (SDOT dot-product acceleration, commit `f0507e7`)
 
 | ctx | GDN (ms) | Full-attn (ms) | FFN (ms) | Total (ms) | tok/s | Full-attn share |
 |----:|---------:|---------------:|---------:|-----------:|------:|----------------:|
-| 1 | 35 | 9 | 50 | 93 | 10.70 | 9.5% |
-| 64 | 35 | 10 | 50 | 94 | 10.59 | 10.5% |
-| 256 | 35 | 15 | 50 | 99 | 10.07 | 14.9% |
-| 512 | 35 | 20 | 50 | 105 | 9.55 | 19.3% |
-| 1024 | 35 | 34 | 50 | 119 | 8.42 | 28.8% |
-| 2048 | 35 | 62 | 50 | 147 | 6.82 | 42.3% |
-| 4096 | 35 | 116 | 50 | 200 | 4.99 | 57.7% |
+| 1 | 12 | 2.5 | 21 | 35 | 28.79 | 7.2% |
+| 64 | 12 | 3 | 21 | 35 | 28.57 | 7.8% |
+| 256 | 12 | 4 | 21 | 36 | 27.98 | 10.1% |
+| 512 | 12 | 5 | 21 | 37 | 27.06 | 12.9% |
+| 1024 | 12 | 7 | 21 | 39 | 25.35 | 18.5% |
+| 2048 | 12 | 12 | 21 | 44 | 22.52 | 27.5% |
+| 4096 | 12 | 22 | 21 | 54 | 18.46 | 40.6% |
 
 ### Key findings
 
@@ -3411,8 +3413,8 @@ modes, and clusters, GDN-layer latency is flat to within measurement noise
 (±2%) from ctx=1 to ctx=4096. The recurrent state matrix does not grow.
 
 **2. Full-attention cost grows linearly with context.** For the 4B INT8 model,
-full-attention latency goes from 37 ms (ctx=1) to 333 ms (ctx=4096) — a **9.0×
-increase**. For the 0.8B INT8 model, it goes from 9 ms to 116 ms — a **12.9×
+full-attention latency goes from 19 ms (ctx=1) to 116 ms (ctx=4096) — a **6.2×
+increase**. For the 0.8B INT8 model, it goes from 2.5 ms to 22 ms — an **8.7×
 increase**. The scaling is linear in context length as expected (each decode
 step reads all cached K/V vectors).
 
@@ -3424,16 +3426,16 @@ shrinks:
 
 | ctx | 4B FP32 tok/s | 4B INT8 tok/s | INT8 speedup |
 |----:|--------------:|--------------:|-------------:|
-| 1 | 1.04 | 1.84 | 1.78× |
-| 1024 | 0.96 | 1.62 | 1.69× |
-| 4096 | 0.79 | 1.19 | 1.51× |
+| 1 | 1.07 | 3.30 | 3.08× |
+| 1024 | 1.04 | 3.09 | 2.97× |
+| 4096 | 0.96 | 2.49 | 2.59× |
 
 This is not a limitation of the quantization scheme — it is the fundamental
 property that KV cache reads are activation traffic, not weight traffic.
 
-**4. At 4K context, full-attention becomes the dominant cost.** For the 0.8B
-INT8 model, full-attention layers consume 58% of decode time at ctx=4096,
-versus 9.5% at ctx=1. The throughput drops from 10.7 to 5.0 tok/s — a **2.1×
+**4. At 4K context, full-attention becomes a significant cost.** For the 0.8B
+INT8 model, full-attention layers consume 41% of decode time at ctx=4096,
+versus 7.2% at ctx=1. The throughput drops from 28.8 to 18.5 tok/s — a **1.6×
 slowdown** — entirely from the full-attention layers that GDN replaces.
 
 **5. KV cache memory grows linearly.** At ctx=4096 the 4B model's KV cache is
@@ -3453,21 +3455,21 @@ the ceiling: what a pure-linear-attention model would achieve.
 
 | ctx | 0.8B hybrid tok/s | 0.8B pure-GDN tok/s | 4B hybrid tok/s | 4B pure-GDN tok/s |
 |----:|------------------:|--------------------:|----------------:|------------------:|
-| 1 | 10.70 | 10.48 | 1.84 | 1.85 |
-| 64 | 10.59 | 10.48 | 1.84 | 1.85 |
-| 256 | 10.07 | 10.47 | 1.79 | 1.85 |
-| 1024 | 8.42 | 10.46 | 1.62 | 1.84 |
-| 2048 | 6.82 | 10.46 | 1.45 | 1.84 |
-| 4096 | 4.99 | 10.45 | 1.19 | 1.84 |
+| 1 | 28.79 | 27.52 | 3.30 | 3.25 |
+| 64 | 28.57 | 27.50 | 3.28 | 3.25 |
+| 256 | 27.98 | 27.50 | 3.24 | 3.25 |
+| 1024 | 25.35 | 27.48 | 3.09 | 3.24 |
+| 2048 | 22.52 | 27.45 | 2.87 | 3.25 |
+| 4096 | 18.46 | 27.47 | 2.49 | 3.24 |
 
-Pure-GDN throughput is **flat to within 0.3%** across all context lengths.
-The hybrid model degrades by 1.55× (4B) to 2.1× (0.8B) at ctx=4096 — entirely
+Pure-GDN throughput is **flat to within 0.2%** across all context lengths.
+The hybrid model degrades by 1.33× (4B) to 1.56× (0.8B) at ctx=4096 — entirely
 from the full-attention layers. KV cache memory is zero for pure-GDN.
 
 At ctx=1 the pure-GDN model is slightly slower than hybrid for the 0.8B model
-(10.48 vs 10.70 tok/s) because it has 6 additional GDN layers (replacing 6
-cheaper full-attention Q/K/V projections). But by ctx=1024 the crossover has
-occurred, and at ctx=4096 pure-GDN is 2.1× faster.
+(27.52 vs 28.79 tok/s) because it has 6 additional GDN layers (replacing 6
+cheaper full-attention Q/K/V projections). But by ctx=512 the crossover has
+occurred, and at ctx=4096 pure-GDN is 1.5× faster.
 
 ### Results — Jetson Nano A57 (cross-device validation)
 
@@ -3501,14 +3503,14 @@ Throughput variance from ctx=1 to ctx=4096: **<0.4%** — perfectly flat.
 
 | Config | A76 ctx=1 | A76 ctx=4096 | A57 ctx=1 | A57 ctx=4096 | A76 slowdown | A57 slowdown |
 |--------|----------:|-------------:|----------:|-------------:|-------------:|-------------:|
-| 0.8B hybrid | 10.70 | 5.01 | 2.95 | 1.67 | 2.14× | 1.77× |
-| 0.8B pure-GDN | 10.46 | 10.44 | 2.88 | 2.89 | 1.00× | 1.00× |
-| 4B hybrid | 1.84 | 1.19 | 0.57 | 0.42 | 1.55× | 1.36× |
-| 4B pure-GDN | 1.84 | 1.83 | 0.57 | 0.59 | 1.01× | 0.97× |
+| 0.8B hybrid | 28.79 | 18.46 | 2.95 | 1.67 | 1.56× | 1.77× |
+| 0.8B pure-GDN | 27.52 | 27.47 | 2.88 | 2.89 | 1.00× | 1.00× |
+| 4B hybrid | 3.30 | 2.49 | 0.57 | 0.42 | 1.33× | 1.36× |
+| 4B pure-GDN | 3.25 | 3.24 | 0.57 | 0.59 | 1.00× | 0.97× |
 
 The GDN advantage holds on both core classes: pure-GDN is flat everywhere,
-hybrid degrades everywhere. The A57's absolute throughput is ~3.6× lower than
-the A76 (consistent with §19's cross-device ratio), but the **scaling shape
+hybrid degrades everywhere. The A57's absolute throughput is ~9.7× lower than
+the A76 (0.8B INT8 hybrid: 2.95 vs 28.79 tok/s), but the **scaling shape
 is identical** — the O(1) vs O(n) distinction is architectural, not
 microarchitectural.
 
@@ -3526,7 +3528,7 @@ arbitrarily long contexts without throughput degradation or memory growth.**
 The 3:1 GDN:full-attention hybrid already captures most of the benefit — 75%
 of layers have O(1) cost. A pure-GDN architecture would eliminate the O(n)
 component entirely, maintaining flat throughput at any context length (measured:
-0.3% variance from ctx=1 to ctx=4096).
+0.2% variance from ctx=1 to ctx=4096).
 
 ### Data
 
@@ -3541,7 +3543,7 @@ component entirely, maintaining flat throughput at any context length (measured:
 - `results/raw/rk3588-t3_big_puregdn_ctxsweep_e2e_raw.csv` — 4B FP32 pure-GDN big
 - `results/raw/rk3588-t3_08b_big_puregdn_ctxsweep_e2e_raw.csv` — 0.8B FP32 pure-GDN big
 
-All at commit `c4cc9be`, governor=performance. Manifests in `results/manifests/`.
+All at commit `f0507e7` (re-run with SDOT + OpenMP fairness), governor=performance. Manifests in `results/manifests/`.
 
 ### Reproducing
 
@@ -3619,6 +3621,25 @@ Data: `results/raw/rk3588-t4_e2e_ctxsweep_4t_fair.csv`,
 `results/raw/rk3588-t4_e2e_ctxsweep_int8_4t_fair.csv`,
 `results/raw/rk3588-t4_e2e_ctxsweep_int8_1t.csv`.
 Manifest: `results/manifests/rk3588-t4.json` (SHA `31cba63`).
+
+### Correction: SDOT re-run (2026-08-10, ob-9ea)
+
+The §17 t3 CSVs were re-run at clean commit `f0507e7` for provenance cleanup
+(original capture at `c4cc9be` had dirty-tree SHAs). Commit `f0507e7` includes
+SDOT INT8 GEMV (ob-8qt.14, 1.9–3.1× over NEON dequant) and OpenMP attention
+parallelization (ob-m2j). The INT8 tables above have been updated to reflect
+the re-run data. Key changes:
+
+- 0.8B INT8 hybrid: 10.70 → 28.79 tok/s at ctx=1 (2.7× from SDOT)
+- 4B INT8 hybrid: 1.84 → 3.30 tok/s at ctx=1 (1.8× from SDOT)
+- Hybrid slowdown at 4K context reduced: 0.8B 2.14× → 1.56×, 4B 1.55× → 1.33×
+
+The qualitative finding (GDN O(1) vs full-attention O(n)) is unchanged — only
+absolute magnitudes shifted. Pure-GDN remains flat within 0.2%. The INT8
+speedup over FP32 increased from 1.5–1.8× to 2.6–3.1× because SDOT accelerates
+the weight-loading matmuls. Generated figures
+(`ctx_length_scaling_a76.md`, `ctx_length_scaling_cross.md`) now reflect this
+data.
 
 ## 18. Sustained-load thermal stability: no throttling on RK3588 (2026-08-07)
 
