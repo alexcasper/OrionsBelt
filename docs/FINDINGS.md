@@ -2220,30 +2220,38 @@ kernel is not even bandwidth-bound — it's dominated by **function-call and sta
 overhead**. The per-element work (whether 2 or 4 FLOPs, 3 or 5 streams) is negligible compared
 to the fixed cost of entering the kernel, loading the state vector, and storing the output.
 
-**Finding 2: GDN-2 costs exactly 2× at prefill.** At seq=64, GDN-2 is 2.0× slower with identical
+**Finding 2: GDN-2 costs exactly 2× at prefill.** ~~At seq=64, GDN-2 is 2.0× slower with identical
 GFLOP/s throughput (1.97 vs 1.96). This means the A76 pipeline processes both kernels at the same
 FLOP rate — GDN-2 simply has 2× the FLOPs to do. The extra streams (5 vs 3) cause the effective
 bandwidth to drop slightly (11.07 → 9.21 GiB/s), suggesting the memory system is approaching
-saturation but is not yet the bottleneck at this shape.
+saturation but is not yet the bottleneck at this shape.~~
+
+> ⚠ **SUPERSEDED by the aliasing-bug correction below (Session 15).** The 2.0× ratio was inflated
+> by a benchmark bug (`w_gate == x` pointer aliasing). Corrected ratio is **~2.7×** (718µs vs 267µs).
+> The "identical GFLOP/s" observation was also an artefact of undercounting bytes.
 
 **Finding 3: GDN-2 penalty is worse on the little cluster.** On A55 (in-order, narrower pipeline),
-GDN-2 is 3.1× slower vs 2.0× on A76. The A55's simpler pipeline cannot hide the extra instruction
-latency from the two additional multiplies per step. This has implications for heterogeneous
-dispatch: GDN-2 models are relatively more expensive on little cores.
+GDN-2 is ~~3.1×~~ slower vs ~~2.0×~~ on A76.
+
+> ⚠ **Numbers above are pre-aliasing-fix.** See the Session 15 correction below for revised values.
+> The qualitative finding (A55 penalty > A76 penalty) holds, but the exact ratios changed.
 
 ### What this means for the project
 
-1. **GDN-2 is a viable decode-time alternative at zero cost.** The decoupled erase/write gating
+1. **GDN-2 is a viable decode-time alternative at ~~zero~~ low cost.** ~~The decoupled erase/write gating
    that improves retrieval quality (per NVLabs' paper) adds no decode latency on this hardware.
-   The quality improvement is "free" at inference time.
+   The quality improvement is "free" at inference time.~~
 
-2. **GDN-2 costs 2× at prefill.** This is expected and acceptable — prefill is amortised across
-   all subsequent decode steps. For a chunk size of 64, the 266µs extra prefill cost is recovered
-   after ~182 decode steps (at 1.46µs/step).
+   > ⚠ **Revised:** corrected numbers show GDN-2 decode is 1.29× slower (not identical). Still
+   > far below the prefill penalty, but not literally free.
 
-3. **On edge devices with little cores, GDN-2 should be routed to big cores only.** The 3.1×
-   penalty on A55 vs 2.0× on A76 means the little cluster is a worse-than-linear fit for GDN-2's
-   extra arithmetic.
+2. **GDN-2 costs ~2.7× at prefill** (corrected from ~~2×~~). This is expected and acceptable — prefill
+   is amortised across all subsequent decode steps. For a chunk size of 64, the corrected 451µs
+   extra prefill cost is recovered after ~309 decode steps (at 1.46µs/step).
+
+3. **On edge devices with little cores, GDN-2 should be routed to big cores only.** The qualitative
+   finding holds: the little-cluster penalty exceeds the big-cluster penalty (see corrected §10
+   numbers).
 
 ### CORRECTION (Session 15): GDN-2 bandwidth was inflated by benchmark aliasing bug
 
