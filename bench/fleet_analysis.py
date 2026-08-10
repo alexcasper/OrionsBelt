@@ -267,7 +267,7 @@ def plot_cross_device(device_data, output_path):
         print("No devices with scan data — skipping cross-device plot")
         return False
 
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5), constrained_layout=True)
 
     # Left: achieved scan throughput bar chart
     colors = [
@@ -330,10 +330,8 @@ def plot_cross_device(device_data, output_path):
         "Fleet Bandwidth-Scaling: GDN Kernels are Instruction-Bound, Not BW-Bound",
         fontsize=11,
         fontweight="bold",
-        y=1.02,
     )
-    fig.tight_layout()
-    fig.savefig(output_path, dpi=150, bbox_inches="tight")
+    fig.savefig(output_path, dpi=150)
     plt.close(fig)
     print(f"Cross-device plot written to {output_path}")
     return True

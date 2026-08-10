@@ -46,7 +46,7 @@ def generate_chart(output_path: str | Path) -> str:
 
     output = str(output_path)
 
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5.5))
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5.5), constrained_layout=True)
 
     # --- 4B panel ---
     bars1 = ax1.bar(range(len(STAGES)), TPUT_4B, color=COLORS, edgecolor="white", linewidth=0.8)
@@ -107,12 +107,10 @@ def generate_chart(output_path: str | Path) -> str:
         "Decode Optimization Stack — RK3588 Cortex-A76 (rk3588-t4)",
         fontsize=13,
         fontweight="bold",
-        y=1.02,
     )
-    fig.tight_layout()
 
     os.makedirs(os.path.dirname(output), exist_ok=True)
-    fig.savefig(output, dpi=150, bbox_inches="tight")
+    fig.savefig(output, dpi=150)
     plt.close(fig)
     print(f"Saved: {output}")
     return output
