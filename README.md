@@ -16,14 +16,14 @@ Three GDN CPU kernels (gated cumulative decay, gated delta-rule scan, causal dep
 
 | Kernel | GiB/s | % of 31.7 GiB/s spec | Spread |
 |---|---:|---:|---:|
-| Cumulative decay | 21.1 | 67% | 3.5% |
-| Causal Conv1D | 18.7 | 59% | 4.8% |
-| Gated delta-rule scan | 10.6 | 33% | 5.4% |
+| Cumulative decay | 21.4 | 67% | 7.3% |
+| Causal Conv1D | 20.6 | 65% | 3.5% |
+| Gated delta-rule scan | 10.6 | 33% | 6.3% |
 
 > Cumulative decay achieves **67% of spec bandwidth** — near the memory ceiling.
 > Scan runs at 33% because its sequential recurrence is **instruction-overhead-bound**, not
-> bandwidth-bound. fp16 state gives **1.77×** on decay; scan is compute-bound and shows no
-> bandwidth benefit. (Manifest git_sha `f015982`, dirty=false, governor=performance, 30 repeats.
+> bandwidth-bound. fp16 state gives **1.64×** on decay; scan is compute-bound and shows no
+> bandwidth benefit. (Manifest git_sha `854c6f1`, dirty=false, governor=performance, 30 repeats.
 > Full table with cross-device validation: [`comparison_table.md`](./results/figures/comparison_table.md).)
 
 **Memory advantage at long context** — GDN's O(1) recurrent state vs attention's O(n) KV cache:
