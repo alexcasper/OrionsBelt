@@ -2,7 +2,9 @@
   "caller": {},
   "git": {
     "dirty": true,
-    "sha": "916f387eac29ef341c215e0c39531fdc23e606f5"
+    "sha": "916f387eac29ef341c215e0c39531fdc23e606f5",
+    "sha_note": "SHA is unrecoverable -- not present in any live branch's history (checked git rev-list --all, git fsck --unreachable --dangling, git branch/tag --contains: nothing). The commit briefly existed as origin/bench/t4's tip (confirmed via git reflog --all) before a later force-push/rebase moved past it during PR #213's review. Result remains a valid measurement; only full commit-lineage tracking is broken for this manifest. See ob-8ms.3.",
+    "sha_resolved": null
   },
   "host": {
     "core_count": 8,
