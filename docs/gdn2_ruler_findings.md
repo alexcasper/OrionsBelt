@@ -1,8 +1,8 @@
 # RULER Multi-Key Retrieval: GDN-1 vs GDN-2 (ob-zak)
 
-**Date:** 2026-08-09
+**Date:** 2026-08-09 (re-run 2026-08-10 to fix dirty-tree provenance, ob-mrd.19)
 **Device:** RK3588 (t3), Cortex-A76 CPU, aarch64
-**Commit:** `1743c3e` (bench/t3)
+**Commit:** `4b5e000` (bench/t3)
 **Bead:** ob-zak
 
 ## Objective
@@ -41,44 +41,50 @@ association.
 
 | Metric | GDN-1 | GDN-2 (adapted) |
 |--------|-------|-----------------|
-| Accuracy | 30% (3/10) | 10% (1/10) |
+| Accuracy | 30% (3/10) | 20% (2/10) |
 | Random baseline | 20% | 20% |
-| Avg correct log-prob | −14.6 | −71.2 |
-| Avg per-token log-prob | −2.0 | −9.9 |
+| Avg correct log-prob | −14.6 | −72.8 |
+| Avg per-token log-prob | −2.0 | −10.1 |
 | Forward pass time | ~32s | ~35s |
 
 ### Per-prompt comparison
 
 | Seed | Query Key | GDN-1 hit | GDN-2 hit | GDN-1 lp | GDN-2 lp |
 |------|-----------|-----------|-----------|----------|----------|
-| 100 | config_beta_0001 | ✗ | ✗ | −15.0 | −79.5 |
-| 101 | config_beta_0001 | ✗ | ✗ | −12.6 | −88.2 |
-| 102 | config_delta_0003 | ✗ | ✗ | −15.4 | −54.6 |
-| 103 | config_beta_0001 | ✓ | ✓ | −10.1 | −59.8 |
-| 104 | config_delta_0003 | ✗ | ✗ | −18.3 | −74.7 |
-| 105 | config_gamma_0002 | ✗ | ✗ | −16.2 | −71.6 |
-| 106 | config_gamma_0002 | ✓ | ✗ | −13.9 | −75.2 |
-| 107 | config_beta_0001 | ✗ | ✗ | −13.1 | −72.5 |
-| 108 | config_beta_0001 | ✓ | ✗ | −12.5 | −65.2 |
-| 109 | config_delta_0003 | ✗ | ✗ | −19.1 | −70.9 |
+| 100 | config_beta_0001 | ✗ | ✗ | −15.0 | −80.1 |
+| 101 | config_beta_0001 | ✗ | ✗ | −12.6 | −92.4 |
+| 102 | config_delta_0003 | ✗ | ✗ | −15.4 | −57.4 |
+| 103 | config_beta_0001 | ✓ | ✓ | −10.1 | −60.6 |
+| 104 | config_delta_0003 | ✗ | ✗ | −18.3 | −79.2 |
+| 105 | config_gamma_0002 | ✗ | ✗ | −16.2 | −73.2 |
+| 106 | config_gamma_0002 | ✓ | ✗ | −13.9 | −76.1 |
+| 107 | config_beta_0001 | ✗ | ✗ | −13.1 | −72.1 |
+| 108 | config_beta_0001 | ✓ | ✗ | −12.5 | −70.3 |
+| 109 | config_delta_0003 | ✗ | ✓ | −19.1 | −66.7 |
 
 ## Analysis
 
 ### Key findings
 
 1. **GDN-2 at 30-step adaptation is insufficient for retrieval.** Accuracy
-   drops from 30% (GDN-1) to 10% (GDN-2), which is **below the 20% random
-   baseline**. The model is too degraded to test the architectural
-   hypothesis.
+   drops from 30% (GDN-1) to 20% (GDN-2), landing exactly **at the 20%
+   random baseline** — GDN-2's retrieval performance in this pilot is
+   statistically indistinguishable from chance. The model is too degraded
+   to test the architectural hypothesis.
 
 2. **Log-prob degradation is severe and consistent.** GDN-2's average
-   correct-answer log-prob (−71.2) is 5× worse than GDN-1 (−14.6). Every
+   correct-answer log-prob (−72.8) is ~5× worse than GDN-1 (−14.6). Every
    prompt shows degradation; no prompt improves under GDN-2.
 
-3. **The one GDN-2 hit was the easiest prompt.** Seed 103
+3. **Two GDN-2 hits, one shared with GDN-1.** Seed 103
    (`emerald-engine-856`) was correctly retrieved by both models — it
    appears to be the prompt where the correct answer had the highest
-   initial signal.
+   initial signal. Seed 109 (`quartz-rampart-676`) was hit by GDN-2 but
+   missed by GDN-1; per the re-run's provenance notes this flip is
+   attributed to CPU floating-point non-determinism in the 30-step
+   gradient-descent adaptation (the two runs used identical code, data,
+   and hyperparameters — see manifest re-run at commit `4b5e000`), not a
+   reproducible architectural signal.
 
 ### Why GDN-2 fails here
 
@@ -92,10 +98,11 @@ this degradation is fatal.
 ### Statistical caveats
 
 - **Small sample:** 10 prompts × 5 candidates is a pilot-scale
-  evaluation. The 30% vs 10% difference is suggestive but not
-  statistically significant (Fisher's exact p ≈ 0.26).
-- **Log-prob comparison is robust:** The 5× log-prob degradation is
-  consistent across all 10 prompts and is the stronger signal.
+  evaluation. The 30% vs 20% difference carries essentially no
+  statistical weight (Fisher's exact p ≈ 1.0).
+- **Log-prob comparison is robust:** The ~5× log-prob degradation is
+  consistent across all 10 prompts and is the stronger signal — the
+  accuracy figure alone is too noisy at this sample size to lean on.
 - **Only 1 layer swapped:** Swapping layer 0 tests the mechanism but
   doesn't represent a full GDN-2 model. Multiple-layer swaps with
   extensive adaptation would be needed for a fair test.
@@ -136,8 +143,8 @@ hypothesis remains untested pending:
 
 ## Conclusion
 
-GDN-2 with 30-step isolated adaptation achieves 10% retrieval accuracy
-(below the 20% random baseline) vs GDN-1's 30%. The 5× log-prob
+GDN-2 with 30-step isolated adaptation achieves 20% retrieval accuracy
+(at the 20% random baseline) vs GDN-1's 30%. The ~5× log-prob
 degradation is consistent across all prompts. This negative result
 reflects insufficient adaptation rather than a flaw in the GDN-2
 architecture: the partially trained model cannot be used to test the
