@@ -7,7 +7,7 @@ See per-device tables (`*_table.md`) for full kernel-level detail._
 
 | Device | CSV | Git SHA | Dirty | Governor | Threads | Manifest |
 |---|---|---|---|---|---|---|
-| rk3588-t3 (big, **8-thread**) | `rk3588-t3-clean.csv` | `f015982` | **false** | performance | 8 | `rk3588-t3-clean.json` |
+| rk3588-t3 (big, **8-thread**) | `rk3588-t3-clean.csv` | `686fdfd` | true | performance | 8 | `rk3588-t3-clean.json` |
 | rk3588-t3 (big, **1-thread**) | `rk3588-t3-clean-singlethread.csv` | `d72eaa1` | **false** | performance | 1 | `rk3588-t3-clean-singlethread.json` |
 | rk3588-t4 (big, 1-thread) | `rk3588-t4-clean.csv` | `1ca4d6d` | **false** | performance | 1 | `rk3588-t4-clean.json` |
 
@@ -65,8 +65,11 @@ Qwen3.5-4B, prefill (seq=64), fp32. ⚠ t3 was 8-thread (threads_source=core_cou
 
 > The 8-thread t3 numbers reflect OpenMP scaling across 4 big cores. The
 > 8-thread vs 8-thread comparison (`rk3588-t3-clean.csv` vs `rk3588-t4_big.csv`,
-> both effective_threads=8) gives cumdecay 21.06 vs 22.25 — t4 is ~6% faster,
-> consistent with its 2400 MHz clock. See §8 for OpenMP scaling analysis.
+> both effective_threads=8) gives cumdecay 21.19 vs 22.25, gated scan 10.49 vs 11.53,
+> Conv1D 21.02 vs 19.04 — boards agree within ~10%. t3 CSV refreshed at `686fdfd`
+> with updated measurement harness (adaptive batch timing) and GDN-2 aliasing fix;
+> non-GDN-2 numbers shifted slightly vs the original `f015982` measurement.
+> See §8 for OpenMP scaling analysis.
 
 ### 1c. 0.8B model (t3 8-thread, t4 1-thread — also confounded)
 
@@ -74,9 +77,13 @@ Qwen3.5-0.8B, prefill (seq=64), fp32 baseline (t3 only; t4 shows similar ratios)
 
 | Kernel | t3 GiB/s | t3 spread |
 |---|---:|---:|
-| gdn_cumdecay | 28.62 | 7.7% |
-| gdn_gated_scan | 15.24 | 2.4% |
-| gdn_causal_dwconv1d | 28.48 | 1.6% |
+| gdn_cumdecay | 26.78 | 0.8% |
+| gdn_gated_scan | 11.59 | 2.1% |
+| gdn_causal_dwconv1d | 20.18 | 1.7% |
+
+> Note: 0.8B prefill numbers shift significantly across measurement sessions on
+> this fleet (ob-bf7: gated_scan ranged 97–204 µs across runs). The CSV was
+> refreshed at `686fdfd` with the GDN-2 aliasing fix; see FINDINGS.md §10 correction.
 
 ## 2. Mixed-precision optimization impact
 
@@ -102,9 +109,9 @@ Qwen3.5-4B, decode (seq=1), A76 big. Both devices clean, post-optimization.
 
 | Kernel | t3 µs/tok | t3 GiB/s | t3 spread | t4 µs/tok | t4 GiB/s | t4 spread |
 |---|---:|---:|---:|---:|---:|---:|
-| gdn_cumdecay | 1.166 | 26.17 | 0.1% | 1.750 | 17.44 | 16.7% |
-| gdn_gated_scan | 1.458 | 52.33 | 20.0% | 2.333 | 32.70 | 0.0% |
-| gdn_causal_dwconv1d | 2.625 | 52.31 | 11.1% | 9.043 | 15.19 | 3.2% |
+| gdn_cumdecay | 1.035 | 29.47 | 0.8% | 1.750 | 17.44 | 16.7% |
+| gdn_gated_scan | 1.386 | 55.07 | 1.3% | 2.333 | 32.70 | 0.0% |
+| gdn_causal_dwconv1d | 3.293 | 41.70 | 1.0% | 9.043 | 15.19 | 3.2% |
 
 > Decode GiB/s exceeds the 31.7 GiB/s DRAM spec on t3 because at seq=1 the working
 > set fits in L1/L2 cache. t4 achieves lower cache-resident throughput, consistent
@@ -236,17 +243,21 @@ t4 = 8 tokens (re-run, see per-row manifest for details).
 
 | Device | Model | Quant | tok/s | TTFT (ms) | Git SHA | Manifest |
 |---|---|---|---:|---:|---|---|
+| rk3588-t3 | 4B   | INT4+SDOT | 4.28 | 233 | `cec1aea` | `rk3588-t3_big_int4_sdot_e2e.json` |
 | rk3588-t4 | 4B   | INT4+SDOT | 4.43 | 226 | `3bff376` | `rk3588-t4_int4sdot_4b.json` |
+| rk3588-t3 | 0.8B | INT4+SDOT | 36.69 | 27 | `cec1aea` | `rk3588-t3_08b_big_int4_sdot_e2e.json` |
 | rk3588-t4 | 0.8B | INT4+SDOT | 37.21 | 27 | `3bff376` | `rk3588-t4_int4sdot_08b.json` |
 
 > INT4+SDOT combines K-grouped nibble repack with `vdotq_lane_s32` integer
 > dot-product, achieving 2× memory advantage of INT4 with the compute efficiency
-> of SDOT. vs INT8+SDOT: **1.27×** (4B) and **1.23×** (0.8B) on A76. The A55
+> of SDOT. vs INT8+SDOT: **1.28×** (4B) and **1.27×** (0.8B) on A76. The A55
 > little cluster does NOT benefit (0.96× — compute-bound, nibble-unpack overhead
-> dominates). t3 INT4+SDOT data not yet captured. See FINDINGS §34.
+> dominates). Cross-device agreement tightens further: 4B at **3.5%** gap
+> (4.28 vs 4.43), 0.8B at **1.4%** gap (36.69 vs 37.21) — the tightest of any
+> quantization method. See FINDINGS §34.
 >
-> **Cumulative optimization stack (4B A76):** 0.07 → 1.04 → 1.84 → 3.37 → **4.43 tok/s**
-> (~63× over naive FP32 baseline).
+> **Cumulative optimization stack (4B A76):** 0.07 → 1.04 → 1.84 → 3.34 → **4.28 tok/s**
+> (~61× over naive FP32 baseline). t4 confirms at 4.43 tok/s (~63×).
 
 ## 8. OpenMP multi-threading scaling (t4)
 

@@ -80,15 +80,15 @@ cross-device effects being interpreted (bead `ob-bf7`):
 
 | Device class | Runs (scan, 4B, GiB/s) | Spread | Why it matters |
 |---|---|---:|---|
-| RK3588 big | t3 10.62 vs t4 5.67 | **1.87x** | **different commits** — t3 `f015982271a1`, t4 `1ca4d6dfb00c`; not an environmental comparison |
+| RK3588 big | t3 10.49 vs t4 5.67 | **1.85x** | **different commits** — t3 `686fdfd3b4d7` (dirty), t4 `1ca4d6dfb00c`; not an environmental comparison |
 | RK3588 little | t3 0.55 vs t4 0.82 | **1.49x** | **different commits** — t3 `234807d46c95`, t4 `f2658cc98138`; not an environmental comparison |
 | Jetson | j1 1.14 vs j2 1.09 | **1.05x** | **different commits** — j1 `5ea3d24b81a9` (dirty), j2 `234807d46c95`; not an environmental comparison |
 
-⚠ **Thread-count confound (ob-mrd.12/14):** the RK3588 replicates were **not** all single-threaded. t3-clean ran at **8 threads** while t4-clean ran at **1 thread**. The 1.87x spread is dominated by this thread-count difference, not by a hardware effect. The like-for-like comparison (both at 8 threads) shows the boards agree within ~7%. See FINDINGS.md §ob-mrd.12 correction.
+⚠ **Thread-count confound (ob-mrd.12/14):** the RK3588 replicates were **not** all single-threaded. t3-clean ran at **8 threads** while t4-clean ran at **1 thread**. The 1.85x spread is dominated by this thread-count difference, not by a hardware effect. The like-for-like comparison (both at 8 threads) shows the boards agree within ~7%. See FINDINGS.md §ob-mrd.12 correction.
 
 ### Provenance audit: were these runs captured from a clean tree?
 
-All replicate runs are from the fleet sweep (ob-bf7/ob-aw9): post-optimization, clean tree, governor=performance. Of 6 runs with manifests, **5 recorded `dirty: false`** and 1 recorded dirty.
+All replicate runs are from the fleet sweep (ob-bf7/ob-aw9): post-optimization, clean tree, governor=performance. Of 6 runs with manifests, **4 recorded `dirty: false`** and 2 recorded dirty.
 
 Since all runs are post-optimization and clean-tree, the RK3588 inter-board gap **would** reflect hardware heterogeneity — **but see the thread-count confound warning above (ob-mrd.12/14)**: t3-clean ran 8-thread while t4-clean ran 1-thread, so the raw gap overstates any real difference.
 

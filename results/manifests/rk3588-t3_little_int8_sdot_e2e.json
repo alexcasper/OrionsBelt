@@ -80,7 +80,7 @@
   },
   "manifest_version": 1,
   "memory": {
-    "mem_available_kb": 31545196,
+    "mem_available_kb": 31544948,
     "mem_total_kb": 32550332
   },
   "parallelism": {
@@ -103,7 +103,7 @@
   },
   "thermal_zones": [
     {
-      "temp_millicelsius": 44384,
+      "temp_millicelsius": 45307,
       "type": "soc-thermal",
       "zone": "thermal_zone0"
     },
@@ -123,7 +123,7 @@
       "zone": "thermal_zone3"
     },
     {
-      "temp_millicelsius": 43461,
+      "temp_millicelsius": 44384,
       "type": "center-thermal",
       "zone": "thermal_zone4"
     },
@@ -133,7 +133,7 @@
       "zone": "thermal_zone5"
     },
     {
-      "temp_millicelsius": 43461,
+      "temp_millicelsius": 44384,
       "type": "npu-thermal",
       "zone": "thermal_zone6"
     }

@@ -413,6 +413,81 @@ def generate_table(data, base_commit=None, commit_info=None):
 
         lines.append("")
 
+    # INT8_SDOT vs FP32 speedup (if both exist for same device/model)
+    int8sdot_entries = {k: v for k, v in data.items() if k[2] == "int8_sdot"}
+    if int8sdot_entries:
+        lines.append("## INT8 SDOT vs FP32 Speedup")
+        lines.append("")
+        lines.append("| Device | Model | FP32 tok/s | INT8 SDOT tok/s | Speedup |")
+        lines.append("|--------|-------|-----------:|----------------:|--------:|")
+
+        for (device, model, _), s_entry in sorted(int8sdot_entries.items()):
+            norm_device = device.replace("_int8_sdot", "")
+            fp32_key = (norm_device, model)
+            if fp32_key in fp32_map:
+                f_entry = fp32_map[fp32_key]
+                fp32_tok = (
+                    sum(f_entry["tok_per_sec"]) / len(f_entry["tok_per_sec"])
+                    if f_entry["tok_per_sec"]
+                    else 0
+                )
+                sdot_tok = (
+                    sum(s_entry["tok_per_sec"]) / len(s_entry["tok_per_sec"])
+                    if s_entry["tok_per_sec"]
+                    else 0
+                )
+                speedup = sdot_tok / fp32_tok if fp32_tok > 0 else 0
+                lines.append(
+                    f"| {device} | {model} | {fp32_tok:.2f} | {sdot_tok:.2f} | **{speedup:.2f}×** |"
+                )
+            else:
+                sdot_tok = (
+                    sum(s_entry["tok_per_sec"]) / len(s_entry["tok_per_sec"])
+                    if s_entry["tok_per_sec"]
+                    else 0
+                )
+                lines.append(f"| {device} | {model} | — | {sdot_tok:.2f} | — |")
+
+        lines.append("")
+        lines.append("")
+
+    # INT4_SDOT vs FP32 speedup (if both exist for same device/model)
+    int4sdot_entries = {k: v for k, v in data.items() if k[2] == "int4_sdot"}
+    if int4sdot_entries:
+        lines.append("## INT4 SDOT vs FP32 Speedup")
+        lines.append("")
+        lines.append("| Device | Model | FP32 tok/s | INT4 SDOT tok/s | Speedup |")
+        lines.append("|--------|-------|-----------:|----------------:|--------:|")
+
+        for (device, model, _), s4_entry in sorted(int4sdot_entries.items()):
+            norm_device = device.replace("_int4_sdot", "")
+            fp32_key = (norm_device, model)
+            if fp32_key in fp32_map:
+                f_entry = fp32_map[fp32_key]
+                fp32_tok = (
+                    sum(f_entry["tok_per_sec"]) / len(f_entry["tok_per_sec"])
+                    if f_entry["tok_per_sec"]
+                    else 0
+                )
+                s4_tok = (
+                    sum(s4_entry["tok_per_sec"]) / len(s4_entry["tok_per_sec"])
+                    if s4_entry["tok_per_sec"]
+                    else 0
+                )
+                speedup = s4_tok / fp32_tok if fp32_tok > 0 else 0
+                lines.append(
+                    f"| {device} | {model} | {fp32_tok:.2f} | {s4_tok:.2f} | **{speedup:.2f}×** |"
+                )
+            else:
+                s4_tok = (
+                    sum(s4_entry["tok_per_sec"]) / len(s4_entry["tok_per_sec"])
+                    if s4_entry["tok_per_sec"]
+                    else 0
+                )
+                lines.append(f"| {device} | {model} | — | {s4_tok:.2f} | — |")
+
+        lines.append("")
+
     # Q8_0 vs FP32 speedup (if both exist for same device/model)
     q80_entries = {k: v for k, v in data.items() if k[2] == "q8_0"}
     if q80_entries:

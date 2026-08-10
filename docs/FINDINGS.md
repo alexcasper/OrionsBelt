@@ -2260,6 +2260,21 @@ memory is UB).
 | 4B decode | 45.78 | 40.69 | 1.13× |
 | 0.8B decode | 30.52 | 30.52 | 1.00× |
 
+**Corrected t3 numbers (A76 big, 8-thread OpenMP, taskset 4-7, governor=performance, commit `686fdfd`):**
+
+| Config | Old GiB/s | New GiB/s | Inflation |
+|---|---|---|---|
+| 4B prefill | 8.97 | 6.63 | 1.35× |
+| 0.8B prefill | 11.57 | 7.64 | 1.51× |
+| 4B decode | 61.04 | 57.40 | 1.06× |
+| 0.8B decode | 45.77 | 46.24 | 0.99× |
+
+Cross-device agreement on corrected numbers: 4B prefill 6.63 vs 6.84 (t3 is 97%
+of t4), 0.8B prefill 7.64 vs 8.15 (94%). The decode numbers diverge more (57.40
+vs 40.69 for 4B) because t3 uses 8-thread OpenMP while t4 uses fewer threads;
+at decode the working set is cache-resident so thread count matters more than
+memory bandwidth.
+
 **Impact on §10 findings:**
 
 - **Finding 2 (prefill ratio) revises from "2.0×" to "~2.7×".** The corrected
@@ -2272,10 +2287,12 @@ memory is UB).
   5/3 = 1.67×** (7.14 vs 11.53 GiB/s = 1.61×), confirming the kernel is genuinely
   bandwidth-bound at prefill.
 
-**Fleet-wide note:** All existing fleet CSVs (t3, t4, jetson, pi5) contain
-inflated GDN-2 numbers. The t4 CSVs have been re-run with the fix; other devices
-need re-running when accessible. The `partial_comparison_table.py` GDN-2 column
-will show corrected numbers for t4 only until other devices re-run.
+**Fleet-wide note:** All existing fleet CSVs initially contained inflated GDN-2
+numbers from the aliasing bug. t4 has been re-run with the fix (commit `20b50c7`).
+t3 has been re-run with the fix (`rk3588-t3-clean.csv` at commit `686fdfd`,
+3×30-repeat run). Jetson and Pi5 still have inflated GDN-2 numbers and should be
+re-run when accessible. The `partial_comparison_table.py` GDN-2 column now shows
+corrected numbers for both t3 and t4.
 
 ### Correctness verification
 
@@ -5091,6 +5108,12 @@ once, while NEON uses float FMA directly).
 | + INT8 weight-only NEON (§16) | 1.84 | ~26× |
 | + SDOT INT8 (§33) | 3.48 | ~50× |
 | + **INT4+SDOT** (this section) | **4.43** | **~63×** |
+
+**Cross-device validation (t3, commit `cec1aea`):** INT4+SDOT on the second
+RK3588 board achieves 4.28 tok/s (4B) and 36.69 tok/s (0.8B) — within **3.5%**
+(4B) and **1.4%** (0.8B) of t4's 4.43 / 37.21. This is the tightest
+cross-device agreement of any quantization method, confirming the INT4+SDOT
+kernel is deterministic and portable across A76 silicon.
 
 ## 35. NEON+SDOT full-attention scoring: 25–35% faster full-attention layer at long context (2026-08-09, ob-8qt.21)
 

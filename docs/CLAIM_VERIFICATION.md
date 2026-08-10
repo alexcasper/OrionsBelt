@@ -211,7 +211,7 @@ Source: our own measurements on RK3588 (Cortex-A76 big cluster, 4×2.4 GHz, gove
 
 All SDOT/INT4+SDOT measurements on A76 use `gcc -O3 -fopenmp -mcpu=cortex-a76`
 (dotprod enabled). Cross-device agreement t3↔t4: 0.9% (4B), 1.1% (0.8B) for
-INT8+SDOT. INT4+SDOT is t4-only (t3 not yet captured). Thermals ≤62°C;
+INT8+SDOT; 3.5% (4B), 1.4% (0.8B) for INT4+SDOT. Thermals ≤62°C;
 governor `performance` confirmed in every manifest.
 
 ### 2.6 Engine boundary-crossing cost (verified 2026-08-09)
