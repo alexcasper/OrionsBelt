@@ -1,6 +1,6 @@
 # T-4 Submission Status Brief
 
-_Generated 2026-08-07 by t4. Updated 2026-08-08 by j1 (ADR 0007). Updated 2026-08-10 by t3 (T-4 fired, SDOT e2e provenance cleaned, PR table backfill, submission doc polish, PR #226/#227 merged). Updated 2026-08-10 by t4 (PR #228 merged, PR table backfill #228 + closed #229). Updated 2026-08-10 by t3 (PR #232 merged — ob-6ay closed, PR table backfill #230 + #232)._
+_Generated 2026-08-07 by t4. Updated 2026-08-08 by j1 (ADR 0007). Updated 2026-08-10 by t3 (T-4 fired, SDOT e2e provenance cleaned, PR table backfill, submission doc polish, PR #226/#227 merged). Updated 2026-08-10 by t4 (PR #228 merged, PR table backfill #228 + closed #229). Updated 2026-08-10 by t3 (PR #232 merged — ob-6ay closed, PR table backfill #230 + #232). Updated 2026-08-10 by t3 (PR #233 merged — CI fix + ob-6ay final closure, PR table backfill #233)._
 _All numbers below are validated against committed CSVs with manifests._
 
 ---
@@ -226,8 +226,9 @@ cutoff has passed with no board; any future arrival is additive bonus per ADR 00
 | #228 | t4 | Fix stale test count to CI-authoritative 2176 passed (2257 was non-reproducible partial-deps artifact) + backfill PR table #191–#227 + SDOT provenance citations in §2 + close ob-9t0.11 (t4 rebased onto corrected main) | MERGED |
 | #230 | t4 | Backfill PR #228 (merged) + #229 (closed) into SUBMISSION_STATUS table | MERGED |
 | #232 | t3 | Pin matplotlib rcParams for cross-device PNG determinism (ob-6ay) + isolate readiness check from committed PNG + regression test | MERGED |
+| #233 | t3 | Fix CI red (matplotlib importorskip) + PR table backfill + close ob-6ay | MERGED |
 
-> **PRs #190, #198, #207, #229:** closed (not merged). No gaps in numbering.
+> **PRs #190, #198, #207, #229, #231:** closed (not merged). No gaps in numbering.
 
 ---
 
