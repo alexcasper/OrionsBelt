@@ -1,6 +1,6 @@
 # T-4 Submission Status Brief
 
-_Generated 2026-08-07 by t4. Updated 2026-08-08 by j1 (ADR 0007). Updated 2026-08-10 by t3 (T-4 fired, SDOT e2e provenance cleaned, PR table backfill, submission doc polish, PR #226/#227 merged). Updated 2026-08-10 by t4 (PR #228 merged, PR table backfill #228 + closed #229). Updated 2026-08-10 by t3 (PR #232 merged — ob-6ay closed, PR table backfill #230 + #232). Updated 2026-08-10 by t4 (PR #233/#234 merged — test counts 2176→2229, skip 52→20, PR table backfill #233 + #234). Updated 2026-08-10 by t3 (ADR 0007 T-4 firing confirmation section added, PR table backfill #235/#236, PR #237 merged). Updated 2026-08-10 by t4 (PR table backfill #238 + #239). Updated 2026-08-10 by t4 (test count 2229→2256, skip 20→2, PR #239 MERGED, #240 OPEN). Updated 2026-08-10 by t4 (gdn2_reference coverage 50%→98%, test count 2256→2262). Updated 2026-08-10 by t3 (PR #240 MERGED — PR table status fix). Updated 2026-08-10 by t3 (test count 2262→2235 CI-authoritative, skip 2→20; PR #242 table backfill)._
+_Generated 2026-08-07 by t4. Updated 2026-08-08 by j1 (ADR 0007). Updated 2026-08-10 by t3 (T-4 fired, SDOT e2e provenance cleaned, PR table backfill, submission doc polish, PR #226/#227 merged). Updated 2026-08-10 by t4 (PR #228 merged, PR table backfill #228 + closed #229). Updated 2026-08-10 by t3 (PR #232 merged — ob-6ay closed, PR table backfill #230 + #232). Updated 2026-08-10 by t4 (PR #233/#234 merged — test counts 2176→2229, skip 52→20, PR table backfill #233 + #234). Updated 2026-08-10 by t3 (ADR 0007 T-4 firing confirmation section added, PR table backfill #235/#236, PR #237 merged). Updated 2026-08-10 by t4 (PR table backfill #238 + #239). Updated 2026-08-10 by t4 (test count 2229→2256, skip 20→2, PR #239 MERGED, #240 OPEN). Updated 2026-08-10 by t4 (gdn2_reference coverage 50%→98%, test count 2256→2262). Updated 2026-08-10 by t3 (PR #240 MERGED — PR table status fix). Updated 2026-08-10 by t3 (test count 2262→2235 CI-authoritative, skip 2→20; PR #242 table backfill). Updated 2026-08-10 by t3 (PR #243 table backfill — MERGED)._
 _All numbers below are validated against committed CSVs with manifests._
 
 ---
@@ -235,6 +235,7 @@ cutoff has passed with no board; any future arrival is additive bonus per ADR 00
 | #240 | t4 | Fix stale test counts + gdn2_reference coverage 50%→98% (2256→2262 passed, skip 20→2; README, DEVPOST, SUBMISSION_STATUS, ADR 0007) | MERGED |
 | #241 | t3 | PR #240 status fix (OPEN→MERGED) + ADR 0007 stale test count (2256→2262) | MERGED |
 | #242 | t3 | Backfill PR #241 (MERGED) in SUBMISSION_STATUS table | MERGED |
+| #243 | t3 | Fix stale test count 2262→2235 CI-authoritative (skip 2→20) + PR #242 table backfill | MERGED |
 
 > **PRs #190, #198, #207, #229, #235:** closed (not merged). No gaps in numbering.
 
