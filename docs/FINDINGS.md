@@ -1656,6 +1656,12 @@ variable is thread count.
    2.96), decode 16.95 GiB/s (+12% vs GDN1's 15.10). The GDN-2 variant's smaller
    recurrent state reduces memory traffic at seq=1 where state I/O dominates.
 
+   > ⚠ **Prefill numbers are inflated by the GDN-2 aliasing bug** (w_gate == x,
+   > §10 correction). Corrected t3/t4 data shows GDN2 prefill is actually ~2.7×
+   > *slower* than GDN1, not equal. Jetson J2 still has uncorrected GDN-2 data
+   > (needs re-run when accessible). The decode comparison may be less affected
+   > since seq=1 working set is cache-resident.
+
 5. **Cross-device consistency.** J2's current run matches the earlier
    `jetson-j2-full-optimized.csv` (3.82 vs 3.85 GiB/s on cumdecay — within 1%),
    confirming the benchmark is reproducible across sessions on the same hardware.
@@ -3044,7 +3050,7 @@ kernels. Both boards are RK3588 (4×A55 + 4×A76) but **different board vendors*
 | gdn_gated_scan | 4B | 1 | 32.70 | 52.33 | 1.60× |
 | gdn_gated_scan | 0.8B | 1 | 26.15 | 32.69 | 1.25× |
 | gdn_causal_dwconv1d | 4B | 64 | 7.04 | 18.73 | 2.66× |
-| gdn2_gated_scan | 4B | 64 | 3.20 | 8.97 | 2.80× |
+| gdn2_gated_scan | 4B | 64 | 3.20 | 6.63 | 2.07× |
 
 ### Analysis
 

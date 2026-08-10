@@ -4,38 +4,38 @@ _Source: committed CSVs in results/raw/_
 
 | Model | Kernel | Dispatch | Channels | p50 (µs) | p95 (µs) | Spread | GiB/s | GFLOP/s |
 |---|---|---|---:|---:|---:|---:|---:|---:|
-| Qwen3.5-4B | Gated Cumulative Decay | neon | 4,096 | 92.8 | 96.0 | 3.5% | 21.06 | 2.83 |
-| Qwen3.5-4B | Gated Delta-Rule Scan | neon | 4,096 | 278.9 | 294.0 | 5.4% | 10.62 | 1.88 |
-| Qwen3.5-4B | Causal Depthwise Conv1D | neon | 4,096 | 110.0 | 115.2 | 4.8% | 18.73 | 19.07 |
-| Qwen3.5-4B | gdn_cumdecay_f16 | neon | 4,096 | 39.4 | 40.5 | 3.0% | 37.20 | 6.66 |
-| Qwen3.5-4B | gdn_gated_scan_f16 | neon | 4,096 | 281.2 | 305.4 | 8.6% | 10.47 | 1.86 |
-| Qwen3.5-4B | gdn_cumdecay_bf16 | neon | 4,096 | 57.5 | 58.9 | 2.5% | 25.49 | 4.56 |
-| Qwen3.5-4B | gdn_gated_scan_bf16 | neon | 4,096 | 280.3 | 296.6 | 5.8% | 10.51 | 1.87 |
-| Qwen3.5-4B | gdn2_gated_scan | neon | 4,096 | 547.8 | 577.2 | 5.4% | 8.97 | 1.91 |
-| Qwen3.5-0.8B | Gated Cumulative Decay | neon | 2,048 | 34.1 | 36.8 | 7.7% | 28.62 | 3.84 |
-| Qwen3.5-0.8B | Gated Delta-Rule Scan | neon | 2,048 | 97.1 | 99.5 | 2.4% | 15.24 | 2.70 |
-| Qwen3.5-0.8B | Causal Depthwise Conv1D | neon | 2,048 | 36.2 | 36.8 | 1.6% | 28.48 | 28.99 |
-| Qwen3.5-0.8B | gdn_cumdecay_f16 | neon | 2,048 | 19.3 | 19.5 | 1.5% | 38.05 | 6.81 |
-| Qwen3.5-0.8B | gdn_gated_scan_f16 | neon | 2,048 | 98.6 | 100.9 | 2.4% | 14.94 | 2.66 |
-| Qwen3.5-0.8B | gdn_cumdecay_bf16 | neon | 2,048 | 27.4 | 27.4 | 0.0% | 26.71 | 4.78 |
-| Qwen3.5-0.8B | gdn_gated_scan_bf16 | neon | 2,048 | 98.0 | 103.0 | 5.1% | 15.02 | 2.67 |
-| Qwen3.5-0.8B | gdn2_gated_scan | neon | 2,048 | 212.3 | 222.3 | 4.7% | 11.57 | 2.47 |
-| Qwen3.5-4B_decode | Gated Cumulative Decay | neon | 4,096 | 1.2 | 1.2 | 0.1% | 26.17 | 3.51 |
-| Qwen3.5-4B_decode | Gated Delta-Rule Scan | neon | 4,096 | 1.5 | 1.8 | 20.0% | 52.33 | 5.62 |
-| Qwen3.5-4B_decode | Causal Depthwise Conv1D | neon | 4,096 | 2.6 | 2.9 | 11.1% | 52.31 | 12.48 |
-| Qwen3.5-4B_decode | gdn_cumdecay_f16 | neon | 4,096 | 1.2 | 1.5 | 24.9% | 19.61 | 3.51 |
-| Qwen3.5-4B_decode | gdn_gated_scan_f16 | neon | 4,096 | 1.5 | 1.5 | 0.1% | 41.86 | 5.62 |
-| Qwen3.5-4B_decode | gdn_cumdecay_bf16 | neon | 4,096 | 1.5 | 1.5 | 0.1% | 15.70 | 2.81 |
-| Qwen3.5-4B_decode | gdn_gated_scan_bf16 | neon | 4,096 | 1.8 | 1.8 | 0.1% | 34.88 | 4.68 |
-| Qwen3.5-4B_decode | gdn2_gated_scan | neon | 4,096 | 1.8 | 1.8 | 0.0% | 61.04 | 9.36 |
-| Qwen3.5-0.8B_decode | Gated Cumulative Decay | neon | 2,048 | 0.9 | 1.2 | 33.4% | 17.44 | 2.34 |
-| Qwen3.5-0.8B_decode | Gated Delta-Rule Scan | neon | 2,048 | 1.2 | 1.2 | 0.0% | 32.69 | 3.51 |
-| Qwen3.5-0.8B_decode | Causal Depthwise Conv1D | neon | 2,048 | 1.8 | 2.0 | 16.6% | 39.22 | 9.36 |
-| Qwen3.5-0.8B_decode | gdn_cumdecay_f16 | neon | 2,048 | 0.9 | 1.2 | 33.4% | 13.08 | 2.34 |
-| Qwen3.5-0.8B_decode | gdn_gated_scan_f16 | neon | 2,048 | 1.2 | 1.2 | 0.0% | 26.15 | 3.51 |
-| Qwen3.5-0.8B_decode | gdn_cumdecay_bf16 | neon | 2,048 | 1.2 | 1.2 | 0.0% | 9.81 | 1.76 |
-| Qwen3.5-0.8B_decode | gdn_gated_scan_bf16 | neon | 2,048 | 1.2 | 1.5 | 25.0% | 26.15 | 3.51 |
-| Qwen3.5-0.8B_decode | gdn2_gated_scan | neon | 2,048 | 1.2 | 1.5 | 25.0% | 45.77 | 7.02 |
+| Qwen3.5-4B | Gated Cumulative Decay | neon | 4,096 | 92.2 | 98.3 | 6.6% | 21.19 | 2.84 |
+| Qwen3.5-4B | Gated Delta-Rule Scan | neon | 4,096 | 282.1 | 298.4 | 5.8% | 10.49 | 1.86 |
+| Qwen3.5-4B | Causal Depthwise Conv1D | neon | 4,096 | 98.0 | 105.9 | 8.0% | 21.02 | 21.40 |
+| Qwen3.5-4B | gdn_cumdecay_f16 | neon | 4,096 | 42.3 | 44.3 | 4.8% | 34.63 | 6.20 |
+| Qwen3.5-4B | gdn_gated_scan_f16 | neon | 4,096 | 280.3 | 288.2 | 2.8% | 10.51 | 1.87 |
+| Qwen3.5-4B | gdn_cumdecay_bf16 | neon | 4,096 | 59.2 | 59.5 | 0.5% | 24.74 | 4.43 |
+| Qwen3.5-4B | gdn_gated_scan_bf16 | neon | 4,096 | 273.6 | 280.6 | 2.6% | 10.76 | 1.92 |
+| Qwen3.5-4B | gdn2_gated_scan | neon | 4,096 | 741.2 | 843.3 | 13.8% | 6.63 | 1.41 |
+| Qwen3.5-0.8B | Gated Cumulative Decay | neon | 2,048 | 36.5 | 36.8 | 0.8% | 26.78 | 3.59 |
+| Qwen3.5-0.8B | Gated Delta-Rule Scan | neon | 2,048 | 127.8 | 130.4 | 2.1% | 11.59 | 2.05 |
+| Qwen3.5-0.8B | Causal Depthwise Conv1D | neon | 2,048 | 51.0 | 51.9 | 1.7% | 20.18 | 20.54 |
+| Qwen3.5-0.8B | gdn_cumdecay_f16 | neon | 2,048 | 20.1 | 20.4 | 1.5% | 36.39 | 6.51 |
+| Qwen3.5-0.8B | gdn_gated_scan_f16 | neon | 2,048 | 128.9 | 132.1 | 2.5% | 11.42 | 2.03 |
+| Qwen3.5-0.8B | gdn_cumdecay_bf16 | neon | 2,048 | 30.0 | 30.6 | 1.9% | 24.38 | 4.36 |
+| Qwen3.5-0.8B | gdn_gated_scan_bf16 | neon | 2,048 | 128.9 | 131.6 | 2.0% | 11.42 | 2.03 |
+| Qwen3.5-0.8B | gdn2_gated_scan | neon | 2,048 | 321.4 | 326.4 | 1.5% | 7.64 | 1.63 |
+| Qwen3.5-4B_decode | Gated Cumulative Decay | neon | 4,096 | 1.0 | 1.0 | 0.8% | 29.47 | 3.96 |
+| Qwen3.5-4B_decode | Gated Delta-Rule Scan | neon | 4,096 | 1.4 | 1.4 | 1.3% | 55.07 | 5.91 |
+| Qwen3.5-4B_decode | Causal Depthwise Conv1D | neon | 4,096 | 3.3 | 3.3 | 1.0% | 41.70 | 9.95 |
+| Qwen3.5-4B_decode | gdn_cumdecay_f16 | neon | 4,096 | 1.1 | 1.1 | 1.6% | 21.38 | 3.83 |
+| Qwen3.5-4B_decode | gdn_gated_scan_f16 | neon | 4,096 | 1.3 | 1.3 | 0.4% | 45.49 | 6.11 |
+| Qwen3.5-4B_decode | gdn_cumdecay_bf16 | neon | 4,096 | 1.3 | 1.3 | 0.2% | 17.28 | 3.09 |
+| Qwen3.5-4B_decode | gdn_gated_scan_bf16 | neon | 4,096 | 1.7 | 1.7 | 1.6% | 36.52 | 4.90 |
+| Qwen3.5-4B_decode | gdn2_gated_scan | neon | 4,096 | 1.9 | 1.9 | 0.9% | 57.40 | 8.80 |
+| Qwen3.5-0.8B_decode | Gated Cumulative Decay | neon | 2,048 | 0.9 | 0.9 | 0.7% | 17.26 | 2.32 |
+| Qwen3.5-0.8B_decode | Gated Delta-Rule Scan | neon | 2,048 | 1.0 | 1.0 | 1.4% | 37.69 | 4.05 |
+| Qwen3.5-0.8B_decode | Causal Depthwise Conv1D | neon | 2,048 | 2.1 | 2.1 | 1.1% | 32.43 | 7.74 |
+| Qwen3.5-0.8B_decode | gdn_cumdecay_f16 | neon | 2,048 | 0.9 | 0.9 | 0.3% | 12.78 | 2.29 |
+| Qwen3.5-0.8B_decode | gdn_gated_scan_f16 | neon | 2,048 | 1.1 | 1.1 | 1.1% | 28.05 | 3.76 |
+| Qwen3.5-0.8B_decode | gdn_cumdecay_bf16 | neon | 2,048 | 1.1 | 1.1 | 0.8% | 10.66 | 1.91 |
+| Qwen3.5-0.8B_decode | gdn_gated_scan_bf16 | neon | 2,048 | 1.2 | 1.2 | 0.7% | 25.03 | 3.36 |
+| Qwen3.5-0.8B_decode | gdn2_gated_scan | neon | 2,048 | 1.2 | 1.2 | 0.8% | 46.24 | 7.09 |
 
 ## Achieved vs Spec Bandwidth
 
@@ -44,35 +44,35 @@ _Source: committed CSVs in results/raw/_
 
 | Kernel | Achieved (GiB/s) | % of Spec | p50 (µs) | Spread |
 |---|---:|---:|---:|---:|
-| Gated Cumulative Decay | 21.06 | 66.4% | 92.8 | 3.5% |
-| Gated Delta-Rule Scan | 10.62 | 33.5% | 278.9 | 5.4% |
-| Causal Depthwise Conv1D | 18.73 | 59.1% | 110.0 | 4.8% |
-| gdn_cumdecay_f16 | 37.20 | 117.4% | 39.4 | 3.0% |
-| gdn_gated_scan_f16 | 10.47 | 33.0% | 281.2 | 8.6% |
-| gdn_cumdecay_bf16 | 25.49 | 80.4% | 57.5 | 2.5% |
-| gdn_gated_scan_bf16 | 10.51 | 33.2% | 280.3 | 5.8% |
-| gdn2_gated_scan | 8.97 | 28.3% | 547.8 | 5.4% |
-| Gated Cumulative Decay | 28.62 | 90.3% | 34.1 | 7.7% |
-| Gated Delta-Rule Scan | 15.24 | 48.1% | 97.1 | 2.4% |
-| Causal Depthwise Conv1D | 28.48 | 89.8% | 36.2 | 1.6% |
-| gdn_cumdecay_f16 | 38.05 | 120.0% | 19.3 | 1.5% |
-| gdn_gated_scan_f16 | 14.94 | 47.1% | 98.6 | 2.4% |
-| gdn_cumdecay_bf16 | 26.71 | 84.3% | 27.4 | 0.0% |
-| gdn_gated_scan_bf16 | 15.02 | 47.4% | 98.0 | 5.1% |
-| gdn2_gated_scan | 11.57 | 36.5% | 212.3 | 4.7% |
-| Gated Cumulative Decay | 26.17 | 82.6% | 1.2 | 0.1% |
-| Gated Delta-Rule Scan | 52.33 | 165.1% | 1.5 | 20.0% |
-| Causal Depthwise Conv1D | 52.31 | 165.0% | 2.6 | 11.1% |
-| gdn_cumdecay_f16 | 19.61 | 61.9% | 1.2 | 24.9% |
-| gdn_gated_scan_f16 | 41.86 | 132.1% | 1.5 | 0.1% |
-| gdn_cumdecay_bf16 | 15.70 | 49.5% | 1.5 | 0.1% |
-| gdn_gated_scan_bf16 | 34.88 | 110.0% | 1.8 | 0.1% |
-| gdn2_gated_scan | 61.04 | 192.6% | 1.8 | 0.0% |
-| Gated Cumulative Decay | 17.44 | 55.0% | 0.9 | 33.4% |
-| Gated Delta-Rule Scan | 32.69 | 103.1% | 1.2 | 0.0% |
-| Causal Depthwise Conv1D | 39.22 | 123.7% | 1.8 | 16.6% |
-| gdn_cumdecay_f16 | 13.08 | 41.3% | 0.9 | 33.4% |
-| gdn_gated_scan_f16 | 26.15 | 82.5% | 1.2 | 0.0% |
-| gdn_cumdecay_bf16 | 9.81 | 30.9% | 1.2 | 0.0% |
-| gdn_gated_scan_bf16 | 26.15 | 82.5% | 1.2 | 25.0% |
-| gdn2_gated_scan | 45.77 | 144.4% | 1.2 | 25.0% |
+| Gated Cumulative Decay | 21.19 | 66.8% | 92.2 | 6.6% |
+| Gated Delta-Rule Scan | 10.49 | 33.1% | 282.1 | 5.8% |
+| Causal Depthwise Conv1D | 21.02 | 66.3% | 98.0 | 8.0% |
+| gdn_cumdecay_f16 | 34.63 | 109.2% | 42.3 | 4.8% |
+| gdn_gated_scan_f16 | 10.51 | 33.2% | 280.3 | 2.8% |
+| gdn_cumdecay_bf16 | 24.74 | 78.0% | 59.2 | 0.5% |
+| gdn_gated_scan_bf16 | 10.76 | 33.9% | 273.6 | 2.6% |
+| gdn2_gated_scan | 6.63 | 20.9% | 741.2 | 13.8% |
+| Gated Cumulative Decay | 26.78 | 84.5% | 36.5 | 0.8% |
+| Gated Delta-Rule Scan | 11.59 | 36.6% | 127.8 | 2.1% |
+| Causal Depthwise Conv1D | 20.18 | 63.7% | 51.0 | 1.7% |
+| gdn_cumdecay_f16 | 36.39 | 114.8% | 20.1 | 1.5% |
+| gdn_gated_scan_f16 | 11.42 | 36.0% | 128.9 | 2.5% |
+| gdn_cumdecay_bf16 | 24.38 | 76.9% | 30.0 | 1.9% |
+| gdn_gated_scan_bf16 | 11.42 | 36.0% | 128.9 | 2.0% |
+| gdn2_gated_scan | 7.64 | 24.1% | 321.4 | 1.5% |
+| Gated Cumulative Decay | 29.47 | 93.0% | 1.0 | 0.8% |
+| Gated Delta-Rule Scan | 55.07 | 173.7% | 1.4 | 1.3% |
+| Causal Depthwise Conv1D | 41.70 | 131.5% | 3.3 | 1.0% |
+| gdn_cumdecay_f16 | 21.38 | 67.4% | 1.1 | 1.6% |
+| gdn_gated_scan_f16 | 45.49 | 143.5% | 1.3 | 0.4% |
+| gdn_cumdecay_bf16 | 17.28 | 54.5% | 1.3 | 0.2% |
+| gdn_gated_scan_bf16 | 36.52 | 115.2% | 1.7 | 1.6% |
+| gdn2_gated_scan | 57.40 | 181.1% | 1.9 | 0.9% |
+| Gated Cumulative Decay | 17.26 | 54.4% | 0.9 | 0.7% |
+| Gated Delta-Rule Scan | 37.69 | 118.9% | 1.0 | 1.4% |
+| Causal Depthwise Conv1D | 32.43 | 102.3% | 2.1 | 1.1% |
+| gdn_cumdecay_f16 | 12.78 | 40.3% | 0.9 | 0.3% |
+| gdn_gated_scan_f16 | 28.05 | 88.5% | 1.1 | 1.1% |
+| gdn_cumdecay_bf16 | 10.66 | 33.6% | 1.1 | 0.8% |
+| gdn_gated_scan_bf16 | 25.03 | 79.0% | 1.2 | 0.7% |
+| gdn2_gated_scan | 46.24 | 145.9% | 1.2 | 0.8% |
