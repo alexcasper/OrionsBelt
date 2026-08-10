@@ -185,7 +185,13 @@ def evaluate_retrieval(model, tokenizer, prompts, max_time_secs=None):
 
 
 def capture_manifest():
-    """Capture provenance metadata."""
+    """Capture provenance metadata matching the canonical manifest schema.
+
+    Uses the nested ``git: {sha, dirty}`` structure expected by
+    ``bench/manifest.py`` and ``tests/test_manifest_sha_provenance.py``,
+    so every RULER manifest passes the same provenance checks as all
+    other committed manifests.
+    """
     import platform
 
     try:
@@ -200,14 +206,21 @@ def capture_manifest():
     except Exception:
         sha, dirty = "unknown", False
     return {
-        "git_sha": sha,
-        "git_dirty": dirty,
-        "device": platform.node(),
-        "machine": platform.machine(),
-        "processor": platform.processor() or "unknown",
-        "python": platform.python_version(),
-        "torch": torch.__version__,
-        "timestamp": time.strftime("%Y%m%dT%H%M%SZ", time.gmtime()),
+        "manifest_version": 1,
+        "git": {
+            "sha": sha,
+            "dirty": dirty,
+        },
+        "host": {
+            "hostname": platform.node(),
+            "machine": platform.machine(),
+            "processor": platform.processor() or "unknown",
+        },
+        "software": {
+            "python_version": platform.python_version(),
+            "torch": torch.__version__,
+        },
+        "timestamp_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     }
 
 

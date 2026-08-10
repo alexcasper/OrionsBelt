@@ -1,11 +1,18 @@
 {
-  "git_sha": "4b5e0003da5870d79e325093e75a6078c5b1e8ff",
-  "git_dirty": false,
-  "device": "t3",
-  "machine": "aarch64",
-  "processor": "aarch64",
-  "python": "3.10.12",
-  "torch": "2.5.0",
-  "timestamp": "20260810T102231Z",
-  "dirty_note": "git_dirty was true due to GDN-1 output files in tree during capture; source code at git_sha is exactly what ran. Manual correction applied."
+  "manifest_version": 1,
+  "git": {
+    "sha": "4b5e0003da5870d79e325093e75a6078c5b1e8ff",
+    "dirty": false,
+    "sha_note": "git_dirty was true due to GDN-1 output files in tree during capture; source code at git.sha is exactly what ran. Manual correction applied."
+  },
+  "host": {
+    "hostname": "t3",
+    "machine": "aarch64",
+    "processor": "aarch64"
+  },
+  "software": {
+    "python_version": "3.10.12",
+    "torch": "2.5.0"
+  },
+  "timestamp_utc": "2026-08-10T10:22:31Z"
 }
