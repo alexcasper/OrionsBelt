@@ -1,6 +1,6 @@
 # T-4 Submission Status Brief
 
-_Generated 2026-08-07 by t4. Updated 2026-08-08 by j1 (ADR 0007). Updated 2026-08-10 by t3 (T-4 fired, SDOT e2e provenance cleaned, PR table backfill, submission doc polish, PR #226/#227 merged). Updated 2026-08-10 by t4 (PR #228 merged, PR table backfill #228 + closed #229). Updated 2026-08-10 by t3 (PR #232 merged — ob-6ay closed, PR table backfill #230 + #232). Updated 2026-08-10 by t4 (PR #233/#234 merged — test counts 2176→2229, skip 52→20, PR table backfill #233 + #234)._
+_Generated 2026-08-07 by t4. Updated 2026-08-08 by j1 (ADR 0007). Updated 2026-08-10 by t3 (T-4 fired, SDOT e2e provenance cleaned, PR table backfill, submission doc polish, PR #226/#227 merged). Updated 2026-08-10 by t4 (PR #228 merged, PR table backfill #228 + closed #229). Updated 2026-08-10 by t3 (PR #232 merged — ob-6ay closed, PR table backfill #230 + #232). Updated 2026-08-10 by t4 (PR #233/#234 merged — test counts 2176→2229, skip 52→20, PR table backfill #233 + #234). Updated 2026-08-10 by t3 (ADR 0007 T-4 firing confirmation section added, PR table backfill #235/#236, PR #237 open)._
 _All numbers below are validated against committed CSVs with manifests._
 
 ---
@@ -228,8 +228,10 @@ cutoff has passed with no board; any future arrival is additive bonus per ADR 00
 | #232 | t3 | Pin matplotlib rcParams for cross-device PNG determinism (ob-6ay) + isolate readiness check from committed PNG + regression test | MERGED |
 | #233 | t3 | Fix CI red — move importorskip before matplotlib import in rcParams test (ob-6ay follow-up) | MERGED |
 | #234 | t4 | Add matplotlib to [dev] extras so CI runs fleet plotting tests (ob-mrd.20) — 53 more tests now execute in CI (2176→2229 passed) | MERGED |
+| #236 | t4 | Update test counts 2176→2229 + skip 52→20 + backfill PR table #233/#234 + close ob-ns4 | MERGED |
+| #237 | t3 | ADR 0007 T-4 firing confirmation — board absent, trigger fired on schedule | OPEN |
 
-> **PRs #190, #198, #207, #229:** closed (not merged). No gaps in numbering.
+> **PRs #190, #198, #207, #229, #235:** closed (not merged). No gaps in numbering.
 
 ---
 
