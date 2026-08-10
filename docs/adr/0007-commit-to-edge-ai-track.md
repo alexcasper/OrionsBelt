@@ -97,6 +97,23 @@ Specifically:
   write-up) now have a stable framing to work against.
 - `ob-kdi` (clean-clone reproduction rehearsal) should verify the Edge AI path end-to-end.
 
+## T-4 Trigger Firing (2026-08-10)
+
+Confirmed by t3 agent on 2026-08-10 (T-4, 4 days to deadline).
+
+- `ob-axq` (Source a Radxa Orion O6) is still **OPEN** — no retail purchase, no loaner, no remote
+  access has materialised.
+- The board has not arrived by the last-useful-arrival cutoff (2026-08-08).
+- **T-4 trigger fired on schedule.** Per ADR 0004 §T-4, on-device NPU execution and INT4
+  quantization validation (`ob-onz`, `ob-huw`) are cut from the critical path. They remain as
+  "designed but not executed" contributions (ADR 0004 §T-4 Kept (c)).
+- Follow-up bead **`ob-9t0.10`** (filed+closed 2026-08-10T04:32Z) is the formal record,
+  referencing `ob-onz`, `ob-huw`, ADR 0004, and this ADR.
+- **T-3 trigger (Aug 11)** is pre-committed by this ADR: Physical AI framing is already dropped;
+  the submission is locked to Edge AI. No reversal is expected.
+- The Edge AI submission remains complete and submission-ready (15/15 readiness checks, 2316
+  tests, ruff clean, all numbers provenance-backed).
+
 **Reversal cost.**
 - **If the board arrives before 2026-08-08**: reversal is cheap. The Edge AI submission is
   intact and additive; bolt on O6 measurements as bonus datapoints. The write-up gains a
