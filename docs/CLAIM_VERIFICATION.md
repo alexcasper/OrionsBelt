@@ -210,9 +210,11 @@ Source: our own measurements on RK3588 (Cortex-A76 big cluster, 4×2.4 GHz, gove
 | INT4+SDOT SNR: 46.7–49.7 dB, identical to NEON | ✅ Confirmed — FINDINGS §34, 12 test cases |
 
 All SDOT/INT4+SDOT measurements on A76 use `gcc -O3 -fopenmp -mcpu=cortex-a76`
-(dotprod enabled). Cross-device agreement t3↔t4: 0.9% (4B), 1.1% (0.8B) for
-INT8+SDOT; 3.5% (4B), 1.4% (0.8B) for INT4+SDOT. Thermals ≤62°C;
-governor `performance` confirmed in every manifest.
+(dotprod enabled). Cross-device agreement t3↔t4 (t3 clean re-run at `c880887`,
+2026-08-10): ~20% (4B), ~14% (0.8B) for INT8+SDOT (t4 faster — t4 manifests
+also dirty=true, re-run recommended); ~5% (4B), ~6% (0.8B) for INT4+SDOT.
+Earlier tighter agreement (0.9–3.5%) was from dirty t3 manifests. Thermals
+≤62°C; governor `performance` confirmed in every manifest.
 
 ### 2.6 Engine boundary-crossing cost (verified 2026-08-09)
 
