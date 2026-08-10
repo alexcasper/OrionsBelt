@@ -34,11 +34,11 @@ At 262K context on the 4B checkpoint, that difference is **23.95 GiB of RAM** �
 - **Cross-vendor NPU operator-coverage audit** — both CIX NOE and Rockchip RKNN reject GDN's variable-length recurrence (the "Loop" op). This generalizes: no current edge NPU compiler handles it
 - **GDN-2 vs GDN-1 comparison** — the decoupled gating in GDN-2 costs 1.2–1.5× at decode on big cores (2.2–2.4× on little), 2.2–2.7× at prefill
 - **Analytical memory model** decomposing weights, KV cache, and recurrent state at every context length
-- **End-to-end model decode** — C decode loop with row-sweep NEON GEMV + INT8 weight-only quantization: **30.2 tok/s (0.8B, A76, INT8+SDOT, t4)**, **2.45 tok/s (0.8B, A57)**, 3.48 tok/s (4B, A76, INT8+SDOT, t4), 0.51 tok/s (4B, A57). ~50× cumulative speedup (INT8+SDOT), up to **~63× with INT4+SDOT** — over the naive FP32 C GEMV baseline
+- **End-to-end model decode** — C decode loop with row-sweep NEON GEMV + INT8 weight-only quantization: **30.5 tok/s (0.8B, A76, INT8+SDOT, t4)**, **2.45 tok/s (0.8B, A57)**, 3.48 tok/s (4B, A76, INT8+SDOT, t4), 0.51 tok/s (4B, A57). ~50× cumulative speedup (INT8+SDOT), up to **~65× with INT4+SDOT** — over the naive FP32 C GEMV baseline
 - **Q8_0 block-quantized GEMV** — per-block fp16 scale + 32 int8 values, matching the llama.cpp Q8_0 format: **2.97× decode speedup over FP32 on the A57** (5.12 tok/s vs 1.72 tok/s), with cosine similarity 1.000000 (numerically indistinguishable from FP32). Context-length sweep confirms the GDN layer cost stays flat at 73–80 ms across ctx 1–4096
 - **INT4 weight-only quantization** — core-type-dependent: 1.40× on A55 little cores (bandwidth wins), 15% slower than INT8 on A76 (compute-bound), no benefit on A57 (narrow pipeline can't hide unpack cost). The optimal precision is core-type-aware, not "always lower"
-- **SDOT-accelerated INT8 GEMV** — `vdotq_lane_s32` INT8×INT8→int32 dot-product kernel for dotprod-capable cores (A76): **1.92× over NEON INT8 on 4B, 3.06× on 0.8B**, reaching 83% of the theoretical DRAM bandwidth ceiling — see [§33](./FINDINGS.md)
-- **INT4+SDOT hybrid GEMV** — combining 4-bit weight packing with the SDOT dot-product instruction: **1.27× over INT8+SDOT** (4.43 tok/s on 4B, 37.21 tok/s on 0.8B), the fastest decode kernel on A76. Cumulative speedup reaches **~63×** over the naive FP32 baseline — see [§34](./FINDINGS.md)
+- **SDOT-accelerated INT8 GEMV** — `vdotq_lane_s32` INT8×INT8→int32 dot-product kernel for dotprod-capable cores (A76): **1.92× over NEON INT8 on 4B, 3.09× on 0.8B**, reaching 83% of the theoretical DRAM bandwidth ceiling — see [§33](./FINDINGS.md)
+- **INT4+SDOT hybrid GEMV** — combining 4-bit weight packing with the SDOT dot-product instruction: **1.30× over INT8+SDOT** (4.52 tok/s on 4B, 36.36 tok/s on 0.8B), the fastest decode kernel on A76. Cumulative speedup reaches **~65×** over the naive FP32 baseline — see [§34](./FINDINGS.md)
 - **Cache-blocked GEMM prefill** — 49–78× prefill speedup from switching naive single-row GEMV to cache-blocked GEMM at M>1, measured across the fleet
 - **ONNX Runtime CPU EP audit** — GDN recurrence is expressible via ONNX `Loop` but 16× slower than our fused kernel. Confirms no existing CPU toolchain has optimized GDN for Arm
 - **Hardware energy profiling** — INA3221 rail-level power characterization on Jetson Nano: 874–1250 mJ/GiB board-wide, power is constant across kernels, `performance` governor is both faster and 28% more energy-efficient than `ondemand`
@@ -104,14 +104,14 @@ On dotprod-capable cores (A76, A720), the Arm `vdotq_lane_s32` instruction compu
 |-------|--------|------:|-------:|-------------:|----------------:|
 | Qwen3.5-4B (A76) | NEON INT8 | 1.81 | 552 | 1.0× | 44% |
 | Qwen3.5-4B (A76) | **SDOT INT8** | **3.48** | **287** | **1.92×** | **83%** |
-| Qwen3.5-4B (A76) | **INT4+SDOT** | **4.43** | **226** | **2.45×** | — |
+| Qwen3.5-4B (A76) | **INT4+SDOT** | **4.52** | **221** | **2.50×** | — |
 | Qwen3.5-0.8B (A76) | NEON INT8 | 9.86 | 101 | 1.0× | — |
-| Qwen3.5-0.8B (A76) | **SDOT INT8** | **30.17** | **33** | **3.06×** | — |
-| Qwen3.5-0.8B (A76) | **INT4+SDOT** | **37.21** | **27** | **3.77×** | — |
+| Qwen3.5-0.8B (A76) | **SDOT INT8** | **30.51** | **33** | **3.09×** | — |
+| Qwen3.5-0.8B (A76) | **INT4+SDOT** | **36.36** | **28** | **3.69×** | — |
 | Qwen3.5-4B (A55) | NEON INT8 | 0.49 | 2034 | 1.0× | — |
 | Qwen3.5-4B (A55) | **SDOT INT8** | **1.36** | **734** | **2.78×** | — |
 
-> SDOT nearly doubles 4B throughput (83% of the 4.5 tok/s theoretical ceiling) and triples 0.8B throughput. The speedup is larger for 0.8B because its smaller weight set (~0.41 GiB INT8) partially fits in the A76 cluster's shared L3, making it more compute-bound — where SDOT's 5× instruction reduction has the most leverage. **INT4+SDOT** pushes further by halving weight memory traffic (4-bit packing with on-the-fly nibble unpack into SDOT's int8 pipeline), adding 1.27× on A76 big cores — but is slightly slower on A55 little cores where the unpack overhead exceeds the bandwidth savings. Cross-validated on two independent RK3588 nodes (t3, t4): INT4+SDOT agrees within 5–6% (4B: 4.21 vs 4.43; 0.8B: 35.05 vs 37.21); INT8+SDOT shows a wider ~15–20% gap (t4 faster, likely board-level compute difference per RESULTS DISCIPLINE/ob-bf7). Table values are t4. Full analysis: [FINDINGS §33, §34](../docs/FINDINGS.md), data: `results/raw/rk3588-t4_sdot_*.csv`, `results/raw/rk3588-t4_int4sdot_*.csv`.
+> SDOT nearly doubles 4B throughput (83% of the 4.5 tok/s theoretical ceiling) and triples 0.8B throughput. The speedup is larger for 0.8B because its smaller weight set (~0.41 GiB INT8) partially fits in the A76 cluster's shared L3, making it more compute-bound — where SDOT's 5× instruction reduction has the most leverage. **INT4+SDOT** pushes further by halving weight memory traffic (4-bit packing with on-the-fly nibble unpack into SDOT's int8 pipeline), adding 1.30× on A76 big cores — but is slightly slower on A55 little cores where the unpack overhead exceeds the bandwidth savings. Cross-validated on two independent RK3588 nodes (t3, t4): INT4+SDOT agrees within 4–8% (4B: 4.21 vs 4.52; 0.8B: 35.05 vs 36.36); INT8+SDOT shows a wider ~15–20% gap (t4 faster, likely board-level compute difference per RESULTS DISCIPLINE/ob-bf7). Table values are t4. Full analysis: [FINDINGS §33, §34](../docs/FINDINGS.md), data: `results/raw/rk3588-t4_sdot_*.csv`, `results/raw/rk3588-t4_int4sdot_*.csv`.
 
 ![Decode optimization stack — RK3588 Cortex-A76](../results/figures/optimization_stack.png)
 

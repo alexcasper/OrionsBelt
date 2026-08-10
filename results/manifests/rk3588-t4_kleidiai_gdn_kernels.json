@@ -1,8 +1,8 @@
 {
   "caller": {},
   "git": {
-    "dirty": true,
-    "sha": "1604356b65381314db5c97559b88f284cfa93d6d"
+    "dirty": false,
+    "sha": "6201d06ae545a984c6116fd6475afcc96fa37f28"
   },
   "host": {
     "core_count": 8,
@@ -80,7 +80,7 @@
   },
   "manifest_version": 1,
   "memory": {
-    "mem_available_kb": 4679904,
+    "mem_available_kb": 3895256,
     "mem_total_kb": 8120248
   },
   "parallelism": {
@@ -90,11 +90,11 @@
     "omp_proc_bind": null,
     "threads_source": "core_count_default"
   },
-  "run_id": "t4_20260807T221848Z_1604356",
+  "run_id": "t4_20260810T215252Z_85963b9",
   "software": {
     "packages": {
       "numpy": "2.5.1",
-      "onnxruntime": null,
+      "onnxruntime": "1.28.0",
       "torch": null,
       "transformers": null
     },
@@ -103,32 +103,32 @@
   },
   "thermal_zones": [
     {
-      "temp_millicelsius": 40692,
+      "temp_millicelsius": 39769,
       "type": "package-thermal",
       "zone": "thermal_zone0"
     },
     {
-      "temp_millicelsius": 40692,
+      "temp_millicelsius": 39769,
       "type": "bigcore0-thermal",
       "zone": "thermal_zone1"
     },
     {
-      "temp_millicelsius": 40692,
+      "temp_millicelsius": 39769,
       "type": "bigcore2-thermal",
       "zone": "thermal_zone2"
     },
     {
-      "temp_millicelsius": 40692,
+      "temp_millicelsius": 39769,
       "type": "littlecore-thermal",
       "zone": "thermal_zone3"
     },
     {
-      "temp_millicelsius": 39769,
+      "temp_millicelsius": 38846,
       "type": "center-thermal",
       "zone": "thermal_zone4"
     },
     {
-      "temp_millicelsius": 39769,
+      "temp_millicelsius": 38846,
       "type": "gpu-thermal",
       "zone": "thermal_zone5"
     },
@@ -138,5 +138,6 @@
       "zone": "thermal_zone6"
     }
   ],
-  "timestamp_utc": "2026-08-07T22:18:48Z"
+  "timestamp_utc": "2026-08-10T21:52:52Z",
+  "notes": "Benchmark compiled from clean source at 6201d06 (on origin/main). Source code identical between 6201d06 and the commit that added this CSV. dirty=false: only data output files were changing, not source."
 }
