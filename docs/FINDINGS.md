@@ -5558,7 +5558,7 @@ against the cached output (6.6 s/step, 66× faster).
 |--------|-------|
 | Post-swap CE loss increase | +9.0 (2.91 → 11.91) |
 | CE recovery after 30 steps | 17.1% (→ 10.37) |
-| Isolated MSE reduction (30 steps) | 94% (0.023 → 0.0036) |
+| Isolated MSE reduction (30 steps) | 84% (0.023 → 0.0036) |
 
 ### Smart gate initialization (ob-t3b.9)
 
