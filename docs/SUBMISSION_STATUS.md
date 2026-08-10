@@ -1,6 +1,6 @@
 # T-4 Submission Status Brief
 
-_Generated 2026-08-07 by t4. Updated 2026-08-08 by j1 (ADR 0007). Updated 2026-08-10 by t3 (T-4 fired, SDOT cross-validation resolved)._
+_Generated 2026-08-07 by t4. Updated 2026-08-08 by j1 (ADR 0007). Updated 2026-08-10 by t3 (T-4 fired, SDOT e2e provenance cleaned, PR table backfill)._
 _All numbers below are validated against committed CSVs with manifests._
 
 ---
@@ -63,11 +63,13 @@ locked to Edge AI.
 | 0.8B INT4+SDOT: 37.21 tok/s (t4) | rk3588-t4_08b_big_int4_sdot_e2e_schema.csv | ✓ |
 | ~50× cumulative speedup (INT8+SDOT) | 0.07 → 3.48 tok/s = 49.7× | ✓ |
 | ~63× cumulative speedup (INT4+SDOT) | 0.07 → 4.43 tok/s = 63.3× | ✓ |
-| (t3 cross-validation) | rk3588-t3 SDOT re-run (§38): 4B 3.28 tok/s, 0.8B 27.70 tok/s | ✓ gap closes to 3.0% (4B) / 5.1% (0.8B) — within fleet variance |
+| (t3 cross-validation) | rk3588-t3_big_int8_sdot_e2e.json (2.80), rk3588-t3_08b_big_int8_sdot_e2e.json (25.6) — dirty=false, SHA `c880887` | ⚠ INT8+SDOT e2e gap ~15–20% vs t4 (board-level, per RESULTS DISCIPLINE/ob-bf7); pure-GDN ctx sweep gap closes to 3–5% (§38) |
 
 All manifests: governor=performance, 30 repeats (kernel) / 1–3 runs (e2e),
-git_sha recorded. t3 manifests are dirty=false. The earlier t3 SDOT warning
-(dirty-tree, ~20% gap) was resolved by the §38 re-run at clean commit `96f8984`.
+git_sha recorded. t3 manifests are dirty=false. The earlier dirty-manifest
+warning on t3 SDOT e2e was resolved (re-captured at clean SHA `c880887`).
+The ~15–20% e2e gap is consistent with fleet variance (ob-bf7); the pure-GDN
+context sweep shows tighter 3–5% agreement (§38, commit `96f8984`).
 
 ---
 
