@@ -8,6 +8,7 @@ because all logic ran at import time. After the __main__ refactor, these
 functions are importable without side effects.
 """
 
+import json
 import os
 import sys
 from pathlib import Path
@@ -170,6 +171,71 @@ class TestGib:
 # ---------------------------------------------------------------------------
 # main — integration (runs full script)
 # ---------------------------------------------------------------------------
+
+
+# ---------------------------------------------------------------------------
+# PROV map — provenance drift regression test
+# ---------------------------------------------------------------------------
+
+# Maps CSV names to their corresponding manifest filenames.
+_CSV_TO_MANIFEST = {
+    "jetson-j1_clean.csv": "jetson-j1_clean.json",
+    "jetson-j1.csv": "jetson-j1.json",
+    "jetson-j1_single.csv": "jetson-j1_single.json",
+    "jetson-j1_omp.csv": "jetson-j1_omp.json",
+    "jetson-j2.csv": "jetson-j2.json",
+    "jetson-j2-omp.csv": "jetson-j2-omp.json",
+    "jetson-j2-omp-full.csv": "jetson-j2-omp-full.json",
+    "jetson-j2-full-optimized.csv": "jetson-j2-full-optimized.json",
+    "jetson-j2-conv-unroll.csv": "jetson-j2-conv-unroll.json",
+    "jetson-j2-omp-unroll.csv": "jetson-j2-omp-unroll.json",
+    "pi5-r5.csv": "pi5-r5.json",
+    "pi5-j1.csv": "pi5-j1.json",
+    "rk3588-t3_big.csv": "rk3588-t3.json",
+    "rk3588-t3_little.csv": "rk3588-t3.json",
+    "rk3588-t4_big.csv": "rk3588-t4.json",
+    "rk3588-t4_little.csv": "rk3588-t4.json",
+    "jetson-j1-clean.csv": "jetson-j1-clean.json",
+    "jetson-j2-clean.csv": "jetson-j2-clean.json",
+    "rk3588-t3-clean.csv": "rk3588-t3-clean.json",
+    "rk3588-t3-little-clean.csv": "rk3588-t3-little-clean.json",
+    "rk3588-t4-clean.csv": "rk3588-t4-clean.json",
+    "rk3588-t4-little-clean.csv": "rk3588-t4-little-clean.json",
+}
+
+
+class TestProvMapConsistency:
+    """Ensure every PROV entry's (sha, dirty) matches the committed manifest.
+
+    Regression test for the silent provenance drift where the PROV map in
+    partial_comparison_table.py became stale after CSVs were re-run at later
+    commits, causing the fleet comparison table to show wrong provenance.
+    """
+
+    @pytest.mark.parametrize("csv_name", sorted(_CSV_TO_MANIFEST))
+    def test_prov_matches_manifest(self, csv_name):
+        from scripts.partial_comparison_table import PROV
+
+        manifest_name = _CSV_TO_MANIFEST[csv_name]
+        manifest_path = os.path.join(_ROOT, "results", "manifests", manifest_name)
+
+        if not os.path.isfile(manifest_path):
+            pytest.skip(f"{manifest_name} not present")
+
+        with open(manifest_path) as f:
+            m = json.load(f)
+
+        prov_run_id, prov_sha, prov_dirty = PROV[csv_name]
+        man_sha = m["git"]["sha"][:7]
+        man_dirty = m["git"]["dirty"]
+
+        assert prov_sha == man_sha, (
+            f"PROV sha for {csv_name} is {prov_sha!r} but manifest {manifest_name} says {man_sha!r}"
+        )
+        assert prov_dirty == man_dirty, (
+            f"PROV dirty for {csv_name} is {prov_dirty!r} but manifest "
+            f"{manifest_name} says {man_dirty!r}"
+        )
 
 
 class TestMain:

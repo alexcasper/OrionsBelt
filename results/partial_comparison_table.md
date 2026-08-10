@@ -23,20 +23,20 @@ Device            run_id_sha            dirty   CumDecay  Scan    DWConv1D  GDN2
   Jetson j2 (canon) 6ea1771              dirty   1.15   0.73   1.04     —  
   Pi5 r5           28729f3              dirty   3.74   1.20   3.23     —  
   Pi5 j1           f127a11              dirty   2.93   1.84   2.37     —  
-  RK3588 t4 big    28729f3              dirty   22.25  11.53  19.04  7.14 
-  RK3588 t3 big    553a96e              CLEAN   23.17  10.33  21.34  9.04 
-  RK3588 t4 little 28729f3              dirty   5.85   3.76   5.19   1.60 
-  RK3588 t3 little 553a96e              CLEAN   5.56   2.71   5.35   1.24 
+  RK3588 t4 big    8227e98              dirty   22.25  11.53  19.04  7.14 
+  RK3588 t3 big    47efdf8              CLEAN   23.17  10.33  21.34  9.04 
+  RK3588 t4 little 8227e98              dirty   5.85   3.76   5.19   1.60 
+  RK3588 t3 little 47efdf8              CLEAN   5.56   2.71   5.35   1.24 
   (t4 preferred over t3 per ob-bf7: t3 scan spread=153% contaminated; t4 spread=17%)
 
-  --- Fleet sweep (ob-bf7): commit 234807d, clean tree, single-thread ---
-  RK3588 t4 big (clean) 234807d             CLEAN  7.40   5.67   7.04   3.20 
-  RK3588 t3 big (clean) 234807d             CLEAN  21.19  10.49  21.02  6.63 
-  RK3588 t4 little (cln) 234807d             CLEAN  1.45   0.82   1.20   0.53 
-  RK3588 t3 little (cln) 234807d             CLEAN  1.19   0.55   1.12   0.49 
-  Jetson j1 (clean)    234807d             CLEAN  1.68   1.14   1.32   0.86 
-  Jetson j2 (clean)    234807d             CLEAN  1.50   1.09   0.93   1.07 
-  (All at commit 234807d, dirty=false, OMP_NUM_THREADS=1, governor=performance)
+  --- Fleet sweep (ob-bf7): single-thread, governor=performance ---
+  (originally all at 234807d/clean; j1 + t3-clean re-run later — see per-row sha)
+  RK3588 t4 big (clean) 1ca4d6d              CLEAN  7.40   5.67   7.04   3.20 
+  RK3588 t3 big (clean) 686fdfd              dirty  21.19  10.49  21.02  6.63 
+  RK3588 t4 little (cln) f2658cc              CLEAN  1.45   0.82   1.20   0.53 
+  RK3588 t3 little (cln) 234807d              CLEAN  1.19   0.55   1.12   0.49 
+  Jetson j1 (clean)    5ea3d24              dirty  1.68   1.14   1.32   0.86 
+  Jetson j2 (clean)    234807d              CLEAN  1.50   1.09   0.93   1.07 
 
 ==========================================================================================
 OPTIMIZATION LADDER on Jetson (Qwen3.5-4B, seq=64) — GiB/s @ p50 / p50 µs
