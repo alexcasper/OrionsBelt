@@ -2275,17 +2275,17 @@ memory is UB).
 | 4B decode | 45.78 | 40.69 | 1.13× |
 | 0.8B decode | 30.52 | 30.52 | 1.00× |
 
-**Corrected t3 numbers (A76 big, 8-thread OpenMP, taskset 4-7, governor=performance, commit `686fdfd`):**
+**Corrected t3 numbers (A76 big, 8-thread OpenMP, taskset 4-7, governor=performance, commit `854c6f1`):**
 
 | Config | Old GiB/s | New GiB/s | Inflation |
 |---|---|---|---|
-| 4B prefill | 8.97 | 6.63 | 1.35× |
-| 0.8B prefill | 11.57 | 7.64 | 1.51× |
-| 4B decode | 61.04 | 57.40 | 1.06× |
-| 0.8B decode | 45.77 | 46.24 | 0.99× |
+| 4B prefill | 8.97 | 6.46 | 1.39× |
+| 0.8B prefill | 11.57 | 7.62 | 1.52× |
+| 4B decode | 61.04 | 57.22 | 1.07× |
+| 0.8B decode | 45.77 | 46.12 | 0.99× |
 
-Cross-device agreement on corrected numbers: 4B prefill 6.63 vs 6.84 (t3 is 97%
-of t4), 0.8B prefill 7.64 vs 8.15 (94%). The decode numbers diverge more (57.40
+Cross-device agreement on corrected numbers: 4B prefill 6.46 vs 6.84 (t3 is 94%
+of t4), 0.8B prefill 7.62 vs 8.15 (93%). The decode numbers diverge more (57.22
 vs 40.69 for 4B) because t3 uses 8-thread OpenMP while t4 uses fewer threads;
 at decode the working set is cache-resident so thread count matters more than
 memory bandwidth.
@@ -2304,7 +2304,7 @@ memory bandwidth.
 
 **Fleet-wide note:** All existing fleet CSVs initially contained inflated GDN-2
 numbers from the aliasing bug. Corrected status by device:
-- **t3** ✅ (`rk3588-t3-clean.csv` at `686fdfd`, 3×30-repeat run)
+- **t3** ✅ (`rk3588-t3-clean.csv` at `854c6f1`, clean tree, 3×30-repeat run)
 - **t4** ✅ (`rk3588-t4-clean.csv` at `20b50c7`)
 - **Jetson J1** ✅ (`jetson-j1-clean.csv` re-run at `414b622`, post-fix;
   GDN-2 4B prefill: 1.13→0.86 GiB/s)
@@ -3028,13 +3028,13 @@ prior workloads), not a kernel or measurement methodology problem.
 >
 > The 8-thread vs 8-thread comparison (`rk3588-t3-clean.csv` vs
 > `rk3588-t4_big.csv`, both `effective_threads=8`) shows the boards agree within
-> ~6% (cumdecay 21.06 vs 22.25), consistent with t4's higher 2400 MHz clock.
+> ~6% (cumdecay 21.39 vs 22.25), consistent with t4's higher 2400 MHz clock.
 >
 > See `comparison_table.md` §1a for the corrected like-for-like analysis.
 
 **Date:** 2026-08-07  
 **Beads:** ob-aw9, ob-bf7  
-**Commits:** t4 at 8b64d1a, t3 fresh at f015982
+**Commits:** t4 at 8b64d1a, t3 clean at 854c6f1
 
 ### Context
 
@@ -3057,14 +3057,14 @@ kernels. Both boards are RK3588 (4×A55 + 4×A76) but **different board vendors*
 
 | Kernel | Model | Seq | t4 GiB/s | t3 GiB/s | Ratio |
 |--------|-------|-----|----------|----------|-------|
-| gdn_gated_scan | 4B | 64 | 5.67 | 10.62 | 1.87× |
+| gdn_gated_scan | 4B | 64 | 5.67 | 10.56 | 1.86× |
 | gdn_gated_scan | 0.8B | 64 | 6.93 | 15.24 | 2.20× |
-| gdn_cumdecay | 4B | 64 | 7.40 | 21.06 | 2.85× |
-| gdn_cumdecay_f16 | 4B | 64 | 8.61 | 37.20 | 4.32× |
+| gdn_cumdecay | 4B | 64 | 7.40 | 21.39 | 2.89× |
+| gdn_cumdecay_f16 | 4B | 64 | 8.61 | 35.12 | 4.08× |
 | gdn_gated_scan | 4B | 1 | 32.70 | 52.33 | 1.60× |
 | gdn_gated_scan | 0.8B | 1 | 26.15 | 32.69 | 1.25× |
-| gdn_causal_dwconv1d | 4B | 64 | 7.04 | 18.73 | 2.66× |
-| gdn2_gated_scan | 4B | 64 | 3.20 | 6.63 | 2.07× |
+| gdn_causal_dwconv1d | 4B | 64 | 7.04 | 20.59 | 2.93× |
+| gdn2_gated_scan | 4B | 64 | 3.20 | 6.46 | 2.02× |
 
 ### Analysis
 
@@ -3138,14 +3138,15 @@ The **equal-thread-count** comparison removes the confound. Both boards at
 
 | Kernel (4B, seq=64) | t4 8-thread GiB/s | t3 8-thread GiB/s | t4÷t3 |
 |---|---:|---:|---:|
-| gdn_cumdecay | 22.25 | 21.06 | 1.06× |
-| gdn_gated_scan | 11.53 | 10.62 | 1.09× |
-| gdn_causal_dwconv1d | 19.04 | 18.73 | 1.02× |
+| gdn_cumdecay | 22.25 | 21.39 | 1.04× |
+| gdn_gated_scan | 11.53 | 10.56 | 1.09× |
+| gdn_causal_dwconv1d | 19.04 | 20.59 | 0.92× |
 
-At equal thread count the two boards agree to within ~9% (cumdecay/scan) and
-**t4 is marginally faster**, consistent with its higher A76 clock (2400 vs
-2304 MHz). The genuine single-thread comparison (above) confirms that cumdecay
-is identical but gated_scan shows a real ~1.87× board-level difference — the
+At equal thread count the two boards agree to within ~9% on all three kernels
+and the direction of who is faster flips per kernel — within the documented
+run-to-run variance (ob-bf7: up to 1.68× between sessions). The genuine
+single-thread comparison (above) confirms that cumdecay is identical but
+gated_scan shows a real ~1.87× board-level difference — the
 "gap is a thread-count artifact" conclusion holds for cumdecay but not for
 gated_scan, where a microarchitectural difference persists even at equal thread
 count. `comparison_table.md` carries the matching correction.

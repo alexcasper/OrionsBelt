@@ -28,7 +28,7 @@ At 262K context on the 4B checkpoint, that difference is **23.95 GiB of RAM** �
 
 **What we built:**
 - **Three GDN CPU kernels** (gated cumulative decay, gated delta-rule scan, causal depthwise Conv1D) in C with NEON intrinsics, verified against FP32 reference implementations
-- **Mixed-precision variants** (fp16, bf16 recurrent state) — fp16 gives 1.77× on the decay chain; scan is compute-bound and shows no bandwidth benefit
+- **Mixed-precision variants** (fp16, bf16 recurrent state) — fp16 gives 1.64× on the decay chain; scan is compute-bound and shows no bandwidth benefit
 - **big.LITTLE affinity policy** — pinning to A76 big cores is 2–3× faster than default scheduler placement
 - **OpenMP parallelization + NEON double-width unrolling** — 2.6–5.1× cumulative speedup on A76
 - **Cross-vendor NPU operator-coverage audit** — both CIX NOE and Rockchip RKNN reject GDN's variable-length recurrence (the "Loop" op). This generalizes: no current edge NPU compiler handles it
@@ -56,18 +56,19 @@ At 262K context on the 4B checkpoint, that difference is **23.95 GiB of RAM** �
 
 ### Headline: GDN kernel bandwidth on RK3588 Cortex-A76
 
-Qwen3.5-4B, prefill (seq=64), fp32 baseline, 8-thread (big cluster). Two independent RK3588 nodes (t3, t4 Turing Machines RK1). Kernel computation is unchanged between commits (diffs in `bench_gdn.c` between f015982 and 8227e98 are infrastructure only: `_POSIX_C_SOURCE` macro, SPDX header, `xmalloc` safety wrapper — no behavioral change to kernel arithmetic).
+Qwen3.5-4B, prefill (seq=64), fp32 baseline, 8-thread (big cluster). Two independent RK3588 nodes (t3, t4 Turing Machines RK1). Kernel computation is unchanged between commits (diffs in `bench_gdn.c` between 854c6f1 and 8227e98 are infrastructure only: `_POSIX_C_SOURCE` macro, SPDX header, `xmalloc` safety wrapper — no behavioral change to kernel arithmetic).
 
 | Kernel | GiB/s (t3) | Spread | GiB/s (t4) | Spread | t3÷t4 |
 |---|---:|---:|---:|---:|---:|
-| Cumulative decay | 21.06 | 3.5% | 22.25 | 14.6% | 0.95× |
-| Gated delta-rule scan | 10.62 | 5.4% | 11.53 | 9.2% | 0.92× |
-| Causal Conv1D | 18.73 | 4.8% | 19.04 | 3.8% | 0.98× |
+| Cumulative decay | 21.39 | 7.3% | 22.25 | 14.6% | 0.96× |
+| Gated delta-rule scan | 10.56 | 6.3% | 11.53 | 9.2% | 0.92× |
+| Causal Conv1D | 20.59 | 3.5% | 19.04 | 3.8% | 1.08× |
 
-> t3 manifest git_sha `f015982`, dirty=false; t4 manifest git_sha `8227e98`,
-> dirty=true; 30 repeats each. The boards agree within 4–15% (t4 marginally
-> faster), confirming the result is hardware-reproducible. Cumulative decay
-> reaches 66% of the 31.7 GiB/s spec bandwidth; gated scan runs at a lower
+> t3 manifest git_sha `854c6f1`, dirty=false; t4 manifest git_sha `8227e98`,
+> dirty=true; 30 repeats each. The boards agree within 4–15% (direction flips
+> per kernel within run-to-run variance), confirming the result is
+> hardware-reproducible. Cumulative decay
+> reaches 67% of the 31.7 GiB/s spec bandwidth; gated scan runs at a lower
 > fraction because its sequential recurrence is
 > **instruction-overhead-bound, not DRAM-bandwidth-bound**.
 > (An earlier version of this table compared t3 8-thread against t4 1-thread
@@ -78,10 +79,10 @@ Qwen3.5-4B, prefill (seq=64), fp32 baseline, 8-thread (big cluster). Two indepen
 
 | Kernel | fp32 | fp16 | Speedup |
 |---|---:|---:|---:|
-| Cumulative decay | 21.06 | 37.20 | **1.77×** |
-| Gated scan | 10.62 | 10.47 | 0.99× (flat) |
+| Cumulative decay | 21.39 | 35.12 | **1.64×** |
+| Gated scan | 10.56 | 10.43 | 0.99× (flat) |
 
-> fp16 halves memory traffic for the elementwise decay chain → 1.77× on t3. Gated scan is compute-bound on the delta-rule matmul, so halving traffic doesn't help — confirming the instruction-overhead diagnosis.
+> fp16 halves memory traffic for the elementwise decay chain → 1.64× on t3. Gated scan is compute-bound on the delta-rule matmul, so halving traffic doesn't help — confirming the instruction-overhead diagnosis.
 
 ### Q8_0 quantization: 2.97× decode speedup with zero accuracy loss
 
@@ -205,7 +206,7 @@ No GPU, NPU, or proprietary SDK required. Full setup guide: [`docs/SETUP_PORTABL
 - Every measurement has a **provenance manifest** (git SHA, governor state, CPU topology, thermals)
 - 2294 unit tests covering kernel correctness and schema conformance
 - All figures are **regenerable** from committed CSVs (`bench/plots.py`, `scripts/generate_memory_plots.py`)
-- t3 benchmark data: manifest git_sha `f015982`, dirty=false, governor=performance, 30 repeats per kernel
+- t3 benchmark data: manifest git_sha `854c6f1`, dirty=false, governor=performance, 30 repeats per kernel
 
 ---
 

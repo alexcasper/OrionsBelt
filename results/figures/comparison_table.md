@@ -7,7 +7,7 @@ See per-device tables (`*_table.md`) for full kernel-level detail._
 
 | Device | CSV | Git SHA | Dirty | Governor | Threads | Manifest |
 |---|---|---|---|---|---|---|
-| rk3588-t3 (big, **8-thread**) | `rk3588-t3-clean.csv` | `686fdfd` | true | performance | 8 | `rk3588-t3-clean.json` |
+| rk3588-t3 (big, **8-thread**) | `rk3588-t3-clean.csv` | `854c6f1` | **false** | performance | 8 | `rk3588-t3-clean.json` |
 | rk3588-t3 (big, **1-thread**) | `rk3588-t3-clean-singlethread.csv` | `d72eaa1` | **false** | performance | 1 | `rk3588-t3-clean-singlethread.json` |
 | rk3588-t4 (big, 1-thread) | `rk3588-t4-clean.csv` | `1ca4d6d` | **false** | performance | 1 | `rk3588-t4-clean.json` |
 
@@ -23,8 +23,8 @@ See per-device tables (`*_table.md`) for full kernel-level detail._
 > §1a below.
 >
 > The equal-thread-count 8v8 comparison (`rk3588-t3-clean.csv` vs
-> `rk3588-t4_big.csv`, both `effective_threads=8`) gives cumdecay 21.06 vs 22.25,
-> gated scan 10.62 vs 11.53, Conv1D 18.73 vs 19.04 — boards agree within ~9%,
+> `rk3588-t4_big.csv`, both `effective_threads=8`) gives cumdecay 21.39 vs 22.25,
+> gated scan 10.56 vs 11.53, Conv1D 20.59 vs 19.04 — boards agree within ~9%,
 > consistent with t4's higher 2400 MHz clock.
 >
 > t3 is an unknown RK3588 board (kernel 5.10, CFS, 32 GB); t4 is a Turing
@@ -59,16 +59,16 @@ Qwen3.5-4B, prefill (seq=64), fp32. ⚠ t3 was 8-thread (threads_source=core_cou
 
 | Kernel | t3 GiB/s (8T) | t4 GiB/s (1T) | t3÷t4 ratio |
 |---|---:|---:|---:|
-| gdn_cumdecay | 21.06 | 7.40 | 2.85× |
-| gdn_gated_scan | 10.62 | 5.67 | 1.87× |
-| gdn_causal_dwconv1d | 18.73 | 7.04 | 2.66× |
+| gdn_cumdecay | 21.39 | 7.40 | 2.89× |
+| gdn_gated_scan | 10.56 | 5.67 | 1.86× |
+| gdn_causal_dwconv1d | 20.59 | 7.04 | 2.93× |
 
 > The 8-thread t3 numbers reflect OpenMP scaling across 4 big cores. The
 > 8-thread vs 8-thread comparison (`rk3588-t3-clean.csv` vs `rk3588-t4_big.csv`,
-> both effective_threads=8) gives cumdecay 21.19 vs 22.25, gated scan 10.49 vs 11.53,
-> Conv1D 21.02 vs 19.04 — boards agree within ~10%. t3 CSV refreshed at `686fdfd`
-> with updated measurement harness (adaptive batch timing) and GDN-2 aliasing fix;
-> non-GDN-2 numbers shifted slightly vs the original `f015982` measurement.
+> both effective_threads=8) gives cumdecay 21.39 vs 22.25, gated scan 10.56 vs 11.53,
+> Conv1D 20.59 vs 19.04 — boards agree within ~9%. t3 CSV re-run at `854c6f1`
+> (clean tree, dirty=false) to replace a prior dirty-manifest run; non-GDN-2
+> numbers are within the documented run-to-run variance (ob-bf7).
 > See §8 for OpenMP scaling analysis.
 
 ### 1c. 0.8B model (t3 8-thread, t4 1-thread — also confounded)
@@ -77,13 +77,14 @@ Qwen3.5-0.8B, prefill (seq=64), fp32 baseline (t3 only; t4 shows similar ratios)
 
 | Kernel | t3 GiB/s | t3 spread |
 |---|---:|---:|
-| gdn_cumdecay | 26.78 | 0.8% |
-| gdn_gated_scan | 11.59 | 2.1% |
-| gdn_causal_dwconv1d | 20.18 | 1.7% |
+| gdn_cumdecay | 24.98 | 2.2% |
+| gdn_gated_scan | 11.53 | 10.7% |
+| gdn_causal_dwconv1d | 15.98 | 2.7% |
 
 > Note: 0.8B prefill numbers shift significantly across measurement sessions on
-> this fleet (ob-bf7: gated_scan ranged 97–204 µs across runs). The CSV was
-> refreshed at `686fdfd` with the GDN-2 aliasing fix; see FINDINGS.md §10 correction.
+> this fleet (ob-bf7: gated_scan ranged 97–204 µs across runs). dwconv1d at the
+> 0.8B shape is especially noisy (16.0–22.5 GiB/s across 3 back-to-back runs at
+> `854c6f1`). See FINDINGS.md §10 for GDN-2 aliasing correction.
 
 ## 2. Mixed-precision optimization impact
 
@@ -91,12 +92,12 @@ Qwen3.5-4B, prefill (seq=64), A76 big. Both devices clean, post-optimization.
 
 | Kernel | t3 fp32 | t3 fp16 | t3 bf16 | t4 fp32 | t4 fp16 | t4 bf16 | fp16 speedup |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| gdn_cumdecay | 21.06 | 37.20 | 25.49 | 7.40 | 8.61 | 6.01 | **1.16–1.77×** |
-| gdn_gated_scan | 10.62 | 10.47 | 10.51 | 5.67 | 5.66 | 5.67 | 0.99–1.00× |
-| gdn_causal_dwconv1d | 18.73 | — | — | 7.04 | — | — | — |
+| gdn_cumdecay | 21.39 | 35.12 | 25.11 | 7.40 | 8.61 | 6.01 | **1.16–1.64×** |
+| gdn_gated_scan | 10.56 | 10.43 | 10.45 | 5.67 | 5.66 | 5.67 | 0.99–1.00× |
+| gdn_causal_dwconv1d | 20.59 | — | — | 7.04 | — | — | — |
 
 > fp16 halves memory traffic for the decay chain (elementwise gate/decay ops),
-> yielding 1.77× on t3 cumdecay but only 1.16× on t4 (the absolute throughput
+> yielding 1.64× on t3 cumdecay but only 1.16× on t4 (the absolute throughput
 > ceiling differs by board). Gated scan shows **no fp16 benefit** because it is
 > compute-bound on the delta-rule matmul, not bandwidth-bound — consistent with
 > the instruction-overhead finding on both boards.

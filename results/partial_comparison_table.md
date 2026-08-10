@@ -32,7 +32,7 @@ Device            run_id_sha            dirty   CumDecay  Scan    DWConv1D  GDN2
   --- Fleet sweep (ob-bf7): single-thread, governor=performance ---
   (originally all at 234807d/clean; j1 + t3-clean re-run later — see per-row sha)
   RK3588 t4 big (clean) 1ca4d6d              CLEAN  7.40   5.67   7.04   3.20 
-  RK3588 t3 big (clean) 686fdfd              dirty  21.19  10.49  21.02  6.63 
+  RK3588 t3 big (clean) 854c6f1              CLEAN  21.39  10.56  20.59  6.46 
   RK3588 t4 little (cln) f2658cc              CLEAN  1.45   0.82   1.20   0.53 
   RK3588 t3 little (cln) 234807d              CLEAN  1.19   0.55   1.12   0.49 
   Jetson j1 (clean)    5ea3d24              dirty  1.68   1.14   1.32   0.86 

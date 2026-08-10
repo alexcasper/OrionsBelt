@@ -123,7 +123,7 @@ PROV = {
     # for each file — the "matched-commit" property is broken for j1/t3.
     "jetson-j1-clean.csv": ("j1_20260807T230522Z_5ea3d24", "5ea3d24", True),
     "jetson-j2-clean.csv": ("jetson-j2-clean_sweep_234807d", "234807d", False),
-    "rk3588-t3-clean.csv": ("t3_20260810T004752Z_686fdfd", "686fdfd", True),
+    "rk3588-t3-clean.csv": ("t3_20260810T041500Z_854c6f1", "854c6f1", False),
     "rk3588-t3-little-clean.csv": ("rk3588-t3-little-clean_sweep_234807d", "234807d", False),
     "rk3588-t4-clean.csv": ("rk3588-t4-big_sweep_1ca4d6d", "1ca4d6d", False),
     "rk3588-t4-little-clean.csv": ("rk3588-t4-little_sweep_f2658cc", "f2658cc", False),
