@@ -1,6 +1,6 @@
-# Pre-T-4 Submission Status Brief
+# T-4 Submission Status Brief
 
-_Generated 2026-08-07 by t4. Updated 2026-08-08 by j1 to reflect ADR 0007 (Edge AI committed)._
+_Generated 2026-08-07 by t4. Updated 2026-08-08 by j1 (ADR 0007). Updated 2026-08-10 by t3 (T-4 fired, SDOT e2e provenance cleaned, PR table backfill)._
 _All numbers below are validated against committed CSVs with manifests._
 
 ---
@@ -11,9 +11,11 @@ The Edge AI submission is **ready today**. Every claim in
 `DEVPOST_SUBMISSION.md` traces to a manifest-backed CSV. The O6 board
 has not arrived; per [ADR 0007](adr/0007-commit-to-edge-ai-track.md),
 the project committed to the Edge AI track effective **2026-08-06**.
-The Aug 8 last-useful-arrival cutoff (ADR 0004) has now passed with no
-board. T-4 (Aug 10) and T-3 (Aug 11) triggers are pre-committed per
-ADR 0007 — the submission framing is locked to Edge AI.
+The Aug 8 last-useful-arrival cutoff (ADR 0004) has passed with no
+board. **T-4 (Aug 10) has fired** — `ob-axq` still OPEN, follow-up
+`ob-9t0.10` filed (NPU on-device execution: designed, not executed).
+T-3 (Aug 11) is pre-committed per ADR 0007 — the submission framing is
+locked to Edge AI.
 
 ---
 
@@ -61,12 +63,13 @@ ADR 0007 — the submission framing is locked to Edge AI.
 | 0.8B INT4+SDOT: 37.21 tok/s (t4) | rk3588-t4_08b_big_int4_sdot_e2e_schema.csv | ✓ |
 | ~50× cumulative speedup (INT8+SDOT) | 0.07 → 3.48 tok/s = 49.7× | ✓ |
 | ~63× cumulative speedup (INT4+SDOT) | 0.07 → 4.43 tok/s = 63.3× | ✓ |
-| (t3 cross-validation) | rk3588-t3_big_int8_sdot_e2e.json (2.80), rk3588-t3_08b_big_int8_sdot_e2e.json (25.6) | ⚠ re-run at clean HEAD; was dirty — INT8 ~20% gap vs t4, INT4 ~5% (t4 also dirty, re-run recommended) |
+| (t3 cross-validation) | rk3588-t3_big_int8_sdot_e2e.json (2.80), rk3588-t3_08b_big_int8_sdot_e2e.json (25.6) — dirty=false, SHA `c880887` | ⚠ INT8+SDOT e2e gap ~15–20% vs t4 (board-level, per RESULTS DISCIPLINE/ob-bf7); pure-GDN ctx sweep gap closes to 3–5% (§38) |
 
 All manifests: governor=performance, 30 repeats (kernel) / 1–3 runs (e2e),
-git_sha recorded. t3 manifests are dirty=false; t4 SDOT manifests are
-dirty=true (binary built and run before source commit — result files
-written first, then committed together with the source).
+git_sha recorded. t3 manifests are dirty=false. The earlier dirty-manifest
+warning on t3 SDOT e2e was resolved (re-captured at clean SHA `c880887`).
+The ~15–20% e2e gap is consistent with fleet variance (ob-bf7); the pure-GDN
+context sweep shows tighter 3–5% agreement (§38, commit `96f8984`).
 
 ---
 
@@ -91,9 +94,9 @@ cutoff has passed with no board; any future arrival is additive bonus per ADR 00
 | Date | Trigger | Status | Action if fires |
 |---|---|---|---|
 | **Aug 8** | Last useful board arrival | **FIRED** — board not arrived; Edge AI committed (ADR 0007) | Submission locked to Edge AI |
-| **Aug 10** (T-4) | No board by this date | Pre-committed (ADR 0007) | Cut on-device NPU execution; keep NOE audit + CPU+GPU design. **NPU offload design documented** in [`NPU_OFFLOAD_DESIGN.md`](NPU_OFFLOAD_DESIGN.md) |
+| **Aug 10** (T-4) | No board by this date | **FIRED** — `ob-axq` still OPEN; follow-up `ob-9t0.10` filed | Cut on-device NPU execution; keep NOE audit + CPU+GPU design. **NPU offload design documented** in [`NPU_OFFLOAD_DESIGN.md`](NPU_OFFLOAD_DESIGN.md) |
 | **Aug 11** (T-3) | No board booted | Pre-committed (ADR 0007) | Physical AI framing already cut; Edge AI locked |
-| **Aug 12** (T-2) | Insufficient slack for GDN-2 swap | Check schedule | Cut layer swap; keep microbenchmark |
+| **Aug 12** (T-2) | Insufficient slack for GDN-2 swap | GDN-2 swap **done** (§40, PR #204) — trigger moot | Cut layer swap; keep microbenchmark — **not needed: swap completed** |
 | **Aug 13** (T-1) | Time running out | — | Cut demo video + 262K point if needed |
 | **Aug 14 16:00 PT** | Deadline | — | Submit |
 
@@ -187,6 +190,38 @@ cutoff has passed with no board; any future arrival is additive bonus per ADR 00
 | #184 | t4 | Doc consistency fixes — stale counts + PR table backfill | MERGED |
 | #185 | t4 | SDOT/INT4+SDOT e2e fleet data (7 schema CSVs) + DEVPOST/README/submission doc consistency + ~63× cumulative speedup | MERGED |
 | #189 | t4 | Add PR #185 to SUBMISSION_STATUS + fix check_readme_counts bugs (git ls-files, FINDINGS validation, 8 unit tests) | MERGED |
+| #191 | t4 | Fix ruff lint + SUBMISSION_STATUS backfill + test coverage | MERGED |
+| #192 | t3 | update_readme_counts.py auto-fixer + 30 tests | MERGED |
+| #193 | t3 | Lint fix, SPDX header, retroactive manifests, fleet analysis | MERGED |
+| #194 | t4 | Ruff noqa fix + test count sync + provenance drift fix | MERGED |
+| #195 | t4 | Beads export — portable work exhausted, awaiting O6 hardware | MERGED |
+| #196 | t4 | INT4+SDOT submission docs + optimization visualization | MERGED |
+| #197 | t4 | Device bench + portable improvements (tests, NPU design) | MERGED |
+| #199 | t3 | Symlink CLAUDE.md → AGENTS.md (fix bd doctor divergence) | MERGED |
+| #200 | t4 | Coverage improvements across scripts/ and bench/ | MERGED |
+| #201 | t3 | Beads sync after holding session (portable work exhausted) | MERGED |
+| #202 | t4 | Script/bench test coverage + main merge | MERGED |
+| #203 | t4 | Boundary-crossing cost micro-benchmark (ob-t3b.6) | MERGED |
+| #204 | t3 | GDN-2 layer swap + RULER retrieval eval + lint/manifest/conformance fixes | MERGED |
+| #205 | t4 | DEVPOST + SUBMISSION_STATUS stale count sync, boundary-crossing in NPU wall | MERGED |
+| #206 | t3 | GDN-2 smart gate init + adaptation depth sweep (ob-t3b.9) | MERGED |
+| #208–209 | t4 | Beads export sync (post-#205, disk audit update) | MERGED |
+| #210 | t3 | FINDINGS §40 (GDN-2 swap/RULER) + section count update | MERGED |
+| #211 | t3 | Sync stale FINDINGS-count references (53→54) | MERGED |
+| #212 | t3 | CLAIM_VERIFICATION §2.6 — boundary-crossing cost claims | MERGED |
+| #213 | t4 | RK3588 cross-check analysis + SDOT e2e spread data | MERGED |
+| #214 | t3 | INT4+INT8 SDOT e2e benchmark — fleet gap fill (big+little, 4B+0.8B) | MERGED |
+| #215 | t3 | Add missing t4 SDOT ctxsweep manifests + fix masked provenance gap | MERGED |
+| #216 | t3 | Fix stale GDN-2 numbers + PROV map drift in partial_comparison_table.py | MERGED |
+| #217–219 | t3 | Regenerate fleet_cross_device.png (loop flushes) | MERGED |
+| #218 | t3 | Re-run rk3588-t3-clean at clean HEAD — fix dirty-manifest provenance | MERGED |
+| #220 | t3 | Fix dirty provenance on little-cluster SDOT e2e (4 variants) | MERGED |
+| #221 | t3 | RULER manifest schema fix + --max-time arg + clean provenance re-runs | MERGED |
+| #222 | t3 | Fix stale pre-SDOT ctx-length scaling numbers + figure flush (ob-9ea) | MERGED |
+| #223 | t3 | Beads: ob-9t0.11 — flag bench/t4 stale branch for rebasing | MERGED |
+| #224 | t3 | Deterministic PNG output (constrained_layout) + docs provenance corrections | MERGED |
+
+> **PRs #190, #198, #207:** closed (not merged). No gaps in numbering.
 
 ---
 
