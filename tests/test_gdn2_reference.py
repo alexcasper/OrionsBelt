@@ -457,3 +457,53 @@ class TestBandwidthAnalysis:
         gdn2_extra = (H * d_k + H * d_v + H * d_k) * bytes_f32
 
         assert gdn2_extra > gdn1_extra
+
+
+# ---------------------------------------------------------------------------
+# Module-level self-test functions (cover CLI entry-point code paths)
+# ---------------------------------------------------------------------------
+
+
+class TestBuiltinSelfTests:
+    """Exercise the module's built-in self-test and entry-point functions.
+
+    These functions live inside gdn2_reference.py and are normally invoked via
+    ``python3 -m bench.gdn2_reference``.  Calling them here ensures they stay
+    correct and brings the module's coverage above 90 %.
+    """
+
+    def test_known_answer(self):
+        """Built-in test_gdn2_known_answer passes (hand-verified values)."""
+        from bench.gdn2_reference import test_gdn2_known_answer
+
+        test_gdn2_known_answer()
+
+    def test_vs_gdn1_uniform_gates(self):
+        """Built-in test_gdn2_vs_gdn1_uniform_gates passes."""
+        from bench.gdn2_reference import test_gdn2_vs_gdn1_uniform_gates
+
+        test_gdn2_vs_gdn1_uniform_gates()
+
+    def test_multi_step_consistency(self):
+        """Built-in test_gdn2_multi_step_consistency passes."""
+        from bench.gdn2_reference import test_gdn2_multi_step_consistency
+
+        test_gdn2_multi_step_consistency()
+
+    def test_bandwidth_analysis(self):
+        """Built-in test_bandwidth_analysis passes."""
+        from bench.gdn2_reference import test_bandwidth_analysis
+
+        test_bandwidth_analysis()
+
+    def test_micro_benchmark(self):
+        """micro_benchmark() runs without error and prints timing."""
+        from bench.gdn2_reference import micro_benchmark
+
+        micro_benchmark()
+
+    def test_main(self):
+        """main() runs all built-in self-tests without error."""
+        from bench.gdn2_reference import main
+
+        main()
