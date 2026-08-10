@@ -1,6 +1,6 @@
 # T-4 Submission Status Brief
 
-_Generated 2026-08-07 by t4. Updated 2026-08-08 by j1 (ADR 0007). Updated 2026-08-10 by t3 (T-4 fired, SDOT e2e provenance cleaned, PR table backfill, submission doc polish, PR #226/#227 merged). Updated 2026-08-10 by t4 (PR #228 merged, PR table backfill #228 + closed #229). Updated 2026-08-10 by t3 (PR #232 merged — ob-6ay closed, PR table backfill #230 + #232)._
+_Generated 2026-08-07 by t4. Updated 2026-08-08 by j1 (ADR 0007). Updated 2026-08-10 by t3 (T-4 fired, SDOT e2e provenance cleaned, PR table backfill, submission doc polish, PR #226/#227 merged). Updated 2026-08-10 by t4 (PR #228 merged, PR table backfill #228 + closed #229). Updated 2026-08-10 by t3 (PR #232 merged — ob-6ay closed, PR table backfill #230 + #232). Updated 2026-08-10 by t4 (PR #233/#234 merged — test counts 2176→2229, skip 52→20, PR table backfill #233 + #234)._
 _All numbers below are validated against committed CSVs with manifests._
 
 ---
@@ -40,7 +40,7 @@ locked to Edge AI.
 | Submission prep (README, write-up, repro) | ✓ All beads closed | ob-fnq, ob-f7k, ob-kdi, ob-9e2 |
 | Compliance checklist | ✓ ob-9e2 closed | Apache-2.0, no credentials at tip of main/t4 |
 
-**Submission readiness:** 15/15 checks pass, 2176 tests passed (52 skipped on optional deps), Ruff clean, CI green.
+**Submission readiness:** 15/15 checks pass, 2229 tests passed (20 skipped on optional deps), Ruff clean, CI green.
 
 ---
 
@@ -226,6 +226,8 @@ cutoff has passed with no board; any future arrival is additive bonus per ADR 00
 | #228 | t4 | Fix stale test count to CI-authoritative 2176 passed (2257 was non-reproducible partial-deps artifact) + backfill PR table #191–#227 + SDOT provenance citations in §2 + close ob-9t0.11 (t4 rebased onto corrected main) | MERGED |
 | #230 | t4 | Backfill PR #228 (merged) + #229 (closed) into SUBMISSION_STATUS table | MERGED |
 | #232 | t3 | Pin matplotlib rcParams for cross-device PNG determinism (ob-6ay) + isolate readiness check from committed PNG + regression test | MERGED |
+| #233 | t3 | Fix CI red — move importorskip before matplotlib import in rcParams test (ob-6ay follow-up) | MERGED |
+| #234 | t4 | Add matplotlib to [dev] extras so CI runs fleet plotting tests (ob-mrd.20) — 53 more tests now execute in CI (2176→2229 passed) | MERGED |
 
 > **PRs #190, #198, #207, #229:** closed (not merged). No gaps in numbering.
 
