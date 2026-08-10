@@ -1,6 +1,6 @@
 # T-4 Submission Status Brief
 
-_Generated 2026-08-07 by t4. Updated 2026-08-08 by j1 (ADR 0007). Updated 2026-08-10 by t3 (T-4 fired, SDOT e2e provenance cleaned, PR table backfill, submission doc polish)._
+_Generated 2026-08-07 by t4. Updated 2026-08-08 by j1 (ADR 0007). Updated 2026-08-10 by t3 (T-4 fired, SDOT e2e provenance cleaned, PR table backfill, submission doc polish, PR #226 merged)._
 _All numbers below are validated against committed CSVs with manifests._
 
 ---
@@ -221,7 +221,7 @@ cutoff has passed with no board; any future arrival is additive bonus per ADR 00
 | #223 | t3 | Beads: ob-9t0.11 — flag bench/t4 stale branch for rebasing | MERGED |
 | #224 | t3 | Deterministic PNG output (constrained_layout) + docs provenance corrections | MERGED |
 | #225 | t3 | SUBMISSION_STATUS T-4 update — trigger fired, PR table backfill, provenance cleaned | MERGED |
-| #226 | t3 | Submission doc polish — FINDINGS line count + WRITEUP table t3/t4 fix | OPEN |
+| #226 | t3 | Submission doc polish — FINDINGS line count + WRITEUP table t3/t4 fix | MERGED |
 
 > **PRs #190, #198, #207:** closed (not merged). No gaps in numbering.
 
