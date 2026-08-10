@@ -233,6 +233,7 @@ cutoff has passed with no board; any future arrival is additive bonus per ADR 00
 | #238 | t3 | PR #237 → MERGED in SUBMISSION_STATUS table (was merged as 961a28b) | MERGED |
 | #239 | t4 | Merge sync + SUBMISSION_STATUS #237 status fix + PR table backfill #238/#239 | MERGED |
 | #240 | t4 | Fix stale test counts + gdn2_reference coverage 50%→98% (2256→2262 passed, skip 20→2; README, DEVPOST, SUBMISSION_STATUS, ADR 0007) | MERGED |
+| #241 | t3 | PR #240 status fix (OPEN→MERGED) + ADR 0007 stale test count (2256→2262) | MERGED |
 
 > **PRs #190, #198, #207, #229, #235:** closed (not merged). No gaps in numbering.
 
