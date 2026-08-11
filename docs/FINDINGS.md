@@ -1605,9 +1605,10 @@ variable is thread count.
 > **File naming note:** Both `jetson-j1.csv` and `jetson-j2.csv` (canonical)
 > are single-threaded. The OpenMP
 > results below come from `jetson-j2-omp-full.csv`, built with a parallelized
-> variant of the kernel (pragmas not yet in the mainline source). All three
-> CSVs were captured from dirty trees (SHAs `6ea1771`, `6ea1771`, `a085417`
-> respectively). The ST
+> variant of the kernel (pragmas not yet in the mainline source). `jetson-j1.csv`
+> is clean (SHA `148db31`, dirty=false); `jetson-j2.csv` and
+> `jetson-j2-omp-full.csv` were captured from dirty trees (SHAs `6ea1771` and
+> `a085417` respectively). The ST
 > numbers between the two units agree within ±7%, confirming hardware
 > consistency.
 
