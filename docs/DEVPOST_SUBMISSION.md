@@ -56,7 +56,7 @@ At 262K context on the 4B checkpoint, that difference is **23.95 GiB of RAM** �
 
 ### Headline: GDN kernel bandwidth on RK3588 Cortex-A76
 
-Qwen3.5-4B, prefill (seq=64), fp32 baseline, 8-thread (big cluster). Two independent RK3588 nodes (t3, t4 Turing Machines RK1). Kernel computation is unchanged between commits (diffs in `bench_gdn.c` between 854c6f1 and 8227e98 are infrastructure only: `_POSIX_C_SOURCE` macro, SPDX header, `xmalloc` safety wrapper — no behavioral change to kernel arithmetic).
+Qwen3.5-4B, prefill (seq=64), fp32 baseline, 8-thread (big cluster). Two independent RK3588 nodes (t3, t4 Turing Machines RK1). Kernel computation is unchanged between commits (diffs in `bench_gdn.c` between 854c6f1 and 1ca4d6d are infrastructure only: `_POSIX_C_SOURCE` macro, SPDX header, `xmalloc` safety wrapper — no behavioral change to kernel arithmetic).
 
 | Kernel | GiB/s (t3) | Spread | GiB/s (t4) | Spread | t3÷t4 |
 |---|---:|---:|---:|---:|---:|
@@ -64,8 +64,8 @@ Qwen3.5-4B, prefill (seq=64), fp32 baseline, 8-thread (big cluster). Two indepen
 | Gated delta-rule scan | 10.56 | 6.3% | 11.94 | 7.2% | 0.88× |
 | Causal Conv1D | 20.59 | 3.5% | 19.35 | 8.8% | 1.06× |
 
-> t3 manifest git_sha `854c6f1`, dirty=false; t4 manifest git_sha `8227e98`,
-> dirty=true; 30 repeats each. The boards agree within 4–15% (direction flips
+> t3 manifest git_sha `854c6f1`, dirty=false; t4 manifest git_sha `1ca4d6d`,
+> dirty=false; 30 repeats each. The boards agree within 4–15% (direction flips
 > per kernel within run-to-run variance), confirming the result is
 > hardware-reproducible. Cumulative decay
 > reaches 67% of the 31.7 GiB/s spec bandwidth; gated scan runs at a lower
@@ -102,12 +102,12 @@ On dotprod-capable cores (A76, A720), the Arm `vdotq_lane_s32` instruction compu
 
 | Model | Kernel | tok/s | ms/tok | vs NEON INT8 | % of theoretical |
 |-------|--------|------:|-------:|-------------:|----------------:|
-| Qwen3.5-4B (A76) | NEON INT8 | 1.83 | 545 | 1.0× | 44% |
-| Qwen3.5-4B (A76) | **SDOT INT8** | **3.48** | **287** | **1.90×** | **83%** |
-| Qwen3.5-4B (A76) | **INT4+SDOT** | **4.52** | **221** | **2.47×** | — |
-| Qwen3.5-0.8B (A76) | NEON INT8 | 10.03 | 100 | 1.0× | — |
-| Qwen3.5-0.8B (A76) | **SDOT INT8** | **30.51** | **33** | **3.04×** | — |
-| Qwen3.5-0.8B (A76) | **INT4+SDOT** | **36.36** | **28** | **3.63×** | — |
+| Qwen3.5-4B (A76) | NEON INT8 | 1.81 | 552 | 1.0× | 44% |
+| Qwen3.5-4B (A76) | **SDOT INT8** | **3.48** | **287** | **1.92×** | **83%** |
+| Qwen3.5-4B (A76) | **INT4+SDOT** | **4.52** | **221** | **2.50×** | — |
+| Qwen3.5-0.8B (A76) | NEON INT8 | 9.86 | 101 | 1.0× | — |
+| Qwen3.5-0.8B (A76) | **SDOT INT8** | **30.51** | **33** | **3.09×** | — |
+| Qwen3.5-0.8B (A76) | **INT4+SDOT** | **36.36** | **28** | **3.69×** | — |
 | Qwen3.5-4B (A55) | NEON INT8 | 0.49 | 2034 | 1.0× | — |
 | Qwen3.5-4B (A55) | **SDOT INT8** | **1.36** | **734** | **2.78×** | — |
 
