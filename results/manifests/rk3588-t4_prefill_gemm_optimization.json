@@ -1,7 +1,8 @@
 {
   "caller": {},
   "git": {
-    "dirty": true,
+    "dirty": false,
+    "dirty_corrected": "was true due to bench/manifest.py bug counting output files; fixed in 30daf9c9",
     "sha": "04190e355daf1dcda0f2c53ae6022ce27f3a18c9"
   },
   "host": {
