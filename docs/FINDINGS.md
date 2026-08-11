@@ -680,6 +680,8 @@ aarch64-linux-gnu-gcc -O3 -fopenmp -mcpu=cortex-a57 -static \
 ```
 
 Raw CSV files for each optimization stage are committed under `results/raw/jetson-j2*.csv`.
+All were captured from dirty trees during active kernel development (manifest
+`jetson-j2-conv-unroll.json`, SHA `152808b`, dirty=true).
 
 ### Decode-phase with optimized kernels (ob-8qt.9)
 
@@ -1354,6 +1356,17 @@ were at the unoptimized baseline. Manifest:
 `results/manifests/rk3588-t4_optimized.json` (SHA 8f8be11, governor=performance,
 thermals 37–41 °C pre/post).
 
+> **⚠ PROVENANCE NOTE (ob-dsb, 2026-08-11):** The table above cites data from
+> commit `8f8be11`. The `rk3588-t4_big.csv` file has since been re-run multiple
+> times (commits be02d3b, c9be6ae, d242d53, and the ob-8ms.3 fleet bench),
+> overwriting both the optimized values and the pre-optimization baseline.
+> Current CSV values for the 4B/seq=64 optimized run: cumdecay 22.25 GiB/s
+> (p50=87.8 µs), scan 11.53 GiB/s (p50=256.7 µs), conv1d 19.04 GiB/s
+> (p50=108.2 µs) — within fleet inter-run variance (ob-bf7). The pre-optimization
+> baseline (4.25/3.29/4.52 GiB/s) is preserved at the parent of `8f8be11` in git
+> history. The manifest was regenerated to SHA `4ecfd6e` during a clean-tree
+> re-bench (fdff0d2).
+
 ### Per-Layer Latency Profile: GDN vs Full-Attention (ob-c9k)
 
 Instrumented all 24 decoder layers of Qwen3.5-0.8B with PyTorch forward
@@ -1590,9 +1603,12 @@ OpenMP 4-thread parallelism** enabled at build time. Same ISA, same governor
 variable is thread count.
 
 > **File naming note:** Both `jetson-j1.csv` and `jetson-j2.csv` (canonical)
-> are single-threaded and reproducible from the committed source. The OpenMP
+> are single-threaded. The OpenMP
 > results below come from `jetson-j2-omp-full.csv`, built with a parallelized
-> variant of the kernel (pragmas not yet in the mainline source). The ST
+> variant of the kernel (pragmas not yet in the mainline source). `jetson-j1.csv`
+> is clean (SHA `148db31`, dirty=false); `jetson-j2.csv` and
+> `jetson-j2-omp-full.csv` were captured from dirty trees (SHAs `6ea1771` and
+> `a085417` respectively). The ST
 > numbers between the two units agree within ±7%, confirming hardware
 > consistency.
 
@@ -3620,7 +3636,7 @@ Data: `results/raw/rk3588-t4_e2e_ctxsweep_4t_fair.csv`,
 `results/raw/rk3588-t4_e2e_ctxsweep_1t.csv`,
 `results/raw/rk3588-t4_e2e_ctxsweep_int8_4t_fair.csv`,
 `results/raw/rk3588-t4_e2e_ctxsweep_int8_1t.csv`.
-Manifest: `results/manifests/rk3588-t4.json` (SHA `31cba63`).
+Manifests: per-file `rk3588-t4_e2e_ctxsweep_{1t,4t_fair,int8_1t,int8_4t_fair}.json` (all dirty tree, SHA `be4d3ca`).
 
 ### Correction: SDOT re-run (2026-08-10, ob-9ea)
 
@@ -4473,7 +4489,7 @@ A57 speedup (57–60×) falls between the A76 (49×) and A55 (78×) results, con
 CSVs: `results/raw/rk3588-t4_prefill_{big,little}_{optimized,naive_m8}.csv`,
 `results/raw/rk3588-t4_prefill_big_4b_optimized.csv`,
 `results/raw/rk3588-t4_prefill_big_int8_{optimized,naive_m8}.csv`.
-Manifest: `results/manifests/rk3588-t4_prefill_gemm_optimization.json`.
+Manifest: `results/manifests/rk3588-t4_prefill_gemm_optimization.json` (dirty tree, SHA `04190e3`).
 Governor: performance. Thermals: 39–41 °C (no throttling).
 Device: rk3588-t4 (RK3588, 2nd unit).
 
@@ -4836,7 +4852,7 @@ Tested across both model sizes (0.8B and 4B) on Jetson Nano A57.
 
 CSV: `results/raw/jetson-j1_quant_accuracy_08b_4b.csv` (66 rows: 11 matrices
 × 3 variants × 2 models).
-Manifest: `results/manifests/jetson-j1_quant_accuracy_08b_4b.json` (sha `c643e34`).
+Manifest: `results/manifests/jetson-j1_quant_accuracy_08b_4b.json` (sha `c643e34`, dirty tree — uncommitted changes present at capture time).
 
 ## 31. Q8_0 context-length scaling: constant-time GDN advantage grows with quantization (2026-08-08, ob-4p0)
 
@@ -4912,7 +4928,7 @@ GDN recurrent state is genuinely constant-time, not just "slow-growing."
 CSVs: `results/raw/jetson-j1_08b_q80_ctxsweep_e2e_raw.csv` (7 rows) and
 `results/raw/jetson-j1_08b_q80_puregdn_ctxsweep_e2e_raw.csv` (7 rows).
 Manifests: `results/manifests/jetson-j1_08b_q80_ctxsweep.json` and
-`results/manifests/jetson-j1_08b_q80_puregdn_ctxsweep.json`.
+`results/manifests/jetson-j1_08b_q80_puregdn_ctxsweep.json` (both dirty tree — SHAs `d63e64a` and `72bafcc` respectively).
 ## 32. INT4 context-length sweep: dequant overhead makes INT4 slower than FP32 at short context on A57 (2026-08-08, ob-brn)
 
 ### Motivation
@@ -4966,7 +4982,7 @@ Three replicate runs; max Δ = 2.1% (ctx=1).
 ### Data
 
 CSV: `results/raw/jetson-j1_08b_int4_ctxsweep_e2e_raw.csv` (7 rows).
-Manifest: `results/manifests/jetson-j1_08b_int4_ctxsweep.json`.
+Manifest: `results/manifests/jetson-j1_08b_int4_ctxsweep.json` (dirty tree, SHA `00fe9f1`).
 Generator: `bench/ctx_scaling_analysis.py` (INT4 added to CONFIGS_JETSON).
 Generated report: `results/figures/ctx_length_scaling_a57.md`.
 
