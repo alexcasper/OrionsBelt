@@ -179,7 +179,9 @@ on dotprod-capable cores) and progressively optimizing it yields a
 > rows are from node t4 (same SoC, same Cortex-A76 big cluster). The 0.8B SDOT
 > value (30.5) is from a single raw run; the fleet harness 3-run average is
 > 30.19 tok/s (§33). Cross-validated on both nodes: SDOT INT8 measures 25.6 tok/s
-> (0.8B) and 2.80 tok/s (4B) on t3, within ~15% fleet variance (ob-bf7). See
+> (0.8B) and 2.80 tok/s (4B) on t3; the e2e gap (~15%) traces to RAM-bandwidth
+> differences in full-attention KV cache reads (t3: 32 GB vs t4: 8 GB, §38), while
+> pure-GDN kernel agreement is 3–5% (§38). See
 > the headline table above for the full cross-device comparison.
 
 ![Decode optimization stack on RK3588 Cortex-A76](../results/figures/optimization_stack.png)
