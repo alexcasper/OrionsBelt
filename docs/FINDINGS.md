@@ -1356,6 +1356,17 @@ were at the unoptimized baseline. Manifest:
 `results/manifests/rk3588-t4_optimized.json` (SHA 8f8be11, governor=performance,
 thermals 37–41 °C pre/post).
 
+> **⚠ PROVENANCE NOTE (ob-dsb, 2026-08-11):** The table above cites data from
+> commit `8f8be11`. The `rk3588-t4_big.csv` file has since been re-run multiple
+> times (commits be02d3b, c9be6ae, d242d53, and the ob-8ms.3 fleet bench),
+> overwriting both the optimized values and the pre-optimization baseline.
+> Current CSV values for the 4B/seq=64 optimized run: cumdecay 22.25 GiB/s
+> (p50=87.8 µs), scan 11.53 GiB/s (p50=256.7 µs), conv1d 19.04 GiB/s
+> (p50=108.2 µs) — within fleet inter-run variance (ob-bf7). The pre-optimization
+> baseline (4.25/3.29/4.52 GiB/s) is preserved at the parent of `8f8be11` in git
+> history. The manifest was regenerated to SHA `4ecfd6e` during a clean-tree
+> re-bench (fdff0d2).
+
 ### Per-Layer Latency Profile: GDN vs Full-Attention (ob-c9k)
 
 Instrumented all 24 decoder layers of Qwen3.5-0.8B with PyTorch forward

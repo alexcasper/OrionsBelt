@@ -93,6 +93,13 @@ to devices but was never previously tested in the correctness suite).
 > ceiling (~25 GiB/s measured, 79% of the 33.8 GB/s theoretical spec at
 > 2112 MHz).** The kernel is now memory-bound — the optimization has taken
 > it as far as the hardware allows.
+>
+> **Provenance:** Optimization measurements from commit `8f8be11` on rk3588-t4
+> (manifest `rk3588-t4_optimized.json`). The CSV has since been re-run; current
+> values (22.25/11.53/19.04 GiB/s) are consistent within fleet inter-run
+> variance. Pre-optimization baseline is preserved in git history at the parent
+> of `8f8be11`. See FINDINGS.md §"Device-Microbenchmark: Optimized vs
+> Unoptimized GDN Kernels on RK3588" for the full provenance note.
 
 The OpenMP parallelization across 4 cores accounts for ~4×; NEON double-width
 unrolling adds further gains. The little cluster (A55) benefits more
