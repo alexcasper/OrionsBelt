@@ -524,6 +524,44 @@ class TestGenerateTable:
         assert "Q8_0 vs FP32" in md
         assert "3.00×" in md
 
+    def test_int8_sdot_speedup_section(self):
+        """INT8 SDOT speedup table appears when both FP32 and INT8_SDOT exist."""
+        rows = [
+            _row(quant="fp32", value=1.0, device="rk3588-t3_big"),
+            _row(quant="int8_sdot", value=2.5, device="rk3588-t3_big"),
+        ]
+        data = extract_metrics(rows)
+        md = generate_table(data)
+        assert "INT8 SDOT vs FP32" in md
+        assert "2.50×" in md
+
+    def test_int8_sdot_speedup_without_fp32(self):
+        """INT8 SDOT without FP32 baseline shows em-dash for speedup."""
+        rows = [_row(quant="int8_sdot", value=2.5, device="rk3588-t3_big")]
+        data = extract_metrics(rows)
+        md = generate_table(data)
+        assert "INT8 SDOT vs FP32" in md
+        assert "—" in md
+
+    def test_int4_sdot_speedup_section(self):
+        """INT4 SDOT speedup table appears when both FP32 and INT4_SDOT exist."""
+        rows = [
+            _row(quant="fp32", value=1.0, device="rk3588-t3_big"),
+            _row(quant="int4_sdot", value=4.0, device="rk3588-t3_big"),
+        ]
+        data = extract_metrics(rows)
+        md = generate_table(data)
+        assert "INT4 SDOT vs FP32" in md
+        assert "4.00×" in md
+
+    def test_int4_sdot_speedup_without_fp32(self):
+        """INT4 SDOT without FP32 baseline shows em-dash for speedup."""
+        rows = [_row(quant="int4_sdot", value=4.0, device="rk3588-t3_big")]
+        data = extract_metrics(rows)
+        md = generate_table(data)
+        assert "INT4 SDOT vs FP32" in md
+        assert "—" in md
+
     def test_data_sources_section(self):
         """Generated table ends with a Data Sources section."""
         data = extract_metrics([_row()])
