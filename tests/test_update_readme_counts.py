@@ -25,11 +25,14 @@ import scripts.update_readme_counts as urc  # noqa: E402
 # ---------------------------------------------------------------------------
 
 
-def _make_repo(tmp_path: Path, csvs: int = 3, manifests: int = 5, figures: int = 2):
+def _make_repo(
+    tmp_path: Path, csvs: int = 3, manifests: int = 5, figures: int = 2, findings: int = 3
+):
     """Create a minimal repo structure under *tmp_path*."""
     (tmp_path / "results" / "raw").mkdir(parents=True)
     (tmp_path / "results" / "manifests").mkdir(parents=True)
     (tmp_path / "results" / "figures").mkdir(parents=True)
+    (tmp_path / "docs").mkdir(exist_ok=True)
 
     for i in range(csvs):
         (tmp_path / "results" / "raw" / f"device-{i}.csv").write_text("data\n")
@@ -41,11 +44,16 @@ def _make_repo(tmp_path: Path, csvs: int = 3, manifests: int = 5, figures: int =
     # figures/README.md should NOT be counted as a figure
     (tmp_path / "results" / "figures" / "README.md").write_text("# index\n")
 
+    # docs/FINDINGS.md with the requested number of ## sections
+    (tmp_path / "docs" / "FINDINGS.md").write_text(
+        "".join(f"## Section {i}\nContent.\n\n" for i in range(findings))
+    )
+
 
 README_TEMPLATE = """\
 # Test Repo
 
-> **Results so far:** {csvs} CSVs from the device fleet, {manifests} provenance manifests, {figs} generated figures/tables, 1 FINDINGS section.
+> **Results so far:** {csvs} CSVs from the device fleet, {manifests} provenance manifests, {figs} generated figures/tables, {findings} FINDINGS sections.
 
 > ```
 > results/
@@ -61,9 +69,10 @@ def _write_readme(
     csvs: int,
     manifests: int,
     figs: int,
+    findings: int = 3,
 ):
     (tmp_path / "README.md").write_text(
-        README_TEMPLATE.format(csvs=csvs, manifests=manifests, figs=figs)
+        README_TEMPLATE.format(csvs=csvs, manifests=manifests, figs=figs, findings=findings)
     )
 
 
@@ -102,6 +111,17 @@ class TestCountFiles:
         monkeypatch.setattr(urc, "REPO_ROOT", str(tmp_path))
         (tmp_path / "results" / "raw").mkdir(parents=True)
         assert urc._count_files("results/raw", suffix=".csv") == 0
+
+    def test_count_findings_sections(self, tmp_path, monkeypatch):
+        """_count_findings_sections counts all ## headers in FINDINGS.md."""
+        monkeypatch.setattr(urc, "REPO_ROOT", str(tmp_path))
+        _make_repo(tmp_path, findings=5)
+        assert urc._count_findings_sections() == 5
+
+    def test_count_findings_sections_no_file(self, tmp_path, monkeypatch):
+        """Returns 0 when docs/FINDINGS.md does not exist."""
+        monkeypatch.setattr(urc, "REPO_ROOT", str(tmp_path))
+        assert urc._count_findings_sections() == 0
 
 
 # ---------------------------------------------------------------------------
@@ -153,6 +173,17 @@ class TestUpdateReadmeRepair:
         text = (tmp_path / "README.md").read_text()
         assert "6 generated figures/tables" in text
 
+    def test_fix_findings_drift_headline(self, tmp_path, monkeypatch):
+        """Stale FINDINGS count in headline is repaired."""
+        monkeypatch.setattr(urc, "REPO_ROOT", str(tmp_path))
+        _make_repo(tmp_path, csvs=5, manifests=10, figures=3, findings=7)
+        _write_readme(tmp_path, csvs=5, manifests=10, figs=3, findings=3)
+
+        n = urc.update_readme()
+        assert n == 1  # headline only (FINDINGS drift)
+        text = (tmp_path / "README.md").read_text()
+        assert "7 FINDINGS sections" in text
+
     def test_fix_all_three_drift(self, tmp_path, monkeypatch):
         """All counts drift at once — headline repaired, dir-layout manifest too."""
         monkeypatch.setattr(urc, "REPO_ROOT", str(tmp_path))
@@ -172,7 +203,7 @@ class TestUpdateReadmeRepair:
         _make_repo(tmp_path, csvs=5, manifests=10, figures=3)
         # Write README with correct headline but stale dir-layout
         (tmp_path / "README.md").write_text(
-            README_TEMPLATE.format(csvs=5, manifests=10, figs=3).replace(
+            README_TEMPLATE.format(csvs=5, manifests=10, figs=3, findings=3).replace(
                 "10 provenance manifests (git SHA", "5 provenance manifests (git SHA"
             )
         )

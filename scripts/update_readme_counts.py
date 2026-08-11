@@ -60,12 +60,27 @@ def _count_files(dirpath: str, suffix: str | None = None, exclude_name: str | No
     return total
 
 
+def _count_findings_sections() -> int:
+    """Count ``##`` headers in ``docs/FINDINGS.md``.
+
+    Mirrors the logic in ``validate_results.py``'s
+    ``check_readme_counts()`` — counts ALL ``##`` headers (numbered +
+    named), not just ``^## [0-9]`` which misses sub-sections.
+    """
+    findings_path = os.path.join(REPO_ROOT, "docs", "FINDINGS.md")
+    if not os.path.isfile(findings_path):
+        return 0
+    with open(findings_path) as f:
+        return sum(1 for line in f if line.startswith("## "))
+
+
 # Regex patterns for the two locations we need to patch.
 # "Results so far" headline.
 RE_HEADLINE = re.compile(
     r"(Results so far:\*\*\s*)(\d+)(\s*CSVs from the device fleet,\s*)"
     r"(\d+)(\s*provenance manifests,\s*)"
-    r"(\d+)(\s*generated figures/tables.*)"
+    r"(\d+)(\s*generated figures/tables,\s*)"
+    r"(\d+)(\s*FINDINGS sections.*)"
 )
 # Directory-layout manifest count.
 RE_DIRLAYOUT = re.compile(r"(manifests/\s*<-\s*)(\d+)(\s*provenance manifests.*)")
@@ -80,17 +95,22 @@ def update_readme(dry_run: bool = False) -> int:
     actual_csvs = _count_files("results/raw", suffix=".csv")
     actual_manifests = _count_files("results/manifests", suffix=".json")
     actual_figures = _count_files("results/figures", exclude_name="README.md")
+    actual_findings = _count_findings_sections()
 
     changes = []
 
     # --- Headline line ---
     m = RE_HEADLINE.search(text)
     if m:
-        old_csvs, old_manifests, old_figures = int(m.group(2)), int(m.group(4)), int(m.group(6))
-        if (old_csvs, old_manifests, old_figures) != (
+        old_csvs = int(m.group(2))
+        old_manifests = int(m.group(4))
+        old_figures = int(m.group(6))
+        old_findings = int(m.group(8))
+        if (old_csvs, old_manifests, old_figures, old_findings) != (
             actual_csvs,
             actual_manifests,
             actual_figures,
+            actual_findings,
         ):
             replacement = (
                 m.group(1)
@@ -100,12 +120,15 @@ def update_readme(dry_run: bool = False) -> int:
                 + m.group(5)
                 + str(actual_figures)
                 + m.group(7)
+                + str(actual_findings)
+                + m.group(9)
             )
             text = text[: m.start()] + replacement + text[m.end() :]
             changes.append(
                 f"headline: CSVs {old_csvs}→{actual_csvs}, "
                 f"manifests {old_manifests}→{actual_manifests}, "
-                f"figures {old_figures}→{actual_figures}"
+                f"figures {old_figures}→{actual_figures}, "
+                f"FINDINGS {old_findings}→{actual_findings}"
             )
 
     # --- Directory layout manifest count ---
