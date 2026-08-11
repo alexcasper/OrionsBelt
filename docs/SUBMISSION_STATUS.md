@@ -245,7 +245,7 @@ cutoff has passed with no board; any future arrival is additive bonus per ADR 00
 | #249 | t4 | Security audit refresh + beads sync + goose-loop manifest cleanup fix + README count fix (89→90) + SUBMISSION_STATUS PR table backfill #244–#250 | MERGED |
 | #250 | t3 | beads cleanup — remove 3 accidental junk issues (ob-kor, ob-z5p, ob-mtf) | MERGED |
 | #251 | t3 | Provenance disclosures for dirty-tree CSVs in FINDINGS.md (ob-7fs) | OPEN |
-| #252 | t4 | DEVPOST t4 dirty-tree provenance disclosure in Reproducibility section | OPEN |
+| #252 | t4 | DEVPOST t4 dirty-tree provenance disclosure + INT4+SDOT ratio accuracy fix (0.8B: 1.19× not 1.30×) + SUBMISSION_STATUS PR table update | OPEN |
 
 > **PRs #190, #198, #207, #229, #235, #245:** closed (not merged). No gaps in numbering.
 
