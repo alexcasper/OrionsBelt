@@ -209,7 +209,7 @@ All figures above are verified against primary sources (Radxa product page and d
 > ```
 > results/
 >   raw/         <- 226 per-run CSVs across 5 devices (incl. ablation/, affinity/, kleidiai/ subdirs)
->   manifests/   <- 206 provenance manifests (git SHA, governor, thermals)
+>   manifests/   <- 326 provenance manifests (git SHA, governor, thermals)
 >   figures/     <- fleet analysis, comparison table, kernel/memory plots> ```
 >
 > See [`results/README.md`](./results/README.md) for the layout, [`docs/FINDINGS.md`](./docs/FINDINGS.md) for findings, and [`results/figures/fleet_bandwidth_scaling.md`](./results/figures/fleet_bandwidth_scaling.md) for the headline cross-device analysis.
