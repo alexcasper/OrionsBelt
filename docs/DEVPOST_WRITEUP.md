@@ -82,28 +82,30 @@ to devices but was never previously tested in the correctness suite).
 
 | Kernel | Cluster | Before (GiB/s) | After (GiB/s) | Speedup |
 |--------|---------|---------------:|--------------:|--------:|
-| gdn_cumdecay | A76 big | 4.25 | **24.3** | 5.7× |
-| gdn_gated_scan | A76 big | 3.29 | **11.5** | 3.5× |
-| gdn_causal_dwconv1d | A76 big | 4.52 | **21.0** | 4.7× |
+| gdn_cumdecay | A76 big | 4.25 | **21.5** | 5.0× |
+| gdn_gated_scan | A76 big | 3.29 | **11.9** | 3.6× |
+| gdn_causal_dwconv1d | A76 big | 4.52 | **19.4** | 4.3× |
 | gdn_cumdecay | A55 little | 0.97 | **5.87** | 6.0× |
 | gdn_gated_scan | A55 little | 0.55 | **3.91** | 7.1× |
 | gdn_causal_dwconv1d | A55 little | 0.71 | **5.30** | 7.4× |
 
-> **cumdecay at 24.3 GiB/s approaches the RK3588's practical DRAM bandwidth
-> ceiling (~25 GiB/s measured, 79% of the 33.8 GB/s theoretical spec at
-> 2112 MHz).** The kernel is now memory-bound — the optimization has taken
-> it as far as the hardware allows.
+> **cumdecay at 21.5 GiB/s reaches 86% of the RK3588's measured DRAM bandwidth
+> ceiling (~25 GiB/s, 64% of the 33.8 GB/s theoretical spec at 2112 MHz).**
+> The kernel is memory-bound — the optimization has taken it close to what the
+> hardware allows.
 >
-> **Provenance:** Optimization measurements from commit `8f8be11` on rk3588-t4
-> (manifest `rk3588-t4_optimized.json`). The CSV has since been re-run; current
-> values (21.46/11.94/19.35 GiB/s) are consistent within fleet inter-run
-> variance. Pre-optimization baseline is preserved in git history at the parent
-> of `8f8be11`. See FINDINGS.md §"Device-Microbenchmark: Optimized vs
-> Unoptimized GDN Kernels on RK3588" for the full provenance note.
+> **Provenance:** Big-cluster "After" values are current measurements from
+> rk3588-t4 (`rk3588-t4_big.csv`, multi-thread, dirty=true — t4 manifests are
+> habitually dirty from active kernel development), independently cross-validated
+> on rk3588-t3 (21.39/10.56/20.59 GiB/s, dirty=false). Little-cluster
+> values are from the initial optimization run (commit `8f8be11`, 4-thread OpenMP);
+> clean single-thread little-cluster data is 1.19/0.55/1.12 GiB/s. Pre-optimization
+> baseline is preserved at the parent of `8f8be11`. See FINDINGS.md §"Device-
+> Microbenchmark: Optimized vs Unoptimized GDN Kernels on RK3588" for full detail.
 
 The OpenMP parallelization across 4 cores accounts for ~4×; NEON double-width
 unrolling adds further gains. The little cluster (A55) benefits more
-(6.0–7.4×) than the big cluster (3.5–5.9×) because the A55's weaker
+(6.0–7.4×) than the big cluster (3.6–5.0×) because the A55's weaker
 single-thread throughput makes it more reliant on multi-thread parallelization
 — the optimization closes the big/little gap from ~4:1 to ~2.5:1.
 

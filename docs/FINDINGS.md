@@ -1326,9 +1326,9 @@ pinning, 30 repeats, 3 warmups).
 
 | Kernel | Cluster | Old p50 (µs) | Old GiB/s | New p50 (µs) | New GiB/s | Speedup |
 |--------|---------|-------------:|----------:|-------------:|----------:|--------:|
-| gdn_cumdecay | A76 big | 459.4 | 4.25 | 80.5 | 24.3 | 5.7× |
-| gdn_gated_scan | A76 big | 899.0 | 3.29 | 257.9 | 11.5 | 3.5× |
-| gdn_causal_dwconv1d | A76 big | 456.2 | 4.52 | 98.0 | 21.0 | 4.7× |
+| gdn_cumdecay | A76 big | 459.4 | 4.25 | 91.0 | 21.5 | 5.0× |
+| gdn_gated_scan | A76 big | 899.0 | 3.29 | 247.9 | 11.9 | 3.6× |
+| gdn_causal_dwconv1d | A76 big | 456.2 | 4.52 | 106.5 | 19.4 | 4.3× |
 | gdn_cumdecay | A55 little | 2008.3 | 0.97 | 332.8 | 5.87 | 6.0× |
 | gdn_gated_scan | A55 little | 5395.6 | 0.55 | 757.2 | 3.91 | 7.1× |
 | gdn_causal_dwconv1d | A55 little | 2892.1 | 0.71 | 388.8 | 5.30 | 7.4× |
@@ -1343,11 +1343,11 @@ pinning, 30 repeats, 3 warmups).
 
 **Key observations:**
 
-1. **3.5×–7.4× speedup** across all kernels and clusters. The OpenMP
+1. **3.6×–7.4× speedup** across all kernels and clusters. The OpenMP
    parallelization across 4 cores accounts for ~4×, with NEON unrolling adding
    further gains on the sequential-scan kernels.
 
-2. **Little cluster (A55) benefits more** (6.0–7.4×) than big (A76) (3.5–5.9×).
+2. **Little cluster (A55) benefits more** (6.0–7.4×) than big (A76) (3.6–5.0×).
    The A55's weaker single-thread NEON throughput makes it more reliant on
    multi-thread parallelization — the optimization closes the big/little gap
    from ~4:1 to ~2.5:1 on bandwidth.
@@ -1356,10 +1356,10 @@ pinning, 30 repeats, 3 warmups).
    consistent with the OpenMP work distribution reducing per-iteration
    variance.
 
-4. **cumdecay is now bandwidth-saturated**: 24.3 GiB/s on the A76 big cluster
-   approaches the RK3588's **practical** DRAM bandwidth ceiling (~25 GiB/s
-   measured on t3, vs 33.8 GB/s theoretical at 2112 MHz — 79% STREAM
-   efficiency is typical for LPDDR4x). The theoretical spec is higher, but
+4. **cumdecay approaches bandwidth saturation**: 21.5 GiB/s on the A76 big cluster
+   reaches 86% of the RK3588's **practical** DRAM bandwidth ceiling (~25 GiB/s
+   measured on t3, vs 33.8 GB/s theoretical at 2112 MHz — 64% STREAM
+   efficiency). The theoretical spec is higher, but
    sustained workload bandwidth saturates well below it. Measurement:
    2026-08-07 on t3 (Turing RK1), DMC at 2112 MHz / performance governor,
    `scripts/mem_bw_probe.c` (4-thread sequential read: 25.0 GiB/s peak).
@@ -1371,16 +1371,18 @@ were at the unoptimized baseline. Manifest:
 `results/manifests/rk3588-t4_optimized.json` (SHA 8f8be11, governor=performance,
 thermals 37–41 °C pre/post).
 
-> **⚠ PROVENANCE NOTE (ob-dsb, 2026-08-11):** The table above cites data from
-> commit `8f8be11`. The `rk3588-t4_big.csv` file has since been re-run multiple
-> times (commits be02d3b, c9be6ae, d242d53, and the ob-8ms.3 fleet bench),
-> overwriting both the optimized values and the pre-optimization baseline.
-> Current CSV values for the 4B/seq=64 optimized run: cumdecay 21.46 GiB/s
-> (p50=91.0 µs), scan 11.94 GiB/s (p50=247.9 µs), conv1d 19.35 GiB/s
-> (p50=108.2 µs) — within fleet inter-run variance (ob-bf7). The pre-optimization
-> baseline (4.25/3.29/4.52 GiB/s) is preserved at the parent of `8f8be11` in git
-> history. The manifest was regenerated to SHA `4ecfd6e` during a clean-tree
-> re-bench (fdff0d2).
+> **⚠ PROVENANCE NOTE (ob-dsb, 2026-08-11; updated 2026-08-11 t3):** Big-cluster
+> "New" values in the table above are current measurements from
+> `rk3588-t4_big.csv` (multi-thread, dirty=true — t4 manifests are habitually
+> dirty from active kernel development), cross-validated on t3
+> (21.39/10.56/20.59 GiB/s, dirty=false). The original optimization run was at
+> commit `8f8be11` (also dirty tree); its inflated values (24.3/11.5/21.0) have
+> been replaced with values from the more recent re-run. Little-cluster values remain from the
+> `8f8be11` run (4-thread OpenMP, pre-clean-tree); clean single-thread data is
+> 1.19/0.55/1.12 GiB/s. The pre-optimization baseline (4.25/3.29/4.52 GiB/s) is
+> preserved at the parent of `8f8be11` in git history. Manifest:
+> `results/manifests/rk3588-t4_optimized.json` (regenerated to SHA `4ecfd6e`
+> during clean-tree re-bench fdff0d2).
 
 ### Per-Layer Latency Profile: GDN vs Full-Attention (ob-c9k)
 
@@ -5196,19 +5198,18 @@ once, while NEON uses float FMA directly).
 | + SDOT INT8 (§33) | 3.48 | ~50× |
 | + **INT4+SDOT** (this section) | **4.52** | **~65×** |
 
-**Cross-device validation (t3, commit `cec1aea`):** INT4+SDOT on the second
-RK3588 board achieves 4.28 tok/s (4B) and 36.69 tok/s (0.8B) — within **5.6%**
-(4B) and **0.9%** (0.8B) of t4's 4.52 / 36.36. This is the tightest
-cross-device agreement of any quantization method, confirming the INT4+SDOT
-kernel is deterministic and portable across A76 silicon.
+**Cross-device validation (t3, clean commit `c880887`, dirty=false):**
+INT4+SDOT on the second RK3588 board achieves 4.21 tok/s (4B) and 35.05 tok/s
+(0.8B) — within **7.4%** (4B) and **3.7%** (0.8B) of t4's 4.52 / 36.36. This is
+the tightest cross-device agreement of any quantization method, confirming the
+INT4+SDOT kernel is deterministic and portable across A76 silicon.
 
-> **Correction (2026-08-10, t3 clean re-run at `c880887`):** The `cec1aea`
-> manifest was dirty=true (binary built from uncommitted tree). Re-running at
-> clean HEAD yields 4.21 tok/s (4B) and 35.05 tok/s (0.8B) — **7.4%** (4B) and
-> **3.7%** (0.8B) gap vs t4. Still the tightest cross-device agreement, but
-> wider than the dirty-data 3.5%/1.4%. For INT8+SDOT the clean gap is ~20% (4B)
-> and ~14% (0.8B); t4 manifests are also dirty and re-run is recommended.
-> See comparison_table.md §7 and RESULTS DISCIPLINE/ob-bf7.
+> **Provenance note:** An initial run at `cec1aea` (dirty=true, binary from
+> uncommitted tree) reported 4.28/36.69 tok/s — deceptively close to t4. The
+> clean re-run at `c880887` (dirty=false) gives the values cited above. For
+> INT8+SDOT the clean cross-device gap is ~20% (4B) and ~14% (0.8B); t4
+> manifests are also dirty and re-run is recommended. See comparison_table.md §7
+> and RESULTS DISCIPLINE/ob-bf7.
 
 ## 35. NEON+SDOT full-attention scoring: 25–35% faster full-attention layer at long context (2026-08-09, ob-8qt.21)
 
