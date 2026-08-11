@@ -56,7 +56,7 @@ At 262K context on the 4B checkpoint, that difference is **23.95 GiB of RAM** �
 
 ### Headline: GDN kernel bandwidth on RK3588 Cortex-A76
 
-Qwen3.5-4B, prefill (seq=64), fp32 baseline, 8-thread (big cluster). Two independent RK3588 nodes (t3, t4 Turing Machines RK1). Kernel computation is unchanged between commits (diffs in `bench_gdn.c` between 854c6f1 and 8227e98 are infrastructure only: `_POSIX_C_SOURCE` macro, SPDX header, `xmalloc` safety wrapper — no behavioral change to kernel arithmetic).
+Qwen3.5-4B, prefill (seq=64), fp32 baseline, 8-thread (big cluster). Two independent RK3588 nodes (t3, t4 Turing Machines RK1). Kernel computation is unchanged between commits — `bench_gdn.c` is byte-identical between 854c6f1 (t3) and 79d1b47 (t4, current data), so the comparison is exact, not just infrastructure-equivalent.
 
 | Kernel | GiB/s (t3) | Spread | GiB/s (t4) | Spread | t3÷t4 |
 |---|---:|---:|---:|---:|---:|
@@ -64,8 +64,10 @@ Qwen3.5-4B, prefill (seq=64), fp32 baseline, 8-thread (big cluster). Two indepen
 | Gated delta-rule scan | 10.56 | 6.3% | 11.94 | 7.2% | 0.88× |
 | Causal Conv1D | 20.59 | 3.5% | 19.35 | 8.8% | 1.06× |
 
-> t3 manifest git_sha `854c6f1`, dirty=false; t4 manifest git_sha `8227e98`,
-> dirty=true; 30 repeats each. The boards agree within 4–15% (direction flips
+> t3 manifest git_sha `854c6f1`, dirty=false; t4 manifest git_sha `79d1b47`,
+> dirty=true (t4 manifests are habitually dirty from active kernel development;
+> `bench_gdn.c` itself is unchanged from t3's clean commit, per above); 30
+> repeats each. The boards agree within 4–15% (direction flips
 > per kernel within run-to-run variance), confirming the result is
 > hardware-reproducible. Cumulative decay
 > reaches 67% of the 31.7 GiB/s spec bandwidth; gated scan runs at a lower
@@ -102,16 +104,16 @@ On dotprod-capable cores (A76, A720), the Arm `vdotq_lane_s32` instruction compu
 
 | Model | Kernel | tok/s | ms/tok | vs NEON INT8 | % of theoretical |
 |-------|--------|------:|-------:|-------------:|----------------:|
-| Qwen3.5-4B (A76) | NEON INT8 | 1.83 | 545 | 1.0× | 44% |
-| Qwen3.5-4B (A76) | **SDOT INT8** | **3.48** | **287** | **1.90×** | **83%** |
-| Qwen3.5-4B (A76) | **INT4+SDOT** | **4.52** | **221** | **2.47×** | — |
-| Qwen3.5-0.8B (A76) | NEON INT8 | 10.03 | 100 | 1.0× | — |
-| Qwen3.5-0.8B (A76) | **SDOT INT8** | **30.51** | **33** | **3.04×** | — |
-| Qwen3.5-0.8B (A76) | **INT4+SDOT** | **36.36** | **28** | **3.63×** | — |
+| Qwen3.5-4B (A76) | NEON INT8 | 1.81 | 552 | 1.0× | 44% |
+| Qwen3.5-4B (A76) | **SDOT INT8** | **3.48** | **287** | **1.92×** | **83%** |
+| Qwen3.5-4B (A76) | **INT4+SDOT** | **4.52** | **221** | **2.50×** | — |
+| Qwen3.5-0.8B (A76) | NEON INT8 | 9.86 | 101 | 1.0× | — |
+| Qwen3.5-0.8B (A76) | **SDOT INT8** | **30.51** | **33** | **3.09×** | — |
+| Qwen3.5-0.8B (A76) | **INT4+SDOT** | **36.36** | **28** | **3.69×** | — |
 | Qwen3.5-4B (A55) | NEON INT8 | 0.49 | 2034 | 1.0× | — |
 | Qwen3.5-4B (A55) | **SDOT INT8** | **1.36** | **734** | **2.78×** | — |
 
-> SDOT nearly doubles 4B throughput (83% of the ~4.2 tok/s theoretical ceiling) and triples 0.8B throughput. The speedup is larger for 0.8B because its smaller weight set (~0.41 GiB INT8) partially fits in the A76 cluster's shared L3, making it more compute-bound — where SDOT's 5× instruction reduction has the most leverage. **INT4+SDOT** pushes further by halving weight memory traffic (4-bit packing with on-the-fly nibble unpack into SDOT's int8 pipeline), adding 1.30× on A76 big cores for 4B (1.19× for 0.8B) — but is slightly slower on A55 little cores where the unpack overhead exceeds the bandwidth savings. Cross-validated on two independent RK3588 nodes (t3, t4): INT4+SDOT agrees within 4–8% (4B: 4.21 vs 4.52; 0.8B: 35.05 vs 36.36); INT8+SDOT shows a wider ~15–20% gap (t4 faster, likely board-level compute difference per RESULTS DISCIPLINE/ob-bf7). Table values are t4. Full analysis: [FINDINGS §33, §34](../docs/FINDINGS.md), data: `results/raw/rk3588-t4_sdot_*.csv`, `results/raw/rk3588-t4_int4sdot_*.csv`.
+> SDOT nearly doubles 4B throughput (83% of the ~4.2 tok/s theoretical ceiling) and triples 0.8B throughput. The speedup is larger for 0.8B because its smaller weight set (~0.41 GiB INT8) partially fits in the A76 cluster's shared L3, making it more compute-bound — where SDOT's 5× instruction reduction has the most leverage. **INT4+SDOT** pushes further by halving weight memory traffic (4-bit packing with on-the-fly nibble unpack into SDOT's int8 pipeline), adding 1.30× on A76 big cores for 4B (1.19× for 0.8B) — but is slightly slower on A55 little cores where the unpack overhead exceeds the bandwidth savings. Cross-validated on two independent RK3588 nodes (t3, t4): INT4+SDOT agrees within 4–8% (4B: 4.21 vs 4.52; 0.8B: 35.05 vs 36.36); INT8+SDOT agrees within 3–5% on both devices (§38 — an initial wider gap was traced to t3 running a pre-SDOT binary, not hardware). Table values are t4. Full analysis: [FINDINGS §33, §34](../docs/FINDINGS.md), data: `results/raw/rk3588-t4_sdot_*.csv`, `results/raw/rk3588-t4_int4sdot_*.csv`.
 
 ![Decode optimization stack — RK3588 Cortex-A76](../results/figures/optimization_stack.png)
 
@@ -207,7 +209,7 @@ No GPU, NPU, or proprietary SDK required. Full setup guide: [`docs/SETUP_PORTABL
 - 2324 unit tests pass in CI (20 skips due to missing optional deps; 2411 pass locally with full deps) covering kernel correctness and schema conformance
 - All figures are **regenerable** from committed CSVs (`bench/plots.py`, `scripts/generate_memory_plots.py`)
 - t3 benchmark data: manifest git_sha `854c6f1`, dirty=false, governor=performance, 30 repeats per kernel
-- t4 benchmark data: most runs captured during active kernel development (dirty=true in manifests); each manifest records the exact git SHA, governor state, and thermals so every number is traceable to its source tree state
+- t4 benchmark data: SDOT/INT4+SDOT microbenches at clean commit `d6b77b2` (dirty=false); the kernel-bandwidth headline (`rk3588-t4_big.csv`) and most other runs captured during active kernel development (dirty=true in manifests, though `bench_gdn.c` itself is byte-identical to t3's clean commit — see §2 above); each manifest records the exact git SHA, governor state, and thermals so every number is traceable to its source tree state
 
 ---
 
