@@ -5057,7 +5057,7 @@ path uses the float activation directly). All 5 tests pass (test binary:
 | Qwen3.5-4B (A55 little) | NEON INT8 (§16) | 0.49 | 2034 | 1.0× | — |
 | Qwen3.5-4B (A55 little) | **SDOT INT8**   | **1.36** | **734** | **2.78×** | — |
 
-Theoretical ceiling: 13.5 GiB/s ÷ 3.0 GiB INT8-weight/token ≈ 4.5 tok/s for 4B.
+Theoretical ceiling: 13.5 GiB/s ÷ ~3.2 GiB INT8-weight/token ≈ 4.2 tok/s for 4B.
 All runs at commit on `bench/t4`, governor=performance, `taskset -c 4-7` (A76 big)
 or `taskset -c 0-3` (A55 little), thermal 40→49 °C (no throttling). Manifests:
 `results/manifests/rk3588-t4_sdot_int8.json`.
@@ -5069,7 +5069,7 @@ Raw CSVs: `results/raw/rk3588-t4_sdot_{4b,08b}_big.csv`, `results/raw/rk3588-t4_
 The 0.8B model's smaller weight set (~0.41 GiB INT8) partially fits in the A76
 cluster's shared L3, making the workload more compute-bound and less
 DRAM-bound. SDOT's 5× instruction reduction has more leverage when compute —
-not bandwidth — is the limiter. The 4B model (~3.0 GiB INT8) vastly exceeds all
+not bandwidth — is the limiter. The 4B model (~3.2 GiB INT8) vastly exceeds all
 cache levels, so it remains bandwidth-bound even with the faster kernel; SDOT
 still wins (1.92×) by reducing the instruction overhead that prevented the NEON
 path from saturating bandwidth.
