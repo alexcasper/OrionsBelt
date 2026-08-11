@@ -234,7 +234,7 @@ t4 = 8 tokens (re-run, see per-row manifest for details).
 | rk3588-t3 | 0.8B | INT8+SDOT | 25.60 | 39 | `c880887` | `rk3588-t3_08b_big_int8_sdot_e2e.json` |
 | rk3588-t4 | 0.8B | INT8+SDOT | 29.25 | 34 | `be4d3ca` | `rk3588-t4_e2e_ctxsweep_08b_int8_puregdn_4t.json` |
 
-> The SDOT (`vdotq_s32`) INT8×INT8→int32 dot-product kernel replaces the NEON
+> The SDOT (`vdotq_lane_s32`) INT8×INT8→int32 dot-product kernel replaces the NEON
 > dequant→float32 FMA path, cutting GDN projection and FFN decode time by
 > 1.63× and 1.85× respectively. t3's pre-SDOT INT8 was 1.84 tok/s (4B) / 10.58
 > tok/s (0.8B); with SDOT, 2.80 / 25.60 — a 1.52× and 2.42× speedup. **Provenance
