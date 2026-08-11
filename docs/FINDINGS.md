@@ -1523,7 +1523,9 @@ j1's main benchmark CSV (`jetson-j1.csv`) was originally captured at commit
 OpenMP parallelization were added. It was re-run at commit `148db31` (dirty=false,
 4-thread, landed in `4ef46f8`) with the current optimized binary, resolving the
 staleness. The fleet comparison table (§5b) uses the clean single-threaded sweep
-(`jetson-j1-clean.csv` at `234807d`) for fair cross-device comparison.
+(`jetson-j1-clean.csv` at `5ea3d24`, dirty tree — effective commit `414b622`;
+originally run at `234807d`, re-run twice for decode-timing (ob-9xr) and GDN-2
+aliasing fix) for fair cross-device comparison.
 
 ### Energy efficiency: optimized kernels vs old kernels (single-threaded)
 
@@ -1691,7 +1693,7 @@ variable is thread count.
 > decode kernel runtime. The corrected values (adaptive batched timing, 100
 > calls/measurement for kernels <20 µs) are in
 > [`jetson-j1-clean.csv`](../results/raw/jetson-j1-clean.csv) at commit
-> `5ea3d24`. Key corrections: gated_scan 4B decode 5.9→10.0 GiB/s (+70%),
+> `5ea3d24` (dirty tree — effective commit `414b622`). Key corrections: gated_scan 4B decode 5.9→10.0 GiB/s (+70%),
 > cumdecay 0.8B decode 3.7→5.2 GiB/s (+43%). Prefill shapes are unaffected
 > (all >100 µs). The J2 OMP column has the same single-call limitation; a
 > corrected re-run is tracked as ob-9xr.
@@ -2333,7 +2335,7 @@ memory bandwidth.
 numbers from the aliasing bug. Corrected status by device:
 - **t3** ✅ (`rk3588-t3-clean.csv` at `854c6f1`, clean tree, 3×30-repeat run)
 - **t4** ✅ (`rk3588-t4-clean.csv` at `20b50c7`)
-- **Jetson J1** ✅ (`jetson-j1-clean.csv` re-run at `414b622`, post-fix;
+- **Jetson J1** ✅ (`jetson-j1-clean.csv` re-run at `414b622` — dirty tree at SHA `5ea3d24`, effective commit `414b622`; post-fix;
   GDN-2 4B prefill: 1.13→0.86 GiB/s)
 - **Jetson J2** ❌ still inflated (`jetson-j2-clean.csv` at `6a4d8ab`, pre-fix;
   needs re-run when accessible)
