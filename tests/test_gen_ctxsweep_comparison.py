@@ -32,6 +32,7 @@ from gen_ctxsweep_comparison import (  # noqa: E402
 # classify()
 # ---------------------------------------------------------------------------
 
+
 class TestClassify:
     """Filename classification: device, cluster, model, quant, arch."""
 
@@ -91,6 +92,7 @@ class TestClassify:
 # Formatters
 # ---------------------------------------------------------------------------
 
+
 class TestFormatters:
     def test_fmt_tok_normal(self):
         assert fmt_tok("4.5231") == "4.52"
@@ -127,6 +129,7 @@ class TestFormatters:
 # load_ctxsweep_data — dedup preference
 # ---------------------------------------------------------------------------
 
+
 class TestDedupPreference:
     """_4t_fair variant should win over _1t when both exist."""
 
@@ -161,11 +164,11 @@ class TestDedupPreference:
 
         header = ["ctx_len", "tok_per_sec", "kv_cache_mb", "total_us"]
 
-        for _quant, fname in [("FP32", "rk3588-t4_e2e_ctxsweep_4t_fair.csv"),
-                             ("INT8", "rk3588-t4_e2e_ctxsweep_int8_4t_fair.csv")]:
-            (tmp_path / fname).write_text(
-                f"{','.join(header)}\n1,2.0,0,500000\n"
-            )
+        for _quant, fname in [
+            ("FP32", "rk3588-t4_e2e_ctxsweep_4t_fair.csv"),
+            ("INT8", "rk3588-t4_e2e_ctxsweep_int8_4t_fair.csv"),
+        ]:
+            (tmp_path / fname).write_text(f"{','.join(header)}\n1,2.0,0,500000\n")
 
         monkeypatch.setattr(mod, "RAW_DIR", tmp_path)
         datasets, _ = mod.load_ctxsweep_data()
@@ -212,21 +215,25 @@ class TestDedupPreference:
 # generate_markdown — integration
 # ---------------------------------------------------------------------------
 
+
 class TestGenerateMarkdown:
     """Verify markdown output structure and content."""
 
     @staticmethod
     def _make_dataset(ctx_lens=(1, 1024, 4096)):
         """Build a minimal dataset for one hybrid+puregdn pair."""
+
         def make_rows(tok_per_sec, kv_growth):
             rows = []
             for i, ctx in enumerate(ctx_lens):
-                rows.append({
-                    "ctx_len": str(ctx),
-                    "tok_per_sec": str(tok_per_sec),
-                    "kv_cache_mb": str(kv_growth * i),
-                    "total_us": str(int(1e6 / tok_per_sec)),
-                })
+                rows.append(
+                    {
+                        "ctx_len": str(ctx),
+                        "tok_per_sec": str(tok_per_sec),
+                        "kv_cache_mb": str(kv_growth * i),
+                        "total_us": str(int(1e6 / tok_per_sec)),
+                    }
+                )
             return rows
 
         key_h = ("rk3588-t4", "big", "Qwen3.5-4B", "FP32", "hybrid")
@@ -327,9 +334,11 @@ class TestGenerateMarkdown:
 
     def test_multiple_sections_numbered(self):
         """Two different device+model combos produce sections 1 and 2."""
+
         def make_rows(tps):
-            return [{"ctx_len": "1", "tok_per_sec": str(tps),
-                      "kv_cache_mb": "0", "total_us": "500000"}]
+            return [
+                {"ctx_len": "1", "tok_per_sec": str(tps), "kv_cache_mb": "0", "total_us": "500000"}
+            ]
 
         datasets = {
             ("jetson-j1", "big", "Qwen3.5-4B", "FP32", "hybrid"): make_rows(2.0),
