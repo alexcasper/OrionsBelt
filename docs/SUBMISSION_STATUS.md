@@ -65,14 +65,15 @@ locked to Edge AI.
 | 0.8B INT4+SDOT: 36.36 tok/s (t4) | rk3588-t4_int4sdot_08b_big.csv | ✓ |
 | ~50× cumulative speedup (INT8+SDOT) | 0.07 → 3.48 tok/s = 49.7× | ✓ |
 | ~65× cumulative speedup (INT4+SDOT) | 0.07 → 4.52 tok/s = 64.6× | ✓ |
-| (t3 cross-validation, INT8+SDOT) | rk3588-t3_big_int8_sdot_e2e.json (2.80), rk3588-t3_08b_big_int8_sdot_e2e.json (25.6) — dirty=false, SHA `c880887` | ⚠ INT8+SDOT e2e gap ~15–20% vs t4 (board-level, per RESULTS DISCIPLINE/ob-bf7); pure-GDN ctx sweep gap closes to 3–5% (§38) |
+| (t3 cross-validation, INT8+SDOT) | rk3588-t3_big_int8_sdot_e2e.json (2.80), rk3588-t3_08b_big_int8_sdot_e2e.json (25.6) — dirty=false, SHA `c880887` | ⚠ INT8+SDOT e2e gap ~15–20% vs t4 (RAM-bandwidth difference: t3 32 GB vs t4 8 GB, §38); pure-GDN gap closes to 3–5% (§38) |
 | (t3 cross-validation, INT4+SDOT) | rk3588-t3_big_int4_sdot_e2e.json (4.21), rk3588-t3_08b_big_int4_sdot_e2e.json (35.05) — dirty=false, SHA `c880887` | ✓ INT4+SDOT e2e gap 7.4% (4B) / 3.7% (0.8B) vs t4 — tightest cross-device agreement of any quant method |
 
 All manifests: governor=performance, 30 repeats (kernel) / 1–3 runs (e2e),
 git_sha recorded. t3 manifests are dirty=false. The earlier dirty-manifest
 warning on t3 SDOT e2e was resolved (re-captured at clean SHA `c880887`).
-The ~15–20% e2e gap is consistent with fleet variance (ob-bf7); the pure-GDN
-context sweep shows tighter 3–5% agreement (§38, commit `96f8984`).
+The ~15–20% e2e gap grows with context length due to RAM-bandwidth differences
+between the two boards (t3: 32 GB, t4: 8 GB) — not compute — as identified in
+§38; the pure-GDN context sweep shows tighter 3–5% agreement (§38, `96f8984`).
 
 ---
 
