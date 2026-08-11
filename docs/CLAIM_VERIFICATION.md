@@ -231,6 +231,22 @@ ADR 0005 designates this as a valid proxy for the O6's Immortalis-G720. Absolute
 will differ on target hardware; cost structure (latency-dominated for small payloads)
 is expected to transfer.
 
+### 2.7 GPU kernel performance — corrected conclusion (verified 2026-08-11)
+
+| Claim | Status |
+|---|---|
+| All 4 GDN primitives have OpenCL kernels, bit-exact validated (87/87 tests) | ✅ Confirmed — `gpu/gdn_gpu_kernels.cl` (205 lines), `gpu/gdn_gpu_bench.c` (617 lines), validation harness |
+| Mali-G610 matches or beats 4-thread A76 CPU on all three channel-wise kernels | ✅ Confirmed — FINDINGS §13, `results/raw/rk3588-t3_gpu_gdn_kernels.json`, commit `fbda76e`, 4 independent runs of 50 repeats, spread ≤8.7% |
+| Scan kernel: GPU 57.5 µs vs CPU 114.9 µs (1.99×) | ✅ Confirmed — same JSON; device-side profiling (CL_QUEUE_PROFILING_ENABLE) |
+| CumDecay: GPU 31.9 µs vs CPU 33.0 µs (1.03×) | ✅ Confirmed — same JSON |
+| DWConv1D: GPU 38.5 µs vs CPU 50.2 µs (1.30×) | ✅ Confirmed — same JSON |
+| Initial conclusion was reversed by kernel-code fix | ✅ Confirmed — commits 4cc1cba/d60220c (matrix notation), old data at 048aa7e showed GPU 0.59–0.81× CPU |
+| Validated on two independent driver stacks | ✅ Confirmed — ARM Mali libmali blob + open-source Mesa RustiCL (FINDINGS §13, ob-q44.1) |
+
+> **Caveat:** GPU timing is device-side profiling (excludes host↔device transfer).
+> CPU comparison is 4-thread A76 (OMP_NUM_THREADS=4, taskset cores 4–7).
+> Full methodology in FINDINGS §13.
+
 ---
 
 ## 3. Finding that changes the technical thesis 🔴

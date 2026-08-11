@@ -460,14 +460,19 @@ ORIONS_FORCE_FP32=1 python3 bench/harness.py \
   overhead means NEON wins at decode batch size
 - Clean-clone reproduction rehearsal verified on fresh hardware
 - Device-fleet benchmarks across 3 platforms (A57, A76, A55)
+- GPU scan kernel: hand-written OpenCL for all four GDN primitives, bit-exact
+  on two driver stacks (Mali libmali blob + Mesa RustiCL), GPU now matches/beats
+  4-thread A76 on all three channel-wise kernels after code fixes (FINDINGS §13)
 
 ### Not achieved (honestly stated)
 
 - **Orion O6 results:** board has not arrived (externally gated procurement
-  since project start). All NPU/GPU results are from toolchain analysis, not
-  silicon measurement. The complete NPU offload design — operator-level
-  mapping, subgraph boundaries, phase-dependent routing, and quantization
-  policy — is documented in
+  since project start). All NPU results are from toolchain analysis, not
+  silicon measurement. GPU results **are** measured on the RK3588 Mali-G610
+  (bit-exact validation, 87/87 tests, 4 independent benchmark runs — see
+  FINDINGS §13), but O6-class GPU performance remains unmeasured. The complete
+  NPU offload design — operator-level mapping, subgraph boundaries,
+  phase-dependent routing, and quantization policy — is documented in
   [`NPU_OFFLOAD_DESIGN.md`](./NPU_OFFLOAD_DESIGN.md).
 - **Decode throughput optimized ~65× from naive baseline:** the naive FP32 C
   GEMV (column-sweep, 0.17% cache-line utilization) ran at 0.68 tok/s (0.8B)

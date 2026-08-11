@@ -38,7 +38,7 @@ locked to Edge AI.
 | KleidiAI gap analysis + submission | ✓ Complete, 14 tests pass | No recurrence primitive; dwconv is SME2-only |
 | Memory scaling analysis | ✓ Analytical model | 262K: 24 GiB savings (51 MiB state vs 8+ GiB KV cache) |
 | big.LITTLE affinity policy | ✓ Measured | A76 2–3× faster than A55; diminishing returns past 4 big |
-| GPU Mali-G610 OpenCL | ✓ ob-q44.1 closed | Scan kernel prototyped on RK3588 GPU |
+| GPU Mali-G610 OpenCL | ✓ ob-q44.1, ob-q44.2 closed | All 4 GDN kernels validated bit-exact (87/87), GPU matches/beats 4T A76 |
 | Submission prep (README, write-up, repro) | ✓ All beads closed | ob-fnq, ob-f7k, ob-kdi, ob-9e2 |
 | Compliance checklist | ✓ ob-9e2 closed | Apache-2.0, no credentials at tip of main/t4 |
 

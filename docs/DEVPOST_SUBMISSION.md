@@ -41,10 +41,11 @@ At 262K context on the 4B checkpoint, that difference is **23.95 GiB of RAM** �
 - **INT4+SDOT hybrid GEMV** — combining 4-bit weight packing with the SDOT dot-product instruction: **1.30× over INT8+SDOT on 4B (1.19× on 0.8B)** (4.52 tok/s on 4B, 36.36 tok/s on 0.8B), the fastest decode kernel on A76. Cumulative speedup reaches **~65×** over the naive FP32 baseline — see [§34](./FINDINGS.md)
 - **Cache-blocked GEMM prefill** — 49–78× prefill speedup from switching naive single-row GEMV to cache-blocked GEMM at M>1, measured across the fleet
 - **ONNX Runtime CPU EP audit** — GDN recurrence is expressible via ONNX `Loop` but 16× slower than our fused kernel. Confirms no existing CPU toolchain has optimized GDN for Arm
+- **OpenCL GPU kernels** — hand-written kernels for all four GDN primitives, bit-exact validated on two independent driver stacks (ARM Mali blob + open-source Mesa RustiCL). After fixing a matrix-notation bug, the Mali-G610 now **matches or beats the 4-thread A76 CPU** on all three channel-wise kernels — reversing our own initial conclusion. See [FINDINGS §13](./FINDINGS.md)
 - **Hardware energy profiling** — INA3221 rail-level power characterization on Jetson Nano: 874–1250 mJ/GiB board-wide, power is constant across kernels, `performance` governor is both faster and 28% more energy-efficient than `ondemand`
 
 **What we did NOT achieve (stated honestly):**
-- Heterogeneous NPU/GPU/CPU dispatch — requires the Orion O6's GPU+NPU for a meaningful test; designed but not implemented
+- Heterogeneous NPU/GPU/CPU dynamic dispatch — requires the Orion O6's GPU+NPU for a meaningful test; designed but not implemented (individual GPU kernels are validated — see above)
 - NPU acceleration — both vendors' compilers reject the recurrence (see above)
 - The target Orion O6 board did not arrive in time; all results are from the portable aarch64 fleet (Pi 5, RK3588, Jetson Nano)
 
@@ -232,7 +233,7 @@ Specifically:
 
 - **Repository:** https://github.com/alexcasper/OrionsBelt
 - **License:** Apache-2.0
-- **Findings (54 sections, 5718 lines):** [`docs/FINDINGS.md`](../docs/FINDINGS.md)
+- **Findings (54 sections, 5743 lines):** [`docs/FINDINGS.md`](../docs/FINDINGS.md)
 - **Comparison table:** [`results/figures/comparison_table.md`](../results/figures/comparison_table.md)
 - **Fleet bandwidth analysis:** [`results/figures/fleet_bandwidth_scaling.md`](../results/figures/fleet_bandwidth_scaling.md)
 - **Memory scaling figures:** [`results/figures/memory_comparison.md`](../results/figures/memory_comparison.md)
