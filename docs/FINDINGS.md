@@ -878,7 +878,7 @@ narrow only for prefill chunk boundaries.
 > `rk3588-t4-clean.json` records `effective_threads: 1`. The "1.98×
 > genuine hardware effect" conclusion is **not supported**; the gap is
 > primarily an 8-thread-vs-1-thread confound. The like-for-like comparison
-> (both 8-thread) shows the boards agree within ~7%. See the full
+> (both 8-thread) shows the boards agree within ~12%. See the full
 > correction at [§ob-mrd.12](#correction-ob-mrd12-2026-08-07--the-single-thread-claim-is-false-the-gap-is-a-thread-count-artifact)
 > below. The `fleet_bandwidth_scaling.md` report has been regenerated with
 > matching warnings.
@@ -3072,7 +3072,7 @@ prior workloads), not a kernel or measurement methodology problem.
 >
 > The 8-thread vs 8-thread comparison (`rk3588-t3-clean.csv` vs
 > `rk3588-t4_big.csv`, both `effective_threads=8`) shows the boards agree within
-> ~6% (cumdecay 21.39 vs 21.46), consistent with t4's higher 2400 MHz clock.
+> ~12% (cumdecay 21.39 vs 21.46), consistent with t4's higher 2400 MHz clock.
 >
 > See `comparison_table.md` §1a for the corrected like-for-like analysis.
 
@@ -3138,7 +3138,7 @@ kernels. Both boards are RK3588 (4×A55 + 4×A76) but **different board vendors*
 - **⚠ The t3/t4 performance gap was NOT real — it was a thread-count artifact.**
   The original analysis below assumed both boards were single-thread; in fact t3
   ran 8-thread (effective_threads=8). At matched thread counts the boards agree
-  within ~7% (8-thread) or within noise for cumdecay (1-thread). See ob-mrd.12,
+  within ~12% (8-thread) or within noise for cumdecay (1-thread). See ob-mrd.12,
   ob-mrd.13, and comparison_table.md §1a for the corrected analysis.
 - The original ob-bf7 spread concern remains RESOLVED for stale data (both
   boards now have clean post-optimization CSVs with <8% spread).
@@ -3186,7 +3186,7 @@ The **equal-thread-count** comparison removes the confound. Both boards at
 | gdn_gated_scan | 11.94 | 10.56 | 1.13× |
 | gdn_causal_dwconv1d | 19.35 | 20.59 | 0.94× |
 
-At equal thread count the two boards agree to within ~9% on all three kernels
+At equal thread count the two boards agree to within ~12% on all three kernels
 and the direction of who is faster flips per kernel — within the documented
 run-to-run variance (ob-bf7: up to 1.68× between sessions). The genuine
 single-thread comparison (above) confirms that cumdecay is identical but
