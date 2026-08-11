@@ -5207,9 +5207,12 @@ INT4+SDOT kernel is deterministic and portable across A76 silicon.
 > **Provenance note:** An initial run at `cec1aea` (dirty=true, binary from
 > uncommitted tree) reported 4.28/36.69 tok/s — deceptively close to t4. The
 > clean re-run at `c880887` (dirty=false) gives the values cited above. For
-> INT8+SDOT the clean cross-device gap is ~20% (4B) and ~14% (0.8B); t4
-> manifests are also dirty and re-run is recommended. See comparison_table.md §7
-> and RESULTS DISCIPLINE/ob-bf7.
+> ~~INT8+SDOT the clean cross-device gap is ~20% (4B) and ~14% (0.8B); t4
+> manifests are also dirty and re-run is recommended.~~ **Resolved in §38:**
+> the gap was caused by t3 running a pre-SDOT binary (`c4cc9be`), not hardware.
+> After re-running t3 with the SDOT-enabled binary (`96f8984`), the cross-device
+> gap closed to 3.0% (4B) and 5.1% (0.8B) — within the expected variance band.
+> See §38 for full details.
 
 ## 35. NEON+SDOT full-attention scoring: 25–35% faster full-attention layer at long context (2026-08-09, ob-8qt.21)
 
