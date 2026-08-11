@@ -1372,11 +1372,12 @@ were at the unoptimized baseline. Manifest:
 thermals 37–41 °C pre/post).
 
 > **⚠ PROVENANCE NOTE (ob-dsb, 2026-08-11; updated 2026-08-11 t3):** Big-cluster
-> "New" values in the table above are current clean-tree measurements from
-> `rk3588-t4_big.csv` (multi-thread, dirty=false), cross-validated on t3
+> "New" values in the table above are current measurements from
+> `rk3588-t4_big.csv` (multi-thread, dirty=true — t4 manifests are habitually
+> dirty from active kernel development), cross-validated on t3
 > (21.39/10.56/20.59 GiB/s, dirty=false). The original optimization run was at
-> commit `8f8be11` (dirty tree); its inflated values (24.3/11.5/21.0) have been
-> replaced with clean re-run values. Little-cluster values remain from the
+> commit `8f8be11` (also dirty tree); its inflated values (24.3/11.5/21.0) have
+> been replaced with values from the more recent re-run. Little-cluster values remain from the
 > `8f8be11` run (4-thread OpenMP, pre-clean-tree); clean single-thread data is
 > 1.19/0.55/1.12 GiB/s. The pre-optimization baseline (4.25/3.29/4.52 GiB/s) is
 > preserved at the parent of `8f8be11` in git history. Manifest:

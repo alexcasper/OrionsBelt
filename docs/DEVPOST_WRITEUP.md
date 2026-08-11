@@ -94,9 +94,10 @@ to devices but was never previously tested in the correctness suite).
 > The kernel is memory-bound — the optimization has taken it close to what the
 > hardware allows.
 >
-> **Provenance:** Big-cluster "After" values are current clean-tree measurements
-> from rk3588-t4 (`rk3588-t4_big.csv`, multi-thread, dirty=false), independently
-> cross-validated on rk3588-t3 (21.39/10.56/20.59 GiB/s, dirty=false). Little-cluster
+> **Provenance:** Big-cluster "After" values are current measurements from
+> rk3588-t4 (`rk3588-t4_big.csv`, multi-thread, dirty=true — t4 manifests are
+> habitually dirty from active kernel development), independently cross-validated
+> on rk3588-t3 (21.39/10.56/20.59 GiB/s, dirty=false). Little-cluster
 > values are from the initial optimization run (commit `8f8be11`, 4-thread OpenMP);
 > clean single-thread little-cluster data is 1.19/0.55/1.12 GiB/s. Pre-optimization
 > baseline is preserved at the parent of `8f8be11`. See FINDINGS.md §"Device-
