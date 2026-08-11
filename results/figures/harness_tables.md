@@ -35,11 +35,29 @@ _Source: committed CSVs from bench/harness.py_
 |---:|---:|---:|---:|---:|
 | 16 | 7.9 | 8.0 | 0.1 | 3 |
 
+**Qwen/Qwen3.5-0.8B — rk3588-t3_08b_big_int4_sdot — Decode**
+
+| Context | p50 (tok/s) | p95 (tok/s) | Spread | Repeats |
+|---:|---:|---:|---:|---:|
+| 20 | 35.1 | 35.4 | 0.3 | 3 |
+
 **Qwen/Qwen3.5-0.8B — rk3588-t3_08b_big_int8 — Decode**
 
 | Context | p50 (tok/s) | p95 (tok/s) | Spread | Repeats |
 |---:|---:|---:|---:|---:|
 | 16 | 10.6 | 10.7 | 0.1 | 3 |
+
+**Qwen/Qwen3.5-0.8B — rk3588-t3_08b_big_int8_sdot — Decode**
+
+| Context | p50 (tok/s) | p95 (tok/s) | Spread | Repeats |
+|---:|---:|---:|---:|---:|
+| 20 | 25.6 | 25.7 | 0.1 | 3 |
+
+**Qwen/Qwen3.5-0.8B — rk3588-t3_08b_little_int4_sdot — Decode**
+
+| Context | p50 (tok/s) | p95 (tok/s) | Spread | Repeats |
+|---:|---:|---:|---:|---:|
+| 20 | 9.0 | 9.1 | 0.0 | 3 |
 
 **Qwen/Qwen3.5-0.8B — rk3588-t3_08b_little_int8 — Decode**
 
@@ -47,17 +65,41 @@ _Source: committed CSVs from bench/harness.py_
 |---:|---:|---:|---:|---:|
 | 20 | 2.4 | 2.4 | 0.0 | 2 |
 
+**Qwen/Qwen3.5-0.8B — rk3588-t3_08b_little_int8_sdot — Decode**
+
+| Context | p50 (tok/s) | p95 (tok/s) | Spread | Repeats |
+|---:|---:|---:|---:|---:|
+| 20 | 9.3 | 9.4 | 0.0 | 3 |
+
 **Qwen/Qwen3.5-0.8B — rk3588-t4_08b_big — Decode**
 
 | Context | p50 (tok/s) | p95 (tok/s) | Spread | Repeats |
 |---:|---:|---:|---:|---:|
 | 8 | 8.2 | 8.3 | 0.1 | 3 |
 
+**Qwen/Qwen3.5-0.8B — rk3588-t4_08b_big_int4_sdot — Decode**
+
+| Context | p50 (tok/s) | p95 (tok/s) | Spread | Repeats |
+|---:|---:|---:|---:|---:|
+| 20 | 35.7 | 36.3 | 0.6 | 3 |
+
 **Qwen/Qwen3.5-0.8B — rk3588-t4_08b_big_int8 — Decode**
 
 | Context | p50 (tok/s) | p95 (tok/s) | Spread | Repeats |
 |---:|---:|---:|---:|---:|
 | 8 | 10.0 | 10.1 | 0.1 | 3 |
+
+**Qwen/Qwen3.5-0.8B — rk3588-t4_08b_big_int8_sdot — Decode**
+
+| Context | p50 (tok/s) | p95 (tok/s) | Spread | Repeats |
+|---:|---:|---:|---:|---:|
+| 20 | 30.2 | 30.3 | 0.1 | 3 |
+
+**Qwen/Qwen3.5-0.8B — rk3588-t4_08b_little_int4_sdot — Decode**
+
+| Context | p50 (tok/s) | p95 (tok/s) | Spread | Repeats |
+|---:|---:|---:|---:|---:|
+| 20 | 10.7 | 10.8 | 0.1 | 3 |
 
 **Qwen/Qwen3.5-4B — jetson-j1 — Decode**
 
@@ -83,11 +125,29 @@ _Source: committed CSVs from bench/harness.py_
 |---:|---:|---:|---:|---:|
 | 16 | 1.0 | 1.0 | 0.0 | 3 |
 
+**Qwen/Qwen3.5-4B — rk3588-t3_big_int4_sdot — Decode**
+
+| Context | p50 (tok/s) | p95 (tok/s) | Spread | Repeats |
+|---:|---:|---:|---:|---:|
+| 20 | 4.2 | 4.2 | 0.0 | 3 |
+
 **Qwen/Qwen3.5-4B — rk3588-t3_big_int8 — Decode**
 
 | Context | p50 (tok/s) | p95 (tok/s) | Spread | Repeats |
 |---:|---:|---:|---:|---:|
 | 16 | 1.8 | 1.9 | 0.0 | 3 |
+
+**Qwen/Qwen3.5-4B — rk3588-t3_big_int8_sdot — Decode**
+
+| Context | p50 (tok/s) | p95 (tok/s) | Spread | Repeats |
+|---:|---:|---:|---:|---:|
+| 20 | 2.8 | 2.8 | 0.0 | 3 |
+
+**Qwen/Qwen3.5-4B — rk3588-t3_little_int4_sdot — Decode**
+
+| Context | p50 (tok/s) | p95 (tok/s) | Spread | Repeats |
+|---:|---:|---:|---:|---:|
+| 20 | 1.1 | 1.1 | 0.0 | 3 |
 
 **Qwen/Qwen3.5-4B — rk3588-t3_little_int8 — Decode**
 
@@ -95,17 +155,47 @@ _Source: committed CSVs from bench/harness.py_
 |---:|---:|---:|---:|---:|
 | 20 | 0.5 | 0.5 | 0.0 | 2 |
 
+**Qwen/Qwen3.5-4B — rk3588-t3_little_int8_sdot — Decode**
+
+| Context | p50 (tok/s) | p95 (tok/s) | Spread | Repeats |
+|---:|---:|---:|---:|---:|
+| 20 | 1.3 | 1.3 | 0.0 | 3 |
+
 **Qwen/Qwen3.5-4B — rk3588-t4_big — Decode**
 
 | Context | p50 (tok/s) | p95 (tok/s) | Spread | Repeats |
 |---:|---:|---:|---:|---:|
 | 8 | 1.1 | 1.1 | 0.0 | 3 |
 
+**Qwen/Qwen3.5-4B — rk3588-t4_big_int4_sdot — Decode**
+
+| Context | p50 (tok/s) | p95 (tok/s) | Spread | Repeats |
+|---:|---:|---:|---:|---:|
+| 20 | 4.5 | 4.5 | 0.0 | 3 |
+
 **Qwen/Qwen3.5-4B — rk3588-t4_big_int8 — Decode**
 
 | Context | p50 (tok/s) | p95 (tok/s) | Spread | Repeats |
 |---:|---:|---:|---:|---:|
 | 8 | 1.8 | 1.8 | 0.0 | 3 |
+
+**Qwen/Qwen3.5-4B — rk3588-t4_big_int8_sdot — Decode**
+
+| Context | p50 (tok/s) | p95 (tok/s) | Spread | Repeats |
+|---:|---:|---:|---:|---:|
+| 20 | 3.5 | 3.5 | 0.0 | 3 |
+
+**Qwen/Qwen3.5-4B — rk3588-t4_little_int4_sdot — Decode**
+
+| Context | p50 (tok/s) | p95 (tok/s) | Spread | Repeats |
+|---:|---:|---:|---:|---:|
+| 20 | 1.3 | 1.3 | 0.0 | 3 |
+
+**Qwen/Qwen3.5-4B — rk3588-t4_little_int8_sdot — Decode**
+
+| Context | p50 (tok/s) | p95 (tok/s) | Spread | Repeats |
+|---:|---:|---:|---:|---:|
+| 20 | 1.4 | 1.4 | 0.0 | 3 |
 
 **Qwen3.5-0.8B — rk3588-t4 — Decode**
 
