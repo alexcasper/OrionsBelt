@@ -175,7 +175,7 @@ All figures above are verified against primary sources (Radxa product page and d
 | E2E model decode (tokens/sec, TTFT) | FP32 + INT8 + Q8_0 + INT4 measured — 0.8B: 5.12 tok/s (A57 Q8_0, 2.97× over FP32), 30.5 tok/s (A76 INT8+SDOT, t4), **36.36 tok/s (A76 INT4+SDOT, t4)**. [e2e comparison](./results/figures/e2e_fleet_comparison.md), [§29, §33, §34, §38](./docs/FINDINGS.md) |
 | Q8_0 block-quantized GEMV | Done — 2.97× decode speedup, cos_sim=1.000000 vs FP32. [§29, §30](./docs/FINDINGS.md) |
 | Cache-blocked GEMM for prefill | Done — 49–78× prefill speedup for M>1. [§25](./docs/FINDINGS.md) |
-| INT4 weight-only quantization | Done — core-type-dependent: slower alone, but **INT4+SDOT hybrid** is fastest on A76 (1.30× over INT8+SDOT). [§26, §34](./docs/FINDINGS.md) |
+| INT4 weight-only quantization | Done — core-type-dependent: slower alone, but **INT4+SDOT hybrid** is fastest on A76 (1.30× over INT8+SDOT on 4B, 1.19× on 0.8B). [§26, §34](./docs/FINDINGS.md) |
 | llama.cpp baseline comparison | Done — mature Q8_0/Q4_0 inference 3.1× faster decode, 2.3× faster prefill on A57. [§28](./docs/FINDINGS.md) |
 | Context-length scaling (GDN O(1) vs full-attn O(n)) | Done — pure-GDN flat to <0.3% across ctx=1–8192, fair 4-thread comparison, cross-validated on 2× RK3588 (§36). [§17](./docs/FINDINGS.md) |
 | INT8 KV cache quantization | Done — 1.7–2.6× full-attn speedup at long context, 4× KV memory reduction. [§20](./docs/FINDINGS.md) |

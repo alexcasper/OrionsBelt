@@ -30,7 +30,7 @@ locked to Edge AI.
 | GEMV optimization | ✓ 14.9× speedup | 0.07→1.04 tok/s (4B FP32), dirty=false manifests |
 | INT8 weight-only quant | ✓ 1.65–1.77× on big cores | KV cache context sweep on t3+t4, <6% divergence |
 | SDOT INT8 GEMV (dotprod cores) | ✓ 1.92–3.09× over NEON INT8 | 4B: 3.48 tok/s (83% of theoretical); 0.8B: 30.51 tok/s (t4, cross-val with t3 at 25.6 — ~19% gap, within fleet variance per RESULTS DISCIPLINE/ob-bf7) |
-| INT4+SDOT hybrid GEMV | ✓ 1.30× over INT8+SDOT on A76 | 4B: 4.52 tok/s; 0.8B: 36.36 tok/s (t4, big cluster); A55: INT8+SDOT remains optimal |
+| INT4+SDOT hybrid GEMV | ✓ 1.30× over INT8+SDOT on 4B (1.19× on 0.8B), A76 | 4B: 4.52 tok/s; 0.8B: 36.36 tok/s (t4, big cluster); A55: INT8+SDOT remains optimal |
 | Mixed-precision (fp16/bf16) | ✓ fp16 gives 1.64× on decay | scan compute-bound, flat under fp16 |
 | GDN-2 vs GDN-1 comparison | ✓ Microbenchmark | 1.2–1.5× decode cost on big, 2.2–2.4× on little |
 | NOE op-coverage audit | ✓ Hardware-independent | Scan rejected, Loop trap documented (both CIX NOE + RKNN) |
@@ -242,8 +242,10 @@ cutoff has passed with no board; any future arrival is additive bonus per ADR 00
 | #246 | t4 | SDOT/INT4+SDOT clean re-run + KleidiAI provenance fix (ob-mrd.21) | MERGED |
 | #247 | t3 | Fix submission doc arithmetic errors (scan citation 10.62→10.56 ob-9t0.13 + MSE 94%→84% ob-9t0.14) | MERGED |
 | #248 | t4 | beads sync (security audit refresh ob-3i5 — bench/r5 still has credential) | MERGED |
-| #249 | t4 | Security audit refresh + beads sync + goose-loop manifest cleanup fix + README count fix (89→90) | OPEN |
+| #249 | t4 | Security audit refresh + beads sync + goose-loop manifest cleanup fix + README count fix (89→90) + SUBMISSION_STATUS PR table backfill #244–#250 | MERGED |
 | #250 | t3 | beads cleanup — remove 3 accidental junk issues (ob-kor, ob-z5p, ob-mtf) | MERGED |
+| #251 | t3 | Provenance disclosures for dirty-tree CSVs in FINDINGS.md (ob-7fs) | MERGED |
+| #252 | t4 | DEVPOST t4 dirty-tree provenance disclosure + INT4+SDOT ratio accuracy fix in SUBMISSION + WRITEUP (0.8B: 1.19× not 1.30×) + merged origin/main (t3 PR #251) | OPEN |
 
 > **PRs #190, #198, #207, #229, #235, #245:** closed (not merged). No gaps in numbering.
 
