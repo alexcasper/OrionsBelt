@@ -98,9 +98,10 @@ the gates are clearly converging toward the GDN-1 reference behavior.
    outputs when dropped into the Qwen3.5 forward pass. The recurrence is
    numerically stable.
 
-2. **Gate learning:** The isolated MSE drops 94% in 30 steps with smooth,
-   monotonic convergence. The GDN-2 gate parameters can learn to
-   reproduce GDN-1's per-token behavior.
+2. **Gate learning:** The isolated MSE drops 94% in 30 steps (initial run,
+   lr=1e-3, seq_len=64) with smooth, monotonic convergence. The matched
+   comparison (lr=3e-4, seq_len=128, FINDINGS §40) shows 84% — both confirm
+   the GDN-2 gate parameters can learn to reproduce GDN-1's per-token behavior.
 
 3. **Efficient training proxy:** Isolated MSE distillation avoids
    full-model backprop (436 s/step → 6.6 s/step, 66× faster) while

@@ -419,7 +419,7 @@ ORIONS_FORCE_FP32=1 python3 bench/harness.py \
   paths, bit-verified across 9 targets including OpenMP
 - 3.5×–7.4× optimization speedup from OpenMP + NEON unrolling, with cumdecay
   hitting the LPDDR4x bandwidth ceiling
-- SDOT (`vdotq_s32`) INT8×INT8→int32 dot-product kernel: 1.9–3.1× over NEON
+- SDOT (`vdotq_lane_s32`) INT8×INT8→int32 dot-product kernel: 1.9–3.1× over NEON
   INT8 GEMV on dotprod-capable cores, reaching 83% of theoretical bandwidth
   ceiling (FINDINGS.md §33)
 - INT4+SDOT hybrid GEMV: K-grouped nibble repack + SDOT, 1.30× over INT8+SDOT
