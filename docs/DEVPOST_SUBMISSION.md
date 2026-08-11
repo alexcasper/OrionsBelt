@@ -22,7 +22,7 @@ Hand-writing and benchmarking the GDN recurrence kernels that don't exist yet fo
 
 Gated DeltaNet (GDN) is a **linear-attention mechanism** arriving in next-generation hybrid LLMs (Qwen3.5 ships a 3:1 mix of GDN and full-attention layers). It replaces the ever-growing KV cache with a **fixed-size recurrent state** — O(1) decode memory regardless of context length, versus O(n) for standard attention.
 
-At 262K context on the 4B checkpoint, that difference is **23.95 GiB of RAM** — the recurrent state is 51 MiB; if all 32 layers were attention, the KV cache alone would be 32 GiB and still growing. On a memory-constrained edge board, that is the difference between running long-context inference and not running it at all.
+At 262K context on the 4B checkpoint, that difference is **23.95 GiB of RAM** — the GDN decode state (recurrent + conv) is 51 MiB; if all 32 layers were attention, the KV cache alone would be 32 GiB and still growing. On a memory-constrained edge board, that is the difference between running long-context inference and not running it at all.
 
 **The problem:** the fast GDN kernels (causal_conv1d, fla) do not exist for Arm architectures. Without them, the model silently falls back to slow, generic PyTorch ops. This is happening *today* on NVIDIA's own silicon; on Arm/Vulkan the gap is wider. **Our contribution is filling that gap:** three hand-written NEON/SVE CPU kernels, numerically verified, benchmarked across a 5-device Arm fleet, and an honest operator-coverage audit showing where NPU acceleration can and cannot help.
 

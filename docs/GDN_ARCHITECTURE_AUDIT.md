@@ -86,7 +86,7 @@ self.conv1d = nn.Conv1d(
   `F.conv1d` with groups — functionally correct but slower.
 
 **Conv state shape** (decode): `(batch, conv_dim, kernel_size)` =
-`(B, 8192, 4)` for 4B = 131 072 elements per layer = 512 KiB in FP32.
+`(B, 8192, 4)` for 4B = 32 768 elements per layer = 128 KiB in FP32.
 
 ### 2.4 Decay gate (`g`) — data-dependent, not a fixed scalar
 
@@ -226,8 +226,8 @@ The PyTorch fallbacks are functionally correct but:
 
 | Model | Per layer | GDN layers | Total (FP32) |
 |---|---:|---:|---:|
-| 4B | 131 072 floats | 24 | **12 MiB** |
-| 0.8B | 98 304 floats | 18 | **6.75 MiB** |
+| 4B | 32 768 floats | 24 | **3 MiB** |
+| 0.8B | 24 576 floats | 18 | **1.7 MiB** |
 
 ### Full-attention KV cache (grows linearly with context length)
 
