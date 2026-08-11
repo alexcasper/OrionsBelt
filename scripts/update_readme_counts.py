@@ -85,6 +85,9 @@ RE_HEADLINE = re.compile(
 # Directory-layout manifest count.
 RE_DIRLAYOUT = re.compile(r"(manifests/\s*<-\s*)(\d+)(\s*provenance manifests.*)")
 
+# Directory-layout raw CSV count.
+RE_RAWLAYOUT = re.compile(r"(raw/\s*<-\s*)(\d+)(\s*per-run CSVs.*)")
+
 
 def update_readme(dry_run: bool = False) -> int:
     """Update README.md counts. Returns number of changes made."""
@@ -139,6 +142,15 @@ def update_readme(dry_run: bool = False) -> int:
             replacement = m.group(1) + str(actual_manifests) + m.group(3)
             text = text[: m.start()] + replacement + text[m.end() :]
             changes.append(f"dir-layout: manifests {old_count}→{actual_manifests}")
+
+    # --- Directory layout raw CSV count ---
+    m = RE_RAWLAYOUT.search(text)
+    if m:
+        old_count = int(m.group(2))
+        if old_count != actual_csvs:
+            replacement = m.group(1) + str(actual_csvs) + m.group(3)
+            text = text[: m.start()] + replacement + text[m.end() :]
+            changes.append(f"dir-layout: raw CSVs {old_count}→{actual_csvs}")
 
     if changes:
         for c in changes:

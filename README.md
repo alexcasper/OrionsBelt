@@ -206,7 +206,7 @@ All figures above are verified against primary sources (Radxa product page and d
 >
 > ```
 > results/
->   raw/         <- 214 per-run CSVs across 5 devices (incl. ablation/, affinity/, kleidiai/ subdirs)
+>   raw/         <- 226 per-run CSVs across 5 devices (incl. ablation/, affinity/, kleidiai/ subdirs)
 >   manifests/   <- 206 provenance manifests (git SHA, governor, thermals)
 >   figures/     <- fleet analysis, comparison table, kernel/memory plots> ```
 >

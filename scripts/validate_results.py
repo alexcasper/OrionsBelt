@@ -1329,6 +1329,20 @@ def check_readme_counts(issues, repo_root="."):
             f"(all ## headers in docs/FINDINGS.md)"
         )
 
+    # Also check the directory-layout raw/ CSV count (separate from the headline).
+    m_raw = re.search(r"raw/\s*<-\s*(\d+)\s*per-run CSVs", readme_text)
+    if m_raw:
+        claimed_raw = int(m_raw.group(1))
+        if claimed_raw != actual_csvs:
+            issues.append(
+                Issue(
+                    "WARNING",
+                    "README.md",
+                    f"stale dir-layout raw/ count -- README says {claimed_raw}, "
+                    f"actual is {actual_csvs}",
+                )
+            )
+
     for mismatch in mismatches:
         issues.append(Issue("WARNING", "README.md", f"stale 'Results so far' line -- {mismatch}"))
 
