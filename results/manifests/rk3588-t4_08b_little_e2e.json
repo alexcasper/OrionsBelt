@@ -2,7 +2,7 @@
   "caller": {},
   "git": {
     "dirty": false,
-    "sha": "230c2b8234ce1820c1b119e2ea3cf11e181ae7fd"
+    "sha": "897f67f6b97ff5b92e3e01b8d07916e530fc15c8"
   },
   "host": {
     "core_count": 8,
@@ -80,7 +80,7 @@
   },
   "manifest_version": 1,
   "memory": {
-    "mem_available_kb": 6297408,
+    "mem_available_kb": 6285496,
     "mem_total_kb": 8120248
   },
   "parallelism": {
@@ -90,7 +90,7 @@
     "omp_proc_bind": null,
     "threads_source": "core_count_default"
   },
-  "run_id": "t4_20260811T234234Z_230c2b8",
+  "run_id": "t4_20260811T234706Z_897f67f",
   "software": {
     "packages": {
       "numpy": "2.5.1",
@@ -103,40 +103,40 @@
   },
   "thermal_zones": [
     {
-      "temp_millicelsius": 39769,
+      "temp_millicelsius": 40692,
       "type": "package-thermal",
       "zone": "thermal_zone0"
     },
     {
-      "temp_millicelsius": 39769,
+      "temp_millicelsius": 40692,
       "type": "bigcore0-thermal",
       "zone": "thermal_zone1"
     },
     {
-      "temp_millicelsius": 39769,
+      "temp_millicelsius": 40692,
       "type": "bigcore2-thermal",
       "zone": "thermal_zone2"
     },
     {
-      "temp_millicelsius": 39769,
+      "temp_millicelsius": 40692,
       "type": "littlecore-thermal",
       "zone": "thermal_zone3"
     },
     {
-      "temp_millicelsius": 38846,
+      "temp_millicelsius": 39769,
       "type": "center-thermal",
       "zone": "thermal_zone4"
     },
     {
-      "temp_millicelsius": 38846,
+      "temp_millicelsius": 39769,
       "type": "gpu-thermal",
       "zone": "thermal_zone5"
     },
     {
-      "temp_millicelsius": 38846,
+      "temp_millicelsius": 39769,
       "type": "npu-thermal",
       "zone": "thermal_zone6"
     }
   ],
-  "timestamp_utc": "2026-08-11T23:42:34Z"
+  "timestamp_utc": "2026-08-11T23:47:06Z"
 }

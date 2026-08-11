@@ -1,3 +1,5 @@
 kernel,M,K,N,repeats,p50_us,p95_us,gib_per_s_p50
-gdn_delta_rule_matmul,1,128,2048,30,402.819,427.612,2.44
-gdn_delta_rule_matmul,64,128,2048,30,28863.497,29151.684,0.05
+gdn_delta_rule_matmul,1,128,128,30,25.377,25.669,2.44
+gdn_delta_rule_matmul,64,128,128,30,1617.990,1659.702,0.08
+gdn_delta_rule_matmul,1,128,2048,30,405.154,430.239,2.43
+gdn_delta_rule_matmul,64,128,2048,30,28798.600,28856.937,0.05

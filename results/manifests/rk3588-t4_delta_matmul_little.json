@@ -1,12 +1,8 @@
 {
-  "caller": {
-    "original_csv": "rk3588-t4_delta_matmul_little.csv",
-    "retroactive": true
-  },
+  "caller": {},
   "git": {
-    "dirty": true,
-    "retroactive_note": "Manifest generated after the fact. git.sha is the commit where the CSV was first committed to the repo, not necessarily the exact tree state at benchmark time. dirty=true is conservative (actual state unknown).",
-    "sha": "6216b9603d3c75ea4816cc959ffa68c6b7498da0"
+    "dirty": false,
+    "sha": "230c2b8234ce1820c1b119e2ea3cf11e181ae7fd"
   },
   "host": {
     "core_count": 8,
@@ -84,7 +80,7 @@
   },
   "manifest_version": 1,
   "memory": {
-    "mem_available_kb": 5003148,
+    "mem_available_kb": 6299472,
     "mem_total_kb": 8120248
   },
   "parallelism": {
@@ -94,11 +90,11 @@
     "omp_proc_bind": null,
     "threads_source": "core_count_default"
   },
-  "run_id": "t4_retroactive_6216b96",
+  "run_id": "t4_20260811T234234Z_230c2b8",
   "software": {
     "packages": {
       "numpy": "2.5.1",
-      "onnxruntime": null,
+      "onnxruntime": "1.28.0",
       "torch": null,
       "transformers": null
     },
@@ -122,7 +118,7 @@
       "zone": "thermal_zone2"
     },
     {
-      "temp_millicelsius": 40692,
+      "temp_millicelsius": 39769,
       "type": "littlecore-thermal",
       "zone": "thermal_zone3"
     },
@@ -142,5 +138,5 @@
       "zone": "thermal_zone6"
     }
   ],
-  "timestamp_utc": "2026-08-07T12:43:36Z"
+  "timestamp_utc": "2026-08-11T23:42:34Z"
 }
