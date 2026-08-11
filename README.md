@@ -2,7 +2,7 @@
 
 **Building and contributing optimized CPU kernels for Gated DeltaNet (linear attention) toward Arm's [KleidiAI](https://gitlab.arm.com/kleidi/kleidiai), demonstrated on a Qwen3.5 GDN hybrid model across the aarch64 edge device fleet.**
 
-Submission for the [Arm Create: AI Optimization Challenge](https://arm-ai-optimization-challenge.devpost.com/) (deadline 2026-08-14, 16:00 PDT). **Committed to the Edge AI track** (ADR [0007](./docs/adr/0007-commit-to-edge-ai-track.md)) — the Orion O6 board never arrived, so the project re-centered on what's provable without it: NEON/SVE2 CPU kernels for GDN's chunkwise recurrence (scan, decay, causal conv1d, and the delta-rule matmul), verified correct and benchmarked across five real Arm CPUs, with the headline deliverable being an actual upstream contribution to KleidiAI rather than a heterogeneous NPU/GPU/CPU demo. NPU and GPU exploration continues as secondary findings (see [`docs/FINDINGS.md`](./docs/FINDINGS.md) §1, §7, §8) — see [`docs/archive/`](./docs/archive/) for the original O6/NPU-primary plan and why it changed.
+Submission for the [Arm Create: AI Optimization Challenge](https://arm-ai-optimization-challenge.devpost.com/) (deadline 2026-08-14, 16:00 PDT). **Committed to the Edge AI track** (ADR [0007](./docs/adr/0007-commit-to-edge-ai-track.md)) — the Orion O6 board never arrived, so the project re-centered on what's provable without it: NEON/SVE2 CPU kernels for GDN's chunkwise recurrence (scan, decay, causal conv1d, and the delta-rule matmul), verified correct and benchmarked across five real Arm CPUs, with the headline deliverable being an actual upstream contribution to KleidiAI rather than a heterogeneous NPU/GPU/CPU demo. NPU and GPU exploration continues as secondary findings (see [`docs/FINDINGS.md`](./docs/FINDINGS.md) §1, §7, §8, §13) — see [`docs/archive/`](./docs/archive/) for the original O6/NPU-primary plan and why it changed.
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE)
 
@@ -152,6 +152,7 @@ All figures above are verified against primary sources (Radxa product page and d
 - GDN-2 vs GDN-1: decoupled gating costs 2.2–2.7× at prefill (bandwidth-bound), 1.2–1.5× at decode on big cores but 2.2–2.4× on A55 little cores (compute-bound); clean-tree re-run, single-thread (§10)
 - INA3221 power/energy: all three GDN kernels draw ~900–925 mW over idle on the Jetson A57 — power is constant, energy-per-GiB tracks 1/throughput (874–1250 mJ/GiB board-wide). `performance` governor is both faster and 28% more energy-efficient than `ondemand` (ob-agf.1)
 - Engine boundary-crossing cost: portable OpenCL proxy on Mali-G610 measures 16 crossings/token at **3.36 ms (~10% of 30 t/s decode budget)**, latency-dominated (~0.1 ms dispatch floor regardless of payload size). Heterogeneous offload must deliver >11% speedup to break even (§39)
+- OpenCL GPU kernels: hand-written kernels for all 4 GDN primitives, bit-exact validated on two driver stacks (Mali blob + Mesa RustiCL). After fixing a matrix-notation bug, the Mali-G610 **matches or beats the 4-thread A76 CPU** on all three channel-wise kernels — correcting our own initial conclusion (§13)
 
 | Item | Status |
 |---|---|
@@ -169,6 +170,7 @@ All figures above are verified against primary sources (Radxa product page and d
 | Mixed-precision state kernels (bf16/fp16) | Implemented, benchmarked on Jetson |
 | NPU operator-coverage audit (CIX NOE + RKNN) | Done — [FINDINGS.md](./docs/FINDINGS.md) §1, §7 |
 | NPU offload design (designed, not executed) | Done — [NPU_OFFLOAD_DESIGN.md](./docs/NPU_OFFLOAD_DESIGN.md) |
+| GPU OpenCL kernels (all 4 GDN primitives) | Done — bit-exact (87/87), GPU matches/beats 4T A76 after code fix. [§13](./docs/FINDINGS.md) |
 | KleidiAI matmul evaluation | Done — [FINDINGS.md](./docs/FINDINGS.md) §8 |
 | big.LITTLE affinity policy | Done — [FINDINGS.md](./docs/FINDINGS.md) §9 |
 | GDN-2 vs GDN-1 microbenchmark | Done — [FINDINGS.md](./docs/FINDINGS.md) §10, clean-tree re-run |
@@ -188,7 +190,7 @@ All figures above are verified against primary sources (Radxa product page and d
 | Per-layer engine mapping (NPU/GPU/CPU) | Hypothesis only — pending measurements |
 | Full inference results (tokens/sec, TTFT, memory) | Done — C decode loop (FP32+INT8+Q8_0), ctx-length scaling (§17–20), quantization accuracy (§30), cross-device (A57+A76), sustained-load thermal stability (§18). [e2e comparison](./results/figures/e2e_fleet_comparison.md) |
 
-> **Results so far:** 226 CSVs from the device fleet, 206 provenance manifests, 90 generated figures/tables, 54 FINDINGS sections.
+> **Results so far:** 226 CSVs from the device fleet, 326 provenance manifests, 90 generated figures/tables, 54 FINDINGS sections.
 > (Counted recursively — `results/raw/` and `results/manifests/` include
 > subdirectories `ablation/`, `affinity/`, and `kleidiai/`, which hold real
 > fleet benchmark data, not scratch files. A non-recursive `ls *.csv` count
