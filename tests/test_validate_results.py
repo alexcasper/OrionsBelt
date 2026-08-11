@@ -1301,11 +1301,13 @@ class TestCheckReadmeCounts:
             findings_lines.append(f"## {i + 1}. Finding number {i + 1}\nbody\n")
         (docs / "FINDINGS.md").write_text("".join(findings_lines))
 
-        # README.md with the "Results so far" line
+        # README.md with the "Results so far" line and raw/ dir-layout line
         readme = (
             f"> **Results so far:** {n_csv} CSVs from the device fleet, "
             f"{n_manifest} provenance manifests, {n_figures} generated "
             f"figures/tables, {n_findings} FINDINGS sections.\n"
+            f"\n"
+            f"raw/ <- {n_csv} per-run CSVs\n"
         )
         (root / "README.md").write_text(readme)
         return root
@@ -1398,6 +1400,31 @@ class TestCheckReadmeCounts:
         issues = []
         check_readme_counts(issues, repo_root=str(root))
         assert issues == []  # 3 == 3, correct
+
+    def test_matching_raw_layout_no_issues(self, tmp_path):
+        """Correct raw/ dir-layout count produces no issue."""
+        root = self._make_repo(tmp_path, n_csv=5)
+        issues = []
+        check_readme_counts(issues, repo_root=str(root))
+        msgs = [i.message for i in issues]
+        assert not any("dir-layout raw" in m for m in msgs)
+
+    def test_wrong_raw_layout_count(self, tmp_path):
+        """Stale raw/ dir-layout CSV count is flagged."""
+        root = self._make_repo(tmp_path, n_csv=3)
+        # Tamper with the dir-layout line to claim a wrong count
+        readme = root / "README.md"
+        readme.write_text(
+            "> **Results so far:** 3 CSVs from the device fleet, "
+            "1 provenance manifests, 1 generated figures/tables, 1 FINDINGS sections.\n"
+            "\n"
+            "raw/ <- 99 per-run CSVs\n"
+        )
+        issues = []
+        check_readme_counts(issues, repo_root=str(root))
+        msgs = [i.message for i in issues]
+        assert any("stale dir-layout raw" in m for m in msgs)
+        assert any("99" in m and "3" in m for m in msgs)
 
     def test_no_readme_no_crash(self, tmp_path):
         """Missing README.md does not crash."""
@@ -2248,52 +2275,38 @@ class TestValidateBoundaryCrossingRow:
 
     def test_valid_row_no_issues(self):
         issues = []
-        validate_gpu_micro_row(
-            _boundary_crossing_row(), "test_bc.csv", issues, 2
-        )
+        validate_gpu_micro_row(_boundary_crossing_row(), "test_bc.csv", issues, 2)
         assert issues == []
 
     def test_missing_dim1_errors(self):
         issues = []
-        validate_gpu_micro_row(
-            _boundary_crossing_row(dim1=""), "test_bc.csv", issues, 2
-        )
+        validate_gpu_micro_row(_boundary_crossing_row(dim1=""), "test_bc.csv", issues, 2)
         assert any("missing dim1" in i.message for i in issues)
 
     def test_non_positive_p50_errors(self):
         issues = []
-        validate_gpu_micro_row(
-            _boundary_crossing_row(p50_ms="0"), "test_bc.csv", issues, 2
-        )
+        validate_gpu_micro_row(_boundary_crossing_row(p50_ms="0"), "test_bc.csv", issues, 2)
         assert any("non-positive p50_ms" in i.message for i in issues)
 
     def test_malformed_p50_errors(self):
         issues = []
-        validate_gpu_micro_row(
-            _boundary_crossing_row(p50_ms="N/A"), "test_bc.csv", issues, 2
-        )
+        validate_gpu_micro_row(_boundary_crossing_row(p50_ms="N/A"), "test_bc.csv", issues, 2)
         assert any("cannot parse p50_ms" in i.message for i in issues)
 
     def test_negative_bw_errors(self):
         issues = []
-        validate_gpu_micro_row(
-            _boundary_crossing_row(bw_mibs="-1.5"), "test_bc.csv", issues, 2
-        )
+        validate_gpu_micro_row(_boundary_crossing_row(bw_mibs="-1.5"), "test_bc.csv", issues, 2)
         assert any("negative bw_mibs" in i.message for i in issues)
 
     def test_malformed_bw_errors(self):
         issues = []
-        validate_gpu_micro_row(
-            _boundary_crossing_row(bw_mibs="oops"), "test_bc.csv", issues, 2
-        )
+        validate_gpu_micro_row(_boundary_crossing_row(bw_mibs="oops"), "test_bc.csv", issues, 2)
         assert any("cannot parse bw_mibs" in i.message for i in issues)
 
     def test_zero_bw_passes(self):
         """bw_mibs=0 is valid for boundary-crossing rows (not measured)."""
         issues = []
-        validate_gpu_micro_row(
-            _boundary_crossing_row(bw_mibs="0"), "test_bc.csv", issues, 2
-        )
+        validate_gpu_micro_row(_boundary_crossing_row(bw_mibs="0"), "test_bc.csv", issues, 2)
         assert not any("bw_mibs" in i.message for i in issues)
 
     def test_dispatched_through_validate_csv(self, tmp_path):

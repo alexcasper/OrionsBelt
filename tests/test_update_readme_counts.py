@@ -158,7 +158,7 @@ class TestUpdateReadmeRepair:
         _write_readme(tmp_path, csvs=5, manifests=10, figs=3)
 
         n = urc.update_readme()
-        assert n == 1  # headline only (manifests match in dir-layout too)
+        assert n == 2  # headline + raw dir-layout (manifests match in dir-layout too)
         text = (tmp_path / "README.md").read_text()
         assert "8 CSVs" in text
 
@@ -185,13 +185,13 @@ class TestUpdateReadmeRepair:
         assert "7 FINDINGS sections" in text
 
     def test_fix_all_three_drift(self, tmp_path, monkeypatch):
-        """All counts drift at once — headline repaired, dir-layout manifest too."""
+        """All counts drift at once — headline repaired, dir-layout manifest + raw too."""
         monkeypatch.setattr(urc, "REPO_ROOT", str(tmp_path))
         _make_repo(tmp_path, csvs=10, manifests=15, figures=7)
         _write_readme(tmp_path, csvs=3, manifests=5, figs=2)
 
         n = urc.update_readme()
-        assert n == 2  # headline + dir-layout
+        assert n == 3  # headline + manifests dir-layout + raw dir-layout
         text = (tmp_path / "README.md").read_text()
         assert "10 CSVs" in text
         assert "15 provenance manifests" in text
