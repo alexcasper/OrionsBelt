@@ -204,7 +204,7 @@ No GPU, NPU, or proprietary SDK required. Full setup guide: [`docs/SETUP_PORTABL
 ### Reproducibility
 
 - Every measurement has a **provenance manifest** (git SHA, governor state, CPU topology, thermals)
-- 2253 unit tests (CI-verified; 20 skip on optional deps like torch/pandas) covering kernel correctness and schema conformance
+- 2378 unit tests (1 skip — CI confirmation pending after PR #268 ctxsweep tests merged) covering kernel correctness and schema conformance
 - All figures are **regenerable** from committed CSVs (`bench/plots.py`, `scripts/generate_memory_plots.py`)
 - t3 benchmark data: manifest git_sha `854c6f1`, dirty=false, governor=performance, 30 repeats per kernel
 - t4 benchmark data: most runs captured during active kernel development (dirty=true in manifests); each manifest records the exact git SHA, governor state, and thermals so every number is traceable to its source tree state
