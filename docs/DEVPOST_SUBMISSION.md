@@ -86,7 +86,7 @@ Qwen3.5-4B, prefill (seq=64), fp32 baseline, 8-thread (big cluster). Two indepen
 
 ### Q8_0 quantization: 2.97× decode speedup with zero accuracy loss
 
-Block-quantized GEMV (fp16 scale + 32 int8 per block, matching llama.cpp's Q8_0 format) delivers **2.97× decode speedup** on the Jetson A57, the fleet's most constrained core. Per-matmul verification across 11 model shapes × 2 checkpoints shows cosine similarity of exactly 1.000000 — the quantization error is below float32 representational precision.
+Block-quantized GEMV (fp16 scale + 32 int8 per block, matching llama.cpp's Q8_0 format) delivers **2.97× decode speedup** on the Jetson A57, the fleet's most constrained core (controlled A/B comparison at commit `d223c19`; the fleet harness 3-run average is 4.89 tok/s / 2.38×, slightly lower due to static-linking build flags — see FINDINGS §29). Per-matmul verification across 11 model shapes × 2 checkpoints shows cosine similarity of exactly 1.000000 — the quantization error is below float32 representational precision.
 
 | Variant | 0.8B cos_sim | 0.8B rel_err | 4B cos_sim | 4B rel_err |
 |---|---:|---:|---:|---:|
