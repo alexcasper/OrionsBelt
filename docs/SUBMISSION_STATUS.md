@@ -1,6 +1,6 @@
 # T-4 Submission Status Brief
 
-_Generated 2026-08-07 by t4. Updated 2026-08-08 by j1 (ADR 0007). Updated 2026-08-10 by t3 (T-4 fired, SDOT e2e provenance cleaned, PR table backfill, submission doc polish, PR #226/#227 merged). Updated 2026-08-10 by t4 (PR #228 merged, PR table backfill #228 + closed #229). Updated 2026-08-10 by t3 (PR #232 merged — ob-6ay closed, PR table backfill #230 + #232). Updated 2026-08-10 by t4 (PR #233/#234 merged — test counts 2176→2229, skip 52→20, PR table backfill #233 + #234). Updated 2026-08-10 by t3 (ADR 0007 T-4 firing confirmation section added, PR table backfill #235/#236, PR #237 merged). Updated 2026-08-10 by t4 (PR table backfill #238 + #239). Updated 2026-08-10 by t4 (test count 2229→2256, skip 20→2, PR #239 MERGED, #240 OPEN). Updated 2026-08-10 by t4 (gdn2_reference coverage 50%→98%, test count 2256→2262). Updated 2026-08-10 by t3 (PR #240 MERGED — PR table status fix). Updated 2026-08-10 by t3 (test count 2262→2235 CI-authoritative, skip 2→20; PR #242 table backfill). Updated 2026-08-10 by t3 (PR #243 table backfill — MERGED)._
+_Generated 2026-08-07 by t4. Updated 2026-08-08 by j1 (ADR 0007). Updated 2026-08-10 by t3 (T-4 fired, SDOT e2e provenance cleaned, PR table backfill, submission doc polish, PR #226/#227 merged). Updated 2026-08-10 by t4 (PR #228 merged, PR table backfill #228 + closed #229). Updated 2026-08-10 by t3 (PR #232 merged — ob-6ay closed, PR table backfill #230 + #232). Updated 2026-08-10 by t4 (PR #233/#234 merged — test counts 2176→2229, skip 52→20, PR table backfill #233 + #234). Updated 2026-08-10 by t3 (ADR 0007 T-4 firing confirmation section added, PR table backfill #235/#236, PR #237 merged). Updated 2026-08-10 by t4 (PR table backfill #238 + #239). Updated 2026-08-10 by t4 (test count 2229→2256, skip 20→2, PR #239 MERGED, #240 OPEN). Updated 2026-08-10 by t4 (gdn2_reference coverage 50%→98%, test count 2256→2262). Updated 2026-08-10 by t3 (PR #240 MERGED — PR table status fix). Updated 2026-08-10 by t3 (test count 2262→2235 CI-authoritative, skip 2→20; PR #242 table backfill). Updated 2026-08-10 by t3 (PR #243 table backfill — MERGED). Updated 2026-08-11 by t4 (PR table backfill #244–#250, README figure count 89→90)._
 Updated 2026-08-10 by t4 (SDOT/INT4+SDOT microbench CSVs re-run clean `d6b77b2`, dirty=false — ob-mrd.21)._
 _All numbers below are validated against committed CSVs with manifests._
 
@@ -237,8 +237,15 @@ cutoff has passed with no board; any future arrival is additive bonus per ADR 00
 | #241 | t3 | PR #240 status fix (OPEN→MERGED) + ADR 0007 stale test count (2256→2262) | MERGED |
 | #242 | t3 | Backfill PR #241 (MERGED) in SUBMISSION_STATUS table | MERGED |
 | #243 | t3 | Fix stale test count 2262→2235 CI-authoritative (skip 2→20) + PR #242 table backfill | MERGED |
+| #244 | t3 | PR #243 table backfill (MERGED) | MERGED |
+| #245 | t4 | beads export sync (portable work exhausted, all 31 open items HW-gated) | CLOSED |
+| #246 | t4 | SDOT/INT4+SDOT clean re-run + KleidiAI provenance fix (ob-mrd.21) | MERGED |
+| #247 | t3 | Fix submission doc arithmetic errors (scan citation 10.62→10.56 ob-9t0.13 + MSE 94%→84% ob-9t0.14) | MERGED |
+| #248 | t4 | beads sync (security audit refresh ob-3i5 — bench/r5 still has credential) | MERGED |
+| #249 | t4 | Security audit refresh + beads sync + goose-loop manifest cleanup fix + README count fix (89→90) | OPEN |
+| #250 | t3 | beads cleanup — remove 3 accidental junk issues (ob-kor, ob-z5p, ob-mtf) | MERGED |
 
-> **PRs #190, #198, #207, #229, #235:** closed (not merged). No gaps in numbering.
+> **PRs #190, #198, #207, #229, #235, #245:** closed (not merged). No gaps in numbering.
 
 ---
 

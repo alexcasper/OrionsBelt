@@ -70,6 +70,13 @@ while true; do
     tail -2000 "$LOG" > "$LOG.tmp" && mv "$LOG.tmp" "$LOG"
     echo "[log-rotate: truncated to last 2000 lines, was $((_LOG_SIZE / 1048576))MB]" >> "$LOG"
   fi
+  # Clean stale auto-generated manifests (prevent disk fill, ob-502 fleet pattern).
+  # generic_aarch64_* manifests accumulate from bench/manifest.py runs; they're
+  # gitignored so git add -A never collects them, but they pile up on disk.
+  # Keep the tracked provenance exception + anything <30 min old (may be in use).
+  find results/manifests -maxdepth 1 -name "generic_aarch64_*.json" \
+    ! -name "generic_aarch64_20260806T145501Z_23550d6.json" \
+    -mmin +30 -delete 2>/dev/null
   # self-heal: if the last run tripped the bloat-stall signature, force a fresh session
   if tail -40 "$LOG" 2>/dev/null | grep -q "create a new session"; then
     rm -f "$HOME/OrionsBelt/.goose-session-created"; echo "[self-heal: fresh session]" >>"$LOG"
