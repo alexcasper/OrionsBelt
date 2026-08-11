@@ -11,7 +11,7 @@ script *repairs* it.
 
 Usage::
 
-    python3 scripts/update_readme_counts.py [--dry-run]
+    python3 scripts/update_readme_counts.py [--dry-run] [--test-count N]
 
 Exits 0 if README was already up to date (or was corrected), non-zero
 on error.
@@ -87,6 +87,12 @@ RE_DIRLAYOUT = re.compile(r"(manifests/\s*<-\s*)(\d+)(\s*provenance manifests.*)
 
 # Directory-layout raw CSV count.
 RE_RAWLAYOUT = re.compile(r"(raw/\s*<-\s*)(\d+)(\s*per-run CSVs.*)")
+
+# Test count in README.md CI line.
+RE_README_TESTS = re.compile(r"(\d+)(\s*passed locally)")
+
+# Test count in DEVPOST_SUBMISSION.md.
+RE_DEVPOST_TESTS = re.compile(r"(-\s*)(\d+)(\s*unit tests)")
 
 
 def update_readme(dry_run: bool = False) -> int:
@@ -167,12 +173,68 @@ def update_readme(dry_run: bool = False) -> int:
     return len(changes)
 
 
+def update_test_count(test_count: int, dry_run: bool = False) -> int:
+    """Update the test count in README.md and DEVPOST_SUBMISSION.md.
+
+    Returns number of changes made.
+    """
+    changes = []
+
+    # --- README.md CI line ---
+    readme_path = os.path.join(REPO_ROOT, "README.md")
+    with open(readme_path) as f:
+        text = f.read()
+    m = RE_README_TESTS.search(text)
+    if m:
+        old_count = int(m.group(1))
+        if old_count != test_count:
+            replacement = str(test_count) + m.group(2)
+            text = text[: m.start()] + replacement + text[m.end() :]
+            if not dry_run:
+                with open(readme_path, "w") as f:
+                    f.write(text)
+            changes.append(f"README.md test count {old_count}→{test_count}")
+
+    # --- DEVPOST_SUBMISSION.md ---
+    devpost_path = os.path.join(REPO_ROOT, "docs", "DEVPOST_SUBMISSION.md")
+    with open(devpost_path) as f:
+        text = f.read()
+    m = RE_DEVPOST_TESTS.search(text)
+    if m:
+        old_count = int(m.group(2))
+        if old_count != test_count:
+            replacement = m.group(1) + str(test_count) + m.group(3)
+            text = text[: m.start()] + replacement + text[m.end() :]
+            if not dry_run:
+                with open(devpost_path, "w") as f:
+                    f.write(text)
+            changes.append(f"DEVPOST_SUBMISSION.md test count {old_count}→{test_count}")
+
+    if changes:
+        for c in changes:
+            print(f"  updated: {c}")
+        if dry_run:
+            print("[dry-run] files not modified.")
+    else:
+        print("Test counts already correct — no changes needed.")
+
+    return len(changes)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Auto-update README.md result counts.")
     parser.add_argument("--dry-run", action="store_true", help="Report changes without writing.")
+    parser.add_argument(
+        "--test-count",
+        type=int,
+        default=None,
+        help="Update test count in README.md and DEVPOST_SUBMISSION.md to N.",
+    )
     args = parser.parse_args()
 
     update_readme(dry_run=args.dry_run)
+    if args.test_count is not None:
+        update_test_count(args.test_count, dry_run=args.dry_run)
     return 0
 
 

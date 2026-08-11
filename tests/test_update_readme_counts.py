@@ -347,3 +347,84 @@ class TestMain:
         monkeypatch.setattr("sys.argv", ["update_readme_counts.py", "--dry-run"])
         assert urc.main() == 0
         assert called["dry_run"] is True
+
+
+# ---------------------------------------------------------------------------
+# update_test_count()
+# ---------------------------------------------------------------------------
+
+
+class TestUpdateTestCount:
+    """Tests for the --test-count flag in update_readme_counts.py."""
+
+    @staticmethod
+    def _make_readme(tmp_path):
+        """Create minimal README.md and DEVPOST_SUBMISSION.md with test counts."""
+        root = tmp_path / "repo"
+        root.mkdir()
+        docs = root / "docs"
+        docs.mkdir()
+        (root / "README.md").write_text(
+            "| CI: lint + unit tests (100 passed locally, 1 skipped — pending) |\n"
+        )
+        (docs / "DEVPOST_SUBMISSION.md").write_text(
+            "- 100 unit tests (1 skip) covering correctness\n"
+        )
+        return root
+
+    def test_matching_counts_no_changes(self, tmp_path, monkeypatch):
+        """Correct test count produces no changes."""
+        root = self._make_readme(tmp_path)
+        monkeypatch.setattr(urc, "REPO_ROOT", str(root))
+        changes = urc.update_test_count(100)
+        assert changes == 0
+
+    def test_stale_readme_test_count_fixed(self, tmp_path, monkeypatch):
+        """Stale README.md test count is updated."""
+        root = self._make_readme(tmp_path)
+        monkeypatch.setattr(urc, "REPO_ROOT", str(root))
+        changes = urc.update_test_count(200)
+        assert changes >= 1
+        readme = (root / "README.md").read_text()
+        assert "200 passed locally" in readme
+
+    def test_stale_devpost_test_count_fixed(self, tmp_path, monkeypatch):
+        """Stale DEVPOST_SUBMISSION.md test count is updated."""
+        root = self._make_readme(tmp_path)
+        monkeypatch.setattr(urc, "REPO_ROOT", str(root))
+        changes = urc.update_test_count(200)
+        assert changes >= 1
+        devpost = (root / "docs" / "DEVPOST_SUBMISSION.md").read_text()
+        assert "200 unit tests" in devpost
+
+    def test_both_files_updated(self, tmp_path, monkeypatch):
+        """Both files are updated in one call."""
+        root = self._make_readme(tmp_path)
+        monkeypatch.setattr(urc, "REPO_ROOT", str(root))
+        changes = urc.update_test_count(300)
+        assert changes == 2
+
+    def test_dry_run_no_write(self, tmp_path, monkeypatch):
+        """Dry-run does not modify files."""
+        root = self._make_readme(tmp_path)
+        monkeypatch.setattr(urc, "REPO_ROOT", str(root))
+        changes = urc.update_test_count(300, dry_run=True)
+        assert changes == 2
+        # Files unchanged
+        assert "100 passed locally" in (root / "README.md").read_text()
+        assert "100 unit tests" in (root / "docs" / "DEVPOST_SUBMISSION.md").read_text()
+
+    def test_main_with_test_count_flag(self, monkeypatch):
+        """main() calls update_test_count when --test-count is provided."""
+        called = {}
+
+        def mock_test_count(test_count, dry_run=False):
+            called["test_count"] = test_count
+            called["dry_run"] = dry_run
+            return 0
+
+        monkeypatch.setattr(urc, "update_readme", lambda **kw: 0)
+        monkeypatch.setattr(urc, "update_test_count", mock_test_count)
+        monkeypatch.setattr("sys.argv", ["update_readme_counts.py", "--test-count", "500"])
+        assert urc.main() == 0
+        assert called["test_count"] == 500
