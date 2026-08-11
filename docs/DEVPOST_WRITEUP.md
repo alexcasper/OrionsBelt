@@ -423,7 +423,7 @@ ORIONS_FORCE_FP32=1 python3 bench/harness.py \
   INT8 GEMV on dotprod-capable cores, reaching 83% of theoretical bandwidth
   ceiling (FINDINGS.md §33)
 - INT4+SDOT hybrid GEMV: K-grouped nibble repack + SDOT, 1.30× over INT8+SDOT
-  on A76 (4.52 tok/s 4B, 36.36 tok/s 0.8B) — the fastest decode kernel on A76
+  on A76 for 4B (1.19× for 0.8B; 4.52 tok/s 4B, 36.36 tok/s 0.8B) — the fastest decode kernel on A76
   (FINDINGS.md §34)
 - Cross-vendor NPU op-coverage analysis (CIX NOE + Rockchip RKNN) — the
   first published confirmation that runtime recurrence is structurally
