@@ -265,7 +265,10 @@ cutoff has passed with no board; any future arrival is additive bonus per ADR 00
 | #269 | t4 | Lint fix test_gen_ctxsweep_comparison.py + stale t4_big.csv number fix (cumdecay 22.25→21.46, scan 11.53→11.94, conv1d 19.04→19.35) | MERGED |
 | #270 | t3 | Ruff lint fix + PR table backfill #265–#268 + stale test count 2253→2378 + stale t4 number fix in DEVPOST_WRITEUP + comparison_table + raw/ CSV count fix + generator root-cause fix + ruff format fixes | MERGED |
 | #271 | t4 | Fix stale t4_big 4B numbers in 3 more files + validate_results.py test coverage (ob-8qt.25, 21 new tests) | MERGED |
-| #272 | t3 | --test-count flag for update_readme_counts.py + raw/ dir-layout test coverage + ruff format fixes + PR table backfill | OPEN |
+| #272 | t3 | --test-count flag for update_readme_counts.py + raw/ dir-layout test coverage + ruff format fixes + PR table backfill | MERGED |
+| #273 | t4 | gen_e2e_comparison tests + cross-doc discrepancy fixes (ob-9t0.15, ob-8qt.25) | MERGED |
+| #274 | t4 | Fix stale counts (test 2407→2351 CI-authoritative, figures 91→90) | OPEN |
+| #275 | t3 | Fix stale test count 2407→2411 local after t4 PR #273 added 4 INT8/INT4 SDOT tests | OPEN |
 
 > **PRs #190, #198, #207, #229, #235, #245:** closed (not merged). No gaps in numbering.
 
