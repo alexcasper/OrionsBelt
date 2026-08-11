@@ -93,7 +93,11 @@ All replicate runs are from the fleet sweep (ob-bf7/ob-aw9): post-optimization, 
 Since all runs are post-optimization and clean-tree, the RK3588 inter-board gap **would** reflect hardware heterogeneity — **but see the thread-count confound warning above (ob-mrd.12/14)**: t3-clean ran 8-thread while t4-clean ran 1-thread, so the raw gap overstates any real difference.
 
 RK3588 and Jetson data are from the fleet sweep (ob-bf7/ob-aw9). Pi 5 was not part of the sweep; its provenance is noted in the audit above.
-**Treat the predictions as order-of-magnitude, not as a fit.** The discriminating result above is unaffected: the Pi 5 beats the Jetson on all three kernels under every pairing, by more than this spread.
+**Treat the predictions as order-of-magnitude, not as a fit.**
+
+⚠ The Pi 5 data is from commit `28729f3e0a3c` (dirty, pre-OpenMP) — a different commit than the Jetson and RK3588 fleet-sweep data. This is a mixed-commit comparison; re-running the Pi 5 at the current commit (ob-mrd.22) could shift these numbers.
+
+The Pi 5 robustly beats the Jetson on Cumulative Decay (2.23×), Causal DWConv1D (2.45×) — above the fleet's worst replicate spread (1.86×). However, the Gated Delta-Rule Scan (1.05×) margin is **within that spread** and is not a statistically reliable result (RESULTS DISCIPLINE, ob-bf7).
 
 ## O6 extrapolation (prediction)
 

@@ -5,63 +5,83 @@
   "driver": "libmali-valhall-g610-g13p0-x11 (libmali-g610-x11 1.0.5-2)",
   "gpu_clock_mhz": 1000,
   "gpu_governor": "performance",
-  "commit": "048aa7e",
-  "date": "2026-08-06T16:10:00Z",
-  "thermals_c_pre": 38.8,
+  "commit": "fbda76e",
+  "dirty": true,
+  "dirty_reason": "manifest file created post-benchmark (expected per DEVICE_RUNBOOK flow)",
+  "date": "2026-08-11T23:20:00Z",
+  "thermals_c_pre": 41.6,
+  "thermals_c_post": 41.6,
   "kernel_source": "gpu/gdn_gpu_kernels.cl",
   "harness": "gpu/gdn_gpu_bench.c",
   "repeats": 50,
   "warmups": 3,
+  "timing_method": "CL_QUEUE_PROFILING_ENABLE (device-side profiling events via libmali blob)",
   "validation": {
     "gated_scan":    {"max_abs": 0.0,       "max_rel": 0.0,       "verdict": "bit-exact"},
     "cumdecay":      {"max_abs": 0.0,       "max_rel": 0.0,       "verdict": "bit-exact"},
     "causal_dwconv1d": {"max_abs": 5.96e-08, "max_rel": 2.67e-06, "verdict": "fp32 round-trip noise"},
     "delta_rule":    {"max_abs": 1.86e-08,  "max_rel": 6.60e-07, "verdict": "within oracle atol=1e-4"}
   },
+  "validation_suite": {
+    "total": 87, "passed": 87, "failed": 0,
+    "verdict": "All 87 tests within oracle tolerances"
+  },
   "results": [
     {
       "kernel": "gdn_gated_scan",
       "seq": 64, "channels": 2048,
-      "p50_ms": 0.1647, "p95_ms": 0.1665,
-      "bandwidth_mibs": 9202.8,
+      "p50_ms_median_4runs": 0.0575,
+      "p50_ms_spread_pct": 4.4,
+      "bandwidth_mibs_median": 26333,
       "bytes_per_call": 1589248,
-      "note": "0.8B model dimensions"
+      "note": "0.8B model dimensions; 4 independent runs of 50 repeats each"
     },
     {
       "kernel": "gdn_cumdecay",
       "seq": 64, "channels": 2048,
-      "p50_ms": 0.0438,
-      "bandwidth_mibs": 22833.1,
+      "p50_ms_median_4runs": 0.0319,
+      "p50_ms_spread_pct": 7.8,
+      "bandwidth_mibs_median": 31383,
       "bytes_per_call": 524288,
-      "note": "0.8B model dimensions"
+      "note": "0.8B model dimensions; 4 independent runs of 50 repeats each"
     },
     {
       "kernel": "gdn_causal_dwconv1d",
       "seq": 64, "channels": 2048,
-      "p50_ms": 0.0478,
-      "bandwidth_mibs": 22554.0,
+      "p50_ms_median_4runs": 0.0385,
+      "p50_ms_spread_pct": 3.1,
+      "bandwidth_mibs_median": 28093,
       "bytes_per_call": 1081344,
-      "note": "0.8B model dimensions"
+      "note": "0.8B model dimensions; 4 independent runs of 50 repeats each"
     },
     {
       "kernel": "gdn_delta_rule_decode",
       "num_heads": 16, "head_k_dim": 128, "head_v_dim": 128,
-      "p50_ms": 0.2903, "p95_ms": 0.2944,
-      "bandwidth_mibs": 13887.9,
+      "p50_ms_median_4runs": 0.2724,
+      "p50_ms_spread_pct": 8.7,
+      "bandwidth_mibs_median": 14817,
       "state_size_floats": 262144,
       "state_size_kib": 1024.0,
-      "note": "Full per-token delta-rule: decay+retrieve+correct+write+read, 0.8B dimensions"
+      "note": "Full per-token delta-rule: decay+retrieve+correct+write+read, 0.8B dimensions; 4 runs"
     }
   ],
   "cpu_comparison": {
     "device": "Cortex-A76 (4 cores, NEON double-width unroll)",
-    "source": "dist/bench_gdn_rk3588_a76 --repeats 30, same commit",
+    "source": "OMP_NUM_THREADS=4 taskset -c 4-7 dist/bench_gdn_rk3588_a76 --repeats 30, same commit",
+    "timing_method": "wall-clock (clock_gettime CLOCK_MONOTONIC)",
     "0.8B_dims": {
-      "gdn_cumdecay":      {"cpu_us": 35.59, "gpu_us": 43.8,  "gpu_cpu_ratio": 0.81},
-      "gdn_gated_scan":    {"cpu_us": 96.84, "gpu_us": 164.7, "gpu_cpu_ratio": 0.59},
-      "gdn_causal_dwconv1d": {"cpu_us": 34.42, "gpu_us": 47.8, "gpu_cpu_ratio": 0.72}
+      "gdn_cumdecay":      {"cpu_us_p50": 32.96, "gpu_us_p50": 31.9,  "gpu_cpu_ratio": 1.03},
+      "gdn_gated_scan":    {"cpu_us_p50": 114.92, "gpu_us_p50": 57.5, "gpu_cpu_ratio": 2.00},
+      "gdn_causal_dwconv1d": {"cpu_us_p50": 50.17, "gpu_us_p50": 38.5, "gpu_cpu_ratio": 1.30}
     },
-    "interpretation": "On the Mali-G610 (Valhall), the GPU is slower than A76 NEON for all three channel-wise primitives. This is expected: mid-range mobile GPU with limited compute units, and the scan operations are bandwidth-bound with low arithmetic intensity. The value is code-path validation and O6 transferability, not G610 throughput."
+    "interpretation": "On the Mali-G610 (Valhall), the GPU now matches or beats the 4-thread A76 CPU on all three channel-wise primitives. The GPU kernel code was improved since the initial measurement (commit 048aa7e): matrix notation fixes (4cc1cba, d60220c) resolved correctness issues that also affected code generation. IMPORTANT CAVEAT: GPU timing is device-side profiling (excludes host<->device data transfer); CPU timing is wall-clock. For sustained decode where the state matrix persists on-GPU, transfer overhead amortizes."
+  },
+  "prior_measurement": {
+    "commit": "048aa7e",
+    "date": "2026-08-06T16:10:00Z",
+    "note": "Original measurement before kernel code improvements. Scan was 164.7us (2.9x slower than current). CumDecay was 43.8us (1.4x slower). The conclusion 'GPU slower than CPU for all three' was correct at that commit but is no longer valid.",
+    "old_conclusion": "GPU slower than CPU for all three kernels",
+    "new_conclusion": "GPU matches or beats CPU on all three kernels (device-side profiling)"
   },
   "o6_transferability": {
     "target_gpu": "Immortalis-G720 (Arm 5th gen, CIX P1 / Orion O6)",

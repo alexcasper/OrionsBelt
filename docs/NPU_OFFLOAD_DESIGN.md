@@ -211,22 +211,24 @@ While the NPU path remains unexecuted, the GPU compute path has been
 **implemented, validated, and benchmarked** on the RK3588 fleet (FINDINGS §13,
 bead `ob-q44`):
 
-| Kernel | CPU A76 NEON | GPU Mali-G610 | GPU/CPU |
+| Kernel | CPU A76 NEON (4T) | GPU Mali-G610 | GPU/CPU |
 |---|---|---|---|
-| `gdn_gated_scan` | 96.8 µs | 164.7 µs | 0.59× |
-| `gdn_cumdecay` | 35.6 µs | 43.8 µs | 0.81× |
-| `gdn_causal_dwconv1d` | 34.4 µs | 47.8 µs | 0.72× |
-| `gdn_delta_rule_decode` | — | 290.3 µs | (no CPU equivalent) |
+| `gdn_gated_scan` | 114.9 µs | 57.5 µs | **1.99×** |
+| `gdn_cumdecay` | 33.0 µs | 31.9 µs | 1.03× |
+| `gdn_causal_dwconv1d` | 50.2 µs | 38.5 µs | **1.30×** |
+| `gdn_delta_rule_decode` | — | 272.4 µs | (no CPU equivalent) |
 
 All four kernels are **bit-exact** or within FP32 round-trip noise against a
-scalar CPU reference. The Mali-G610 is slower than the A76 CPU for the
-channel-wise primitives — expected, since these operations are
-bandwidth-bound (1 FMA per 12 bytes), and the A76's cache hierarchy wins.
+scalar CPU reference (87/87 validation tests pass). The Mali-G610 now **matches
+or beats** the 4-thread A76 CPU on all three channel-wise primitives (device-side
+profiling time). This reverses the initial measurement at commit `048aa7e`, where
+the GPU was 0.59–0.81× the CPU — kernel code improvements (matrix notation fixes,
+4cc1cba/d60220c) improved scan throughput 2.9×. GPU timing is device-side profiling
+(excludes host↔device transfer); see FINDINGS §13 for the full methodology caveat.
 
 The Immortalis-G720 on the O6 is 2–3 GPU generations newer with significantly
 more shader cores. The kernel code is identical; only the performance
-conclusion is O6-gated. On-device measurement would have determined whether
-the G720 flips the GPU/CPU ratio.
+conclusion is O6-gated.
 
 ---
 

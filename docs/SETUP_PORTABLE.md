@@ -211,10 +211,13 @@ The discriminating case: the Pi 5 has the **newest cores** (A76) but the
 **more bandwidth**. If the Nano beats the Pi 5 on the scan kernel, that is strong
 evidence for bandwidth-boundedness.
 
-**The result:** the Pi 5 wins on ALL three kernels despite having 33% LESS spec
-bandwidth. The bandwidth-bound hypothesis does **not** hold at seq=64 working-set
-sizes — these kernels are **instruction-overhead-bound, not DRAM-bandwidth-bound**.
-See [`docs/DEVICE_RUNBOOK.md`](./DEVICE_RUNBOOK.md) §"What we are actually testing"
+**The result:** the Pi 5 robustly wins on CumDecay and DWConv1D (2.2–2.5× margins)
+despite having 33% LESS spec bandwidth. The Scan kernel shows only a marginal edge
+(1.05×, within the Jetson inter-board replicate spread — not statistically
+reliable). On the two kernels where the result is unambiguous, the bandwidth-bound
+hypothesis does **not** hold at seq=64 working-set sizes — those kernels are
+**instruction-overhead-bound, not DRAM-bandwidth-bound**. See
+[`docs/DEVICE_RUNBOOK.md`](./DEVICE_RUNBOOK.md) §"What we are actually testing"
 and [`FINDINGS.md`](./FINDINGS.md) §5b for the full analysis.
 
 ### Reading the CSV columns
@@ -237,11 +240,13 @@ NEON path (see [`FINDINGS.md`](./FINDINGS.md) §5b for the full analysis):
 | Raspberry Pi 5 (A76) | 15.8 GiB/s | 1.20 GiB/s | 7.6% |
 | RK3588 big (A76) | 31.7 GiB/s | 5.67 GiB/s | 17.9% |
 
-The Pi 5 wins despite having 33% less spec bandwidth than the Jetson and ~50%
-less than the RK3588. This is **not** a broken setup — the Jetson's low scan
-number is real. The bottleneck is the core microarchitecture (IPC, OoO depth,
-clock frequency), not the memory system. The A76's ~1.6× higher clock and
-substantially better IPC than the A57 explains the win despite less bandwidth.
+The Pi 5 wins on CumDecay and DWConv1D despite having 33% less spec bandwidth
+than the Jetson and ~50% less than the RK3588. Its Scan margin (1.05×) is within
+inter-board replicate noise and not reliable (ob-5kw). This is **not** a broken
+setup — the Jetson's low scan number is real. The bottleneck is the core
+microarchitecture (IPC, OoO depth, clock frequency), not the memory system. The
+A76's ~1.6× higher clock and substantially better IPC than the A57 explains the
+win despite less bandwidth.
 Multi-threaded scaling (OpenMP) reveals a bandwidth component that the
 single-thread comparison cannot expose — see the optimization-impact section in
 [`fleet_bandwidth_scaling.md`](../results/figures/fleet_bandwidth_scaling.md).

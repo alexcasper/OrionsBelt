@@ -657,11 +657,52 @@ def generate_report(output_path):
             "RK3588 and Jetson data are from the fleet sweep (ob-bf7/ob-aw9). "
             "Pi 5 was not part of the sweep; its provenance is noted in the audit above."
         )
-        lines.append(
-            "**Treat the predictions as order-of-magnitude, not as a fit.** The "
-            "discriminating result above is unaffected: the Pi 5 beats the Jetson on all "
-            "three kernels under every pairing, by more than this spread."
-        )
+        lines.append("**Treat the predictions as order-of-magnitude, not as a fit.**")
+        lines.append("")
+
+        # RESULTS DISCIPLINE: the original hard-coded claim ("Pi 5 beats the
+        # Jetson on ALL three kernels by more than this spread") was factually
+        # wrong for the scan kernel, whose Pi5/J1 margin (1.05×) exactly equals
+        # the Jetson inter-board replicate spread. Compute per-kernel margins
+        # dynamically so the text cannot drift from the data (ob-bf7).
+        pi5_sha, pi5_dirty, _ = get_manifest_sha("results/raw/pi5-r5.csv")
+        _4B_KERNELS = [
+            ("gdn_cumdecay", "Cumulative Decay"),
+            ("gdn_gated_scan", "Gated Delta-Rule Scan"),
+            ("gdn_causal_dwconv1d", "Causal DWConv1D"),
+        ]
+        robust, marginal = [], []
+        for kern, label in _4B_KERNELS:
+            pv = get_gibs(pi5_d["rows"], "Qwen3.5-4B", kern) or 0
+            jv = get_gibs(j1_d["rows"], "Qwen3.5-4B", kern) or 0
+            if jv > 0:
+                r = pv / jv
+                (robust if r >= worst else marginal).append((label, r))
+
+        if pi5_sha:
+            lines.append(
+                f"⚠ The Pi 5 data is from commit `{pi5_sha}`"
+                + (" (dirty, pre-OpenMP)" if pi5_dirty else " (pre-OpenMP)")
+                + " — a different commit than the Jetson and RK3588 "
+                "fleet-sweep data. This is a mixed-commit comparison; re-running the "
+                "Pi 5 at the current commit (ob-mrd.22) could shift these numbers."
+            )
+            lines.append("")
+
+        if marginal:
+            robust_s = ", ".join(f"{lbl} ({r:.2f}×)" for lbl, r in robust)
+            marginal_s = ", ".join(f"{lbl} ({r:.2f}×)" for lbl, r in marginal)
+            lines.append(
+                f"The Pi 5 robustly beats the Jetson on {robust_s} — above the "
+                f"fleet's worst replicate spread ({worst:.2f}×). However, the "
+                f"{marginal_s} margin is **within that spread** and is not a "
+                "statistically reliable result (RESULTS DISCIPLINE, ob-bf7)."
+            )
+        else:
+            lines.append(
+                f"The Pi 5 beats the Jetson on all three kernels by more than the "
+                f"fleet replicate spread ({worst:.2f}×)."
+            )
         lines.append("")
 
     # ---- O6 extrapolation ----
