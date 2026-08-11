@@ -21,6 +21,7 @@ Usage::
     python3 scripts/gen_ctxsweep_comparison.py
 """
 
+import contextlib
 import csv
 import re
 from collections import defaultdict
@@ -62,10 +63,14 @@ def classify(name: str):
     lower = name.lower()
     if "ctxsweep" not in lower and "ctx_sweep" not in lower:
         return None
-    if not name.endswith("_raw.csv") and not name.endswith("_e2e.csv"):
-        # also accept the t4 naming: *_4t.csv, *_4t_fair.csv etc
-        if not re.search(r"_\dt.*\.csv$", lower) and not lower.endswith(".csv"):
-            return None
+    # Accept *_raw.csv, *_e2e.csv, and the t4 naming *_4t.csv, *_4t_fair.csv
+    if (
+        not name.endswith("_raw.csv")
+        and not name.endswith("_e2e.csv")
+        and not re.search(r"_\dt.*\.csv$", lower)
+        and not lower.endswith(".csv")
+    ):
+        return None
     # skip schema files
     if "schema" in lower:
         return None
@@ -121,6 +126,14 @@ def load_ctxsweep_data():
             continue
 
         key = (device, cluster, model, quant, arch)
+        # When multiple CSVs share the same key (e.g. _1t vs _4t_fair
+        # variants of the same config), prefer _4t_fair as it reflects
+        # real-world multi-threaded performance.  Track skipped files
+        # for provenance transparency.
+        is_4t_fair = "_4t_fair" in name
+        if key in datasets and not is_4t_fair:
+            # existing entry wins unless we are the _4t_fair variant
+            continue
         datasets[key] = rows
         sources[key] = {"csv": name}
 
@@ -173,10 +186,8 @@ def generate_markdown(datasets, sources):
         group_key = (device, cluster, model)
         by_device[group_key][key] = datasets[key]
 
-    section_num = 0
-    for group_key in sorted(by_device.keys()):
+    for section_num, group_key in enumerate(sorted(by_device.keys()), 1):
         device, cluster, model = group_key
-        section_num += 1
         lines.append(f"## {section_num}. {model} on {device} ({cluster} cluster)")
         lines.append("")
 
@@ -184,10 +195,8 @@ def generate_markdown(datasets, sources):
         all_ctxs = set()
         for key in by_device[group_key]:
             for row in by_device[group_key][key]:
-                try:
+                with contextlib.suppress(ValueError, KeyError):
                     all_ctxs.add(int(float(row["ctx_len"])))
-                except (ValueError, KeyError):
-                    pass
         ctxs = sorted(all_ctxs)
 
         # Order: FP32, INT8, INT8+SDOT, INT4+SDOT
