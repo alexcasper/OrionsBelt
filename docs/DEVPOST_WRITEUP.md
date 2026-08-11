@@ -16,7 +16,7 @@ Potential impact (20 pts), Developer experience (15 pts).
 Qwen3.5 uses a **Gated DeltaNet (GDN)** hybrid architecture: 24 out of 32
 layers are linear-attention (GDN) layers with a fixed-size recurrent state,
 and 8 are standard full-attention layers. At decode time, GDN layers consume
-**O(1) memory per token** — a fixed 576 KiB recurrent state that never grows
+**O(1) memory per token** — a fixed ~48 MiB recurrent state that never grows
 — while full-attention layers grow a KV cache linearly with context length.
 This makes GDN *the* architecture that benefits most from edge deployment,
 where memory is scarce and shared across the entire SoC.
@@ -250,10 +250,10 @@ not peak-only artifacts — critical for an honest Edge AI submission.
 |-----------|-----:|---------|----------------|
 | Weights (0.8B, fp32) | 2.802 GiB | Flat | Dominates total memory |
 | KV cache (6 full-attn layers) | 24,576 B/token | Linear in context | Only 6 of 24 layers contribute |
-| Recurrent state (18 GDN layers) | 576 KiB | **O(1)** — never grows | The architectural advantage |
+| Recurrent state (18 GDN layers) | 19.7 MiB | **O(1)** — never grows | The architectural advantage |
 
 At 32K context, the KV cache would reach ~768 MiB while the recurrent state
-stays at 576 KiB. If all 24 layers were full-attention, the KV cache would
+stays at 19.7 MiB. If all 24 layers were full-attention, the KV cache would
 be 4× larger (~3 GiB). The hybrid GDN architecture saves 75% of KV cache
 memory — exactly the 18/24 ratio of linear-to-total layers.
 

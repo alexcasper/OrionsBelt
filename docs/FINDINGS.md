@@ -1254,24 +1254,39 @@ linear-attention (GDN) layers** and **6 full-attention layers** (every 4th).
 
 Measured memory breakdown (fp32, RK3588 Cortex-A76, governor=performance):
 
-| Context | Weights (GiB) | KV Cache (MiB) | Recurrent State (KiB) | Total (GiB) |
-|--------:|:-------------:|:---------------:|----------------------:|:-----------:|
-|      32 | 2.802         | 0.75            | 576                   | 2.803       |
-|      64 | 2.802         | 1.50            | 576                   | 2.804       |
-|     128 | 2.802         | 3.00            | 576                   | 2.805       |
-|     256 | 2.802         | 6.00            | 576                   | 2.808       |
+| Context | Weights (GiB) | KV Cache (MiB) | GDN State (MiB) | Total (GiB) |
+|--------:|:-------------:|:---------------:|-----------------:|:-----------:|
+|      32 | 2.802         | 0.75            | 19.7             | 2.822       |
+|      64 | 2.802         | 1.50            | 19.7             | 2.823       |
+|     128 | 2.802         | 3.00            | 19.7             | 2.824       |
+|     256 | 2.802         | 6.00            | 19.7             | 2.827       |
 
-**Analytical predictions match measurements exactly:**
+**Analytical predictions (verified against `src/orionsbelt/model/gdn_layer_info.py`):**
 
 - **KV cache:** 24,576 bytes/token = 2 (K+V) × 6 (full-attn layers) × 2 (KV
   heads) × 256 (head_dim) × 4 (fp32 bytes). Scales linearly with seq_len.
-- **Recurrent state:** 589,824 bytes = 18 (linear layers) × 32,768 bytes/layer.
-  Each GDN layer holds: key_state (16×128×4 = 8 KiB) + value_state (8 KiB) +
-  conv_state (4×1024×4 = 16 KiB). **O(1) — does not grow with seq_len.**
+- **GDN recurrent state:** 18,874,368 bytes = 18 (GDN layers) × 1,048,576
+  bytes/layer. Each GDN layer holds an outer-product state matrix of shape
+  `(16 v_heads, 128 k_dim, 128 v_dim)` = 262,144 elements × 4 bytes = 1 MiB
+  (confirmed by architecture audit `ob-37v` and `gdn_layer_info.py`).
+  **O(1) — does not grow with seq_len.**
+- **GDN conv state:** 1,769,472 bytes = 18 layers × 98,304 bytes/layer.
+  Conv dim = 6144 (key_dim×2 + value_dim), kernel = 4, × 4 bytes. Also O(1).
 - **Weights:** 3,009,572,096 bytes (752M params × 4 bytes fp32). Flat.
 
+> **Correction note (2026-08-11):** The original version of this section
+> reported the recurrent state as 576 KiB, decomposing it into separate
+> `key_state` (16×128) + `value_state` (16×128) vectors of 8 KiB each.
+> This was incorrect — the GDN state is an **outer-product matrix**
+> `k ⊗ v` of shape `(num_v_heads, head_k_dim, head_v_dim)`, not separate
+> key/value vectors. The corrected figure is 18 MiB for the recurrent state
+> alone (19.7 MiB including conv state). The original "Total" column
+> understated memory by ~19 MiB (~0.7%), within RSS measurement noise,
+> so the overall conclusion — GDN state is negligible vs KV cache — is
+> unchanged.
+
 **Implication:** at 32K context, the KV cache would reach ~768 MiB, while the
-recurrent state remains at 576 KiB. If all 24 layers were full-attention, the KV
+GDN decode state remains at 19.7 MiB. If all 24 layers were full-attention, the KV
 cache would be 4× larger (~3 GiB at 32K). The hybrid GDN architecture saves 75%
 of KV cache memory — exactly the ratio of linear-to-total layers (18/24).
 

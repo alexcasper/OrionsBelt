@@ -22,7 +22,7 @@ Hand-writing and benchmarking the GDN recurrence kernels that don't exist yet fo
 
 Gated DeltaNet (GDN) is a **linear-attention mechanism** arriving in next-generation hybrid LLMs (Qwen3.5 ships a 3:1 mix of GDN and full-attention layers). It replaces the ever-growing KV cache with a **fixed-size recurrent state** — O(1) decode memory regardless of context length, versus O(n) for standard attention.
 
-At 262K context on the 4B checkpoint, that difference is **23.95 GiB of RAM** — the recurrent state is 51 MiB; if all 32 layers were attention, the KV cache alone would be 32 GiB and still growing. On a memory-constrained edge board, that is the difference between running long-context inference and not running it at all.
+At 262K context on the 4B checkpoint, that difference is **23.95 GiB of RAM** — the GDN decode state (recurrent + conv) is 51 MiB; if all 32 layers were attention, the KV cache alone would be 32 GiB and still growing. On a memory-constrained edge board, that is the difference between running long-context inference and not running it at all.
 
 **The problem:** the fast GDN kernels (causal_conv1d, fla) do not exist for Arm architectures. Without them, the model silently falls back to slow, generic PyTorch ops. This is happening *today* on NVIDIA's own silicon; on Arm/Vulkan the gap is wider. **Our contribution is filling that gap:** three hand-written NEON/SVE CPU kernels, numerically verified, benchmarked across a 5-device Arm fleet, and an honest operator-coverage audit showing where NPU acceleration can and cannot help.
 
@@ -230,7 +230,7 @@ Specifically:
 
 - **Repository:** https://github.com/alexcasper/OrionsBelt
 - **License:** Apache-2.0
-- **Findings (54 sections, 5699 lines):** [`docs/FINDINGS.md`](../docs/FINDINGS.md)
+- **Findings (54 sections, 5714 lines):** [`docs/FINDINGS.md`](../docs/FINDINGS.md)
 - **Comparison table:** [`results/figures/comparison_table.md`](../results/figures/comparison_table.md)
 - **Fleet bandwidth analysis:** [`results/figures/fleet_bandwidth_scaling.md`](../results/figures/fleet_bandwidth_scaling.md)
 - **Memory scaling figures:** [`results/figures/memory_comparison.md`](../results/figures/memory_comparison.md)
