@@ -9,12 +9,8 @@ formatter helpers, and end-to-end markdown output validation.
 
 from __future__ import annotations
 
-import csv
-import io
 import sys
 from pathlib import Path
-
-import pytest
 
 _ROOT = str(Path(__file__).resolve().parent.parent)
 if _ROOT not in sys.path:
@@ -30,9 +26,7 @@ from gen_ctxsweep_comparison import (  # noqa: E402
     fmt_tok,
     fmt_us,
     generate_markdown,
-    load_ctxsweep_data,
 )
-
 
 # ---------------------------------------------------------------------------
 # classify()
@@ -167,7 +161,7 @@ class TestDedupPreference:
 
         header = ["ctx_len", "tok_per_sec", "kv_cache_mb", "total_us"]
 
-        for quant, fname in [("FP32", "rk3588-t4_e2e_ctxsweep_4t_fair.csv"),
+        for _quant, fname in [("FP32", "rk3588-t4_e2e_ctxsweep_4t_fair.csv"),
                              ("INT8", "rk3588-t4_e2e_ctxsweep_int8_4t_fair.csv")]:
             (tmp_path / fname).write_text(
                 f"{','.join(header)}\n1,2.0,0,500000\n"
