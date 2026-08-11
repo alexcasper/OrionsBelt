@@ -772,8 +772,10 @@ Full analysis is regenerable via `python3 bench/fleet_analysis.py` and committed
 RK3588, Jetson j1, and Jetson j2 data are from the **fleet sweep** (ob-bf7):
 commit `234807d`, clean tree, single-threaded (`OMP_NUM_THREADS=1`). Jetson j1
 was subsequently refreshed with the batched-timing fix (commit `414b622`,
-ob-9xr). Pi 5 was not part of the fleet sweep; its data is from an earlier
-commit. See the optimization-impact section below for multi-threaded results.
+ob-9xr). Pi 5 was not part of the fleet sweep; its data is from commit
+`28729f3` (dirty, pre-OpenMP — see ob-mrd.22). This is a **mixed-commit
+comparison**; re-running the Pi 5 at the current commit could shift these
+numbers. See the optimization-impact section below for multi-threaded results.
 
 | Device | Spec | CumDecay | Scan | DWConv1D | Scan/Spec |
 |--------|------|----------|------|----------|-----------|
@@ -792,13 +794,21 @@ Pi 5 (15.8 GiB/s, newest A76 cores).
 | Kernel | Pi 5 | Jetson j1 | Jetson j2 | Winner | Pi5/J1 |
 |--------|------|-----------|-----------|--------|--------|
 | CumDecay | 3.74 | 1.68 | 1.50 | **Pi 5** | 2.23x |
-| Scan | 1.20 | 1.14 | 1.09 | **Pi 5** | 1.05x |
+| Scan | 1.20 | 1.14 | 1.09 | Pi 5 (marginal) | 1.05x ⚠ |
 | DWConv1D | 3.23 | 1.32 | 0.93 | **Pi 5** | 2.45x |
 
-**Result: the Pi 5 wins on ALL three kernels despite having 33% LESS spec
-bandwidth.** The bandwidth-bound hypothesis does NOT hold at seq=64 working set
-sizes. These kernels are **instruction-overhead-bound, not DRAM-bandwidth-bound**
-at this scale.
+> ⚠ **RESULTS DISCIPLINE (ob-5kw, ob-bf7):** The Scan margin (1.05×) equals
+> the Jetson j1/j2 inter-board replicate spread (1.14/1.09 = 1.05×). It is
+> **within measurement noise** and is not a statistically reliable result.
+> CumDecay (2.23×) and DWConv1D (2.45×) are robust wins — both far exceed the
+> fleet's worst replicate spread. The conclusion below is qualified accordingly.
+
+**Result: the Pi 5 robustly outperforms the Jetson on CumDecay and DWConv1D
+(2.2–2.5× margins) despite having 33% LESS spec bandwidth.** The Scan kernel
+shows a marginal Pi 5 edge that is within inter-board replicate noise. On the
+two kernels where the result is unambiguous, the bandwidth-bound hypothesis does
+NOT hold at seq=64 working set sizes — those kernels are
+**instruction-overhead-bound, not DRAM-bandwidth-bound** at this scale.
 
 This is consistent with the working set analysis: at seq=64 with 4096 channels,
 the total traffic is ~1 MiB — small enough to be L2/L3-resident, so core
