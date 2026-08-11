@@ -1009,6 +1009,147 @@ def validate_csv(path, csv_name, issues):
                             )
                     except ValueError:
                         pass
+                elif csv_type == "power":
+                    # Power readings: mw must be positive & plausible for edge
+                    # devices (<100 W), temperature in a survivable range.
+                    try:
+                        mw = float(row.get("power_in_mw", 0))
+                        if mw <= 0 or mw > 100_000:
+                            issues.append(
+                                Issue(
+                                    "WARNING",
+                                    csv_name,
+                                    f"row {i}: implausible power_in_mw {mw}",
+                                )
+                            )
+                    except ValueError:
+                        pass
+                    try:
+                        tc = float(row.get("temp_milliC", 0))
+                        if tc < -40_000 or tc > 150_000:
+                            issues.append(
+                                Issue(
+                                    "WARNING",
+                                    csv_name,
+                                    f"row {i}: implausible temp_milliC {tc}",
+                                )
+                            )
+                    except ValueError:
+                        pass
+                elif csv_type == "e2e_ctxsweep":
+                    try:
+                        total = float(row.get("total_us", 0))
+                        if total <= 0:
+                            issues.append(
+                                Issue(
+                                    "WARNING",
+                                    csv_name,
+                                    f"row {i}: non-positive total_us {total}",
+                                )
+                            )
+                    except ValueError:
+                        pass
+                elif csv_type == "thermal_stress":
+                    try:
+                        tps = float(row.get("tok_per_sec", 0))
+                        if tps <= 0 or tps > 1000:
+                            issues.append(
+                                Issue(
+                                    "WARNING",
+                                    csv_name,
+                                    f"row {i}: implausible tok/s {tps}",
+                                )
+                            )
+                    except ValueError:
+                        pass
+                    for zone_col in ("thermal_zone1_C", "thermal_zone2_C"):
+                        try:
+                            temp = float(row.get(zone_col, 0))
+                            if temp < 0 or temp > 150:
+                                issues.append(
+                                    Issue(
+                                        "WARNING",
+                                        csv_name,
+                                        f"row {i}: implausible {zone_col} {temp}",
+                                    )
+                                )
+                        except ValueError:
+                            pass
+                elif csv_type == "retrieval_capacity":
+                    try:
+                        keys = float(row.get("num_keys", 0))
+                        if keys <= 0:
+                            issues.append(
+                                Issue(
+                                    "WARNING",
+                                    csv_name,
+                                    f"row {i}: non-positive num_keys {keys}",
+                                )
+                            )
+                    except ValueError:
+                        pass
+                    try:
+                        acc = float(row.get("accuracy", 0))
+                        if acc < 0 or acc > 1.0001:
+                            issues.append(
+                                Issue(
+                                    "WARNING",
+                                    csv_name,
+                                    f"row {i}: implausible accuracy {acc}",
+                                )
+                            )
+                    except ValueError:
+                        pass
+                elif csv_type == "gdn2_swap":
+                    try:
+                        step = float(row.get("step", 0))
+                        if step <= 0:
+                            issues.append(
+                                Issue(
+                                    "WARNING",
+                                    csv_name,
+                                    f"row {i}: non-positive step {step}",
+                                )
+                            )
+                    except ValueError:
+                        pass
+                    try:
+                        loss = float(row.get("mse_loss", 0))
+                        if loss < 0:
+                            issues.append(
+                                Issue(
+                                    "WARNING",
+                                    csv_name,
+                                    f"row {i}: negative mse_loss {loss}",
+                                )
+                            )
+                    except ValueError:
+                        pass
+                elif csv_type == "ruler_eval":
+                    try:
+                        hit = float(row.get("hit", 0))
+                        if hit not in (0, 1):
+                            issues.append(
+                                Issue(
+                                    "WARNING",
+                                    csv_name,
+                                    f"row {i}: hit not 0/1: {hit}",
+                                )
+                            )
+                    except ValueError:
+                        pass
+                    try:
+                        logprob = float(row.get("correct_logprob", 0))
+                        if logprob > 0:
+                            issues.append(
+                                Issue(
+                                    "WARNING",
+                                    csv_name,
+                                    f"row {i}: positive log_prob {logprob}",
+                                )
+                            )
+                    except ValueError:
+                        pass
 
             return csv_type, row_count, manifest_ref
 
