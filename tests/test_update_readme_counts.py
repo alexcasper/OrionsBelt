@@ -72,9 +72,7 @@ def _write_readme(
     findings: int = 3,
 ):
     (tmp_path / "README.md").write_text(
-        README_TEMPLATE.format(
-            csvs=csvs, manifests=manifests, figs=figs, findings=findings
-        )
+        README_TEMPLATE.format(csvs=csvs, manifests=manifests, figs=figs, findings=findings)
     )
 
 
