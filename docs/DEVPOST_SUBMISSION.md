@@ -60,9 +60,9 @@ Qwen3.5-4B, prefill (seq=64), fp32 baseline, 8-thread (big cluster). Two indepen
 
 | Kernel | GiB/s (t3) | Spread | GiB/s (t4) | Spread | t3÷t4 |
 |---|---:|---:|---:|---:|---:|
-| Cumulative decay | 21.39 | 7.3% | 22.25 | 14.6% | 0.96× |
-| Gated delta-rule scan | 10.56 | 6.3% | 11.53 | 9.2% | 0.92× |
-| Causal Conv1D | 20.59 | 3.5% | 19.04 | 3.8% | 1.08× |
+| Cumulative decay | 21.39 | 7.3% | 21.46 | 3.2% | 1.00× |
+| Gated delta-rule scan | 10.56 | 6.3% | 11.94 | 7.2% | 0.88× |
+| Causal Conv1D | 20.59 | 3.5% | 19.35 | 8.8% | 1.06× |
 
 > t3 manifest git_sha `854c6f1`, dirty=false; t4 manifest git_sha `8227e98`,
 > dirty=true; 30 repeats each. The boards agree within 4–15% (direction flips
