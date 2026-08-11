@@ -34,7 +34,7 @@ optimization" rubric line would have been addressed with the NPU leg.
 | Subgraph boundaries for NPU export | ⚠️ **Designed** | This document, §4 |
 | Quantization policy (INT4/INT8/FP32) | ✅ **Complete** | `ob-qpa`, QUANTIZATION_POLICY.md |
 | GPU scan kernel correctness | ✅ **Measured** | FINDINGS §13, bit-exact on Mali-G610 |
-| GPU vs. CPU performance characterization | ✅ **Measured** | FINDINGS §13, CPU wins on G610 |
+| GPU vs. CPU performance characterization | ✅ **Measured** | FINDINGS §13, GPU matches/beats CPU on G610 |
 | NPU subgraph export via `cixbuild` | ❌ **Not executed** | Requires O6 board |
 | On-device NPU latency measurement | ❌ **Not executed** | Requires O6 board |
 | INT8/INT4 accuracy regression on NPU | ❌ **Not executed** | Requires O6 board |
@@ -274,10 +274,10 @@ This design demonstrates:
    sequential scan**, which is architecturally inexpressible — verified via
    the compiler frontend, without silicon (FINDINGS §1).
 
-2. **A complete heterogeneous partitioning design** that keeps the scan on CPU
-   (where SVE2/i8mm kernels are verified correct) and offloads dense math to
-   the NPU — with a phase-dependent routing policy motivated by the
-   boundary-crossing cost analysis.
+2. **A complete heterogeneous partitioning design** that places the scan on
+   CPU or GPU (both are verified-correct and competitive on RK3588; see
+   FINDINGS §13) and offloads dense math to the NPU — with a phase-dependent
+   routing policy motivated by the boundary-crossing cost analysis.
 
 3. **A quantization policy** that targets INT4 for 95%+ of decode bandwidth
    (the dominant lever) while preserving FP32 precision for recurrent state
@@ -285,8 +285,10 @@ This design demonstrates:
 
 4. **Validated GPU kernels** for all four GDN primitives, bit-exact on two
    independent driver stacks (ARM proprietary and open-source Mesa RustiCL),
-   characterised honestly — including the finding that on this GPU generation,
-   the CPU wins.
+   characterised honestly — including **correcting our own initial conclusion**
+   when a kernel-code fix (matrix notation) reversed the GPU vs CPU comparison:
+   the GPU now matches or beats the 4-thread A76 on all three channel-wise
+   primitives (FINDINGS §13).
 
 5. **The specific measurements that were never possible** because the board did
    not arrive, listed transparently so a reviewer can assess the design's
