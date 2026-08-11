@@ -115,8 +115,8 @@ PROV = {
     "pi5-j1.csv": ("r5_20260803T083154Z_f127a11", "f127a11", True),
     "rk3588-t3_big.csv": ("t3_20260806T163210Z_47efdf8", "47efdf8", False),
     "rk3588-t3_little.csv": ("t3_20260806T163210Z_47efdf8", "47efdf8", False),
-    "rk3588-t4_big.csv": ("t4_20260811T063753Z_79d1b47", "79d1b47", True),
-    "rk3588-t4_little.csv": ("t4_20260811T063753Z_79d1b47", "79d1b47", True),
+    "rk3588-t4_big.csv": ("t4_20260811T233010Z_82f4833", "82f4833", False),
+    "rk3588-t4_little.csv": ("t4_20260811T233010Z_82f4833", "82f4833", False),
     # Fleet sweep (ob-bf7): originally all at commit 234807d, clean-tree, single-thread.
     # Some CSVs have since been re-run at later commits (GDN-2 aliasing fix,
     # adaptive batched timing).  PROV entries below match the CURRENT manifest
