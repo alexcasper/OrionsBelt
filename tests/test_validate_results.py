@@ -2221,3 +2221,213 @@ class TestValidateCsvRulerEval:
         issues = []
         validate_csv(str(csv_path), "test_ruler3.csv", issues)
         assert not any("hit not" in i.message and "log_prob" in i.message for i in issues)
+
+
+# ---------------------------------------------------------------------------
+# Boundary-crossing row validation (bead ob-8qt.25)
+# ---------------------------------------------------------------------------
+
+
+def _boundary_crossing_row(**overrides):
+    """A valid engine-boundary-crossing latency row (gpu/boundary_crossing_bench.c)."""
+    base = {
+        "kernel": "write_blocking",
+        "dim1": "512B",
+        "dim2": "",
+        "dim3": "",
+        "p50_ms": "0.082",
+        "p95_ms": "0",
+        "bw_mibs": "0",
+    }
+    base.update(overrides)
+    return base
+
+
+class TestValidateBoundaryCrossingRow:
+    """Unit tests for validate_boundary_crossing_row (bead ob-t3b.6 CSV)."""
+
+    def test_valid_row_no_issues(self):
+        issues = []
+        validate_gpu_micro_row(
+            _boundary_crossing_row(), "test_bc.csv", issues, 2
+        )
+        assert issues == []
+
+    def test_missing_dim1_errors(self):
+        issues = []
+        validate_gpu_micro_row(
+            _boundary_crossing_row(dim1=""), "test_bc.csv", issues, 2
+        )
+        assert any("missing dim1" in i.message for i in issues)
+
+    def test_non_positive_p50_errors(self):
+        issues = []
+        validate_gpu_micro_row(
+            _boundary_crossing_row(p50_ms="0"), "test_bc.csv", issues, 2
+        )
+        assert any("non-positive p50_ms" in i.message for i in issues)
+
+    def test_malformed_p50_errors(self):
+        issues = []
+        validate_gpu_micro_row(
+            _boundary_crossing_row(p50_ms="N/A"), "test_bc.csv", issues, 2
+        )
+        assert any("cannot parse p50_ms" in i.message for i in issues)
+
+    def test_negative_bw_errors(self):
+        issues = []
+        validate_gpu_micro_row(
+            _boundary_crossing_row(bw_mibs="-1.5"), "test_bc.csv", issues, 2
+        )
+        assert any("negative bw_mibs" in i.message for i in issues)
+
+    def test_malformed_bw_errors(self):
+        issues = []
+        validate_gpu_micro_row(
+            _boundary_crossing_row(bw_mibs="oops"), "test_bc.csv", issues, 2
+        )
+        assert any("cannot parse bw_mibs" in i.message for i in issues)
+
+    def test_zero_bw_passes(self):
+        """bw_mibs=0 is valid for boundary-crossing rows (not measured)."""
+        issues = []
+        validate_gpu_micro_row(
+            _boundary_crossing_row(bw_mibs="0"), "test_bc.csv", issues, 2
+        )
+        assert not any("bw_mibs" in i.message for i in issues)
+
+    def test_dispatched_through_validate_csv(self, tmp_path):
+        """A gpu_micro CSV with boundary-crossing kernel should route correctly."""
+        csv_path = tmp_path / "test_bc_dispatch.csv"
+        header = "kernel,dim1,dim2,dim3,p50_ms,p95_ms,bw_mibs"
+        _write_csv(csv_path, header, "write_blocking,512B,,,0,-1,0")
+        issues = []
+        validate_csv(str(csv_path), "test_bc_dispatch.csv", issues)
+        assert any("non-positive p50_ms" in i.message for i in issues)
+
+
+# ---------------------------------------------------------------------------
+# e2e_ctxsweep inline validation dispatched through validate_csv (ob-8qt.25)
+# ---------------------------------------------------------------------------
+
+
+class TestValidateCsvE2eCtxSweepDispatch:
+    """The inline e2e_ctxsweep branch in validate_csv (non-positive total_us)."""
+
+    def test_non_positive_total_us_warns(self, tmp_path):
+        # Header has e2e_ctxsweep cols (gdn_layer_us, kv_cache_mb, total_us)
+        # but is missing ctx_len/full_attn_us so it doesn't match ctx_sweep.
+        csv_path = tmp_path / "test_ctxsweep.csv"
+        header = "model,gdn_layer_us,total_us,tok_per_sec,kv_cache_mb"
+        _write_csv(csv_path, header, "qwen2.5,100,0,50,10")
+        issues = []
+        validate_csv(str(csv_path), "test_ctxsweep.csv", issues)
+        assert any("non-positive total_us" in i.message for i in issues)
+
+    def test_valid_total_us_passes(self, tmp_path):
+        csv_path = tmp_path / "test_ctxsweep2.csv"
+        header = "model,gdn_layer_us,total_us,tok_per_sec,kv_cache_mb"
+        _write_csv(csv_path, header, "qwen2.5,100,180.5,50,10")
+        issues = []
+        validate_csv(str(csv_path), "test_ctxsweep2.csv", issues)
+        assert not any("total_us" in i.message for i in issues)
+
+    def test_malformed_total_us_passes_silently(self, tmp_path):
+        """Non-numeric total_us is caught by except ValueError — no crash, no warning."""
+        csv_path = tmp_path / "test_ctxsweep3.csv"
+        header = "model,gdn_layer_us,total_us,tok_per_sec,kv_cache_mb"
+        _write_csv(csv_path, header, "qwen2.5,100,garbage,50,10")
+        issues = []
+        validate_csv(str(csv_path), "test_ctxsweep3.csv", issues)
+        assert not any("total_us" in i.message for i in issues)
+
+
+# ---------------------------------------------------------------------------
+# Malformed-value (except ValueError) branches for inline CSV validators (ob-8qt.25)
+# ---------------------------------------------------------------------------
+
+
+class TestValidateCsvMalformedValues:
+    """Exercise the 'except ValueError: pass' branches in validate_csv's inline
+    per-type validation blocks. These guard against malformed numeric data
+    slipping through as silent passes — the branches must not crash."""
+
+    def test_power_malformed_mw(self, tmp_path):
+        csv_path = tmp_path / "test_power_bad_mw.csv"
+        header = "timestamp_ms,power_in_mw,power_gpu_mw,power_cpu_mw,temp_milliC"
+        _write_csv(csv_path, header, "50,abc,0,50,50000")
+        issues = []
+        validate_csv(str(csv_path), "test_power_bad_mw.csv", issues)
+        assert not any("power_in_mw" in i.message for i in issues)
+
+    def test_power_malformed_temp(self, tmp_path):
+        csv_path = tmp_path / "test_power_bad_temp.csv"
+        header = "timestamp_ms,power_in_mw,power_gpu_mw,power_cpu_mw,temp_milliC"
+        _write_csv(csv_path, header, "50,2000,0,50,???")
+        issues = []
+        validate_csv(str(csv_path), "test_power_bad_temp.csv", issues)
+        assert not any("temp_milliC" in i.message for i in issues)
+
+    def test_thermal_malformed_tps(self, tmp_path):
+        csv_path = tmp_path / "test_thermal_bad.csv"
+        header = "iteration,tok_per_sec,thermal_zone1_C,thermal_zone2_C,elapsed_s"
+        _write_csv(csv_path, header, "1,abc,51,51,33")
+        issues = []
+        validate_csv(str(csv_path), "test_thermal_bad.csv", issues)
+        assert not any("tok/s" in i.message for i in issues)
+
+    def test_thermal_malformed_zone_temp(self, tmp_path):
+        csv_path = tmp_path / "test_thermal_bad2.csv"
+        header = "iteration,tok_per_sec,thermal_zone1_C,thermal_zone2_C,elapsed_s"
+        _write_csv(csv_path, header, "1,1.5,definitely_hot,51,33")
+        issues = []
+        validate_csv(str(csv_path), "test_thermal_bad2.csv", issues)
+        assert not any("thermal_zone1_C" in i.message for i in issues)
+
+    def test_retrieval_malformed_keys(self, tmp_path):
+        csv_path = tmp_path / "test_retrieval_bad.csv"
+        header = "test,model,num_keys,accuracy,param,param_value"
+        _write_csv(csv_path, header, "capacity,gdn1,many,1.0,,")
+        issues = []
+        validate_csv(str(csv_path), "test_retrieval_bad.csv", issues)
+        assert not any("num_keys" in i.message for i in issues)
+
+    def test_retrieval_malformed_accuracy(self, tmp_path):
+        csv_path = tmp_path / "test_retrieval_bad2.csv"
+        header = "test,model,num_keys,accuracy,param,param_value"
+        _write_csv(csv_path, header, "capacity,gdn1,8,surely,,")
+        issues = []
+        validate_csv(str(csv_path), "test_retrieval_bad2.csv", issues)
+        assert not any("accuracy" in i.message for i in issues)
+
+    def test_gdn2_swap_malformed_step(self, tmp_path):
+        csv_path = tmp_path / "test_swap_bad.csv"
+        header = "step,mse_loss"
+        _write_csv(csv_path, header, "N/A,0.01")
+        issues = []
+        validate_csv(str(csv_path), "test_swap_bad.csv", issues)
+        assert not any("step" in i.message for i in issues)
+
+    def test_gdn2_swap_malformed_loss(self, tmp_path):
+        csv_path = tmp_path / "test_swap_bad2.csv"
+        header = "step,mse_loss"
+        _write_csv(csv_path, header, "1,garbage")
+        issues = []
+        validate_csv(str(csv_path), "test_swap_bad2.csv", issues)
+        assert not any("mse_loss" in i.message for i in issues)
+
+    def test_ruler_malformed_hit(self, tmp_path):
+        csv_path = tmp_path / "test_ruler_bad.csv"
+        header = "prompt_idx,seed,query_key,correct_answer,hit,correct_logprob,margin"
+        _write_csv(csv_path, header, "1,100,key,ans,yes,-15.0,-5.4")
+        issues = []
+        validate_csv(str(csv_path), "test_ruler_bad.csv", issues)
+        assert not any("hit" in i.message for i in issues)
+
+    def test_ruler_malformed_logprob(self, tmp_path):
+        csv_path = tmp_path / "test_ruler_bad2.csv"
+        header = "prompt_idx,seed,query_key,correct_answer,hit,correct_logprob,margin"
+        _write_csv(csv_path, header, "1,100,key,ans,1,positive,-5.4")
+        issues = []
+        validate_csv(str(csv_path), "test_ruler_bad2.csv", issues)
+        assert not any("log_prob" in i.message for i in issues)

@@ -96,7 +96,7 @@ to devices but was never previously tested in the correctness suite).
 >
 > **Provenance:** Optimization measurements from commit `8f8be11` on rk3588-t4
 > (manifest `rk3588-t4_optimized.json`). The CSV has since been re-run; current
-> values (22.25/11.53/19.04 GiB/s) are consistent within fleet inter-run
+> values (21.46/11.94/19.35 GiB/s) are consistent within fleet inter-run
 > variance. Pre-optimization baseline is preserved in git history at the parent
 > of `8f8be11`. See FINDINGS.md §"Device-Microbenchmark: Optimized vs
 > Unoptimized GDN Kernels on RK3588" for the full provenance note.
