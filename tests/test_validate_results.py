@@ -2076,3 +2076,148 @@ class TestValidateCsvDispatch:
         issues = []
         validate_csv(str(csv_path), "test_kgdn.csv", issues)
         assert any("negative gib_per_s_p50" in i.message for i in issues)
+
+
+# ---------------------------------------------------------------------------
+# Row-level validation for previously-unvalidated CSV types (ob-se6)
+# ---------------------------------------------------------------------------
+
+
+class TestValidateCsvPower:
+    """Power CSV row-level sanity checks."""
+
+    def test_implausible_power_warns(self, tmp_path):
+        csv_path = tmp_path / "test_power.csv"
+        header = "timestamp_ms,power_in_mw,power_gpu_mw,power_cpu_mw,temp_milliC"
+        _write_csv(csv_path, header, "50,-100,0,50,50000")
+        issues = []
+        validate_csv(str(csv_path), "test_power.csv", issues)
+        assert any("implausible power_in_mw" in i.message for i in issues)
+
+    def test_implausible_temp_warns(self, tmp_path):
+        csv_path = tmp_path / "test_power2.csv"
+        header = "timestamp_ms,power_in_mw,power_gpu_mw,power_cpu_mw,temp_milliC"
+        _write_csv(csv_path, header, "50,2000,0,50,200000")
+        issues = []
+        validate_csv(str(csv_path), "test_power2.csv", issues)
+        assert any("implausible temp_milliC" in i.message for i in issues)
+
+    def test_valid_power_passes(self, tmp_path):
+        csv_path = tmp_path / "test_power3.csv"
+        header = "timestamp_ms,power_in_mw,power_gpu_mw,power_cpu_mw,temp_milliC"
+        _write_csv(csv_path, header, "50,2010,0,1105,50500")
+        issues = []
+        validate_csv(str(csv_path), "test_power3.csv", issues)
+        assert not any("power_in_mw" in i.message for i in issues)
+
+
+class TestValidateCsvThermalStress:
+    """Thermal-stress CSV row-level sanity checks."""
+
+    def test_implausible_tps_warns(self, tmp_path):
+        csv_path = tmp_path / "test_thermal.csv"
+        header = "iteration,tok_per_sec,thermal_zone1_C,thermal_zone2_C,elapsed_s"
+        _write_csv(csv_path, header, "1,0,51,51,33")
+        issues = []
+        validate_csv(str(csv_path), "test_thermal.csv", issues)
+        assert any("implausible tok/s" in i.message for i in issues)
+
+    def test_implausible_thermal_warns(self, tmp_path):
+        csv_path = tmp_path / "test_thermal2.csv"
+        header = "iteration,tok_per_sec,thermal_zone1_C,thermal_zone2_C,elapsed_s"
+        _write_csv(csv_path, header, "1,1.1,200,51,33")
+        issues = []
+        validate_csv(str(csv_path), "test_thermal2.csv", issues)
+        assert any("thermal_zone1_C" in i.message for i in issues)
+
+    def test_valid_thermal_passes(self, tmp_path):
+        csv_path = tmp_path / "test_thermal3.csv"
+        header = "iteration,tok_per_sec,thermal_zone1_C,thermal_zone2_C,elapsed_s"
+        _write_csv(csv_path, header, "1,1.10,51.7,51.7,33")
+        issues = []
+        validate_csv(str(csv_path), "test_thermal3.csv", issues)
+        assert not any("thermal_zone" in i.message for i in issues)
+
+
+class TestValidateCsvGdn2Swap:
+    """GDN2-swap CSV row-level sanity checks."""
+
+    def test_negative_mse_loss_warns(self, tmp_path):
+        csv_path = tmp_path / "test_swap.csv"
+        header = "step,mse_loss"
+        _write_csv(csv_path, header, "1,-0.5")
+        issues = []
+        validate_csv(str(csv_path), "test_swap.csv", issues)
+        assert any("negative mse_loss" in i.message for i in issues)
+
+    def test_non_positive_step_warns(self, tmp_path):
+        csv_path = tmp_path / "test_swap2.csv"
+        header = "step,mse_loss"
+        _write_csv(csv_path, header, "0,0.01")
+        issues = []
+        validate_csv(str(csv_path), "test_swap2.csv", issues)
+        assert any("non-positive step" in i.message for i in issues)
+
+    def test_valid_swap_passes(self, tmp_path):
+        csv_path = tmp_path / "test_swap3.csv"
+        header = "step,mse_loss"
+        _write_csv(csv_path, header, "1,0.013965")
+        issues = []
+        validate_csv(str(csv_path), "test_swap3.csv", issues)
+        assert not any("mse_loss" in i.message for i in issues)
+
+
+class TestValidateCsvRetrievalCapacity:
+    """Retrieval-capacity CSV row-level sanity checks."""
+
+    def test_implausible_accuracy_warns(self, tmp_path):
+        csv_path = tmp_path / "test_retrieval.csv"
+        header = "test,model,num_keys,accuracy,param,param_value"
+        _write_csv(csv_path, header, "capacity,gdn1,8,1.5,,")
+        issues = []
+        validate_csv(str(csv_path), "test_retrieval.csv", issues)
+        assert any("implausible accuracy" in i.message for i in issues)
+
+    def test_non_positive_keys_warns(self, tmp_path):
+        csv_path = tmp_path / "test_retrieval2.csv"
+        header = "test,model,num_keys,accuracy,param,param_value"
+        _write_csv(csv_path, header, "capacity,gdn1,0,1.0,,")
+        issues = []
+        validate_csv(str(csv_path), "test_retrieval2.csv", issues)
+        assert any("non-positive num_keys" in i.message for i in issues)
+
+    def test_valid_retrieval_passes(self, tmp_path):
+        csv_path = tmp_path / "test_retrieval3.csv"
+        header = "test,model,num_keys,accuracy,param,param_value"
+        _write_csv(csv_path, header, "capacity,gdn1,8,1.000000,,")
+        issues = []
+        validate_csv(str(csv_path), "test_retrieval3.csv", issues)
+        assert not any("accuracy" in i.message for i in issues)
+
+
+class TestValidateCsvRulerEval:
+    """Ruler-eval CSV row-level sanity checks."""
+
+    def test_invalid_hit_warns(self, tmp_path):
+        csv_path = tmp_path / "test_ruler.csv"
+        header = "prompt_idx,seed,query_key,correct_answer,hit,correct_logprob,margin"
+        _write_csv(csv_path, header, "1,100,key,ans,5,-15.0,-5.4")
+        issues = []
+        validate_csv(str(csv_path), "test_ruler.csv", issues)
+        assert any("hit not 0/1" in i.message for i in issues)
+
+    def test_positive_logprob_warns(self, tmp_path):
+        csv_path = tmp_path / "test_ruler2.csv"
+        header = "prompt_idx,seed,query_key,correct_answer,hit,correct_logprob,margin"
+        _write_csv(csv_path, header, "1,100,key,ans,1,3.5,-5.4")
+        issues = []
+        validate_csv(str(csv_path), "test_ruler2.csv", issues)
+        assert any("positive log_prob" in i.message for i in issues)
+
+    def test_valid_ruler_passes(self, tmp_path):
+        csv_path = tmp_path / "test_ruler3.csv"
+        header = "prompt_idx,seed,query_key,correct_answer,hit,correct_logprob,margin"
+        _write_csv(csv_path, header, "1,100,key,ans,0,-15.0160,-5.3972")
+        issues = []
+        validate_csv(str(csv_path), "test_ruler3.csv", issues)
+        assert not any("hit not" in i.message and "log_prob" in i.message for i in issues)
