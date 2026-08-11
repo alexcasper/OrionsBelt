@@ -56,7 +56,7 @@ At 262K context on the 4B checkpoint, that difference is **23.95 GiB of RAM** �
 
 ### Headline: GDN kernel bandwidth on RK3588 Cortex-A76
 
-Qwen3.5-4B, prefill (seq=64), fp32 baseline, 8-thread (big cluster). Two independent RK3588 nodes (t3, t4 Turing Machines RK1). Kernel computation is unchanged between commits (diffs in `bench_gdn.c` between 854c6f1 and 1ca4d6d are infrastructure only: `_POSIX_C_SOURCE` macro, SPDX header, `xmalloc` safety wrapper — no behavioral change to kernel arithmetic).
+Qwen3.5-4B, prefill (seq=64), fp32 baseline, 8-thread (big cluster). Two independent RK3588 nodes (t3, t4 Turing Machines RK1). Kernel computation is unchanged between commits — `bench_gdn.c` is byte-identical between 854c6f1 (t3) and 79d1b47 (t4, current data), so the comparison is exact, not just infrastructure-equivalent.
 
 | Kernel | GiB/s (t3) | Spread | GiB/s (t4) | Spread | t3÷t4 |
 |---|---:|---:|---:|---:|---:|
@@ -64,8 +64,10 @@ Qwen3.5-4B, prefill (seq=64), fp32 baseline, 8-thread (big cluster). Two indepen
 | Gated delta-rule scan | 10.56 | 6.3% | 11.94 | 7.2% | 0.88× |
 | Causal Conv1D | 20.59 | 3.5% | 19.35 | 8.8% | 1.06× |
 
-> t3 manifest git_sha `854c6f1`, dirty=false; t4 manifest git_sha `1ca4d6d`,
-> dirty=false; 30 repeats each. The boards agree within 4–15% (direction flips
+> t3 manifest git_sha `854c6f1`, dirty=false; t4 manifest git_sha `79d1b47`,
+> dirty=true (t4 manifests are habitually dirty from active kernel development;
+> `bench_gdn.c` itself is unchanged from t3's clean commit, per above); 30
+> repeats each. The boards agree within 4–15% (direction flips
 > per kernel within run-to-run variance), confirming the result is
 > hardware-reproducible. Cumulative decay
 > reaches 67% of the 31.7 GiB/s spec bandwidth; gated scan runs at a lower
@@ -207,7 +209,7 @@ No GPU, NPU, or proprietary SDK required. Full setup guide: [`docs/SETUP_PORTABL
 - 2324 unit tests pass in CI (20 skips due to missing optional deps; 2411 pass locally with full deps) covering kernel correctness and schema conformance
 - All figures are **regenerable** from committed CSVs (`bench/plots.py`, `scripts/generate_memory_plots.py`)
 - t3 benchmark data: manifest git_sha `854c6f1`, dirty=false, governor=performance, 30 repeats per kernel
-- t4 benchmark data: most runs captured during active kernel development (dirty=true in manifests); each manifest records the exact git SHA, governor state, and thermals so every number is traceable to its source tree state
+- t4 benchmark data: SDOT/INT4+SDOT microbenches at clean commit `d6b77b2` (dirty=false); the kernel-bandwidth headline (`rk3588-t4_big.csv`) and most other runs captured during active kernel development (dirty=true in manifests, though `bench_gdn.c` itself is byte-identical to t3's clean commit — see §2 above); each manifest records the exact git SHA, governor state, and thermals so every number is traceable to its source tree state
 
 ---
 
