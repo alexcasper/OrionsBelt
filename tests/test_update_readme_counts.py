@@ -114,6 +114,17 @@ class TestCountFiles:
         (tmp_path / "results" / "raw").mkdir(parents=True)
         assert urc._count_files("results/raw", suffix=".csv") == 0
 
+    def test_count_findings_sections(self, tmp_path, monkeypatch):
+        """_count_findings_sections counts all ## headers in FINDINGS.md."""
+        monkeypatch.setattr(urc, "REPO_ROOT", str(tmp_path))
+        _make_repo(tmp_path, findings=5)
+        assert urc._count_findings_sections() == 5
+
+    def test_count_findings_sections_no_file(self, tmp_path, monkeypatch):
+        """Returns 0 when docs/FINDINGS.md does not exist."""
+        monkeypatch.setattr(urc, "REPO_ROOT", str(tmp_path))
+        assert urc._count_findings_sections() == 0
+
 
 # ---------------------------------------------------------------------------
 # update_readme — repair scenarios
@@ -163,6 +174,17 @@ class TestUpdateReadmeRepair:
         assert n == 1  # headline only
         text = (tmp_path / "README.md").read_text()
         assert "6 generated figures/tables" in text
+
+    def test_fix_findings_drift_headline(self, tmp_path, monkeypatch):
+        """Stale FINDINGS count in headline is repaired."""
+        monkeypatch.setattr(urc, "REPO_ROOT", str(tmp_path))
+        _make_repo(tmp_path, csvs=5, manifests=10, figures=3, findings=7)
+        _write_readme(tmp_path, csvs=5, manifests=10, figs=3, findings=3)
+
+        n = urc.update_readme()
+        assert n == 1  # headline only (FINDINGS drift)
+        text = (tmp_path / "README.md").read_text()
+        assert "7 FINDINGS sections" in text
 
     def test_fix_all_three_drift(self, tmp_path, monkeypatch):
         """All counts drift at once — headline repaired, dir-layout manifest too."""
