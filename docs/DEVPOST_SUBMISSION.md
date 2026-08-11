@@ -220,7 +220,7 @@ The framing matters: Cortex-A76/A720/A57 are **Arm IP**. Hand-writing NEON/SVE k
 Specifically:
 1. **Three novel NEON/SVE kernels** for GDN operations that no existing library provides for Arm
 2. **big.LITTLE scheduling policy** exploiting the heterogeneous Arm core topology
-3. **KleidiAI integration** — reusing Arm's own matmul micro-kernels for the delta-rule updates
+3. **KleidiAI integration** — Arm's own `kai_matmul_clamp_6x8x4_neon_mla` micro-kernel for the delta-rule matmul: 3.2–3.6× at prefill, packing cost dominates at decode, dual-path strategy recommended ([§8](./FINDINGS.md))
 4. **Cross-vendor NPU analysis** showing why the recurrence must stay on the Arm CPU, not the accelerator
 5. **5-device fleet validation** across three Arm core generations (A57 → A55 → A76)
 
