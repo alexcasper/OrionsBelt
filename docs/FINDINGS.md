@@ -5335,7 +5335,7 @@ not a measurement artifact.
 
 **Root cause**: t3's INT8 sweep was captured at commit `13df7a6` (2026-08-08), which
 predates the SDOT INT8 GEMV kernel (`dccee52`, §33). At that commit, the INT8 decode
-path used NEON dequant→float32 FMA, which is ~2× slower than the `vdotq_s32`
+path used NEON dequant→float32 FMA, which is ~2× slower than the `vdotq_lane_s32`
 int8×int8→int32 dot-product kernel. The ~1.8× gap matches the expected SDOT speedup.
 
 **This is not a hardware discrepancy** — both devices report `asimddp: true` (DOTPROD
