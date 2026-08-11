@@ -173,10 +173,12 @@ on dotprod-capable cores) and progressively optimizing it yields a
 | C: + SDOT INT8 GEMV | **30.5** | **3.48** | — | — |
 | C: + INT4+SDOT hybrid | **36.36** | **4.52** | — | — |
 
-> A76 numbers are from RK3588 node t4 (Cortex-A76 big cluster), matching the
-> figure below. Cross-validated on independent node t3: SDOT INT8 measures
-> 25.6 tok/s (0.8B) and 2.80 tok/s (4B), within ~15% fleet variance (ob-bf7).
-> See the headline table above for the full cross-device comparison.
+> A76 numbers: FP32 and INT8 rows are from RK3588 node t3; SDOT and INT4+SDOT
+> rows are from node t4 (same SoC, same Cortex-A76 big cluster). The 0.8B SDOT
+> value (30.5) is from a single raw run; the fleet harness 3-run average is
+> 30.19 tok/s (§33). Cross-validated on both nodes: SDOT INT8 measures 25.6 tok/s
+> (0.8B) and 2.80 tok/s (4B) on t3, within ~15% fleet variance (ob-bf7). See
+> the headline table above for the full cross-device comparison.
 
 ![Decode optimization stack on RK3588 Cortex-A76](../results/figures/optimization_stack.png)
 
@@ -192,8 +194,8 @@ remain <1% of decode time; the bottleneck is weight-loading matmuls (FFN
 We implemented real grouped-query attention (GQA) with a growing KV cache in
 the full-attention layers, then swept context length from 1 to 4096 tokens
 to measure the scaling behavior of each layer type independently
-(FINDINGS.md §17, commit `f0507e7`, RK3588-t3 A76, INT8 with SDOT
-dot-product acceleration):
+(FINDINGS.md §17, commit `f0507e7`, RK3588-t3 A76, INT8
+weight quantization):
 
 | Context | 0.8B hybrid tok/s | 0.8B pure-GDN tok/s | 4B hybrid tok/s | 4B pure-GDN tok/s |
 |--------:|------------------:|--------------------:|----------------:|------------------:|
