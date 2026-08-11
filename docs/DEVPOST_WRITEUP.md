@@ -216,6 +216,12 @@ Nano (Cortex-A57, 2014-era). Pure-GDN stays flat (0.4% variance); hybrid
 degrades 1.77× at 4K context. The O(1) vs O(n) distinction is architectural,
 not microarchitectural. (FINDINGS.md §17.)
 
+> **Full comparison table:** the complete multi-device, multi-quant
+> context-sweep — throughput, KV cache growth, and per-token latency
+> across all 36 datasets — is in
+> [`results/figures/ctxsweep_comparison.md`](../results/figures/ctxsweep_comparison.md).
+> Pure-GDN retention holds at 99–100% across every configuration tested.
+
 **INT8 KV cache quantization: the counter-argument, measured.**
 
 The strongest counter to GDN's advantage is to quantize the full-attention KV
