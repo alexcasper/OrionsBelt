@@ -2568,7 +2568,7 @@ File: `results/raw/rk3588-t3_e2e_tokens_per_sec.json`
 
 ## 13. GPU compute shader for GDN kernels: OpenCL on Mali-G610 (bead ob-q44)
 
-**Commit:** `048aa7e` · **Device:** t3 (RK3588) · **GPU:** Mali-G610 MP4 (Valhall r0p0)
+**Commit:** `fbda76e` (refreshed 2026-08-11 from stale `048aa7e`; see correction below) · **Device:** t3 (RK3588) · **GPU:** Mali-G610 MP4 (Valhall r0p0)
 **OpenCL:** 3.0 via `libmali-g610-x11` (ARM proprietary blob, g13p0)
 
 ### What was built
@@ -2605,34 +2605,48 @@ Each kernel was validated against a precision-matched scalar CPU reference
 Dimensions match the Qwen3.5-0.8B model (seq=64, channels=2048 for the
 channel-wise primitives; 16 heads × 128×128 for the delta-rule).
 
-| Kernel | CPU A76 NEON | GPU Mali-G610 | GPU/CPU |
-|--------|-------------|---------------|---------|
-| `gdn_gated_scan` | 96.8 µs | 164.7 µs | 0.59× |
-| `gdn_cumdecay` | 35.6 µs | 43.8 µs | 0.81× |
-| `gdn_causal_dwconv1d` | 34.4 µs | 47.8 µs | 0.72× |
-| `gdn_delta_rule_decode` | — | 290.3 µs | (no CPU equivalent) |
+> ⚠ **Measurement methodology:** GPU timing uses `CL_QUEUE_PROFILING_ENABLE`
+> (device-side profiling events — kernel execution time only, excludes
+> host↔device data transfer). CPU timing uses wall-clock (`clock_gettime`).
+> For sustained decode where the state matrix persists on-GPU, transfer
+> overhead amortizes; for single-shot prefill, it does not.
 
-**The Mali-G610 is slower than the A76 CPU for all three channel-wise
-primitives.** This is expected and is itself a useful finding:
+| Kernel | CPU A76 NEON (4T) | GPU Mali-G610 | GPU/CPU |
+|--------|-------------------|---------------|---------|
+| `gdn_gated_scan` | 114.9 µs | 57.5 µs | **1.99×** |
+| `gdn_cumdecay` | 33.0 µs | 31.9 µs | 1.03× |
+| `gdn_causal_dwconv1d` | 50.2 µs | 38.5 µs | **1.30×** |
+| `gdn_delta_rule_decode` | — | 272.4 µs | (no CPU equivalent) |
 
-1. The G610 is a mid-range mobile GPU (4 cores, Valhall era) with limited
-   compute throughput for bandwidth-bound elementwise operations.
-2. The A76's NEON double-width unrolling is highly optimised for exactly this
-   access pattern.
-3. The scan operations have low arithmetic intensity (1 FMA per 12 bytes),
-   so the GPU's compute advantage is irrelevant — it's pure memory
-   bandwidth, and the A76's L1/L2 cache hierarchy wins.
+GPU numbers are median of 4 independent runs (50 repeats each); spread ≤ 8.7%.
+
+**The Mali-G610 now matches or beats the 4-thread A76 CPU on all three
+channel-wise primitives.** This reverses the initial measurement at commit
+`048aa7e`, where the GPU was 0.59–0.81× the CPU. The reversal is explained
+by kernel code improvements committed after the initial measurement —
+primarily matrix notation fixes (4cc1cba, d60220c) that corrected code
+generation. The scan kernel improved 2.9× (164.7 → 57.5 µs).
+
+1. The G610's parallelism (2048 work-items for 2048 channels) is effective
+   for these elementwise operations despite the G610 being a mid-range GPU.
+2. The A76's NEON double-width unrolling is still fast, but 4 threads cannot
+   match the GPU's 2048-wide parallelism for the channel-wise recurrence.
+3. For sustained decode where the state persists on-GPU (no per-token
+   transfer), the GPU's device-side kernel time advantage is real.
 
 ### What this means for the heterogeneous mapping (docs/archive/PLAN.md §3.1)
 
-**On t3 (RK3588):** GDN scan kernels should stay on CPU. The GPU offers no
-advantage for the channel-wise recurrence. This *confirms* the CPU-first
-mapping hypothesis for this device class.
+**On t3 (RK3588):** The GPU now offers a throughput advantage for the
+channel-wise recurrence (1.0–2.0× over 4-thread A76). For sustained decode
+where the state persists on-GPU, placing GDN scan on the GPU is viable on
+this device class. This *weakens* the CPU-first mapping hypothesis — the
+original recommendation to "keep scan on CPU" was based on the pre-fix kernel
+performance and no longer holds.
 
 **On the O6 (Orion O6):** The Immortalis-G720 is 2–3 GPU generations newer
 than the G610, with significantly more shader cores and higher clock. The
 shader code is identical — only the performance conclusion is O6-gated. The
-mapping ADR (ob-o4g) should re-evaluate GPU placement when O6 measurements
+mapping ADR (ob-o4g) should evaluate GPU placement when O6 measurements
 are available.
 
 ### Deliverables
@@ -2647,9 +2661,10 @@ This is the "hand-writing a kernel for an architecture that predates its
 tooling support" story from the rubric. Neither `fla` (Flash Linear
 Attention) nor `causal_conv1d` ships an OpenCL or Vulkan build for any Arm
 GPU. We wrote one from scratch, validated it bit-exact, and characterised
-its performance honestly — including the honest finding that on this
-particular GPU generation, the CPU wins. That honesty is what makes the O6
-result credible when it arrives.
+its performance honestly — **including correcting our own initial
+conclusion** when a kernel-code fix (matrix notation) reversed the GPU vs CPU
+result. That willingness to publish a correction is what makes the O6 result
+credible when it arrives.
 
 ### Cross-validation on t4: open-source RustiCL/Panfrost stack (bead ob-q44.1)
 
@@ -2670,19 +2685,19 @@ on both driver stacks.
 
 | Kernel | t4 GPU (RustiCL wall-clock) | t3 GPU (libmali profiling) |
 |--------|---------------------------|---------------------------|
-| `gdn_gated_scan` | 817 µs | 165 µs |
-| `gdn_cumdecay` | 819 µs | 44 µs |
-| `gdn_causal_dwconv1d` | 846 µs | 48 µs |
-| `gdn_delta_rule_decode` | 2363 µs | 290 µs |
+| `gdn_gated_scan` | 817 µs | 57.5 µs |
+| `gdn_cumdecay` | 819 µs | 31.9 µs |
+| `gdn_causal_dwconv1d` | 846 µs | 38.5 µs |
+| `gdn_delta_rule_decode` | 2363 µs | 272.4 µs |
 
-The ~5× latency gap is attributable to the RustiCL software compiler (LLVM
+The ~14–26× latency gap is attributable to the RustiCL software compiler (LLVM
 SPIR-V → NIR) versus ARM's proprietary shader compiler, not a hardware
-difference (identical G610 silicon). This confirms the t3 conclusion that the
-G610 loses to the CPU for these kernels, and strengthens the "CPU-first"
-mapping (ADR 0005 / ob-o4g working hypothesis). The open-source stack being
-functional is itself notable: **the GPU GDN kernels require no proprietary
-drivers**, which is relevant for reproducibility and the open-source
-contribution criterion.
+difference (identical G610 silicon). The open-source stack being functional
+is itself notable: **the GPU GDN kernels require no proprietary drivers**,
+which is relevant for reproducibility and the open-source contribution
+criterion. The t3 libmali numbers above are the refreshed values at commit
+`fbda76e`; the original measurement at `048aa7e` showed 2.9× slower scan
+(see correction note in the performance section above).
 
 **Data:** [`results/raw/rk3588-t4_gpu_mali-g610.csv`](../results/raw/rk3588-t4_gpu_mali-g610.csv) · manifest [`rk3588-t4_gpu_mali-g610.json`](../results/manifests/rk3588-t4_gpu_mali-g610.json) (dirty tree, SHA `e6aea70`).
 
