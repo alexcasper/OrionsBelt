@@ -2248,52 +2248,38 @@ class TestValidateBoundaryCrossingRow:
 
     def test_valid_row_no_issues(self):
         issues = []
-        validate_gpu_micro_row(
-            _boundary_crossing_row(), "test_bc.csv", issues, 2
-        )
+        validate_gpu_micro_row(_boundary_crossing_row(), "test_bc.csv", issues, 2)
         assert issues == []
 
     def test_missing_dim1_errors(self):
         issues = []
-        validate_gpu_micro_row(
-            _boundary_crossing_row(dim1=""), "test_bc.csv", issues, 2
-        )
+        validate_gpu_micro_row(_boundary_crossing_row(dim1=""), "test_bc.csv", issues, 2)
         assert any("missing dim1" in i.message for i in issues)
 
     def test_non_positive_p50_errors(self):
         issues = []
-        validate_gpu_micro_row(
-            _boundary_crossing_row(p50_ms="0"), "test_bc.csv", issues, 2
-        )
+        validate_gpu_micro_row(_boundary_crossing_row(p50_ms="0"), "test_bc.csv", issues, 2)
         assert any("non-positive p50_ms" in i.message for i in issues)
 
     def test_malformed_p50_errors(self):
         issues = []
-        validate_gpu_micro_row(
-            _boundary_crossing_row(p50_ms="N/A"), "test_bc.csv", issues, 2
-        )
+        validate_gpu_micro_row(_boundary_crossing_row(p50_ms="N/A"), "test_bc.csv", issues, 2)
         assert any("cannot parse p50_ms" in i.message for i in issues)
 
     def test_negative_bw_errors(self):
         issues = []
-        validate_gpu_micro_row(
-            _boundary_crossing_row(bw_mibs="-1.5"), "test_bc.csv", issues, 2
-        )
+        validate_gpu_micro_row(_boundary_crossing_row(bw_mibs="-1.5"), "test_bc.csv", issues, 2)
         assert any("negative bw_mibs" in i.message for i in issues)
 
     def test_malformed_bw_errors(self):
         issues = []
-        validate_gpu_micro_row(
-            _boundary_crossing_row(bw_mibs="oops"), "test_bc.csv", issues, 2
-        )
+        validate_gpu_micro_row(_boundary_crossing_row(bw_mibs="oops"), "test_bc.csv", issues, 2)
         assert any("cannot parse bw_mibs" in i.message for i in issues)
 
     def test_zero_bw_passes(self):
         """bw_mibs=0 is valid for boundary-crossing rows (not measured)."""
         issues = []
-        validate_gpu_micro_row(
-            _boundary_crossing_row(bw_mibs="0"), "test_bc.csv", issues, 2
-        )
+        validate_gpu_micro_row(_boundary_crossing_row(bw_mibs="0"), "test_bc.csv", issues, 2)
         assert not any("bw_mibs" in i.message for i in issues)
 
     def test_dispatched_through_validate_csv(self, tmp_path):
