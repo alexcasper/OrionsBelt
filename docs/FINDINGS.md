@@ -5679,7 +5679,7 @@ not single points. Memory-bound kernels (f16 cumdecay) are reproducible to
 
 | Device | Commit | Manifest |
 |--------|--------|----------|
-| rk3588-t4 | `8227e98` | `results/manifests/rk3588-t4.json` |
+| rk3588-t4 | `79d1b47` | `results/manifests/rk3588-t4.json` |
 | rk3588-t3 | `47efdf8` | `results/manifests/rk3588-t3.json` |
 
 ### SDOT context-length scaling on t4: O(1) GDN decode confirmed (ob-8ms.3)
