@@ -145,7 +145,7 @@ All figures above are verified against primary sources (Radxa product page and d
 
 **Context-length scaling proves GDN's core value proposition on silicon (§17).** Sweeping context length from 1 to 4096 tokens with real grouped-query attention: **pure-GDN throughput is flat to within 0.2%** while the hybrid model degrades 1.33× (4B) to 1.56× (0.8B) — entirely from the full-attention layers whose KV cache reads grow linearly. INT8 KV cache quantization (§20) cuts KV memory 4× and delivers 1.7–2.6× full-attention speedup at long context, but full-attention's cost still scales O(n). Sustained-load tests confirm <1% throughput decay over 3–5 min — burst numbers are steady-state sustainable (§18, §37). Cross-validated on two independent RK3588 units (§36) and across A57+A76. See [FINDINGS.md §17–20](./docs/FINDINGS.md).
 
-**Operator analysis findings** ([`docs/FINDINGS.md`](./docs/FINDINGS.md), 43 sections):
+**Operator analysis findings** ([`docs/FINDINGS.md`](./docs/FINDINGS.md), 54 sections):
 - CIX NOE and Rockchip RKNN toolchains both reject GDN's runtime-length recurrence — the limitation generalises beyond one vendor (§1, §7)
 - KleidiAI packed GEMM wins 1.7–3.6× on matmul but packing cost dominates at decode; dual-path strategy recommended (§8)
 - big.LITTLE affinity: pinning to A76 big cores is 2–3× faster than default scheduler placement (§9)
