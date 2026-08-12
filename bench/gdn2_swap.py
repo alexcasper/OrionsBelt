@@ -350,10 +350,14 @@ def capture_manifest():
         sha = subprocess.check_output(
             ["git", "rev-parse", "HEAD"], stderr=subprocess.DEVNULL, text=True
         ).strip()
-        dirty = bool(
-            subprocess.check_output(
-                ["git", "status", "--porcelain"], stderr=subprocess.DEVNULL, text=True
-            ).strip()
+        _status = subprocess.check_output(
+            ["git", "status", "--porcelain"], stderr=subprocess.DEVNULL, text=True
+        ).strip()
+        # Exclude results/ and .beads/ — output data, not source changes.
+        import re
+        _OUTPUT_RE = re.compile(r"^[ ?][M?] (results/|\.beads/)")
+        dirty = any(
+            not _OUTPUT_RE.match(line) for line in _status.splitlines() if line
         )
     except Exception:
         sha, dirty = "unknown", False

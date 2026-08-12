@@ -107,7 +107,8 @@ if [ -z "$BINARY" ]; then
 fi
 
 # --- 1. clean tree check ----------------------------------------------------
-STATUS=$(git status --porcelain 2>/dev/null || true)
+# Exclude results/ and .beads/ — output data from prior runs, not source changes.
+STATUS=$(git status --porcelain 2>/dev/null | grep -vE '^[ ?][M?] (results/|\.beads/)' || true)
 if [ -n "$STATUS" ] && [ "$FORCE" -eq 0 ]; then
     echo "ERROR: working tree is dirty. A dirty tree means the manifest's git SHA" >&2
     echo "       does not identify the code that produced the numbers (bead ob-bf7)." >&2

@@ -42,6 +42,7 @@ import argparse
 import contextlib
 import json
 import platform
+import re
 import subprocess
 import sys
 import time
@@ -243,7 +244,11 @@ def _git_sha() -> str:
 
 
 def _git_dirty() -> bool:
-    """Return True if the working tree has uncommitted changes."""
+    """Return True if the working tree has uncommitted source changes.
+
+    Excludes results/ and .beads/ — output data, not source code.
+    Matches the filtering in scripts/capture_manifest.sh and bench/manifest.py.
+    """
     try:
         result = subprocess.run(
             ["git", "status", "--porcelain"],
@@ -251,7 +256,12 @@ def _git_dirty() -> bool:
             capture_output=True,
             text=True,
         )
-        return bool(result.stdout.strip())
+        _OUTPUT_RE = re.compile(r"^[ ?][M?] (results/|\.beads/)")
+        filtered = [
+            line for line in result.stdout.splitlines()
+            if not _OUTPUT_RE.match(line)
+        ]
+        return len(filtered) > 0
     except Exception:
         return True
 
