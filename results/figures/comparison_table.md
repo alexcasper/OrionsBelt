@@ -247,7 +247,9 @@ t4 = 8 tokens (re-run, see per-row manifest for details).
 > (2026-08-10, clean `d6b77b2`):** INT8+SDOT and INT4+SDOT microbench CSVs
 > (sdot_4b_big, sdot_08b_big, int4sdot_4b_big, int4sdot_08b_big) re-run at
 > clean HEAD, dirty=false. Numbers within 2% of original dirty runs. The e2e
-> ctxsweep CSVs remain dirty=true (see §38). See FINDINGS §33 and §38.
+> ctxsweep manifests were previously dirty=true but are now confirmed clean
+> (false positives from the output-file counting bug fixed in ob-mrd.24).
+> See FINDINGS §33 and §38.
 
 **After INT4+SDOT hybrid GEMV kernel (commit `3bff376`, §34):**
 
