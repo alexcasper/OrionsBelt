@@ -257,10 +257,7 @@ def _git_dirty() -> bool:
             text=True,
         )
         _OUTPUT_RE = re.compile(r"^[ ?][M?] (results/|\.beads/)")
-        filtered = [
-            line for line in result.stdout.splitlines()
-            if not _OUTPUT_RE.match(line)
-        ]
+        filtered = [line for line in result.stdout.splitlines() if not _OUTPUT_RE.match(line)]
         return len(filtered) > 0
     except Exception:
         return True
