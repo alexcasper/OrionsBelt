@@ -639,7 +639,7 @@ def generate_report(output_path):
                 f"while t4-clean ran at **{rk_t4_t} thread**. The "
                 f"{worst:.2f}x spread is dominated by this thread-count difference, not "
                 "by a hardware effect. The like-for-like comparison (both at 8 threads) "
-                "shows the boards agree within ~12%. See FINDINGS.md §ob-mrd.12 correction."
+                "shows the boards agree within ~8%. See FINDINGS.md §ob-mrd.12 correction."
             )
         else:
             lines.append(
