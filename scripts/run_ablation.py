@@ -41,16 +41,6 @@ from bench.manifest import capture  # noqa: E402
 from bench.manifest import write as write_manifest  # noqa: E402
 from bench.schema import write_csv  # noqa: E402
 
-# The canonical, git-tracked provenance manifest for ablation runs.
-# Per-run manifests (generic_aarch64_<timestamp>_<sha>.json) are gitignored
-# (see .gitignore line 40) and get removed by loop-flush cleanups, which
-# left ablation CSVs with dangling manifest references.  All ablation CSVs
-# point here instead — it captures the device, git SHA, and configuration
-# of the first canonical ablation run.
-CANONICAL_ABLATION_MANIFEST = (
-    "results/manifests/generic_aarch64_20260806T145501Z_23550d6.json"
-)
-
 # The ablation grid: each entry is one configuration to benchmark.
 # engine_gdn / engine_full_attention define the layer-to-engine assignment.
 ABLATION_GRID = [
@@ -170,22 +160,15 @@ def run_ablation(
         )
 
         rows = run_sweep(backend, config)
-
-        # Point all rows at the canonical git-tracked manifest so the CSVs
-        # survive loop-flush cleanups of gitignored per-run manifests.
-        for row in rows:
-            row.manifest_ref = CANONICAL_ABLATION_MANIFEST
-
         csv_file = str(output_path / f"ablation_{name}.csv")
         write_csv(rows, csv_file)
         csv_paths.append(csv_file)
         print(f"    {len(rows)} rows → {csv_file}")
 
-        # Capture per-run provenance manifest locally (gitignored, for
-        # local debugging).  CSVs reference the canonical manifest above.
+        # Capture provenance manifest (ob-20t: previously missing)
         mpath = _write_manifest_for_rows(rows, config, manifest_dir=manifest_dir)
         if mpath:
-            print(f"    local manifest → {mpath}")
+            print(f"    manifest → {mpath}")
 
     return csv_paths
 
