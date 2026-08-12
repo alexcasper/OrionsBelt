@@ -30,9 +30,9 @@ Three GDN CPU kernels (gated cumulative decay, gated delta-rule scan, causal dep
 
 | Context | GDN state | KV cache (8 attn layers) | Savings vs all-attention |
 |---:|---:|---:|---:|
-| 32K | 48 MiB | 1.0 GiB | 2.95 GiB |
-| 128K | 48 MiB | 4.0 GiB | 11.95 GiB |
-| 262K | 48 MiB | 8.0 GiB | **23.95 GiB** |
+| 32K | 51 MiB | 1.0 GiB | 2.95 GiB |
+| 128K | 51 MiB | 4.0 GiB | 11.95 GiB |
+| 262K | 51 MiB | 8.0 GiB | **23.95 GiB** |
 
 > At 262K, the KV cache alone (8.0 GiB) **exceeds the fp16 weight footprint** (7.83 GiB).
 > The recurrent state never grows. ([`memory_comparison.md`](./results/figures/memory_comparison.md))
