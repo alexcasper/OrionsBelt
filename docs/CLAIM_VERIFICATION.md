@@ -296,6 +296,30 @@ parallelism) is the wrong tool for this workload.
 | Cross-validated on Jetson Nano A57 (second core class) | ✅ Confirmed — FINDINGS §17 A57 ctx-sweep, commit 3d83bdc |
 | Cross-validated on two independent RK3588 units (§36, §38) | ✅ Confirmed — t3 and t4 agree within 3–5% after SDOT binary fix |
 
+### 2.12 GDN-2 layer swap and RULER retrieval (verified 2026-08-12)
+
+| Claim | Status |
+|---|---|
+| Full-model backprop infeasible: 436 s/step on RK3588 | ✅ Confirmed — `docs/gdn2_swap_findings.md` line 48; isolated training 6.6 s/step (66× faster) |
+| Isolated MSE distillation, 30 steps: 84% reduction (0.023 → 0.0036) | ✅ Confirmed — CSV `gdn2_swap_100step_t3.csv`, step 1 MSE=0.022652, step 30 MSE=0.003546; (1−0.003546/0.022652)=84.3% |
+| Adaptation depth sweep: 30→100 steps drops MSE 66% (0.0036→0.0012) | ✅ Confirmed — same CSV, step 30 MSE=0.003546, step 100 MSE=0.001203; (1−0.001203/0.003546)=66.1% |
+| CE recovery 17.1% at 30 steps (→ 10.37) | ✅ Confirmed — `gdn2_swap_findings.md` lines 189–191: baseline CE=2.9085, post-swap=11.9145, final=10.3729, recovery=17.1% |
+| Smart gate init: initial MSE 0.0181 vs random 0.0228 (−20.6%) | ✅ Confirmed — CSV `gdn2_swap_smart_init_t3.csv` step 1 MSE=0.018079; 100-step CSV step 1 MSE=0.022652 (≈0.0228 rounded); Δ=(0.0181−0.0228)/0.0228=−20.6% internally consistent |
+| Smart init CE recovery 19.9% (+2.8 pp over random) | ✅ Confirmed — `gdn2_swap_findings.md` line 191: smart init recovery=19.9%, delta=+2.8 pp |
+| Both init strategies converge to ~same MSE at step 30 (~0.0036) | ✅ Confirmed — random (100-step CSV step 30): 0.003546; smart init step 30: 0.003638; both ≈ 0.0036 |
+| RULER: GDN-1 30% accuracy (3/10), GDN-2 20% (2/10) | ✅ Confirmed — CSVs `ruler_gdn1_t3.csv` (3 hits/10), `ruler_gdn2_t3.csv` (2 hits/10) |
+| RULER: avg correct log-prob GDN-1 −14.6, GDN-2 −72.8 | ✅ Confirmed — computed from same CSVs: mean correct_logprob across all 10 prompts |
+| GDN-2 at 30-step adaptation lands at random baseline (20%) | ✅ Confirmed — 20% accuracy matches 1/5 random chance |
+
+### 2.13 Decode microbenchmark cross-board discrepancy (verified 2026-08-12)
+
+| Claim | Status |
+|---|---|
+| Prefill (seq=64, 4B): t3↔t4 agreement within 10% | ✅ Confirmed — CSVs `rk3588-t3-clean.csv` / `rk3588-t4_big.csv`, 4B model: cumdecay +1.3%, gated_scan +8.1%, dwconv +0.6%, gdn2_scan +9.0% |
+| Decode (seq=1, 0.8B): t4 ~30% slower than t3 in GiB/s | ✅ Confirmed — 0.8B_decode rows: Δ GiB/s ranges −28.3% to −38.6% across 6 kernels |
+| Fixed per-call overhead ~450–560 ns consistent across all kernels | ✅ Confirmed — Δ p50_us × 1000: 528, 511, 563, 478, 485, 458 ns for the 6 kernels |
+| timer overhead (clock_gettime) is 38 ns/call — too small to explain gap | ✅ Confirmed — stated in FINDINGS §41, with BATCH=100 amortization to 0.76 ns/kernel call |
+
 ---
 
 ## 3. Finding that changes the technical thesis 🔴

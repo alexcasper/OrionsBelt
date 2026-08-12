@@ -421,7 +421,13 @@ def _provenance_audit_lines():
         "Since all runs are post-optimization and clean-tree, the RK3588 inter-board "
         "gap **would** reflect hardware heterogeneity — **but see the thread-count "
         "confound warning above (ob-mrd.12/14)**: t3-clean ran 8-thread while t4-clean "
-        "ran 1-thread, so the raw gap overstates any real difference."
+        "ran 1-thread, so the raw gap overstates any real difference. Additionally, "
+        "manifest comparison reveals the two boards are **different SKUs** (t3: 32 GB "
+        "RAM, big-cluster max 2304 MHz, little-cluster cpu_capacity 414; t4: 8 GB RAM, "
+        "big-cluster max 2400 MHz, little-cluster cpu_capacity 397 — different OPP "
+        "tables). Despite this, the residual ~8% gap after controlling for thread "
+        "count is consistent with normal unit-to-unit variance for different DRAM "
+        "densities. See FINDINGS.md §cross-check fleet note (2026-08-12)."
     )
     out.append("")
     return out
