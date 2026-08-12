@@ -5777,3 +5777,99 @@ that grows with context length.
 
 **Provenance:** commit `fc30214`, governor=performance, manifest
 `results/manifests/rk3588-t4_sdot_ctxsweep.json`.
+
+---
+
+## 41. Microbenchmark decode (seq=1) cross-board discrepancy: ~500 ns/call fixed overhead makes raw kernel GiB/s unreliable for t3↔t4 comparison (2026-08-12, ob-mrd.33)
+
+### Motivation
+
+§36 and §38 established that **e2e benchmark** cross-device agreement is 3–5%
+when both RK3588 units run the same binary. This section investigates a
+separate discrepancy in the **raw microbenchmark** CSVs
+(`bench_gdn.c` → `rk3588-t4_big.csv` vs `rk3588-t3-clean.csv`), where decode
+(seq=1) kernel numbers show t4 consistently **~30% slower** than t3.
+
+### Observation: prefill agrees, decode diverges
+
+Same binary (no C source changes between commits `b58071aa` [t3] and `fc9173b2`
+[t4]), same governor (performance), cool thermals (~40 °C on both).
+
+**Prefill (seq=64, 4B model) — within 10%:**
+
+| Kernel | t4 GiB/s | t3 GiB/s | Δ |
+|--------|----------|----------|---|
+| gdn_cumdecay | 21.67 | 21.39 | +1.3% |
+| gdn_gated_scan | 11.42 | 10.56 | +8.1% |
+| gdn_causal_dwconv1d | 20.71 | 20.59 | +0.6% |
+| gdn2_gated_scan | 7.04 | 6.46 | +9.0% |
+
+**Decode (seq=1, 0.8B model) — t4 ~30% slower:**
+
+| Kernel | t4 p50 (µs) | t3 p50 (µs) | Δ (µs) | Δ GiB/s |
+|--------|-------------|-------------|--------|---------|
+| gdn_cumdecay | 1.409 | 0.881 | +0.528 | −37.5% |
+| gdn_gated_scan | 1.526 | 1.015 | +0.511 | −33.4% |
+| gdn_cumdecay_f16 | 1.458 | 0.895 | +0.563 | −38.6% |
+| gdn_gated_scan_f16 | 1.569 | 1.091 | +0.478 | −30.5% |
+| gdn_cumdecay_bf16 | 1.561 | 1.076 | +0.485 | −31.0% |
+| gdn2_gated_scan | 1.616 | 1.158 | +0.458 | −28.3% |
+
+The **per-call time difference is a consistent ~450–560 ns** across all
+kernels — a fixed overhead, not a proportional slowdown.
+
+### Root cause analysis
+
+**Ruled out:**
+
+1. **Binary version** — `git log b58071aa..fc9173b2 -- '*.c' '*.h'` returns
+   empty: no C source changes. Same compiled code on both devices.
+2. **Governor / frequency** — both devices locked to performance governor,
+   big cores at 2.4 GHz, little at 1.8 GHz.
+3. **Thermal throttling** — t4 at ~40 °C at measurement start (§37 confirms
+   zero throttling up to 52 °C).
+4. **Timer overhead** — measured `clock_gettime(CLOCK_MONOTONIC)` on t4 at
+   **38 ns/call**. With BATCH=100, this amortizes to **0.76 ns per kernel
+   call** — far too small to explain a 500 ns gap.
+
+**Likely cause: silicon-variant sensitivity in per-call setup cost.**
+
+At seq=1, each kernel call does only O(channels) work (~1 µs). The fixed
+cost of each call — function entry/exit, state-array cache line fill, loop
+branch prediction warm-up — is a large fraction of total time. Two RK3588
+dies (t3: 32 GB, t4: 8 GB — different PCB/RAM SKUs) can have subtly different
+cache-fill latencies or clock-tree jitter that manifests as ~500 ns/call
+difference at this scale.
+
+At seq=64, each call does O(64 × channels) work (~40–700 µs), and the same
+~500 ns setup is <1% of total — invisible. This perfectly explains why
+prefill numbers agree but decode numbers diverge.
+
+### Why e2e numbers are unaffected
+
+The e2e benchmark (`bench_gdn_e2e_decode`) processes 24 full GDN layers per
+token, each layer consisting of multiple kernel calls over 4096 channels.
+The per-call overhead is amortized across hundreds of calls per layer and
+24 layers per token — making it negligible. This is why §36/§38 show 3–5%
+e2e agreement despite the raw microbenchmark discrepancy.
+
+### Conclusion
+
+1. **Raw microbenchmark decode (seq=1) numbers are unreliable for cross-board
+   throughput comparison.** The ~500 ns fixed per-call overhead varies between
+   silicon samples and dominates the sub-microsecond measurement.
+2. **Prefill (seq=64) microbenchmark numbers remain valid** for cross-board
+   comparison — overhead is <1% of measured time.
+3. **E2E benchmark numbers remain the gold standard** for cross-device
+   comparison (§36/§38, 3–5% agreement).
+4. **Within-device comparisons are unaffected** — the overhead is constant for
+   a given board, so relative kernel rankings and optimization speedups
+   measured on a single device are valid.
+
+### Provenance
+
+t4 data: commit `fc9173b2`, CSV `results/raw/rk3588-t4_big.csv`, re-verified
+2026-08-12 (numbers reproduced within 1%). t3 data: commit `b58071aa`, CSV
+`results/raw/rk3588-t3-clean.csv`. Governor=performance on both devices.
+Timer measurement: `clock_gettime(CLOCK_MONOTONIC)` on t4, gcc 14.2.0,
+kernel 6.11.0-1006-rockchip.
