@@ -31,3 +31,15 @@ if command -v bd >/dev/null 2>&1; then
   if [ $_bd_exit -ne 0 ]; then exit $_bd_exit; fi
 fi
 # --- END BEADS INTEGRATION v1.1.2 ---
+
+# --- t4 provenance manifest protection ---
+# Prevents deletion of tracked generic_aarch64 manifest files (4th recurrence fix).
+deleted_provenance=$(git diff --cached --name-only --diff-filter=D -- 'results/manifests/generic_aarch64_*.json' 2>/dev/null || true)
+if [ -n "$deleted_provenance" ]; then
+    echo "BLOCKED: Attempt to delete tracked provenance manifests:" >&2
+    echo "$deleted_provenance" >&2
+    echo "" >&2
+    echo "These are NOT artifacts — referenced by results/raw/ablation/*.csv." >&2
+    echo "Use --no-verify and document why if you truly need this." >&2
+    exit 1
+fi
