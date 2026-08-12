@@ -105,7 +105,7 @@ to devices but was never previously tested in the correctness suite).
 
 The OpenMP parallelization across 4 cores accounts for ~4×; NEON double-width
 unrolling adds further gains. The little cluster (A55) benefits more
-(6.0–7.4×) than the big cluster (2.3–5.1×) because the A55's weaker
+(6.0–7.4×) than the big cluster (3.5–5.1×) because the A55's weaker
 single-thread throughput makes it more reliant on multi-thread parallelization
 — the optimization closes the big/little gap from ~4:1 to ~2.5:1.
 
