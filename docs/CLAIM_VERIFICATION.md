@@ -221,7 +221,7 @@ between the two boards (t3: 32 GB, t4: 8 GB), not compute — §38. Thermals
 
 | Claim | Status |
 |---|---|
-| 16 crossings/token at 3.36 ms total (5KB hidden state, Mali-G610) | ✅ Confirmed — FINDINGS §39, CSV `rk3588-t4_gpu_boundary_crossing.csv`, manifest `rk3588-t4_gpu_boundary_crossing.json` (sha `7ca7f2a`, dirty=true, governor=performance, ~41°C) |
+| 16 crossings/token at 3.36 ms total (5KB hidden state, Mali-G610) | ✅ Confirmed — FINDINGS §39, CSV `rk3588-t4_gpu_boundary_crossing.csv`, manifest `rk3588-t4_gpu_boundary_crossing.json` (sha `7ca7f2a`, dirty=false corrected from false-positive, governor=performance, ~41°C) |
 | ~10% of 30 tok/s (33.3 ms) decode budget | ✅ Confirmed — 3.36/33.3 = 10.1% |
 | Latency-dominated: ~0.1 ms dispatch floor (1KB–100KB payloads all ~0.10 ms) | ✅ Confirmed — same CSV, write_blocking rows: 0.102/0.102/0.103/0.108/0.112 ms for 1KB/5KB/10KB/50KB/100KB |
 | Heterogeneous offload must deliver >11% speedup to break even | ✅ Confirmed — crossing tax is 10.1%, so net speedup must exceed this |
