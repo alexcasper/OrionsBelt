@@ -217,19 +217,25 @@ gap grows with context (8–27% at ctx 512–4096) due to RAM-bandwidth differen
 between the two boards (t3: 32 GB, t4: 8 GB), not compute — §38. Thermals
 ≤62°C; governor `performance` confirmed in every manifest.
 
-### 2.6 Engine boundary-crossing cost (verified 2026-08-09)
+### 2.6 Engine boundary-crossing cost (verified 2026-08-09, cross-validated 2026-08-12)
 
 | Claim | Status |
 |---|---|
-| 16 crossings/token at 3.36 ms total (5KB hidden state, Mali-G610) | ✅ Confirmed — FINDINGS §39, CSV `rk3588-t4_gpu_boundary_crossing.csv`, manifest `rk3588-t4_gpu_boundary_crossing.json` (sha `7ca7f2a`, dirty=false corrected from false-positive, governor=performance, ~41°C) |
-| ~10% of 30 tok/s (33.3 ms) decode budget | ✅ Confirmed — 3.36/33.3 = 10.1% |
-| Latency-dominated: ~0.1 ms dispatch floor (1KB–100KB payloads all ~0.10 ms) | ✅ Confirmed — same CSV, write_blocking rows: 0.102/0.102/0.103/0.108/0.112 ms for 1KB/5KB/10KB/50KB/100KB |
-| Heterogeneous offload must deliver >11% speedup to break even | ✅ Confirmed — crossing tax is 10.1%, so net speedup must exceed this |
+| 16 crossings/token at 3.36 ms total (5KB hidden state, Mali-G610, RustiCL/Panfrost) | ✅ Confirmed — FINDINGS §39, CSV `rk3588-t4_gpu_boundary_crossing.csv`, manifest `rk3588-t4_gpu_boundary_crossing.json` (sha `7ca7f2a`, dirty=false corrected from false-positive, governor=performance, ~41°C) |
+| ~10% of 30 tok/s (33.3 ms) decode budget (RustiCL/Panfrost) | ✅ Confirmed — 3.36/33.3 = 10.1% |
+| Latency-dominated: ~0.1 ms dispatch floor on RustiCL/Panfrost (1KB–100KB payloads) | ✅ Confirmed — same CSV, write_blocking rows: 0.102/0.102/0.103/0.108/0.112 ms for 1KB/5KB/10KB/50KB/100KB |
+| Heterogeneous offload must deliver >11% speedup to break even (RustiCL/Panfrost) | ✅ Confirmed — crossing tax is 10.1%, so net speedup must exceed this |
+| **ARM blob driver: 16 crossings at 0.24 ms (14× faster than RustiCL/Panfrost)** | ✅ Confirmed — FINDINGS §39 cross-validation, CSV `rk3588-t3_gpu_boundary_crossing.csv`, manifest `rk3588-t3_gpu_boundary_crossing.json` (sha `25941cf`, governor=performance, ~41°C) |
+| **ARM blob crossing tax: 0.7% of decode budget (vs 10.1% on RustiCL)** | ✅ Confirmed — 0.24/33.3 = 0.72% |
+| **ARM blob dispatch floor: ~6 µs per call (vs ~100 µs on RustiCL)** | ✅ Confirmed — same CSV, write_blocking rows: 0.005/0.007/0.007/0.013/0.017 ms for 512B/5KB/10KB/50KB/100KB |
+| **Break-even speedup on blob: >0.7%** | ✅ Confirmed — crossing tax is 0.7%, so net speedup must exceed this (negligible barrier) |
 
-Measured on RK3588 t4 Mali-G610 via RustiCL/Panfrost driver (open-source, not vendor blob).
-ADR 0005 designates this as a valid proxy for the O6's Immortalis-G720. Absolute latency
-will differ on target hardware; cost structure (latency-dominated for small payloads)
-is expected to transfer.
+Initial measurement on RK3588 t4 via RustiCL/Panfrost driver (open-source). Cross-validated
+on RK3588 t3 via ARM proprietary blob (libmali-valhall-g610-g13p0-x11) — the driver type a
+production deployment and the O6 will use. The 14× gap is dispatch-overhead-dominated (not
+bandwidth): both drivers converge at large payloads (1 MB write: 9367 vs 4602 MiB/s, only 2×
+apart). ADR 0005 designates both as valid proxies for the O6's Immortalis-G720. The blob's
+0.24 ms / 0.7% figure is the more representative estimate for target hardware.
 
 ### 2.7 GPU kernel performance — corrected conclusion (verified 2026-08-11)
 
