@@ -22,7 +22,7 @@ Hand-writing and benchmarking the GDN recurrence kernels that don't exist yet fo
 
 Gated DeltaNet (GDN) is a **linear-attention mechanism** arriving in next-generation hybrid LLMs (Qwen3.5 ships a 3:1 mix of GDN and full-attention layers). It replaces the ever-growing KV cache with a **fixed-size recurrent state** — O(1) decode memory regardless of context length, versus O(n) for standard attention.
 
-At 262K context on the 4B checkpoint, that difference is **23.95 GiB of RAM** — the GDN decode state (recurrent + conv) is 48 MiB; if all 32 layers were attention, the KV cache alone would be 32 GiB and still growing. On a memory-constrained edge board, that is the difference between running long-context inference and not running it at all.
+At 262K context on the 4B checkpoint, that difference is **23.95 GiB of RAM** — the GDN recurrent state is 48 MiB (50 MiB including conv state); if all 32 layers were attention, the KV cache alone would be 32 GiB and still growing. On a memory-constrained edge board, that is the difference between running long-context inference and not running it at all.
 
 **The problem:** the fast GDN kernels (causal_conv1d, fla) do not exist for Arm architectures. Without them, the model silently falls back to slow, generic PyTorch ops. This is happening *today* on NVIDIA's own silicon; on Arm/Vulkan the gap is wider. **Our contribution is filling that gap:** three hand-written NEON/SVE CPU kernels, numerically verified, benchmarked across a 5-device Arm fleet, and an honest operator-coverage audit showing where NPU acceleration can and cannot help.
 
@@ -30,7 +30,7 @@ At 262K context on the 4B checkpoint, that difference is **23.95 GiB of RAM** �
 - **Three GDN CPU kernels** (gated cumulative decay, gated delta-rule scan, causal depthwise Conv1D) in C with NEON intrinsics, verified against FP32 reference implementations
 - **Mixed-precision variants** (fp16, bf16 recurrent state) — fp16 gives 1.64× on the decay chain; scan is compute-bound and shows no bandwidth benefit
 - **big.LITTLE affinity policy** — pinning to A76 big cores is 2–3× faster than default scheduler placement
-- **OpenMP parallelization + NEON double-width unrolling** — 2.6–5.1× cumulative speedup on A76
+- **OpenMP parallelization + NEON double-width unrolling** — 2.3–5.1× cumulative speedup on A76
 - **Cross-vendor NPU operator-coverage audit** — both CIX NOE and Rockchip RKNN reject GDN's variable-length recurrence (the "Loop" op). This generalizes: no current edge NPU compiler handles it
 - **GDN-2 vs GDN-1 comparison** — the decoupled gating in GDN-2 costs 1.2–1.5× at decode on big cores (2.2–2.4× on little), 2.2–2.7× at prefill
 - **Analytical memory model** decomposing weights, KV cache, and recurrent state at every context length
