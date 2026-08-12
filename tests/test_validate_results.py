@@ -2444,3 +2444,487 @@ class TestValidateCsvMalformedValues:
         issues = []
         validate_csv(str(csv_path), "test_ruler_bad2.csv", issues)
         assert not any("log_prob" in i.message for i in issues)
+
+
+# ---------------------------------------------------------------------------
+# validate_manifest — git provenance branches (lines 1183, 1206, 1260)
+# ---------------------------------------------------------------------------
+
+
+class TestValidateManifestGitProvenance:
+    """Cover the git-sha, dirty-tree, and no-git-section branches."""
+
+    def test_manifest_no_git_section(self, tmp_path):
+        """A manifest with no git key at all gets a provenance WARNING."""
+        import json
+
+        path = tmp_path / "nogit.json"
+        path.write_text(json.dumps({"device": "test"}))
+        issues = []
+        validate_manifest("test.csv", "standard", 15, str(path), issues, "abc123")
+        assert any("no git section" in i.message and i.severity == "WARNING" for i in issues)
+
+    def test_manifest_sha_mismatch(self, tmp_path):
+        """A manifest whose SHA differs from HEAD gets a NOTE."""
+        import json
+
+        path = tmp_path / "stale.json"
+        path.write_text(json.dumps({"git": {"sha": "different_sha", "dirty": False}}))
+        issues = []
+        validate_manifest("test.csv", "standard", 15, str(path), issues, "abc123")
+        assert any("run-time snapshot" in i.message and i.severity == "NOTE" for i in issues)
+
+    def test_manifest_sha_matches_head(self, tmp_path):
+        """When SHA matches HEAD, no staleness NOTE."""
+        import json
+
+        path = tmp_path / "current.json"
+        path.write_text(json.dumps({"git": {"sha": "abc123", "dirty": False}}))
+        issues = []
+        validate_manifest("test.csv", "standard", 15, str(path), issues, "abc123")
+        assert not any("run-time snapshot" in i.message for i in issues)
+
+    def test_manifest_dirty_tree(self, tmp_path):
+        """A manifest captured from a dirty tree gets a WARNING."""
+        import json
+
+        path = tmp_path / "dirty.json"
+        path.write_text(json.dumps({"git": {"sha": "abc123", "dirty": True}}))
+        issues = []
+        validate_manifest("test.csv", "standard", 15, str(path), issues, "abc123")
+        assert any("DIRTY tree" in i.message and i.severity == "WARNING" for i in issues)
+
+
+# ---------------------------------------------------------------------------
+# validate_manifest — row-count and spec-bandwidth branches (lines 1286, 1295)
+# ---------------------------------------------------------------------------
+
+
+class TestValidateManifestRowAndSpec:
+    """Cover the low-row-count and device-spec-bandwidth NOTE branches."""
+
+    def test_manifest_low_row_count_standard(self, tmp_path):
+        """A standard CSV with <12 rows gets a NOTE about possibly missing variants."""
+        import json
+
+        path = tmp_path / "test.json"
+        path.write_text(json.dumps({"git": {"sha": "abc123", "dirty": False}}))
+        issues = []
+        validate_manifest("test.csv", "standard", 6, str(path), issues, "abc123")
+        assert any("only 6 rows" in i.message and i.severity == "NOTE" for i in issues)
+
+    def test_manifest_row_count_threshold(self, tmp_path):
+        """12 rows is the threshold — exactly 12 should NOT trigger the NOTE."""
+        import json
+
+        path = tmp_path / "test.json"
+        path.write_text(json.dumps({"git": {"sha": "abc123", "dirty": False}}))
+        issues = []
+        validate_manifest("generic.csv", "standard", 12, str(path), issues, "abc123")
+        assert not any("only" in i.message and "rows" in i.message for i in issues)
+
+    def test_manifest_device_spec_bw(self, tmp_path):
+        """A CSV name matching a known device gets a spec-bandwidth NOTE."""
+        import json
+
+        path = tmp_path / "rk3588.json"
+        path.write_text(json.dumps({"git": {"sha": "abc123", "dirty": False}}))
+        issues = []
+        validate_manifest("rk3588-t4_big.csv", "standard", 15, str(path), issues, "abc123")
+        assert any("device spec bandwidth" in i.message and i.severity == "NOTE" for i in issues)
+
+    def test_manifest_no_spec_bw_for_unknown_device(self, tmp_path):
+        """An unrecognized device name produces no spec-bandwidth NOTE."""
+        import json
+
+        path = tmp_path / "unknown.json"
+        path.write_text(json.dumps({"git": {"sha": "abc123", "dirty": False}}))
+        issues = []
+        validate_manifest("mystery-device.csv", "standard", 15, str(path), issues, "abc123")
+        assert not any("device spec bandwidth" in i.message for i in issues)
+
+
+# ---------------------------------------------------------------------------
+# check_ablation_manifests — non-CSV file skip (line 474)
+# ---------------------------------------------------------------------------
+
+
+class TestCheckAblationNonCsvSkip:
+    """Cover the continue branch when ablation dir contains non-CSV files."""
+
+    def test_ablation_dir_with_non_csv_file(self, tmp_path):
+        """A non-CSV file in the ablation dir is silently skipped."""
+        ablation_dir = tmp_path / "ablation"
+        ablation_dir.mkdir()
+        # Put a non-CSV file that should be skipped
+        (ablation_dir / "README.md").write_text("not a CSV")
+        # And a valid CSV that should be processed
+        csv_path = ablation_dir / "ablation_test.csv"
+        with open(csv_path, "w", newline="") as f:
+            w = csv.DictWriter(
+                f,
+                fieldnames=[
+                    "model",
+                    "kernel",
+                    "context_length",
+                    "quantization",
+                    "engine_assignment",
+                    "tok_per_sec_mean",
+                    "gdn_proj_pct",
+                    "ffn_pct",
+                    "manifest_ref",
+                    "timestamp",
+                ],
+            )
+            w.writeheader()
+            w.writerow(
+                {
+                    "model": "qwen35_4b",
+                    "kernel": "baseline",
+                    "context_length": "128",
+                    "quantization": "fp32",
+                    "engine_assignment": "cpu",
+                    "tok_per_sec_mean": "10.0",
+                    "gdn_proj_pct": "50.0",
+                    "ffn_pct": "30.0",
+                    "manifest_ref": "results/manifests/test.json",
+                    "timestamp": "2026-08-12T00:00:00Z",
+                }
+            )
+        issues = []
+        check_ablation_manifests(str(ablation_dir), issues)
+        # Should process the CSV (find the manifest_ref) without crashing on README.md
+        assert any("manifest" in i.message.lower() for i in issues)
+
+
+# ---------------------------------------------------------------------------
+# main() — ablation subdir skip and non-CSV skip (lines 1377, 1386)
+# ---------------------------------------------------------------------------
+
+
+class TestMainCsvDiscovery:
+    """Cover the ablation-skip and non-CSV-skip continue branches in main()."""
+
+    def _run_main(self, csv_dir, manifest_dir):
+        import scripts.validate_results as vr
+
+        orig_argv = sys.argv
+        sys.argv = [
+            "validate_results.py",
+            "--csv-dir",
+            str(csv_dir),
+            "--manifest-dir",
+            str(manifest_dir),
+            "--quiet",
+        ]
+        try:
+            return vr.main()
+        finally:
+            sys.argv = orig_argv
+
+    def test_main_skips_ablation_subdir(self, tmp_path):
+        """The ablation/ subdirectory is excluded from normal CSV discovery."""
+        csv_dir = tmp_path / "raw"
+        man_dir = tmp_path / "manifests"
+        csv_dir.mkdir()
+        man_dir.mkdir()
+        # Create an ablation subdir with a CSV that would cause issues if scanned
+        abl_dir = csv_dir / "ablation"
+        abl_dir.mkdir()
+        _write_std_csv(abl_dir / "should_be_skipped.csv", [_std_row()])
+        # And a valid standard CSV at the top level
+        _write_std_csv(csv_dir / "jetson-j1.csv", [_std_row()])
+        (man_dir / "jetson-j1.json").write_text('{"git": {"sha": "abc", "dirty": false}}')
+        result = self._run_main(csv_dir, man_dir)
+        assert result == 0
+
+    def test_main_skips_non_csv_files(self, tmp_path):
+        """Non-CSV files in the CSV directory are silently ignored."""
+        csv_dir = tmp_path / "raw"
+        man_dir = tmp_path / "manifests"
+        csv_dir.mkdir()
+        man_dir.mkdir()
+        # Put a non-CSV file alongside the valid CSV
+        (csv_dir / "README.txt").write_text("not a CSV")
+        (csv_dir / "notes.log").write_text("log data")
+        _write_std_csv(csv_dir / "jetson-j1.csv", [_std_row()])
+        (man_dir / "jetson-j1.json").write_text('{"git": {"sha": "abc", "dirty": false}}')
+        result = self._run_main(csv_dir, man_dir)
+        assert result == 0
+
+
+# ---------------------------------------------------------------------------
+# check_readme_counts — no-pattern-match and suffix-skip (lines 1260, 1295)
+# ---------------------------------------------------------------------------
+
+
+class TestCheckReadmeCountsExtra:
+    """Cover the no-match early return and suffix-skip continue."""
+
+    def test_readme_without_pattern_no_crash(self, tmp_path):
+        """A README that exists but lacks the pattern returns silently."""
+        root = tmp_path / "repo"
+        root.mkdir()
+        (root / "README.md").write_text("# My Project\n\nNo results line here.\n")
+        issues = []
+        check_readme_counts(issues, repo_root=str(root))
+        assert issues == []
+
+    def test_count_files_suffix_skip(self, tmp_path):
+        """Non-matching files in results/raw are skipped during suffix counting."""
+        root = tmp_path / "repo"
+        raw = root / "results" / "raw"
+        man = root / "results" / "manifests"
+        fig = root / "results" / "figures"
+        docs = root / "docs"
+        raw.mkdir(parents=True)
+        man.mkdir(parents=True)
+        fig.mkdir(parents=True)
+        docs.mkdir(parents=True)
+        # CSVs and a non-CSV file in raw/
+        (raw / "bench_0.csv").write_text("data")
+        (raw / "README.txt").write_text("not a csv")
+        # Manifests
+        (man / "dev_0.json").write_text("{}")
+        # Figures (with README.md that should be excluded)
+        (fig / "plot_0.png").write_text("png")
+        (fig / "README.md").write_text("# Index")
+        # FINDINGS
+        (docs / "FINDINGS.md").write_text("# FINDINGS\n\n## 1. Test\nbody\n")
+        # README with matching counts
+        (root / "README.md").write_text(
+            "> **Results so far:** 1 CSVs from the device fleet, "
+            "1 provenance manifests, 1 generated figures/tables, 1 FINDINGS sections.\n"
+        )
+        issues = []
+        check_readme_counts(issues, repo_root=str(root))
+        # Should produce no issues — the .txt file is correctly skipped
+        assert issues == []
+
+
+# ---------------------------------------------------------------------------
+# main() — non-quiet output paths (lines 1386, 1413, 1435-1441)
+# ---------------------------------------------------------------------------
+
+
+class TestMainNonQuietOutput:
+    """Cover the non-quiet print branches in main()."""
+
+    @staticmethod
+    def _run_main_verbose(csv_dir, manifest_dir):
+        """Run main() WITHOUT --quiet to exercise print branches."""
+        import scripts.validate_results as vr
+
+        orig_argv = sys.argv
+        sys.argv = [
+            "validate_results.py",
+            "--csv-dir",
+            str(csv_dir),
+            "--manifest-dir",
+            str(manifest_dir),
+        ]
+        try:
+            return vr.main()
+        finally:
+            sys.argv = orig_argv
+
+    def test_no_csvs_prints_message(self, tmp_path, capsys):
+        """An empty CSV dir prints 'No CSV files found' and exits 0."""
+        csv_dir = tmp_path / "raw"
+        man_dir = tmp_path / "manifests"
+        csv_dir.mkdir()
+        man_dir.mkdir()
+        result = self._run_main_verbose(csv_dir, man_dir)
+        captured = capsys.readouterr()
+        assert result == 0
+        assert "No CSV files found" in captured.out
+
+    def test_warning_categories_printed(self, tmp_path, capsys):
+        """Warnings produce a category breakdown in verbose output."""
+        csv_dir = tmp_path / "raw"
+        man_dir = tmp_path / "manifests"
+        csv_dir.mkdir()
+        man_dir.mkdir()
+        # CSV with no manifest → WARNING (category "other")
+        _write_std_csv(csv_dir / "jetson-j1.csv", [_std_row()])
+        result = self._run_main_verbose(csv_dir, man_dir)
+        captured = capsys.readouterr()
+        assert result == 1  # warnings → exit 1
+        assert "issue(s) found" in captured.out
+
+
+# ---------------------------------------------------------------------------
+# main() — warning category breakdown (lines 1435, 1437, 1439, 1441)
+# ---------------------------------------------------------------------------
+
+
+class TestMainWarningCategories:
+    """Cover the four specific warning-category print branches."""
+
+    @staticmethod
+    def _run_main_verbose(csv_dir, manifest_dir):
+        import scripts.validate_results as vr
+
+        orig_argv = sys.argv
+        sys.argv = [
+            "validate_results.py",
+            "--csv-dir",
+            str(csv_dir),
+            "--manifest-dir",
+            str(manifest_dir),
+        ]
+        try:
+            return vr.main()
+        finally:
+            sys.argv = orig_argv
+
+    def test_dirty_and_extreme_spread_categories(self, tmp_path, capsys):
+        """Produce 'dirty' and 'extreme spread' warnings and verify categories."""
+        csv_dir = tmp_path / "raw"
+        man_dir = tmp_path / "manifests"
+        csv_dir.mkdir()
+        man_dir.mkdir()
+
+        # Standard CSV with extreme spread (>200%) → WARNING "extreme spread"
+        _write_std_csv(csv_dir / "rk3588-t4_big.csv", [_std_row(spread_pct="300.0")])
+        # Manifest with dirty=true → WARNING "dirty"
+        (man_dir / "rk3588-t4-big.json").write_text('{"git": {"sha": "abc", "dirty": true}}')
+
+        result = self._run_main_verbose(csv_dir, man_dir)
+        captured = capsys.readouterr()
+        assert result == 1  # warnings only
+        assert "dirty-tree" in captured.out
+        assert "extreme spread" in captured.out
+
+    def test_thermal_category(self, tmp_path, capsys):
+        """Sustained CSV with high thermal triggers 'thermal' category."""
+        csv_dir = tmp_path / "raw"
+        man_dir = tmp_path / "manifests"
+        csv_dir.mkdir()
+        man_dir.mkdir()
+
+        # Sustained CSV with thermal_c > 120 → WARNING "very high thermal"
+        sus_header = list(SUSTAINED_COLS)
+        with open(csv_dir / "rk3588-t4_sustained.csv", "w", newline="") as f:
+            w = csv.DictWriter(f, fieldnames=sus_header)
+            w.writeheader()
+            w.writerow(_sustained_row(thermal_c="150.0"))
+        (man_dir / "rk3588-t4-sustained.json").write_text('{"git": {"sha": "abc", "dirty": false}}')
+
+        result = self._run_main_verbose(csv_dir, man_dir)
+        captured = capsys.readouterr()
+        assert result == 1
+        assert "thermal" in captured.out.lower()
+
+    def test_p95_anomaly_category(self, tmp_path, capsys):
+        """Layer-profile CSV with p95 < p50 triggers 'p95 < p50 anomaly' category."""
+        csv_dir = tmp_path / "raw"
+        man_dir = tmp_path / "manifests"
+        csv_dir.mkdir()
+        man_dir.mkdir()
+
+        # Layer-profile CSV with p95 < p50 → WARNING
+        lp_header = list(LAYER_PROFILE_COLS)
+        with open(csv_dir / "rk3588-t4_profile.csv", "w", newline="") as f:
+            w = csv.DictWriter(f, fieldnames=lp_header)
+            w.writeheader()
+            w.writerow(_layer_profile_row(p50_us="200.0", p95_us="150.0"))
+        (man_dir / "rk3588-t4-profile.json").write_text('{"git": {"sha": "abc", "dirty": false}}')
+
+        result = self._run_main_verbose(csv_dir, man_dir)
+        captured = capsys.readouterr()
+        assert result == 1
+        assert "p95" in captured.out.lower()
+
+
+# ---------------------------------------------------------------------------
+# check_readme_counts — git ls-files success path (line 1286)
+# ---------------------------------------------------------------------------
+
+
+class TestCheckReadmeCountsGitLsFiles:
+    """Cover the git ls-files success path in _count_files."""
+
+    def test_git_ls_files_success(self, tmp_path):
+        """When git ls-files succeeds, files are parsed from its output."""
+        from unittest.mock import MagicMock
+
+        import scripts.validate_results as vr
+
+        root = tmp_path / "repo"
+        root.mkdir()
+        (root / "README.md").write_text(
+            "> **Results so far:** 2 CSVs from the device fleet, "
+            "1 provenance manifests, 1 generated figures/tables, 1 FINDINGS sections.\n"
+        )
+        raw = root / "results" / "raw"
+        man = root / "results" / "manifests"
+        fig = root / "results" / "figures"
+        docs = root / "docs"
+        raw.mkdir(parents=True)
+        man.mkdir(parents=True)
+        fig.mkdir(parents=True)
+        docs.mkdir(parents=True)
+        (raw / "bench_0.csv").write_text("data")
+        (raw / "bench_1.csv").write_text("data")
+        (raw / "notes.txt").write_text("skip me")  # non-CSV in raw
+        (man / "dev_0.json").write_text("{}")
+        (fig / "plot_0.png").write_text("png")
+        (fig / "README.md").write_text("# Index")
+        (docs / "FINDINGS.md").write_text("# FINDINGS\n\n## 1. Test\nbody\n")
+
+        def fake_run(cmd, **kw):
+            """Simulate git ls-files returning tracked files for the queried dir."""
+            assert cmd[0] == "git"
+            assert cmd[1] == "ls-files"
+            queried = cmd[3]  # e.g. "results/raw/"
+            # Map queried dir to fake tracked-file output
+            tracked = {
+                "results/raw/": "results/raw/bench_0.csv\nresults/raw/bench_1.csv\n",
+                "results/manifests/": "results/manifests/dev_0.json\n",
+                "results/figures/": "results/figures/plot_0.png\nresults/figures/README.md\n",
+            }
+            out = tracked.get(queried, "")
+            result = MagicMock()
+            result.stdout = out
+            result.stderr = ""
+            return result
+
+        orig_run = vr.subprocess.run
+        vr.subprocess.run = fake_run
+        try:
+            issues = []
+            check_readme_counts(issues, repo_root=str(root))
+            assert issues == []
+        finally:
+            vr.subprocess.run = orig_run
+
+
+# ---------------------------------------------------------------------------
+# main() — results/raw README cross-check (line 1413)
+# ---------------------------------------------------------------------------
+
+
+class TestMainReadmeCrossCheck:
+    """Cover the check_readme_counts call when csv_dir is the real results/raw."""
+
+    def test_readme_cross_check_runs_on_real_results(self):
+        """main() with --csv-dir results/raw triggers check_readme_counts."""
+        import scripts.validate_results as vr
+
+        orig_argv = sys.argv
+        sys.argv = [
+            "validate_results.py",
+            "--csv-dir",
+            "results/raw",
+            "--manifest-dir",
+            "results/manifests",
+            "--quiet",
+        ]
+        try:
+            result = vr.main()
+            # Result depends on current data state; should not crash.
+            # Warnings about dirty manifests are expected (exit 1).
+            assert result in (0, 1, 2)
+        finally:
+            sys.argv = orig_argv
