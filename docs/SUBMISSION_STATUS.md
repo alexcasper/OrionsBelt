@@ -286,13 +286,13 @@ cutoff has passed with no board; any future arrival is additive bonus per ADR 00
 | #287 | t4 | DEVPOST/FINDINGS factual fixes — provenance, SDOT table, cross-device gap | MERGED |
 | #288 | t4 | Post-merge doc accuracy sweep — stale counts + §38 attribution fixes | MERGED |
 | #289 | t3 | Fix stale FINDINGS line count 5715→5718 | CLOSED — superseded (FINDINGS grew to 5743 after GPU benchmark refresh) |
-| #290 | t4 | Fix stale local test count 2411→2351, skip 1→2 | MERGED |
+| #290 | t4 | Fix stale local test count 2411→2351, skip 1→2 | MERGED (partial — see #290 correction: local counts vary by machine, docs cite CI-authoritative 2324/20 instead) |
 | #291 | t3 | Beads export sync | MERGED |
 | #292 | t3 | Fix stale data claims + refresh GPU benchmark (ob-5kw, ob-mrd.23, ob-q44.2) | MERGED |
 | #293 | t4 | t4 device bench + portable work (clean re-runs: dirty→false for kernel/e2e/delta-matmul CSVs) | MERGED |
 | #294 | t3 | Submission-facing doc consistency fixes (ob-q44.3, ob-4ke, ob-rp2, CLAIM_VERIFICATION §2.7) | MERGED |
-| #295 | t3 | Fix manifest count 326→207 git-tracked + refresh README counts after t4 merge (ob-uqxt) | OPEN |
-| #296 | t4 | Fix manifest dirty-check bug + clean 75 false-positive manifests (ob-mrd.24) | OPEN |
+| #295 | t3 | Fix manifest count 326→208 git-tracked + refresh README counts + update stale t4 data after #293 (ob-uqxt, ob-edvc) | MERGED |
+| #296 | t4 | Fix manifest dirty-check bug (bench/manifest.py excluded results/.beads/ output files) + clean 102 false-positive manifests (75 t4 + 27 non-t4, ob-mrd.24) | MERGED — doc updates to DEVPOST_SUBMISSION/WRITEUP/FINDINGS superseded by #295's more complete fix (sha+numbers+dirty); CLAIM_VERIFICATION.md update kept |
 
 > **PRs #190, #198, #207, #229, #235, #245, #289:** closed (not merged). #282's proposed provenance content was rejected but its PR itself shows MERGED on GitHub (content replaced during review — see row above). No gaps in numbering.
 
