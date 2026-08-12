@@ -319,6 +319,20 @@ class TestGitDirtyFiltering:
 
         assert _git_dirty() is False
 
+    def test_beads_gate_lock_gitignored(self):
+        """Root-level .beads.gate.lock (created by in-flight bd writes) must
+        be in .gitignore so it never triggers false dirty=true in manifests.
+
+        Regression test for ob-k0oz: the lock file is operational scratch,
+        not a source change, but _git_dirty()'s output-dir regex only
+        matches ``results/`` and ``.beads/`` (directory), not root-level
+        ``.beads.gate.lock``.
+        """
+        from pathlib import Path
+
+        gi = Path(__file__).resolve().parent.parent / ".gitignore"
+        assert ".beads.gate.lock" in gi.read_text()
+
     def test_none_on_git_failure(self, monkeypatch):
         """When _git_porcelain returns None (git not available), _git_dirty returns None."""
         monkeypatch.setattr(manifest_mod, "_git_porcelain", lambda: None)
