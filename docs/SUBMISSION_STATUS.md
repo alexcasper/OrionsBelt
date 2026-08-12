@@ -312,6 +312,8 @@ cutoff has passed with no board; any future arrival is additive bonus per ADR 00
 | #313 | t4 | Device bench rk3588-t4 big+little clusters + manifest fix (ob-8ms.3); root cause: manifest.py _git_dirty stripped porcelain leading-space, breaking results/ exclusion regex | MERGED |
 | #314 | t3 | Dirty-tree check for validate_bench_csvs.sh (catches provenance gaps like PR #313) | MERGED |
 | #315 | t3 | Regenerate stale fleet_bandwidth_scaling.md (t4 clean re-run data: 11.90→11.42 GiB/s scan) | MERGED |
+| #316 | t4 | Fix stale numbers + SHA in submission docs (82f4833→aa61e20, ±20-30%→±0-9%); ratio arithmetic fix | MERGED |
+| #317 | t3 | Fix stale t4_big cascade across 6 files after PR #313 (DEVPOST_SUBMISSION, FINDINGS ×6, SUBMISSION_STATUS, DEVPOST_WRITEUP, fleet_analysis.py generator) | OPEN |
 
 > **PRs #190, #198, #207, #229, #235, #245, #289:** closed (not merged). #282's proposed provenance content was rejected but its PR itself shows MERGED on GitHub (content replaced during review — see row above). No gaps in numbering.
 
