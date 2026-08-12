@@ -484,7 +484,9 @@ class TestCpuModelFallback:
 
     def test_model_name_key_match(self, monkeypatch):
         """When /proc/cpuinfo has 'model name' key (x86 style), returns it."""
-        monkeypatch.setattr(manifest_mod, "_read_text", lambda path: "model name : Intel i7-12700K\n")
+        monkeypatch.setattr(
+            manifest_mod, "_read_text", lambda path: "model name : Intel i7-12700K\n"
+        )
         assert _cpu_model() == "Intel i7-12700K"
 
 

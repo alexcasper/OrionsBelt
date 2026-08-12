@@ -474,7 +474,9 @@ def generate_niah_multikey(
 
     for stmt in kv_statements:
         insert_pos = cursor + segment_size
-        if insert_pos > len(haystack):  # pragma: no cover (unreachable: segment math guarantees insert_pos ≤ len)
+        if insert_pos > len(
+            haystack
+        ):  # pragma: no cover (unreachable: segment math guarantees insert_pos ≤ len)
             insert_pos = len(haystack)
         parts.append(haystack[cursor:insert_pos])
         parts.append(" " + stmt + " ")

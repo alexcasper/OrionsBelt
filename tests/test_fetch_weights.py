@@ -527,7 +527,9 @@ class TestListRepoFiles:
 
     def test_hub_api_success(self):
         """When huggingface_hub is available, use list_repo_files directly."""
-        with patch("huggingface_hub.list_repo_files", return_value=["model.safetensors", "config.json"]):
+        with patch(
+            "huggingface_hub.list_repo_files", return_value=["model.safetensors", "config.json"]
+        ):
             result = fetch_weights._list_repo_files("Qwen/Qwen3.5-4B")
         assert result == ["config.json", "model.safetensors"]
 

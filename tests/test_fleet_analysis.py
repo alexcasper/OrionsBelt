@@ -530,9 +530,13 @@ class TestProvenanceAudit:
         # Create manifest for base device name (without _big suffix)
         write_manifest(str(manifest_dir / "test-board.json"), dirty=False)
 
-        monkeypatch.setattr(fa, "REPLICATES", [
-            ("Test", [("a", "fake/test-board_big.csv")]),
-        ])
+        monkeypatch.setattr(
+            fa,
+            "REPLICATES",
+            [
+                ("Test", [("a", "fake/test-board_big.csv")]),
+            ],
+        )
         monkeypatch.setattr(fa, "MANIFEST_DIR", str(manifest_dir))
 
         lines = fa._provenance_audit_lines()
@@ -679,8 +683,12 @@ class TestGenerateReport:
         """When all replicate manifests are dirty with same SHA, note warns."""
         setup_fleet_data(tmp_path)
         manifests_dir = tmp_path / "results" / "manifests"
-        for base in ("rk3588-t3-clean", "rk3588-t4-clean",
-                      "rk3588-t3-little-clean", "rk3588-t4-little-clean"):
+        for base in (
+            "rk3588-t3-clean",
+            "rk3588-t4-clean",
+            "rk3588-t3-little-clean",
+            "rk3588-t4-little-clean",
+        ):
             write_manifest(str(manifests_dir / (base + ".json")), dirty=True, sha="same123abc")
         monkeypatch.chdir(tmp_path)
         report = fa.generate_report(str(tmp_path / "report.md"))
@@ -690,14 +698,24 @@ class TestGenerateReport:
         """When Pi 5 beats Jetson on all kernels beyond spread, report says so."""
         setup_fleet_data(tmp_path)
         # Overwrite Pi5 to dominate Jetson on ALL kernels
-        write_device_csv(str(tmp_path / "results" / "raw" / "pi5-r5.csv"),
-                         gib_overrides={"gdn_cumdecay": 10.0, "gdn_gated_scan": 10.0,
-                                        "gdn_causal_dwconv1d": 10.0})
+        write_device_csv(
+            str(tmp_path / "results" / "raw" / "pi5-r5.csv"),
+            gib_overrides={
+                "gdn_cumdecay": 10.0,
+                "gdn_gated_scan": 10.0,
+                "gdn_causal_dwconv1d": 10.0,
+            },
+        )
         # Keep Jetson low
         for jc in ("jetson-j1-clean.csv", "jetson-j2-clean.csv"):
-            write_device_csv(str(tmp_path / "results" / "raw" / jc),
-                             gib_overrides={"gdn_cumdecay": 1.0, "gdn_gated_scan": 1.0,
-                                            "gdn_causal_dwconv1d": 1.0})
+            write_device_csv(
+                str(tmp_path / "results" / "raw" / jc),
+                gib_overrides={
+                    "gdn_cumdecay": 1.0,
+                    "gdn_gated_scan": 1.0,
+                    "gdn_causal_dwconv1d": 1.0,
+                },
+            )
         monkeypatch.chdir(tmp_path)
         report = fa.generate_report(str(tmp_path / "report.md"))
         assert "beats the Jetson on all three kernels" in report
