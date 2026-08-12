@@ -179,7 +179,7 @@ All figures above are verified against primary sources (Radxa product page and d
 | Cache-blocked GEMM for prefill | Done — 49–78× prefill speedup for M>1. [§25](./docs/FINDINGS.md) |
 | INT4 weight-only quantization | Done — core-type-dependent: slower alone, but **INT4+SDOT hybrid** is fastest on A76 (1.30× over INT8+SDOT on 4B, 1.19× on 0.8B). [§26, §34](./docs/FINDINGS.md) |
 | llama.cpp baseline comparison | Done — mature Q8_0/Q4_0 inference 3.1× faster decode, 2.3× faster prefill on A57. [§28](./docs/FINDINGS.md) |
-| Context-length scaling (GDN O(1) vs full-attn O(n)) | Done — pure-GDN flat to <0.2% across ctx=1–4096, fair 4-thread comparison, cross-validated on 2× RK3588 (§36). [§17](./docs/FINDINGS.md) |
+| Context-length scaling (GDN O(1) vs full-attn O(n)) | Done — pure-GDN flat to <0.2% across ctx=1–8192, fair 4-thread comparison, cross-validated on 2× RK3588 (§36). [§17](./docs/FINDINGS.md) |
 | INT8 KV cache quantization | Done — 1.7–2.6× full-attn speedup at long context, 4× KV memory reduction. [§20](./docs/FINDINGS.md) |
 | Sustained-load thermal characterization | Done — <1% throughput decay over 3–5 min on RK3588, temp plateaued at 52°C, no throttling (§18, §37) |
 | INA3221 power/energy profiling | Done — 874–1250 mJ/GiB board-wide on Jetson A57; power constant across kernels, energy tracks 1/throughput (ob-agf.1) |
