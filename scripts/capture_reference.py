@@ -312,10 +312,15 @@ def _build_manifest(
         sha = subprocess.check_output(
             ["git", "rev-parse", "--short", "HEAD"], stderr=subprocess.DEVNULL, text=True
         ).strip()
+        # NOTE: do NOT .strip() — preserve leading space for the regex.
+        # Also filter results/ and .beads/ (output dirs, not source changes).
+        import re
+
         status = subprocess.check_output(
             ["git", "status", "--porcelain"], stderr=subprocess.DEVNULL, text=True
-        ).strip()
-        dirty = bool(status)
+        )
+        _OUTPUT_RE = re.compile(r"^[ ?][M?] (results/|\.beads/)")
+        dirty = any(not _OUTPUT_RE.match(line) for line in status.splitlines() if line)
     except (subprocess.CalledProcessError, FileNotFoundError, OSError):
         pass
 
