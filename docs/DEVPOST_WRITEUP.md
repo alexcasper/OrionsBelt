@@ -90,7 +90,7 @@ to devices but was never previously tested in the correctness suite).
 | gdn_causal_dwconv1d | A55 little | 0.71 | **5.30** | 7.4× |
 
 > **cumdecay at 21.67 GiB/s reaches 87% of the RK3588's measured DRAM bandwidth
-> ceiling (~25 GiB/s, 71% of the 33.8 GB/s theoretical spec at 2112 MHz).**
+> ceiling (~25 GiB/s, 79% of the 31.7 GiB/s theoretical spec at 2112 MHz).**
 > The kernel is memory-bound — the optimization has taken it close to what the
 > hardware allows.
 >
@@ -105,7 +105,7 @@ to devices but was never previously tested in the correctness suite).
 
 The OpenMP parallelization across 4 cores accounts for ~4×; NEON double-width
 unrolling adds further gains. The little cluster (A55) benefits more
-(6.0–7.4×) than the big cluster (3.6–5.0×) because the A55's weaker
+(6.0–7.4×) than the big cluster (2.3–5.1×) because the A55's weaker
 single-thread throughput makes it more reliant on multi-thread parallelization
 — the optimization closes the big/little gap from ~4:1 to ~2.5:1.
 
