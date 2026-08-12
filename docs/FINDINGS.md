@@ -5574,27 +5574,61 @@ not data transfer. Evidence:
 4. **Round-trip ≈ write + read**: Round-trip times closely match the sum of individual
    write + read times, confirming no hidden pipelining benefit when crossings are sequential.
 
+### Cross-validation: ARM blob vs open-source driver (ob-t3b.10, 2026-08-12)
+
+The §39 measurements above were taken on t4 using the open-source **RustiCL/Panfrost**
+driver stack. The same benchmark was re-run on t3 (identical RK3588, same Mali-G610 MP4)
+using the **ARM proprietary blob** (libmali-valhall-g610-g13p0-x11). Governor: performance
+on both. Thermals: ~41 °C on t3, ~40 °C on t4.
+
+| Payload | t4 Write (ms) | t3 Write (ms) | Ratio | t4 Round-trip (ms) | t3 Round-trip (ms) | Ratio |
+|---|---:|---:|---:|---:|---:|---:|
+| 512B | 0.258 | 0.005 | 55× | 0.207 | 0.011 | 19× |
+| **5KB (hidden fp16)** | **0.102** | **0.007** | **15×** | **0.207** | **0.013** | **16×** |
+| 10KB (hidden fp32) | 0.103 | 0.007 | 14× | 0.212 | 0.014 | 15× |
+| 50KB | 0.108 | 0.013 | 9× | 0.246 | 0.023 | 11× |
+| 100KB | 0.112 | 0.017 | 7× | 0.284 | 0.036 | 8× |
+| 1MB | 0.217 | 0.107 | 2× | 1.165 | 0.197 | 6× |
+
+**16 crossings (5KB round-trip): 0.24 ms on ARM blob vs 3.36 ms on RustiCL/Panfrost (14×).**
+
+Key observations:
+
+1. **Dispatch overhead floor**: The ARM blob's per-call overhead is ~5–7 µs vs
+   RustiCL/Panfrost's ~100 µs. This 14–20× difference dominates for decode-sized
+   payloads (≤10 KB) where transfer time is negligible on both drivers.
+
+2. **Bandwidth converges at scale**: At 1 MB, write bandwidth reaches 9367 MiB/s on
+   the blob vs 4602 MiB/s on RustiCL — only 2× apart. As payloads grow, the driver
+   overhead amortises and memory throughput becomes the bottleneck on both stacks.
+
+3. **Blob shows proper scaling**: Write bandwidth scales monotonically from 105 MiB/s
+   (512B) to 9367 MiB/s (1MB) on the blob. RustiCL/Panfrost shows a flat ~0.1 ms floor
+   from 1KB–100KB, masking bandwidth scaling entirely.
+
 ### Impact on the heterogeneous dispatch budget
 
 At the project's 30 tokens/s decode target (33.3 ms/token budget):
 
-| Cost component | Time | % of token budget |
-|---|---|---|
-| 16 boundary crossings (5KB each) | 3.36 ms | 10.1% |
-| Remaining for compute | 29.9 ms | 89.9% |
+| Driver stack | 16 crossings (5KB each) | % of token budget | Break-even speedup |
+|---|---:|---:|---:|
+| RustiCL/Panfrost (t4) | 3.36 ms | 10.1% | >11% |
+| ARM blob (t3) | 0.24 ms | 0.7% | >0.7% |
 
-The 10% crossing tax is **significant but not prohibitive**. It means a heterogeneous
-deployment must deliver >11% speedup from GPU/NPU offload just to break even against
-the crossing overhead. The optimization implication is to **minimize crossing count**
-(structural: fewer layer handoffs) rather than payload size (each crossing costs ~0.1 ms
-regardless of whether the tensor is 1KB or 100KB).
+On the ARM blob — the driver a production deployment would use — the crossing tax is
+**negligible** (0.7%). The 10% figure from the open-source driver overstates the cost
+for realistic deployments. The optimization implication remains to **minimise crossing
+count** (structural: fewer layer handoffs), but the urgency is lower than the
+RustiCL/Panfrost numbers suggest.
 
 ### Caveats and transferability
 
-- **Driver stack matters**: These numbers are from the open-source RustiCL/Panfrost
-  stack, not a vendor blob. The O6's Immortalis-G720 will use a different driver, so
-  absolute latency will differ. The *cost structure* (latency-dominated for small
-  payloads, dispatch overhead as the floor) is expected to transfer.
+- **Driver stack matters — now quantified**: The ARM blob is 14× faster than
+  RustiCL/Panfrost for decode-sized payloads. The O6's Immortalis-G720 will use a
+  vendor driver (closer to the blob than to RustiCL), so the 0.24 ms figure is the
+  more representative estimate. The *cost structure* (latency-dominated for small
+  payloads, dispatch overhead as the floor) holds on both drivers but the floor
+  differs by an order of magnitude.
 - **O6 re-run needed**: ob-t3b.3 on the O6 will measure the same metrics on the actual
   target hardware. The methodology and benchmark code transfer directly — it is a
   re-run, not a from-scratch effort.
