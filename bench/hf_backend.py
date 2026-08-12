@@ -41,7 +41,7 @@ try:
     from transformers import AutoModelForCausalLM, AutoTokenizer  # type: ignore[import-untyped]
 
     _TORCH_AVAILABLE = True
-except ImportError:
+except ImportError:  # pragma: no cover
     _TORCH_AVAILABLE = False
     torch = None  # type: ignore[assignment]
     AutoModelForCausalLM = None  # type: ignore[assignment]

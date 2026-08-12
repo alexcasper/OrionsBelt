@@ -273,5 +273,5 @@ def main():
     generate_report(args.device, args.output_dir)
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     main()

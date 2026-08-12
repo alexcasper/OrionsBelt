@@ -229,5 +229,5 @@ def main():
     write_csv(all_times, full_attn, linear, args.output)
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     main()

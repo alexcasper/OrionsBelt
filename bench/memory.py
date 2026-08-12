@@ -574,7 +574,7 @@ __all__ = [
 ]
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     # Ensure repo root is importable
     _ROOT = str(Path(__file__).resolve().parent.parent)
     if _ROOT not in sys.path:

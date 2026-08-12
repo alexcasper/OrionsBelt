@@ -441,5 +441,5 @@ def main():
         print(f"Manifest: {manifest_path}", flush=True)
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     main()

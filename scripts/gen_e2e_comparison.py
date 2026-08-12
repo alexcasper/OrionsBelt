@@ -595,5 +595,5 @@ def main():
         print("Tip: pass --base-commit <sha> to enable lineage-based verification.")
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     main()

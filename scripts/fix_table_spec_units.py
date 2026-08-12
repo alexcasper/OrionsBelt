@@ -130,5 +130,5 @@ def main():
     print(f"\n{fixed} files fixed, {skipped} skipped.")
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     main()
