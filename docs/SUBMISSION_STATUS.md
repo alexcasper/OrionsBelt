@@ -328,6 +328,11 @@ cutoff has passed with no board; any future arrival is additive bonus per ADR 00
 | #329 | t4 | Coverage improvements: gdn_layer_info 95→100%, isa_detect 99→100% | MERGED |
 | #330 | t4 | Coverage improvements: validate_results 98→100%, gen_ctxsweep 90→100%, __init__ 92→100% | MERGED |
 | #331 | t4 | Coverage batch — 12 modules to 100%, defensive-code pragmas, ruff format fix, CI fix (huggingface_hub mock injection) | MERGED |
+| #332 | t4 | Stale CI test count fix (2370→2419) + 3 coverage improvements to 100% (isa_detect, hf_backend, ort_gdn_probe) | MERGED |
+| #333 | t4 | Gitignore .beads.gate.lock — prevents false dirty=true in manifests (ob-k0oz) | MERGED |
+| #334 | t4 | Decode microbenchmark (seq=1) cross-board discrepancy analysis — ~500 ns/call fixed overhead makes raw kernel GiB/s unreliable for t3↔t4 comparison (ob-mrd.33) | MERGED |
+| #335 | t4 | README FINDINGS count fix 54→55 + holding pattern | OPEN |
+| #336 | t3 | Fix stale FINDINGS section count 54→55 across README + DEVPOST_SUBMISSION + DEVPOST_WRITEUP (ob-mrd.34; superset of #335) | OPEN |
 
 > **PRs #190, #198, #207, #229, #235, #245, #289, #324:** closed (not merged). #282's proposed provenance content was rejected but its PR itself shows MERGED on GitHub (content replaced during review — see row above). No gaps in numbering.
 
