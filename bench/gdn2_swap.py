@@ -342,6 +342,16 @@ def evaluate_loss(model, input_ids, labels):
 # ── Manifest ──────────────────────────────────────────────────────────────────
 
 
+def _torch_version():
+    """Return torch.__version__ or 'not-installed' if torch is unavailable."""
+    try:
+        import torch
+
+        return torch.__version__
+    except ImportError:
+        return "not-installed"
+
+
 def capture_manifest():
     """Capture provenance metadata (mirrors bench/manifest.py)."""
     import platform
@@ -370,7 +380,7 @@ def capture_manifest():
         "machine": platform.machine(),
         "processor": platform.processor() or "unknown",
         "python": platform.python_version(),
-        "torch": torch.__version__,
+        "torch": _torch_version(),
         "timestamp": time.strftime("%Y%m%dT%H%M%SZ", time.gmtime()),
     }
 

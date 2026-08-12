@@ -4,6 +4,10 @@
 
 Tests cover prompt generation, log-likelihood scoring, and the full
 evaluate_retrieval pipeline using mock model/tokenizer objects.
+
+Pure-Python tests (generate_prompts, capture_manifest) run everywhere.
+Torch-dependent tests (score_answer_logprob, evaluate_retrieval) are
+skipped when torch is not installed (e.g. on edge CI runners).
 """
 
 import os
@@ -11,19 +15,23 @@ import sys
 
 import pytest
 
-torch = pytest.importorskip("torch")
-
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "bench"))
 
 from gdn2_ruler import (  # noqa: E402
     capture_manifest,
-    evaluate_retrieval,
     generate_prompts,
-    score_answer_logprob,
 )
 
+try:
+    import torch
+
+    HAS_TORCH = True
+except ImportError:
+    torch = None
+    HAS_TORCH = False
+
 # ---------------------------------------------------------------------------
-# generate_prompts
+# generate_prompts (pure Python — no torch required)
 # ---------------------------------------------------------------------------
 
 
@@ -95,7 +103,38 @@ class TestGeneratePrompts:
 
 
 # ---------------------------------------------------------------------------
-# score_answer_logprob (mock model/tokenizer)
+# capture_manifest (pure Python — no torch required)
+# ---------------------------------------------------------------------------
+
+
+class TestCaptureManifest:
+    def test_returns_dict_with_required_fields(self):
+        m = capture_manifest()
+        assert isinstance(m, dict)
+        assert "git" in m
+        assert "sha" in m["git"]
+        assert "dirty" in m["git"]
+        assert "host" in m
+        assert "machine" in m["host"]
+        assert "software" in m
+
+    def test_git_sha_is_string(self):
+        m = capture_manifest()
+        assert isinstance(m["git"]["sha"], str)
+
+    def test_git_dirty_is_bool(self):
+        m = capture_manifest()
+        assert isinstance(m["git"]["dirty"], bool)
+
+    def test_timestamp_format(self):
+        m = capture_manifest()
+        ts = m["timestamp_utc"]
+        assert ts.endswith("Z")
+        assert "T" in ts
+
+
+# ---------------------------------------------------------------------------
+# score_answer_logprob (mock model/tokenizer — requires torch)
 # ---------------------------------------------------------------------------
 
 
@@ -130,8 +169,11 @@ class _MockTokenizer:
         return {"input_ids": torch.tensor([ids], dtype=torch.long)}
 
 
+@pytest.mark.skipif(not HAS_TORCH, reason="requires torch")
 class TestScoreAnswerLogprob:
     def test_returns_tuple_of_two_floats(self):
+        from gdn2_ruler import score_answer_logprob
+
         model = _MockModel()
         tokenizer = _MockTokenizer()
         total_lp, avg_lp = score_answer_logprob(model, tokenizer, "hello", "world")
@@ -140,12 +182,16 @@ class TestScoreAnswerLogprob:
 
     def test_total_is_sum_of_token_logprobs(self):
         """total_lp should be <= 0 (log-probabilities are non-positive)."""
+        from gdn2_ruler import score_answer_logprob
+
         model = _MockModel()
         tokenizer = _MockTokenizer()
         total_lp, _ = score_answer_logprob(model, tokenizer, "hello", "world")
         assert total_lp <= 0.0
 
     def test_avg_is_total_divided_by_answer_len(self):
+        from gdn2_ruler import score_answer_logprob
+
         model = _MockModel()
         tokenizer = _MockTokenizer()
         total_lp, avg_lp = score_answer_logprob(model, tokenizer, "hello", "world")
@@ -153,6 +199,8 @@ class TestScoreAnswerLogprob:
         assert abs(avg_lp - total_lp / 6) < 1e-5
 
     def test_deterministic(self):
+        from gdn2_ruler import score_answer_logprob
+
         model = _MockModel()
         tokenizer = _MockTokenizer()
         lp1 = score_answer_logprob(model, tokenizer, "hello", "world")
@@ -160,6 +208,8 @@ class TestScoreAnswerLogprob:
         assert lp1 == lp2
 
     def test_different_answers_different_scores(self):
+        from gdn2_ruler import score_answer_logprob
+
         model = _MockModel()
         tokenizer = _MockTokenizer()
         lp1 = score_answer_logprob(model, tokenizer, "prompt", "answer1")
@@ -168,15 +218,18 @@ class TestScoreAnswerLogprob:
 
 
 # ---------------------------------------------------------------------------
-# evaluate_retrieval (mock model/tokenizer)
+# evaluate_retrieval (mock model/tokenizer — requires torch)
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.skipif(not HAS_TORCH, reason="requires torch")
 class TestEvaluateRetrieval:
     def _make_prompts(self, n=2):
         return generate_prompts(num_prompts=n, context_length=512, num_keys=3, seed_base=500)
 
     def test_returns_dict_with_required_fields(self):
+        from gdn2_ruler import evaluate_retrieval
+
         model = _MockModel()
         tokenizer = _MockTokenizer()
         prompts = self._make_prompts(1)
@@ -185,6 +238,8 @@ class TestEvaluateRetrieval:
             assert field in result
 
     def test_accuracy_in_valid_range(self):
+        from gdn2_ruler import evaluate_retrieval
+
         model = _MockModel()
         tokenizer = _MockTokenizer()
         prompts = self._make_prompts(2)
@@ -192,6 +247,8 @@ class TestEvaluateRetrieval:
         assert 0.0 <= result["accuracy"] <= 1.0
 
     def test_num_prompts_matches_input(self):
+        from gdn2_ruler import evaluate_retrieval
+
         model = _MockModel()
         tokenizer = _MockTokenizer()
         prompts = self._make_prompts(3)
@@ -199,6 +256,8 @@ class TestEvaluateRetrieval:
         assert result["num_prompts"] == 3
 
     def test_num_correct_consistent_with_accuracy(self):
+        from gdn2_ruler import evaluate_retrieval
+
         model = _MockModel()
         tokenizer = _MockTokenizer()
         prompts = self._make_prompts(3)
@@ -207,6 +266,8 @@ class TestEvaluateRetrieval:
         assert abs(result["accuracy"] - expected_acc) < 1e-9
 
     def test_details_have_required_fields(self):
+        from gdn2_ruler import evaluate_retrieval
+
         model = _MockModel()
         tokenizer = _MockTokenizer()
         prompts = self._make_prompts(1)
@@ -225,6 +286,8 @@ class TestEvaluateRetrieval:
             assert field in detail
 
     def test_hit_is_bool(self):
+        from gdn2_ruler import evaluate_retrieval
+
         model = _MockModel()
         tokenizer = _MockTokenizer()
         prompts = self._make_prompts(2)
@@ -234,6 +297,8 @@ class TestEvaluateRetrieval:
 
     def test_max_time_budget(self):
         """With negative max_time_secs, the break triggers on first iteration."""
+        from gdn2_ruler import evaluate_retrieval
+
         model = _MockModel()
         tokenizer = _MockTokenizer()
         prompts = self._make_prompts(3)
@@ -243,6 +308,8 @@ class TestEvaluateRetrieval:
 
     def test_margin_zero_when_correct_is_best(self):
         """When the correct answer has the highest logprob, margin should be 0."""
+        from gdn2_ruler import evaluate_retrieval
+
         model = _MockModel()
         tokenizer = _MockTokenizer()
         prompts = self._make_prompts(1)
@@ -253,6 +320,8 @@ class TestEvaluateRetrieval:
 
     def test_margin_negative_when_correct_not_best(self):
         """When the correct answer is NOT the highest, margin should be negative."""
+        from gdn2_ruler import evaluate_retrieval
+
         model = _MockModel()
         tokenizer = _MockTokenizer()
         prompts = self._make_prompts(5)
@@ -263,6 +332,8 @@ class TestEvaluateRetrieval:
 
     def test_scores_sorted_descending(self):
         """Scores list should be sorted by total_logprob descending."""
+        from gdn2_ruler import evaluate_retrieval
+
         model = _MockModel()
         tokenizer = _MockTokenizer()
         prompts = self._make_prompts(2)
@@ -270,34 +341,3 @@ class TestEvaluateRetrieval:
         for d in result["details"]:
             lps = [s["total_logprob"] for s in d["scores"]]
             assert lps == sorted(lps, reverse=True)
-
-
-# ---------------------------------------------------------------------------
-# capture_manifest
-# ---------------------------------------------------------------------------
-
-
-class TestCaptureManifest:
-    def test_returns_dict_with_required_fields(self):
-        m = capture_manifest()
-        assert isinstance(m, dict)
-        assert "git" in m
-        assert "sha" in m["git"]
-        assert "dirty" in m["git"]
-        assert "host" in m
-        assert "machine" in m["host"]
-        assert "software" in m
-
-    def test_git_sha_is_string(self):
-        m = capture_manifest()
-        assert isinstance(m["git"]["sha"], str)
-
-    def test_git_dirty_is_bool(self):
-        m = capture_manifest()
-        assert isinstance(m["git"]["dirty"], bool)
-
-    def test_timestamp_format(self):
-        m = capture_manifest()
-        ts = m["timestamp_utc"]
-        assert ts.endswith("Z")
-        assert "T" in ts
