@@ -309,11 +309,13 @@ The Edge AI submission's strengths:
 - **Novel kernels** that no existing library provides for Arm
 - **5-device cross-validation** proving the bandwidth-boundedness thesis
 - **The NPU wall finding** — a genuinely novel, citable result
+- **GPU OpenCL kernels validated bit-exact on Mali-G610** (87/87 tests) — scan 1.99×, cumdecay 1.03×, DWConv1D 1.30× vs 4-thread A76 (§13)
 - **~65× end-to-end speedup** from C kernel + GEMV + INT8 + SDOT + INT4+SDOT
 - **Honest negative results** (NPU compilers reject the recurrence)
 
-The one weakness: no heterogeneous NPU/GPU/CPU dispatch on target
-silicon. However, the complete NPU offload design — operator-level mapping,
+The one weakness: no heterogeneous NPU/GPU/CPU *dispatcher* on target
+silicon. The individual GPU kernels ARE validated (bit-exact, above),
+and the complete NPU offload design — operator-level mapping,
 subgraph boundaries, phase-dependent routing, and quantization policy — is
 documented in [`NPU_OFFLOAD_DESIGN.md`](NPU_OFFLOAD_DESIGN.md). The O6
 onboarding checklist (`docs/O6_ONBOARDING.md`) and baseline script
