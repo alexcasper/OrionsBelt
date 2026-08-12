@@ -30,9 +30,9 @@ Three GDN CPU kernels (gated cumulative decay, gated delta-rule scan, causal dep
 
 | Context | GDN state | KV cache (8 attn layers) | Savings vs all-attention |
 |---:|---:|---:|---:|
-| 32K | 51 MiB | 1.0 GiB | 2.95 GiB |
-| 128K | 51 MiB | 4.0 GiB | 11.95 GiB |
-| 262K | 51 MiB | 8.0 GiB | **23.95 GiB** |
+| 32K | 48 MiB | 1.0 GiB | 2.95 GiB |
+| 128K | 48 MiB | 4.0 GiB | 11.95 GiB |
+| 262K | 48 MiB | 8.0 GiB | **23.95 GiB** |
 
 > At 262K, the KV cache alone (8.0 GiB) **exceeds the fp16 weight footprint** (7.83 GiB).
 > The recurrent state never grows. ([`memory_comparison.md`](./results/figures/memory_comparison.md))
@@ -137,13 +137,13 @@ All figures above are verified against primary sources (Radxa product page and d
 
 **This is an in-progress research repository as of 2026-08-08.** The project has committed to the **Edge AI track** ([ADR 0007](./docs/adr/0007-commit-to-edge-ai-track.md)) after the Orion O6 board did not arrive by its last-useful-arrival date. All work continues on the portable aarch64 device fleet.
 
-**Device-fleet microbenchmarks are complete across five Arm devices.** Three GDN CPU kernels (gated cumulative decay, gated delta-rule scan, causal depthwise Conv1D) have been measured at verified Qwen3.5-4B and 0.8B shapes on the full fleet: Jetson Nano (Cortex-A57, NEON), Raspberry Pi 5 (Cortex-A76), and RK3588 (Cortex-A76 big + Cortex-A55 little clusters). The optimization stack (OpenMP parallelization + NEON unrolling + fp16 state) delivers 2.6–5.1× on A76 silicon and 2.6–3.1× on A57. The key cross-device finding — that these kernels are **instruction-overhead-bound, not DRAM-bandwidth-bound** at seq=64 working-set sizes — is documented in the [fleet bandwidth-scaling analysis](./results/figures/fleet_bandwidth_scaling.md).
+**Device-fleet microbenchmarks are complete across five Arm devices.** Three GDN CPU kernels (gated cumulative decay, gated delta-rule scan, causal depthwise Conv1D) have been measured at verified Qwen3.5-4B and 0.8B shapes on the full fleet: Jetson Nano (Cortex-A57, NEON), Raspberry Pi 5 (Cortex-A76), and RK3588 (Cortex-A76 big + Cortex-A55 little clusters). The optimization stack (OpenMP parallelization + NEON unrolling + fp16 state) delivers 2.3–5.1× on A76 silicon and 2.6–3.1× on A57. The key cross-device finding — that these kernels are **instruction-overhead-bound, not DRAM-bandwidth-bound** at seq=64 working-set sizes — is documented in the [fleet bandwidth-scaling analysis](./results/figures/fleet_bandwidth_scaling.md).
 
 **End-to-end model decode** runs the full Qwen3.5 forward pass in C with optimized NEON GEMV kernels. With the full optimization stack (row-sweep GEMV + **Q8_0 block-quantized weights**), the 0.8B model achieves **5.12 tok/s on the Jetson Nano (Cortex-A57)** — a 2.97× speedup over FP32 and 95% of llama.cpp's Q8_0 throughput on the same hardware (FINDINGS §29; the fleet harness 3-run average is 4.89 tok/s, slightly lower due to different build flags). Q8_0 quantization preserves output fidelity: cosine similarity 1.000000 vs FP32 across all 11 weight matrices (§30). INT8 weight quantization adds 1.1–1.8× on top of the GEMV optimization; on dotprod-capable cores (A76) the **SDOT (`vdotq_lane_s32`) INT8×INT8→int32 kernel** (§33) adds a further 1.9–3.1× over NEON INT8, for a cumulative ~50× over the naive baseline. The **INT4+SDOT hybrid kernel** (§34) halves weight traffic further for a cumulative **~65×** — the fastest decode kernel on A76 (36.36 tok/s 0.8B, 4.52 tok/s 4B). Cache-blocked GEMM delivers 49–78× prefill speedup (§25). Bottleneck analysis confirms the model is **matmul-bound** (FFN 54–72%), not recurrence-bound — GDN's novel kernels account for <1% of total time. See the [e2e fleet comparison](./results/figures/e2e_fleet_comparison.md) and [FINDINGS.md §16, §29](./docs/FINDINGS.md).
 
 ![Decode optimization stack on RK3588 Cortex-A76](./results/figures/optimization_stack.png)
 
-**Context-length scaling proves GDN's core value proposition on silicon (§17).** Sweeping context length from 1 to 4096 tokens with real grouped-query attention: **pure-GDN throughput is flat to within 0.2%** while the hybrid model degrades 1.33× (4B) to 1.56× (0.8B) — entirely from the full-attention layers whose KV cache reads grow linearly. INT8 KV cache quantization (§20) cuts KV memory 4× and delivers 1.7–2.6× full-attention speedup at long context, but full-attention's cost still scales O(n). Sustained-load tests confirm <1% throughput decay over 3–5 min — burst numbers are steady-state sustainable (§18, §37). Cross-validated on two independent RK3588 units (§36) and across A57+A76. See [FINDINGS.md §17–20](./docs/FINDINGS.md).
+**Context-length scaling proves GDN's core value proposition on silicon (§17).** Sweeping context length from 1 to 8192 tokens with real grouped-query attention: **pure-GDN throughput is flat to within 0.2%** while the hybrid model degrades 1.33× (4B) to 1.56× (0.8B) — entirely from the full-attention layers whose KV cache reads grow linearly. INT8 KV cache quantization (§20) cuts KV memory 4× and delivers 1.7–2.6× full-attention speedup at long context, but full-attention's cost still scales O(n). Sustained-load tests confirm <1% throughput decay over 3–5 min — burst numbers are steady-state sustainable (§18, §37). Cross-validated on two independent RK3588 units (§36) and across A57+A76. See [FINDINGS.md §17–20](./docs/FINDINGS.md).
 
 **Operator analysis findings** ([`docs/FINDINGS.md`](./docs/FINDINGS.md), 54 sections):
 - CIX NOE and Rockchip RKNN toolchains both reject GDN's runtime-length recurrence — the limitation generalises beyond one vendor (§1, §7)
@@ -179,7 +179,7 @@ All figures above are verified against primary sources (Radxa product page and d
 | Cache-blocked GEMM for prefill | Done — 49–78× prefill speedup for M>1. [§25](./docs/FINDINGS.md) |
 | INT4 weight-only quantization | Done — core-type-dependent: slower alone, but **INT4+SDOT hybrid** is fastest on A76 (1.30× over INT8+SDOT on 4B, 1.19× on 0.8B). [§26, §34](./docs/FINDINGS.md) |
 | llama.cpp baseline comparison | Done — mature Q8_0/Q4_0 inference 3.1× faster decode, 2.3× faster prefill on A57. [§28](./docs/FINDINGS.md) |
-| Context-length scaling (GDN O(1) vs full-attn O(n)) | Done — pure-GDN flat to <0.3% across ctx=1–8192, fair 4-thread comparison, cross-validated on 2× RK3588 (§36). [§17](./docs/FINDINGS.md) |
+| Context-length scaling (GDN O(1) vs full-attn O(n)) | Done — pure-GDN flat to 0.2% across ctx=1–8192, fair 4-thread comparison, cross-validated on 2× RK3588 (§36). [§17](./docs/FINDINGS.md) |
 | INT8 KV cache quantization | Done — 1.7–2.6× full-attn speedup at long context, 4× KV memory reduction. [§20](./docs/FINDINGS.md) |
 | Sustained-load thermal characterization | Done — <1% throughput decay over 3–5 min on RK3588, temp plateaued at 52°C, no throttling (§18, §37) |
 | INA3221 power/energy profiling | Done — 874–1250 mJ/GiB board-wide on Jetson A57; power constant across kernels, energy tracks 1/throughput (ob-agf.1) |
