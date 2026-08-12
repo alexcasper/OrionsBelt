@@ -479,5 +479,5 @@ __all__ = [
 ]
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     print(json.dumps(capture(), indent=2, sort_keys=True))

@@ -24,7 +24,7 @@ from typing import Any
 
 # Ensure repo root is importable
 _ROOT = str(Path(__file__).resolve().parent.parent)
-if _ROOT not in sys.path:
+if _ROOT not in sys.path:  # pragma: no cover
     sys.path.insert(0, _ROOT)
 
 from bench.harness import Backend, ModelConfig  # noqa: E402
@@ -41,7 +41,7 @@ try:
     from transformers import AutoModelForCausalLM, AutoTokenizer  # type: ignore[import-untyped]
 
     _TORCH_AVAILABLE = True
-except ImportError:
+except ImportError:  # pragma: no cover
     _TORCH_AVAILABLE = False
     torch = None  # type: ignore[assignment]
     AutoModelForCausalLM = None  # type: ignore[assignment]

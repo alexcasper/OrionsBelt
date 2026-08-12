@@ -104,5 +104,5 @@ def main() -> None:
     print(f"\nTotal: {count} files updated")
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     main()

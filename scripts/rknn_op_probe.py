@@ -262,5 +262,5 @@ def main():
         print(f"{r['probe']:<25} {r['verdict']:<20} {fallbacks:<30} {notes}")
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     main()

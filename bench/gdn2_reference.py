@@ -39,7 +39,7 @@ import sys
 
 try:
     import numpy as np
-except ImportError:
+except ImportError:  # pragma: no cover
     print("ERROR: numpy is required (apt-get install python3-numpy)", file=sys.stderr)
     sys.exit(1)
 
@@ -503,5 +503,5 @@ def main():
     print("  lit_gpt/config.py               — model configs (1.3B: 18 layers, 18 heads, d=128)")
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     main()

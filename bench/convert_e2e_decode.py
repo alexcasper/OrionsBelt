@@ -186,6 +186,6 @@ def convert(raw_path: str, args: argparse.Namespace) -> None:
         print(f"  {r['phase']:8s} {r['metric_name']:30s} = {r['value']:>12s} {r['unit']}")
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     args = parse_args()
     convert(args.raw, args)

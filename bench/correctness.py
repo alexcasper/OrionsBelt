@@ -46,7 +46,7 @@ try:
     import numpy as np
 
     HAS_NUMPY = True
-except ImportError:
+except ImportError:  # pragma: no cover
     HAS_NUMPY = False
 
 
@@ -720,5 +720,5 @@ def main(argv: list[str] | None = None) -> int:
     return 0 if output_data["passed"] else 1
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     sys.exit(main())

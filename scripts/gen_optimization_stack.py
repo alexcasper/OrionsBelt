@@ -121,5 +121,5 @@ def main() -> None:
     generate_chart(output)
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     main()

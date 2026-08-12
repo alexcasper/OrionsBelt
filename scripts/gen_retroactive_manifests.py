@@ -62,5 +62,5 @@ def main():
     print(f"\nGenerated {len(CSV_TO_SHA)} retroactive manifests")
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     main()

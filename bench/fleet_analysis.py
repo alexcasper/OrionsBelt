@@ -940,5 +940,5 @@ def main():
     plot_cross_device(device_data, plot_path)
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     main()
