@@ -57,20 +57,20 @@ At 262K context on the 4B checkpoint, that difference is **23.95 GiB of RAM** �
 
 ### Headline: GDN kernel bandwidth on RK3588 Cortex-A76
 
-Qwen3.5-4B, prefill (seq=64), fp32 baseline, 8-thread (big cluster). Two independent RK3588 nodes (t3, t4 Turing Machines RK1). Kernel computation is unchanged between commits — `bench_gdn.c` is byte-identical between 854c6f1 (t3) and 82f4833 (t4, current data), so the comparison is exact, not just infrastructure-equivalent.
+Qwen3.5-4B, prefill (seq=64), fp32 baseline, 8-thread (big cluster). Two independent RK3588 nodes (t3, t4 Turing Machines RK1). Kernel computation is unchanged between commits — `bench_gdn.c` is byte-identical between 854c6f1 (t3) and aa61e20 (t4, current data), so the comparison is exact, not just infrastructure-equivalent.
 
 | Kernel | GiB/s (t3) | Spread | GiB/s (t4) | Spread | t3÷t4 |
 |---|---:|---:|---:|---:|---:|
-| Cumulative decay | 21.39 | 7.3% | 23.91 | 1.4% | 0.89× |
-| Gated delta-rule scan | 10.56 | 6.3% | 11.90 | 9.3% | 0.89× |
-| Causal Conv1D | 20.59 | 3.5% | 20.77 | 7.6% | 0.99× |
+| Cumulative decay | 21.39 | 7.3% | 21.67 | 12.9% | 0.99× |
+| Gated delta-rule scan | 10.56 | 6.3% | 11.42 | 6.6% | 0.92× |
+| Causal Conv1D | 20.59 | 3.5% | 20.71 | 4.4% | 0.99× |
 
-> t3 manifest git_sha `854c6f1`, dirty=false; t4 manifest git_sha `82f4833`,
+> t3 manifest git_sha `854c6f1`, dirty=false; t4 manifest git_sha `aa61e20`,
 > dirty=false (re-run clean in PR #293); `bench_gdn.c` is byte-identical
 > between commits, per above. 30 repeats each. The boards agree within
-> 0–12% — consistent with t4's ~4% higher clock (2400 vs 2304 MHz) plus
+> 1–8% — consistent with t4's ~4% higher clock (2400 vs 2304 MHz) plus
 > run-to-run variance — confirming the result is hardware-reproducible.
-> Cumulative decay reaches 75% of the 31.7 GiB/s spec bandwidth; gated scan
+> Cumulative decay reaches 68% of the 31.7 GiB/s spec bandwidth; gated scan
 > runs at a lower fraction because its sequential recurrence is
 > **instruction-overhead-bound, not DRAM-bandwidth-bound**.
 > (An earlier version of this table compared t3 8-thread against t4 1-thread
@@ -209,7 +209,7 @@ No GPU, NPU, or proprietary SDK required. Full setup guide: [`docs/SETUP_PORTABL
 - 2370 unit tests pass in CI (59 skips due to missing optional deps); the exact local count varies by machine depending on which optional deps (torch, pandas, matplotlib) are installed — the CI figure is the reproducible reference
 - All figures are **regenerable** from committed CSVs (`bench/plots.py`, `scripts/generate_memory_plots.py`)
 - t3 benchmark data: manifest git_sha `854c6f1`, dirty=false, governor=performance, 30 repeats per kernel
-- t4 benchmark data: all kernel-bandwidth CSVs re-run at clean commit `82f4833` (dirty=false, PR #293); SDOT/INT4+SDOT microbenches at clean commit `d6b77b2` (dirty=false); each manifest records the exact git SHA, governor state, and thermals so every number is traceable to its source tree state
+- t4 benchmark data: all kernel-bandwidth CSVs re-run at clean commit `aa61e20` (dirty=false, PR #293); SDOT/INT4+SDOT microbenches at clean commit `d6b77b2` (dirty=false); each manifest records the exact git SHA, governor state, and thermals so every number is traceable to its source tree state
 
 ---
 
