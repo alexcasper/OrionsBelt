@@ -187,6 +187,19 @@ class TestParseCpuinfo:
         result = _parse_cpuinfo(text)
         assert result.get("processor") == "0"
 
+    def test_duplicate_key_no_blank_line(self):
+        """Duplicate key in same block is skipped (no-break path)."""
+        text = "processor : 0\nprocessor : 1\n"
+        result = _parse_cpuinfo(text)
+        assert result.get("processor") == "0"
+
+    def test_line_without_colon_skipped(self):
+        """A non-blank line without a colon is silently skipped."""
+        text = "processor : 0\ngarbage line without colon\nCPU part : 0xd0b\n"
+        result = _parse_cpuinfo(text)
+        assert result.get("processor") == "0"
+        assert result.get("cpu_part") == "0xd0b"
+
 
 class TestCpuPartNameLower:
     """Cover cpu_part_name lowercase normalization."""
