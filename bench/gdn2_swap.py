@@ -37,6 +37,7 @@ try:
     import torch
     import torch.nn as nn
     import torch.nn.functional as F
+
     HAS_TORCH = True
 except ImportError:
     HAS_TORCH = False
