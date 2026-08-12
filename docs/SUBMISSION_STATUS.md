@@ -334,8 +334,8 @@ cutoff has passed with no board; any future arrival is additive bonus per ADR 00
 | #335 | t4 | README FINDINGS count fix 54→55 + holding pattern | CLOSED (superseded by #336) |
 | #336 | t3 | Fix stale FINDINGS section count 54→55 across README + DEVPOST_SUBMISSION + DEVPOST_WRITEUP (ob-mrd.34; superset of #335) | MERGED |
 | #337 | t3 | Fix stale PR #335/#336 status in SUBMISSION_STATUS table (#335 CLOSED, #336 MERGED; #327/#335 added to closed-PR note) | MERGED |
-| #338 | t3 | PR #337 backfill + stale CI test count 2419→2433 fix + CLAIM_VERIFICATION §40/§41 extension | OPEN |
-| #339 | t4 | t3/t4 fleet SKU characterization (32GB vs 8GB) in FINDINGS.md + fleet_bandwidth_scaling.md | OPEN |
+| #338 | t3 | PR #337 backfill + stale CI test count 2419→2433 fix + CLAIM_VERIFICATION §40/§41 extension | MERGED |
+| #339 | t4 | t3/t4 fleet SKU characterization (32GB vs 8GB) in FINDINGS.md + fleet_bandwidth_scaling.md | MERGED |
 
 > **PRs #190, #198, #207, #229, #235, #245, #289, #324, #327, #335:** closed (not merged). #282's proposed provenance content was rejected but its PR itself shows MERGED on GitHub (content replaced during review — see row above). No gaps in numbering.
 
