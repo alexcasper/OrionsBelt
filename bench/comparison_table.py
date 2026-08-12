@@ -65,7 +65,9 @@ def load_and_summarize(csv_paths: Sequence[str]) -> list[dict]:
                 for row in reader:
                     # Skip rows from non-sweep CSVs (standard benchmark CSVs use a
                     # different schema without context_length/engine_gdn/value).
-                    if "context_length" not in row or "value" not in row:
+                    if (
+                        "context_length" not in row or "value" not in row
+                    ):  # pragma: no cover (unreachable: fieldnames check above)
                         continue
                     try:
                         ctx = int(row["context_length"])

@@ -837,6 +837,18 @@ class TestMainCLI:
         pngs = [f for f in os.listdir(out_dir) if f.endswith(".png")]
         assert len(pngs) >= 1
 
+    def test_main_prints_warnings_for_missing_csv(self, tmp_path, capsys):
+        """main() prints warnings to stderr when a CSV can't be read."""
+        valid_csv = write_temp_csv(MICROBENCH_CSV)
+        out_dir = str(tmp_path / "figures")
+
+        rc = main([valid_csv, "/nonexistent/missing.csv", "--output-dir", out_dir, "--text-only"])
+        os.unlink(valid_csv)
+
+        assert rc == 0  # still succeeds with valid CSV
+        captured = capsys.readouterr()
+        assert "⚠" in captured.err
+
     def test_directory_expansion(self, tmp_path):
         """Passing a directory expands to individual CSVs."""
         pytest.importorskip("matplotlib")

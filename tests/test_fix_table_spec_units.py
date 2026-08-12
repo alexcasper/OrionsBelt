@@ -256,3 +256,32 @@ class TestMain:
         captured = capsys.readouterr()
         assert "FIXED" in captured.out
         assert "1 files fixed" in captured.out
+
+    def test_main_skips_unfixable_file(self, monkeypatch, tmp_path, capsys):
+        """main() should count files that can't be fixed as skipped."""
+        import scripts.fix_table_spec_units as ftsu
+
+        # Table file with unknown device — fix_table_file returns (False, ...)
+        fpath = tmp_path / "unknown_table.md"
+        fpath.write_text(
+            "# unknown Table\n\n"
+            "**Device spec bandwidth:** N/A\n\n"
+            "## Achieved vs Spec Bandwidth\n\n"
+            "| Kernel | Achieved (GiB/s) | % of Spec | p50 | Spread |\n"
+            "|--------|------------------|-----------|-----|--------|\n"
+            "| scan | 10.00 | N/A | 5.0 | 1.1× |\n"
+        )
+
+        def patched_glob(pattern):
+            if "*_table.md" in pattern:
+                return [str(fpath)]
+            return []
+
+        monkeypatch.setattr(ftsu.glob, "glob", patched_glob)
+
+        ftsu.main()
+
+        captured = capsys.readouterr()
+        assert "SKIP" in captured.out
+        assert "0 files fixed" in captured.out
+        assert "1 skipped" in captured.out

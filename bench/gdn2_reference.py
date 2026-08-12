@@ -492,7 +492,7 @@ def main():
     print("All tests PASS — GDN-2 recurrence reference verified.")
     print()
 
-    if "--bench" in sys.argv:
+    if "--bench" in sys.argv:  # pragma: no cover (optional flag, tested separately)
         micro_benchmark()
 
     print("\nReference repo cloned at: references/GatedDeltaNet-2/")

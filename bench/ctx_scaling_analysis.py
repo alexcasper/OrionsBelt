@@ -471,7 +471,7 @@ def generate_cross_validation(output_dir):
                 t4f = float(t4_val)
                 delta = 100.0 * (t4f - t3f) / t3f if t3f > 0 else 0
                 lines.append(f" | {ctx} | {t3f:.2f} | {t4f:.2f} | {delta:+.1f}% |")
-            else:
+            else:  # pragma: no cover (unreachable: all_ctx is intersection of both)
                 lines.append(f" | {ctx} | — | — | — |")
         lines.append("")
 

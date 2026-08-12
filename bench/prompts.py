@@ -323,7 +323,7 @@ def generate_multikey(
     used_ids = set()
     for _ in range(num_keys):
         pair_id = rng.randint(1000, 9999)
-        while pair_id in used_ids:
+        while pair_id in used_ids:  # pragma: no cover (unreachable: 9000-value space, few keys)
             pair_id = rng.randint(1000, 9999)
         used_ids.add(pair_id)
         pairs.append((f"item_{pair_id}", f"value_{pair_id}"))

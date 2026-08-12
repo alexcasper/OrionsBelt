@@ -477,6 +477,18 @@ class TestCpuModelFallback:
         monkeypatch.setattr(manifest_mod.platform, "processor", lambda: "")
         assert _cpu_model() is None
 
+    def test_hardware_key_match(self, monkeypatch):
+        """When /proc/cpuinfo has 'Hardware' key, returns that value."""
+        monkeypatch.setattr(manifest_mod, "_read_text", lambda path: "Hardware : Radxa RK3588\n")
+        assert _cpu_model() == "Radxa RK3588"
+
+    def test_model_name_key_match(self, monkeypatch):
+        """When /proc/cpuinfo has 'model name' key (x86 style), returns it."""
+        monkeypatch.setattr(
+            manifest_mod, "_read_text", lambda path: "model name : Intel i7-12700K\n"
+        )
+        assert _cpu_model() == "Intel i7-12700K"
+
 
 class TestCpufreqTopologyMissing:
     """Cover _cpufreq_topology when /sys tree absent (lines 187, 193)."""

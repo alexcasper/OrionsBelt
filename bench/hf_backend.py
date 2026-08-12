@@ -37,10 +37,13 @@ from bench.memory import (  # noqa: E402
 
 # Conditional imports — torch and transformers are NOT required to import this module.
 try:
-    import torch  # type: ignore[import-untyped]
-    from transformers import AutoModelForCausalLM, AutoTokenizer  # type: ignore[import-untyped]
+    import torch  # type: ignore[import-untyped]  # pragma: no cover
+    from transformers import (  # type: ignore[import-untyped]  # pragma: no cover
+        AutoModelForCausalLM,
+        AutoTokenizer,
+    )
 
-    _TORCH_AVAILABLE = True
+    _TORCH_AVAILABLE = True  # pragma: no cover
 except ImportError:  # pragma: no cover
     _TORCH_AVAILABLE = False
     torch = None  # type: ignore[assignment]

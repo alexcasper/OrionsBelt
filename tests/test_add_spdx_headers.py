@@ -253,14 +253,15 @@ class TestMain:
         (tmp_path / "tests" / "test_foo.py").write_text(
             "# SPDX-License-Identifier: Apache-2.0\nz = 3\n"
         )
+        (tmp_path / "goose-loop.sh").write_text("#!/usr/bin/env bash\necho loop\n")
 
         monkeypatch.setattr(ash, "REPO", tmp_path)
         ash.main()
 
         captured = capsys.readouterr()
         assert (
-            "Total: 3 files updated" in captured.out
-        )  # tool.py, run.sh, kernel.py (test already has SPDX)
+            "Total: 4 files updated" in captured.out
+        )  # tool.py, run.sh, kernel.py, goose-loop.sh (test already has SPDX)
 
     def test_main_idempotent(self, tmp_path, monkeypatch):
         (tmp_path / "scripts").mkdir()

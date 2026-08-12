@@ -140,6 +140,13 @@ class TestGenerateNeedle:
         assert a[0] == b[0]
         assert a[1] == b[1]
 
+    def test_small_target_no_paragraph_boundary(self):
+        """Very small target → single-paragraph filler, no \\n\\n boundary found."""
+        rng = random.Random(MASTER_SEED + 40)
+        prompt, meta = generate_needle(40, rng)
+        assert isinstance(prompt, str)
+        assert meta["question"] in prompt
+
 
 # ---------------------------------------------------------------------------
 # generate_ruler
