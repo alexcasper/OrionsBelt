@@ -316,6 +316,7 @@ cutoff has passed with no board; any future arrival is additive bonus per ADR 00
 | #317 | t3 | Fix stale t4_big cascade across 6 files after PR #313 (DEVPOST_SUBMISSION, FINDINGS ×6, SUBMISSION_STATUS, DEVPOST_WRITEUP, fleet_analysis.py generator); j2-review fixed 2 overshot ~0%/~8% mislabels | MERGED |
 | #318 | t4 | Fix stale 0.8B optimization table in FINDINGS.md (missed by PR #317) | MERGED |
 | #319 | t3 | Restore 6 ablation manifests deleted by loop flush (fef1567) — validate_results.py MISSING warnings → 0 | MERGED |
+| #321 | t3 | Cross-validate boundary-crossing cost ARM blob vs RustiCL/Panfrost (ob-t3b.10) — 14× lower dispatch overhead on blob, 0.7% vs 10.1% crossing tax | OPEN |
 
 > **PRs #190, #198, #207, #229, #235, #245, #289:** closed (not merged). #282's proposed provenance content was rejected but its PR itself shows MERGED on GitHub (content replaced during review — see row above). No gaps in numbering.
 
