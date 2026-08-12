@@ -292,6 +292,7 @@ cutoff has passed with no board; any future arrival is additive bonus per ADR 00
 | #293 | t4 | t4 device bench + portable work (clean re-runs: dirty→false for kernel/e2e/delta-matmul CSVs) | MERGED |
 | #294 | t3 | Submission-facing doc consistency fixes (ob-q44.3, ob-4ke, ob-rp2, CLAIM_VERIFICATION §2.7) | MERGED |
 | #295 | t3 | Fix manifest count 326→207 git-tracked + refresh README counts after t4 merge (ob-uqxt) | OPEN |
+| #296 | t4 | Fix manifest dirty-check bug + clean 75 false-positive manifests (ob-mrd.24) | OPEN |
 
 > **PRs #190, #198, #207, #229, #235, #245, #289:** closed (not merged). #282's proposed provenance content was rejected but its PR itself shows MERGED on GitHub (content replaced during review — see row above). No gaps in numbering.
 
