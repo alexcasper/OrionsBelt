@@ -243,7 +243,7 @@ class TestGitDirtyFiltering:
 
     def test_clean_tree_returns_false(self, monkeypatch):
         """Empty git status → not dirty."""
-        monkeypatch.setattr(manifest_mod, "_run", lambda cmd: "")
+        monkeypatch.setattr(manifest_mod, "_git_porcelain", lambda: "")
         from bench.manifest import _git_dirty
 
         assert _git_dirty() is False
@@ -252,8 +252,8 @@ class TestGitDirtyFiltering:
         """Untracked results/ files should NOT count as dirty."""
         monkeypatch.setattr(
             manifest_mod,
-            "_run",
-            lambda cmd: "?? results/test.csv\n?? results/manifests/foo.json\n",
+            "_git_porcelain",
+            lambda: "?? results/test.csv\n?? results/manifests/foo.json\n",
         )
         from bench.manifest import _git_dirty
 
@@ -263,8 +263,8 @@ class TestGitDirtyFiltering:
         """Untracked .beads/ files should NOT count as dirty."""
         monkeypatch.setattr(
             manifest_mod,
-            "_run",
-            lambda cmd: "?? .beads/issues.jsonl\n?? .beads/dolt/HEAD\n",
+            "_git_porcelain",
+            lambda: "?? .beads/issues.jsonl\n?? .beads/dolt/HEAD\n",
         )
         from bench.manifest import _git_dirty
 
@@ -274,8 +274,8 @@ class TestGitDirtyFiltering:
         """Modified (tracked) results/ file should NOT count as dirty."""
         monkeypatch.setattr(
             manifest_mod,
-            "_run",
-            lambda cmd: " M results/raw/rk3588-t4_big.csv\n",
+            "_git_porcelain",
+            lambda: " M results/raw/rk3588-t4_big.csv\n",
         )
         from bench.manifest import _git_dirty
 
@@ -285,8 +285,8 @@ class TestGitDirtyFiltering:
         """Real source change should count as dirty."""
         monkeypatch.setattr(
             manifest_mod,
-            "_run",
-            lambda cmd: " M bench/manifest.py\n",
+            "_git_porcelain",
+            lambda: " M bench/manifest.py\n",
         )
         from bench.manifest import _git_dirty
 
@@ -296,8 +296,8 @@ class TestGitDirtyFiltering:
         """Source change + output files → still dirty (source change dominates)."""
         monkeypatch.setattr(
             manifest_mod,
-            "_run",
-            lambda cmd: " M bench/manifest.py\n?? results/test.csv\n?? .beads/issues.jsonl\n",
+            "_git_porcelain",
+            lambda: " M bench/manifest.py\n?? results/test.csv\n?? .beads/issues.jsonl\n",
         )
         from bench.manifest import _git_dirty
 
@@ -307,8 +307,8 @@ class TestGitDirtyFiltering:
         """Multiple output dirs, no source → not dirty."""
         monkeypatch.setattr(
             manifest_mod,
-            "_run",
-            lambda cmd: (
+            "_git_porcelain",
+            lambda: (
                 " M results/raw/jetson-j1.csv\n"
                 "?? results/manifests/new.json\n"
                 "?? .beads/issues.jsonl\n"
@@ -320,8 +320,8 @@ class TestGitDirtyFiltering:
         assert _git_dirty() is False
 
     def test_none_on_git_failure(self, monkeypatch):
-        """When _run returns None (git not available), _git_dirty returns None."""
-        monkeypatch.setattr(manifest_mod, "_run", lambda cmd: None)
+        """When _git_porcelain returns None (git not available), _git_dirty returns None."""
+        monkeypatch.setattr(manifest_mod, "_git_porcelain", lambda: None)
         from bench.manifest import _git_dirty
 
         assert _git_dirty() is None
