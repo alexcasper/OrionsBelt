@@ -12,8 +12,17 @@ import sys
 
 import pytest
 
-torch = pytest.importorskip("torch")
-nn = torch.nn
+try:
+    import torch
+    HAS_TORCH = True
+except ImportError:
+    HAS_TORCH = False
+    torch = None
+
+nn = torch.nn if HAS_TORCH else None
+
+_NNModule = nn.Module if HAS_TORCH else object
+_sysmark = pytest.mark.skipif(not HAS_TORCH, reason="requires torch")
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "bench"))
 
@@ -28,8 +37,10 @@ from gdn2_swap import (  # noqa: E402
 # ---------------------------------------------------------------------------
 
 
-def _make_inputs(B=2, H=4, T=6, K=8, V=5, dtype=torch.float32):
+def _make_inputs(B=2, H=4, T=6, K=8, V=5, dtype=None):
     """Create valid recurrence inputs."""
+    if dtype is None:
+        dtype = torch.float32
     torch.manual_seed(42)
     return dict(
         query=torch.randn(B, H, T, K, dtype=dtype),
@@ -41,6 +52,7 @@ def _make_inputs(B=2, H=4, T=6, K=8, V=5, dtype=torch.float32):
     )
 
 
+@_sysmark
 class TestGdn2Recurrent:
     def test_output_shape(self):
         """Output shape is [B, H, T, V] (transpose undoes the internal swap)."""
@@ -132,6 +144,7 @@ class TestGdn2Recurrent:
 # ---------------------------------------------------------------------------
 
 
+@_sysmark
 class TestCountParameters:
     def test_simple_linear(self):
         layer = nn.Linear(10, 5)
@@ -213,7 +226,8 @@ class TestCaptureManifest:
 # ---------------------------------------------------------------------------
 
 
-class _MockGDN1(nn.Module):
+@_sysmark
+class _MockGDN1(_NNModule):
     """Minimal mock of Qwen3_5GatedDeltaNet for testing gate initialization."""
 
     def __init__(self, hidden_size=64, num_v_heads=4, num_k_heads=4, head_k_dim=16, head_v_dim=16):
@@ -249,6 +263,7 @@ class _MockGDN1(nn.Module):
         self.in_proj_b = nn.Linear(hidden_size, num_v_heads, bias=False)
 
 
+@_sysmark
 class TestSmartGateInit:
     """Tests for _init_gates_from_gdn1 / smart_init parameter (ob-t3b.9)."""
 
