@@ -68,7 +68,7 @@ Qwen3.5-4B, prefill (seq=64), fp32 baseline, 8-thread (big cluster). Two indepen
 > t3 manifest git_sha `854c6f1`, dirty=false; t4 manifest git_sha `aa61e20`,
 > dirty=false (re-run clean in PR #313); `bench_gdn.c` is byte-identical
 > between commits, per above. 30 repeats each. The boards agree within
-> 0–8% — consistent with t4's ~4% higher clock (2400 vs 2304 MHz) plus
+> 1–8% — consistent with t4's ~4% higher clock (2400 vs 2304 MHz) plus
 > run-to-run variance — confirming the result is hardware-reproducible.
 > Cumulative decay reaches ~68% of the 31.7 GiB/s spec bandwidth; gated scan
 > runs at a lower fraction because its sequential recurrence is

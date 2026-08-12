@@ -3100,7 +3100,7 @@ prior workloads), not a kernel or measurement methodology problem.
 >
 > The 8-thread vs 8-thread comparison (`rk3588-t3-clean.csv` vs
 > `rk3588-t4_big.csv`, both `effective_threads=8`) shows the boards agree within
-> ~8% (cumdecay 21.39 vs 21.67), consistent with t4's higher 2400 MHz clock.
+> ~1% (cumdecay 21.39 vs 21.67), consistent with t4's higher 2400 MHz clock.
 >
 > See `comparison_table.md` §1a for the corrected like-for-like analysis.
 
