@@ -355,10 +355,9 @@ def capture_manifest():
         ).strip()
         # Exclude results/ and .beads/ — output data, not source changes.
         import re
+
         _OUTPUT_RE = re.compile(r"^[ ?][M?] (results/|\.beads/)")
-        dirty = any(
-            not _OUTPUT_RE.match(line) for line in _status.splitlines() if line
-        )
+        dirty = any(not _OUTPUT_RE.match(line) for line in _status.splitlines() if line)
     except Exception:
         sha, dirty = "unknown", False
 

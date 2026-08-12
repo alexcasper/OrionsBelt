@@ -154,6 +154,8 @@ class TestMain:
                 "5",
                 "--output-dir",
                 str(tmp_path / "ablation"),
+                "--manifest-dir",
+                str(tmp_path / "manifests"),
                 "--table-output",
                 str(tmp_path / "table.md"),
             ]
@@ -172,6 +174,8 @@ class TestMain:
                 "5",
                 "--output-dir",
                 str(tmp_path / "ablation"),
+                "--manifest-dir",
+                str(tmp_path / "manifests"),
                 "--table-output",
                 str(table_path),
             ]
@@ -191,6 +195,8 @@ class TestMain:
                 "5",
                 "--output-dir",
                 str(tmp_path / "ablation"),
+                "--manifest-dir",
+                str(tmp_path / "manifests"),
                 "--table-output",
                 str(tmp_path / "table.md"),
             ]
@@ -236,6 +242,8 @@ class TestMainEntryRunpy:
                 "5",
                 "--output-dir",
                 str(tmp_path / "ablation"),
+                "--manifest-dir",
+                str(tmp_path / "manifests"),
                 "--table-output",
                 str(tmp_path / "table.md"),
             ],
