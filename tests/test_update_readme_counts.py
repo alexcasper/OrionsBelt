@@ -428,3 +428,190 @@ class TestUpdateTestCount:
         monkeypatch.setattr("sys.argv", ["update_readme_counts.py", "--test-count", "500"])
         assert urc.main() == 0
         assert called["test_count"] == 500
+
+
+# ---------------------------------------------------------------------------
+# _count_findings_lines
+# ---------------------------------------------------------------------------
+
+
+class TestCountFindingsLines:
+    """Tests for _count_findings_lines — wc -l equivalent."""
+
+    def test_count_lines(self, tmp_path, monkeypatch):
+        """Counts all lines in FINDINGS.md, not just ## headers."""
+        monkeypatch.setattr(urc, "REPO_ROOT", str(tmp_path))
+        _make_repo(tmp_path, findings=3)
+        # _make_repo creates "## Section N\nContent.\n\n" = 3 lines per section
+        assert urc._count_findings_lines() == 9
+
+    def test_no_file(self, tmp_path, monkeypatch):
+        """Returns 0 when docs/FINDINGS.md does not exist."""
+        monkeypatch.setattr(urc, "REPO_ROOT", str(tmp_path))
+        assert urc._count_findings_lines() == 0
+
+    def test_single_line_file(self, tmp_path, monkeypatch):
+        """A file with no trailing newline is still counted correctly."""
+        monkeypatch.setattr(urc, "REPO_ROOT", str(tmp_path))
+        (tmp_path / "docs").mkdir(parents=True)
+        (tmp_path / "docs" / "FINDINGS.md").write_text("## Only\nBody")
+        assert urc._count_findings_lines() == 2
+
+
+# ---------------------------------------------------------------------------
+# update_readme — "Operator analysis findings" line repair
+# ---------------------------------------------------------------------------
+
+README_WITH_OPERATOR = """\
+# Test Repo
+
+**Operator analysis findings** ([`docs/FINDINGS.md`](./docs/FINDINGS.md), {findings} sections):
+
+> **Results so far:** {csvs} CSVs from the device fleet, {manifests} provenance manifests, {figs} generated figures/tables, {findings2} FINDINGS sections.
+"""
+
+
+class TestOperatorFindingsRepair:
+    """Tests for the 'Operator analysis findings' line auto-fix in update_readme."""
+
+    def test_operator_findings_drift(self, tmp_path, monkeypatch):
+        """Stale 'Operator analysis findings' section count is repaired."""
+        monkeypatch.setattr(urc, "REPO_ROOT", str(tmp_path))
+        _make_repo(tmp_path, csvs=5, manifests=10, figures=3, findings=7)
+        # Write README with stale count in both locations
+        (tmp_path / "README.md").write_text(
+            README_WITH_OPERATOR.format(csvs=5, manifests=10, figs=3, findings=3, findings2=3)
+        )
+        n = urc.update_readme()
+        assert n == 2  # headline FINDINGS + operator-findings
+        text = (tmp_path / "README.md").read_text()
+        assert "55 sections" not in text  # exact count depends on _make_repo
+        assert "7 sections" in text
+
+    def test_operator_findings_only_drift(self, tmp_path, monkeypatch):
+        """When headline FINDINGS matches but operator line drifts, only operator is fixed."""
+        monkeypatch.setattr(urc, "REPO_ROOT", str(tmp_path))
+        _make_repo(tmp_path, csvs=5, manifests=10, figures=3, findings=7)
+        # Headline correct, operator line stale
+        (tmp_path / "README.md").write_text(
+            README_WITH_OPERATOR.format(csvs=5, manifests=10, figs=3, findings=3, findings2=7)
+        )
+        n = urc.update_readme()
+        assert n == 1  # only operator-findings
+        text = (tmp_path / "README.md").read_text()
+        assert "7 sections" in text
+
+    def test_no_operator_line_no_crash(self, tmp_path, monkeypatch):
+        """README without the operator-findings line does not crash."""
+        monkeypatch.setattr(urc, "REPO_ROOT", str(tmp_path))
+        _make_repo(tmp_path, csvs=5, manifests=10, figures=3, findings=3)
+        _write_readme(tmp_path, csvs=5, manifests=10, figs=3, findings=3)
+        n = urc.update_readme()
+        assert n == 0  # nothing wrong, and no operator line to check
+
+
+# ---------------------------------------------------------------------------
+# update_findings_doc_counts
+# ---------------------------------------------------------------------------
+
+DEVPOST_SUBMISSION_TEMPLATE = """\
+# Devpost Submission
+
+- **Findings ({sections} sections, {lines} lines):** [`docs/FINDINGS.md`](../docs/FINDINGS.md)
+"""
+
+DEVPOST_WRITEUP_TEMPLATE = """\
+# Devpost Writeup
+
+| [`docs/FINDINGS.md`](./FINDINGS.md) | All measured results with analysis ({sections} sections) |
+"""
+
+
+def _write_devpost_files(tmp_path, sections, lines, writeup_sections=None):
+    """Write DEVPOST_SUBMISSION.md and DEVPOST_WRITEUP.md with given counts."""
+    if writeup_sections is None:
+        writeup_sections = sections
+    docs = tmp_path / "docs"
+    docs.mkdir(exist_ok=True)
+    (docs / "DEVPOST_SUBMISSION.md").write_text(
+        DEVPOST_SUBMISSION_TEMPLATE.format(sections=sections, lines=lines)
+    )
+    (docs / "DEVPOST_WRITEUP.md").write_text(
+        DEVPOST_WRITEUP_TEMPLATE.format(sections=writeup_sections)
+    )
+
+
+class TestUpdateFindingsDocCounts:
+    """Tests for update_findings_doc_counts — DEVPOST FINDINGS auto-repair."""
+
+    def test_devpost_submission_drift(self, tmp_path, monkeypatch):
+        """Stale DEVPOST_SUBMISSION sections+lines are repaired."""
+        monkeypatch.setattr(urc, "REPO_ROOT", str(tmp_path))
+        _make_repo(tmp_path, findings=7)  # 7 sections = 21 lines
+        _write_devpost_files(tmp_path, sections=3, lines=100)
+        n = urc.update_findings_doc_counts()
+        assert n == 2  # submission + writeup
+        text = (tmp_path / "docs" / "DEVPOST_SUBMISSION.md").read_text()
+        assert "7 sections" in text
+        assert "21 lines" in text
+
+    def test_devpost_writeup_drift(self, tmp_path, monkeypatch):
+        """Stale DEVPOST_WRITEUP section count is repaired independently."""
+        monkeypatch.setattr(urc, "REPO_ROOT", str(tmp_path))
+        _make_repo(tmp_path, findings=7)
+        _write_devpost_files(tmp_path, sections=7, lines=21, writeup_sections=3)
+        n = urc.update_findings_doc_counts()
+        assert n == 1  # only writeup
+        text = (tmp_path / "docs" / "DEVPOST_WRITEUP.md").read_text()
+        assert "7 sections" in text
+
+    def test_already_correct(self, tmp_path, monkeypatch):
+        """When all counts match, no changes are made."""
+        monkeypatch.setattr(urc, "REPO_ROOT", str(tmp_path))
+        _make_repo(tmp_path, findings=7)
+        _write_devpost_files(tmp_path, sections=7, lines=21)
+        n = urc.update_findings_doc_counts()
+        assert n == 0
+
+    def test_dry_run_no_write(self, tmp_path, monkeypatch):
+        """Dry-run reports changes but does not modify files."""
+        monkeypatch.setattr(urc, "REPO_ROOT", str(tmp_path))
+        _make_repo(tmp_path, findings=7)
+        _write_devpost_files(tmp_path, sections=3, lines=100)
+        original_sub = (tmp_path / "docs" / "DEVPOST_SUBMISSION.md").read_text()
+        original_wri = (tmp_path / "docs" / "DEVPOST_WRITEUP.md").read_text()
+        n = urc.update_findings_doc_counts(dry_run=True)
+        assert n == 2
+        # Files unchanged
+        assert (tmp_path / "docs" / "DEVPOST_SUBMISSION.md").read_text() == original_sub
+        assert (tmp_path / "docs" / "DEVPOST_WRITEUP.md").read_text() == original_wri
+
+    def test_missing_files_no_crash(self, tmp_path, monkeypatch):
+        """Missing DEVPOST files result in 0 changes, not an error."""
+        monkeypatch.setattr(urc, "REPO_ROOT", str(tmp_path))
+        _make_repo(tmp_path, findings=7)
+        # Don't create DEVPOST files
+        n = urc.update_findings_doc_counts()
+        assert n == 0
+
+
+# ---------------------------------------------------------------------------
+# main() — calls update_findings_doc_counts
+# ---------------------------------------------------------------------------
+
+
+class TestMainFindingsDocCounts:
+    """Test that main() calls update_findings_doc_counts."""
+
+    def test_main_calls_findings_doc_counts(self, monkeypatch):
+        called = {}
+
+        def mock_findings(dry_run=False):
+            called["dry_run"] = dry_run
+            return 0
+
+        monkeypatch.setattr(urc, "update_readme", lambda **kw: 0)
+        monkeypatch.setattr(urc, "update_findings_doc_counts", mock_findings)
+        monkeypatch.setattr("sys.argv", ["update_readme_counts.py"])
+        assert urc.main() == 0
+        assert called["dry_run"] is False
