@@ -308,6 +308,9 @@ cutoff has passed with no board; any future arrival is additive bonus per ADR 00
 | #309 | t4 | Corpus collision detection tests for multikey (ob-mrd.31; renamed from ob-mrd.30 to resolve a disconnected-Dolt-sync ID collision) | MERGED |
 | #310 | t3 | CI test count 2352→2370 across README/DEVPOST/SUBMISSION_STATUS + PR table backfill #306–#309 (ob-mrd.32; renamed from ob-mrd.31 to resolve a disconnected-Dolt-sync ID collision) | MERGED |
 | #311 | t4 | Add 6 missing ablation manifests (ob-mrd.33; renamed from ob-mrd.31 to resolve a disconnected-Dolt-sync ID collision) | MERGED |
+| #312 | t3 | PR table backfill #310 (MERGED) + #311 (OPEN→MERGED) + stale bead-ID refs | MERGED |
+| #313 | t4 | Device bench rk3588-t4 big+little clusters + manifest fix (ob-8ms.3); root cause: manifest.py _git_dirty stripped porcelain leading-space, breaking results/ exclusion regex | MERGED |
+| #314 | t3 | Dirty-tree check for validate_bench_csvs.sh (catches provenance gaps like PR #313) | MERGED |
 
 > **PRs #190, #198, #207, #229, #235, #245, #289:** closed (not merged). #282's proposed provenance content was rejected but its PR itself shows MERGED on GitHub (content replaced during review — see row above). No gaps in numbering.
 
