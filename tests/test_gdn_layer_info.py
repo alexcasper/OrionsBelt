@@ -32,6 +32,15 @@ class TestQwen35_4B:
         assert self.info.layer_types[0] == "linear_attention"
         assert self.info.full_attention_layer_indices == [3, 7, 11, 15, 19, 23, 27, 31]
 
+    def test_gdn_layer_indices(self):
+        """GDN indices are the complement of full-attention indices (3:1 hybrid)."""
+        gdn = self.info.gdn_layer_indices
+        fa = self.info.full_attention_layer_indices
+        assert len(gdn) == 24
+        assert len(fa) == 8
+        assert set(gdn) | set(fa) == set(range(32))
+        assert set(gdn) & set(fa) == set()
+
     # --- GDN dims ---
     def test_key_value_dims(self):
         assert self.info.key_dim == 2048  # 128 * 16
@@ -45,6 +54,10 @@ class TestQwen35_4B:
     def test_recurrent_state_per_layer(self):
         assert self.info.recurrent_state_elements_per_layer == 524_288
 
+    def test_recurrent_state_bytes_per_layer(self):
+        assert self.info.recurrent_state_bytes_per_layer(dtype_size=4) == 2_097_152
+        assert self.info.recurrent_state_bytes_per_layer(dtype_size=2) == 1_048_576
+
     def test_recurrent_state_total_fp32(self):
         """24 layers * 524288 * 4 bytes = 48 MiB."""
         assert self.info.recurrent_state_total_mib(dtype_size=4) == pytest.approx(48.0, abs=0.1)
@@ -55,6 +68,11 @@ class TestQwen35_4B:
     # --- conv state ---
     def test_conv_state_per_layer(self):
         assert self.info.conv_state_elements_per_layer == 32_768  # 8192 * 4
+
+    def test_conv_state_total_mib(self):
+        """24 layers * 32768 elements * 4 bytes / MiB = 3.0 MiB."""
+        assert self.info.conv_state_total_mib(dtype_size=4) == pytest.approx(3.0, abs=0.01)
+        assert self.info.conv_state_total_mib(dtype_size=2) == pytest.approx(1.5, abs=0.01)
 
     # --- KV cache ---
     def test_kv_cache_per_token_bytes(self):
@@ -96,6 +114,9 @@ class TestQwen35_0_8B:
 
     def test_recurrent_state_per_layer(self):
         assert self.info.recurrent_state_elements_per_layer == 262_144
+
+    def test_recurrent_state_bytes_per_layer(self):
+        assert self.info.recurrent_state_bytes_per_layer(dtype_size=4) == 1_048_576
 
     def test_recurrent_state_total_fp32(self):
         """18 layers * 262144 * 4 bytes = 18 MiB."""
