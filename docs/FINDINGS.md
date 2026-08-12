@@ -1348,17 +1348,17 @@ pinning, 30 repeats, 3 warmups).
 
 | Kernel | Old p50 (µs) | Old GiB/s | New p50 (µs) | New GiB/s | Speedup |
 |--------|-------------:|----------:|-------------:|----------:|--------:|
-| gdn_cumdecay | 195.1 | 5.00 | 33.3 | 29.4 | 5.9× |
-| gdn_gated_scan | 309.2 | 4.79 | 124.6 | 11.9 | 2.5× |
-| gdn_causal_dwconv1d | 171.8 | 6.00 | 47.3 | 21.8 | 3.6× |
+| gdn_cumdecay | 195.1 | 5.00 | 38.2 | 25.56 | 5.1× |
+| gdn_gated_scan | 309.2 | 4.79 | 131.6 | 11.25 | 2.3× |
+| gdn_causal_dwconv1d | 171.8 | 6.00 | 41.1 | 25.04 | 4.2× |
 
 **Key observations:**
 
-1. **3.6×–7.4× speedup** across all kernels and clusters. The OpenMP
+1. **2.3×–7.4× speedup** across all kernels and clusters. The OpenMP
    parallelization across 4 cores accounts for ~4×, with NEON unrolling adding
    further gains on the sequential-scan kernels.
 
-2. **Little cluster (A55) benefits more** (6.0–7.4×) than big (A76) (3.6–5.0×).
+2. **Little cluster (A55) benefits more** (6.0–7.4×) than big (A76) (2.3–5.1×).
    The A55's weaker single-thread NEON throughput makes it more reliant on
    multi-thread parallelization — the optimization closes the big/little gap
    from ~4:1 to ~2.5:1 on bandwidth.
