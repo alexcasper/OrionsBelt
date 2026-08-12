@@ -35,7 +35,7 @@ from typing import Any
 
 # Ensure repo root is importable when run as a script (python3 bench/harness.py).
 _ROOT = str(Path(__file__).resolve().parent.parent)
-if _ROOT not in sys.path:
+if _ROOT not in sys.path:  # pragma: no cover
     sys.path.insert(0, _ROOT)
 
 from bench.manifest import capture, manifest_ref  # noqa: E402
@@ -906,7 +906,7 @@ def main(argv: list[str] | None = None) -> int:
             parser.error(f"--backend hf needs torch + transformers installed: {exc}")
     else:
         parser.error(f"unknown backend: {args.backend}")
-        return 1  # unreachable, keeps type checker happy
+        return 1  # pragma: no cover (unreachable: parser.error calls sys.exit)
 
     model_checkpoint = args.model_checkpoint or f"{model_cfg.name}@{args.backend}"
     config = SweepConfig(

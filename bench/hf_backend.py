@@ -24,7 +24,7 @@ from typing import Any
 
 # Ensure repo root is importable
 _ROOT = str(Path(__file__).resolve().parent.parent)
-if _ROOT not in sys.path:
+if _ROOT not in sys.path:  # pragma: no cover
     sys.path.insert(0, _ROOT)
 
 from bench.harness import Backend, ModelConfig  # noqa: E402

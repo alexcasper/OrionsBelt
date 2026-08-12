@@ -37,7 +37,7 @@ _CURATED_TABLE_FILENAME = "comparison_table.md"
 
 # Ensure repo root is importable
 _ROOT = str(Path(__file__).resolve().parent.parent)
-if _ROOT not in sys.path:
+if _ROOT not in sys.path:  # pragma: no cover
     sys.path.insert(0, _ROOT)
 
 from bench.metrics import percentile  # noqa: E402
