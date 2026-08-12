@@ -31,12 +31,9 @@ import subprocess
 import sys
 import time
 
-import torch
-import torch.nn.functional as F
-
-# Import from gdn2_swap.py
-sys.path.insert(0, os.path.dirname(__file__))
-from gdn2_swap import swap_gdn1_to_gdn2  # noqa: E402
+# NOTE: torch is imported lazily inside functions that need it so that
+# pure-Python helpers (generate_prompts, capture_manifest) remain importable
+# and testable on machines without torch (e.g. edge CI runners).
 
 
 def generate_prompts(num_prompts, context_length, num_keys, seed_base=100):
@@ -85,6 +82,9 @@ def score_answer_logprob(model, tokenizer, prompt, answer):
     Tokenizes prompt + ' ' + answer, forward pass, extracts per-token
     log-probabilities at answer positions.
     """
+    import torch
+    import torch.nn.functional as F
+
     prompt_ids = tokenizer(prompt, return_tensors="pt")["input_ids"]
     answer_ids = tokenizer(" " + answer, return_tensors="pt")["input_ids"]
     prompt_len = prompt_ids.shape[1]
@@ -184,6 +184,16 @@ def evaluate_retrieval(model, tokenizer, prompts, max_time_secs=None):
     }
 
 
+def _torch_version():
+    """Return torch.__version__ or 'not-installed' if torch is unavailable."""
+    try:
+        import torch
+
+        return torch.__version__
+    except ImportError:
+        return "not-installed"
+
+
 def capture_manifest():
     """Capture provenance metadata matching the canonical manifest schema.
 
@@ -221,7 +231,7 @@ def capture_manifest():
         },
         "software": {
             "python_version": platform.python_version(),
-            "torch": torch.__version__,
+            "torch": _torch_version(),
         },
         "timestamp_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     }
@@ -247,6 +257,12 @@ def main():
         help="Max evaluation time in seconds (default 2400; increase for slow devices)",
     )
     args = parser.parse_args()
+
+    import torch
+    import torch.nn.functional as F
+
+    sys.path.insert(0, os.path.dirname(__file__))
+    from gdn2_swap import swap_gdn1_to_gdn2  # noqa: E402
 
     layer_indices = [int(x) for x in args.layers.split(",")]
     tag = "gdn2" if args.gdn2 else "gdn1"

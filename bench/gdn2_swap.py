@@ -23,6 +23,8 @@ Usage:
 Outputs JSON results to stdout and writes CSV to results/raw/ if --csv.
 """
 
+from __future__ import annotations
+
 import argparse
 import json
 import math
@@ -31,9 +33,16 @@ import subprocess
 import sys
 import time
 
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
+try:
+    import torch
+    import torch.nn as nn
+    import torch.nn.functional as F
+    HAS_TORCH = True
+except ImportError:
+    HAS_TORCH = False
+    torch = None
+    nn = None
+    F = None
 
 # ── GDN-2 recurrence (pure PyTorch, token-by-token) ──────────────────────────
 
@@ -100,8 +109,13 @@ def gdn2_recurrent(
 # The forward method replaces the GDN-1 delta-rule recurrence with the GDN-2
 # recurrence.
 
+# When torch is unavailable, fall back to ``object`` so the module can still
+# be imported and the pure-Python functions (capture_manifest, etc.) remain
+# testable without the heavy dependency.
+_NNModule = nn.Module if HAS_TORCH else object
 
-class Qwen3_5GDN2(nn.Module):
+
+class Qwen3_5GDN2(_NNModule):
     """GDN-2 attention: drop-in replacement for Qwen3_5GatedDeltaNet.
 
     Copies weights from a source GDN-1 module and adds two new gate projections.
@@ -342,6 +356,16 @@ def evaluate_loss(model, input_ids, labels):
 # ── Manifest ──────────────────────────────────────────────────────────────────
 
 
+def _torch_version():
+    """Return torch.__version__ or 'not-installed' if torch is unavailable."""
+    try:
+        import torch
+
+        return torch.__version__
+    except ImportError:
+        return "not-installed"
+
+
 def capture_manifest():
     """Capture provenance metadata (mirrors bench/manifest.py)."""
     import platform
@@ -370,7 +394,7 @@ def capture_manifest():
         "machine": platform.machine(),
         "processor": platform.processor() or "unknown",
         "python": platform.python_version(),
-        "torch": torch.__version__,
+        "torch": _torch_version(),
         "timestamp": time.strftime("%Y%m%dT%H%M%SZ", time.gmtime()),
     }
 
