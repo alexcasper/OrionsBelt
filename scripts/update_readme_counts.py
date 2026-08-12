@@ -74,7 +74,16 @@ def _count_findings_sections() -> int:
         return sum(1 for line in f if line.startswith("## "))
 
 
-# Regex patterns for the two locations we need to patch.
+def _count_findings_lines() -> int:
+    """Count total lines in ``docs/FINDINGS.md``."""
+    findings_path = os.path.join(REPO_ROOT, "docs", "FINDINGS.md")
+    if not os.path.isfile(findings_path):
+        return 0
+    with open(findings_path) as f:
+        return sum(1 for _ in f)
+
+
+# Regex patterns for the locations we need to patch.
 # "Results so far" headline.
 RE_HEADLINE = re.compile(
     r"(Results so far:\*\*\s*)(\d+)(\s*CSVs from the device fleet,\s*)"
@@ -87,6 +96,17 @@ RE_DIRLAYOUT = re.compile(r"(manifests/\s*<-\s*)(\d+)(\s*provenance manifests.*)
 
 # Directory-layout raw CSV count.
 RE_RAWLAYOUT = re.compile(r"(raw/\s*<-\s*)(\d+)(\s*per-run CSVs.*)")
+
+# "Operator analysis findings" — second FINDINGS count reference in README.md.
+RE_README_FINDINGS_REF = re.compile(r"(Operator analysis findings.*?,\s*)(\d+)(\s*sections)")
+
+# DEVPOST_SUBMISSION.md "Findings (N sections, N lines):" line.
+RE_DEVPOST_FINDINGS = re.compile(r"(Findings \()(\d+)(\s*sections,\s*)(\d+)(\s*lines?\))(:)")
+
+# DEVPOST_WRITEUP.md "All measured results with analysis (N sections)" row.
+RE_DEVPOST_WRITEUP_FINDINGS = re.compile(
+    r"(All measured results with analysis \()(\d+)(\s*sections?\))"
+)
 
 # Test count in README.md CI line.
 RE_README_TESTS = re.compile(r"(\d+)(\s*passed locally)")
@@ -173,6 +193,94 @@ def update_readme(dry_run: bool = False) -> int:
     return len(changes)
 
 
+def update_findings_sections(dry_run: bool = False) -> int:
+    """Update FINDINGS section/line count references across all docs.
+
+    Patches the secondary FINDINGS count in README.md line 148
+    ("Operator analysis findings"), the DEVPOST_SUBMISSION.md
+    "Findings (N sections, N lines)" line, and the DEVPOST_WRITEUP.md
+    "All measured results with analysis (N sections)" row.
+
+    The headline "Results so far" line is already handled by
+    :func:`update_readme`; this function covers the remaining references
+    that drift when FINDINGS.md grows.
+
+    Returns number of changes made.
+    """
+    actual_sections = _count_findings_sections()
+    actual_lines = _count_findings_lines()
+    changes = []
+
+    # --- README.md "Operator analysis findings" (line ~148) ---
+    readme_path = os.path.join(REPO_ROOT, "README.md")
+    if os.path.isfile(readme_path):
+        with open(readme_path) as f:
+            text = f.read()
+        m = RE_README_FINDINGS_REF.search(text)
+        if m and int(m.group(2)) != actual_sections:
+            replacement = m.group(1) + str(actual_sections) + m.group(3)
+            text = text[: m.start()] + replacement + text[m.end() :]
+            if not dry_run:
+                with open(readme_path, "w") as f:
+                    f.write(text)
+            changes.append(
+                f"README.md operator-findings sections {int(m.group(2))}→{actual_sections}"
+            )
+
+    # --- DEVPOST_SUBMISSION.md "Findings (N sections, N lines)" ---
+    devpost_path = os.path.join(REPO_ROOT, "docs", "DEVPOST_SUBMISSION.md")
+    if os.path.isfile(devpost_path):
+        with open(devpost_path) as f:
+            text = f.read()
+        m = RE_DEVPOST_FINDINGS.search(text)
+        if m:
+            old_sections = int(m.group(2))
+            old_lines = int(m.group(4))
+            if old_sections != actual_sections or old_lines != actual_lines:
+                replacement = (
+                    m.group(1)
+                    + str(actual_sections)
+                    + m.group(3)
+                    + str(actual_lines)
+                    + m.group(5)
+                    + m.group(6)
+                )
+                text = text[: m.start()] + replacement + text[m.end() :]
+                if not dry_run:
+                    with open(devpost_path, "w") as f:
+                        f.write(text)
+                parts = []
+                if old_sections != actual_sections:
+                    parts.append(f"sections {old_sections}→{actual_sections}")
+                if old_lines != actual_lines:
+                    parts.append(f"lines {old_lines}→{actual_lines}")
+                changes.append(f"DEVPOST_SUBMISSION.md {', '.join(parts)}")
+
+    # --- DEVPOST_WRITEUP.md "All measured results with analysis (N sections)" ---
+    writeup_path = os.path.join(REPO_ROOT, "docs", "DEVPOST_WRITEUP.md")
+    if os.path.isfile(writeup_path):
+        with open(writeup_path) as f:
+            text = f.read()
+        m = RE_DEVPOST_WRITEUP_FINDINGS.search(text)
+        if m and int(m.group(2)) != actual_sections:
+            replacement = m.group(1) + str(actual_sections) + m.group(3)
+            text = text[: m.start()] + replacement + text[m.end() :]
+            if not dry_run:
+                with open(writeup_path, "w") as f:
+                    f.write(text)
+            changes.append(f"DEVPOST_WRITEUP.md sections {int(m.group(2))}→{actual_sections}")
+
+    if changes:
+        for c in changes:
+            print(f"  updated: {c}")
+        if dry_run:
+            print("[dry-run] files not modified.")
+    else:
+        print("FINDINGS section/line counts already correct — no changes needed.")
+
+    return len(changes)
+
+
 def update_test_count(test_count: int, dry_run: bool = False) -> int:
     """Update the test count in README.md and DEVPOST_SUBMISSION.md.
 
@@ -233,6 +341,7 @@ def main() -> int:
     args = parser.parse_args()
 
     update_readme(dry_run=args.dry_run)
+    update_findings_sections(dry_run=args.dry_run)
     if args.test_count is not None:
         update_test_count(args.test_count, dry_run=args.dry_run)
     return 0

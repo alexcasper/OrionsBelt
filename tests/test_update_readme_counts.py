@@ -123,6 +123,138 @@ class TestCountFiles:
         monkeypatch.setattr(urc, "REPO_ROOT", str(tmp_path))
         assert urc._count_findings_sections() == 0
 
+    def test_count_findings_lines(self, tmp_path, monkeypatch):
+        """_count_findings_lines counts total lines in FINDINGS.md."""
+        monkeypatch.setattr(urc, "REPO_ROOT", str(tmp_path))
+        _make_repo(tmp_path, findings=3)
+        # Each section is "## Section N\nContent.\n\n" = 3 lines, 3 sections = 9 lines
+        assert urc._count_findings_lines() == 9
+
+    def test_count_findings_lines_no_file(self, tmp_path, monkeypatch):
+        """Returns 0 when docs/FINDINGS.md does not exist."""
+        monkeypatch.setattr(urc, "REPO_ROOT", str(tmp_path))
+        assert urc._count_findings_lines() == 0
+
+
+# ---------------------------------------------------------------------------
+# update_findings_sections
+# ---------------------------------------------------------------------------
+
+
+class TestUpdateFindingsSections:
+    """Tests for update_findings_sections() — cross-doc FINDINGS count repair."""
+
+    @staticmethod
+    def _make_docs(tmp_path, findings=3, stale_sections=2, stale_lines=100):
+        """Create minimal repo with README, DEVPOST_SUBMISSION, DEVPOST_WRITEUP."""
+        root = tmp_path / "repo"
+        root.mkdir()
+        docs = root / "docs"
+        docs.mkdir()
+        results_raw = root / "results" / "raw"
+        results_raw.mkdir(parents=True)
+        results_manifests = root / "results" / "manifests"
+        results_manifests.mkdir(parents=True)
+        results_figures = root / "results" / "figures"
+        results_figures.mkdir(parents=True)
+
+        # FINDINGS.md
+        (docs / "FINDINGS.md").write_text(
+            "".join(f"## Section {i}\nContent.\n\n" for i in range(findings))
+        )
+
+        # README with stale operator-findings line
+        (root / "README.md").write_text(
+            f"**Operator analysis findings** (`docs/FINDINGS.md`, {stale_sections} sections):\n"
+        )
+
+        # DEVPOST_SUBMISSION with stale sections+lines
+        (docs / "DEVPOST_SUBMISSION.md").write_text(
+            f"- **Findings ({stale_sections} sections, {stale_lines} lines):** "
+            f"[`docs/FINDINGS.md`](../docs/FINDINGS.md)\n"
+        )
+
+        # DEVPOST_WRITEUP with stale sections
+        (docs / "DEVPOST_WRITEUP.md").write_text(
+            f"| [`docs/FINDINGS.md`](./FINDINGS.md) | "
+            f"All measured results with analysis ({stale_sections} sections) |\n"
+        )
+
+        return root
+
+    def test_all_correct_no_changes(self, tmp_path, monkeypatch):
+        """When all counts match, no changes are made."""
+        root = self._make_docs(tmp_path, findings=3, stale_sections=3, stale_lines=9)
+        monkeypatch.setattr(urc, "REPO_ROOT", str(root))
+        n = urc.update_findings_sections()
+        assert n == 0
+
+    def test_fix_readme_operator_findings(self, tmp_path, monkeypatch):
+        """Stale sections in README 'Operator analysis findings' line is repaired."""
+        root = self._make_docs(tmp_path, findings=5, stale_sections=3, stale_lines=15)
+        monkeypatch.setattr(urc, "REPO_ROOT", str(root))
+        n = urc.update_findings_sections()
+        assert n >= 1
+        text = (root / "README.md").read_text()
+        assert "5 sections" in text
+
+    def test_fix_devpost_submission_sections_and_lines(self, tmp_path, monkeypatch):
+        """Stale sections+lines in DEVPOST_SUBMISSION.md are repaired."""
+        root = self._make_docs(tmp_path, findings=5, stale_sections=3, stale_lines=100)
+        monkeypatch.setattr(urc, "REPO_ROOT", str(root))
+        n = urc.update_findings_sections()
+        assert n >= 1
+        text = (root / "docs" / "DEVPOST_SUBMISSION.md").read_text()
+        assert "5 sections" in text
+        assert "15 lines" in text
+
+    def test_fix_devpost_writeup_sections(self, tmp_path, monkeypatch):
+        """Stale sections in DEVPOST_WRITEUP.md row is repaired."""
+        root = self._make_docs(tmp_path, findings=5, stale_sections=3, stale_lines=15)
+        monkeypatch.setattr(urc, "REPO_ROOT", str(root))
+        n = urc.update_findings_sections()
+        assert n >= 1
+        text = (root / "docs" / "DEVPOST_WRITEUP.md").read_text()
+        assert "5 sections)" in text
+
+    def test_all_three_docs_updated(self, tmp_path, monkeypatch):
+        """All three docs are updated when all are stale."""
+        root = self._make_docs(tmp_path, findings=7, stale_sections=3, stale_lines=100)
+        monkeypatch.setattr(urc, "REPO_ROOT", str(root))
+        n = urc.update_findings_sections()
+        assert n == 3
+
+    def test_dry_run_no_write(self, tmp_path, monkeypatch):
+        """Dry-run detects changes but does not modify files."""
+        root = self._make_docs(tmp_path, findings=5, stale_sections=3, stale_lines=100)
+        monkeypatch.setattr(urc, "REPO_ROOT", str(root))
+        original_readme = (root / "README.md").read_text()
+        original_devpost = (root / "docs" / "DEVPOST_SUBMISSION.md").read_text()
+        original_writeup = (root / "docs" / "DEVPOST_WRITEUP.md").read_text()
+        n = urc.update_findings_sections(dry_run=True)
+        assert n == 3
+        assert (root / "README.md").read_text() == original_readme
+        assert (root / "docs" / "DEVPOST_SUBMISSION.md").read_text() == original_devpost
+        assert (root / "docs" / "DEVPOST_WRITEUP.md").read_text() == original_writeup
+
+    def test_missing_files_no_crash(self, tmp_path, monkeypatch):
+        """Missing DEVPOST docs do not cause crashes."""
+        root = tmp_path / "repo"
+        root.mkdir()
+        docs = root / "docs"
+        docs.mkdir()
+        results_raw = root / "results" / "raw"
+        results_raw.mkdir(parents=True)
+        results_manifests = root / "results" / "manifests"
+        results_manifests.mkdir(parents=True)
+        results_figures = root / "results" / "figures"
+        results_figures.mkdir(parents=True)
+        (docs / "FINDINGS.md").write_text("## S1\n## S2\n")
+        (root / "README.md").write_text("No patterns here.\n")
+        monkeypatch.setattr(urc, "REPO_ROOT", str(root))
+        n = urc.update_findings_sections()
+        assert n == 0
+
 
 # ---------------------------------------------------------------------------
 # update_readme — repair scenarios
@@ -428,3 +560,17 @@ class TestUpdateTestCount:
         monkeypatch.setattr("sys.argv", ["update_readme_counts.py", "--test-count", "500"])
         assert urc.main() == 0
         assert called["test_count"] == 500
+
+    def test_main_calls_update_findings_sections(self, monkeypatch):
+        """main() calls update_findings_sections alongside update_readme."""
+        called = {"findings": False}
+
+        def mock_findings(dry_run=False):
+            called["findings"] = True
+            return 0
+
+        monkeypatch.setattr(urc, "update_readme", lambda **kw: 0)
+        monkeypatch.setattr(urc, "update_findings_sections", mock_findings)
+        monkeypatch.setattr("sys.argv", ["update_readme_counts.py"])
+        assert urc.main() == 0
+        assert called["findings"] is True
