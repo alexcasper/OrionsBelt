@@ -3019,7 +3019,7 @@ hardware is available.
 **Date:** 2026-08-07
 **Device:** rk3588-t4 (RK3588, A76)
 **Bead:** ob-bf7
-**Data:** `results/raw/rk3588-t4_clean_stability_check.csv`
+**Data:** `results/raw/rk3588-t4_clean_stability_check.txt`
 
 ### Problem
 
