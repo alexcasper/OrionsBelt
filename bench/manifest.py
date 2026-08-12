@@ -98,10 +98,24 @@ def _git_sha() -> str | None:
 
 
 def _git_dirty() -> bool | None:
+    """Check whether the working tree has source changes.
+
+    Excludes ``results/`` and ``.beads/`` because those are output data
+    produced by benchmark runs, not source-code changes that invalidate
+    provenance. This mirrors the filtering in ``scripts/capture_manifest.sh``
+    (line ~119): writing a CSV or manifest JSON should not mark the tree
+    dirty. Without this filter, every benchmark run that writes its own
+    output reports ``git.dirty=true``, which per PLAN.md §9 invalidates the
+    result for no real reason.
+    """
     status = _safe(_run, ["git", "status", "--porcelain"])
     if status is None:
         return None
-    return len(status) > 0
+    # Filter lines that are only output dirs (results/ or .beads/).
+    # git status --porcelain format: "XY path" where X/Y are status codes.
+    _OUTPUT_RE = re.compile(r"^[ ?][M?] (results/|\.beads/)")
+    filtered = [line for line in status.splitlines() if not _OUTPUT_RE.match(line)]
+    return len(filtered) > 0
 
 
 def _default_run_id() -> str:

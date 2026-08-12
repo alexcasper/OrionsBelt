@@ -229,6 +229,105 @@ class TestWrite:
 
 
 # ---------------------------------------------------------------------------
+# _git_dirty — regression test for output-file filtering fix (30daf9c9)
+# ---------------------------------------------------------------------------
+
+
+class TestGitDirtyFiltering:
+    """The dirty check must exclude results/ and .beads/ output files.
+
+    Regression test for the bug where _git_dirty() counted ALL git status
+    lines, causing every benchmark run that wrote its own output to report
+    dirty=true (PLAN.md §9 violation). Fixed in 30daf9c9.
+    """
+
+    def test_clean_tree_returns_false(self, monkeypatch):
+        """Empty git status → not dirty."""
+        monkeypatch.setattr(manifest_mod, "_run", lambda cmd: "")
+        from bench.manifest import _git_dirty
+
+        assert _git_dirty() is False
+
+    def test_only_results_files_returns_false(self, monkeypatch):
+        """Untracked results/ files should NOT count as dirty."""
+        monkeypatch.setattr(
+            manifest_mod,
+            "_run",
+            lambda cmd: "?? results/test.csv\n?? results/manifests/foo.json\n",
+        )
+        from bench.manifest import _git_dirty
+
+        assert _git_dirty() is False
+
+    def test_only_beads_files_returns_false(self, monkeypatch):
+        """Untracked .beads/ files should NOT count as dirty."""
+        monkeypatch.setattr(
+            manifest_mod,
+            "_run",
+            lambda cmd: "?? .beads/issues.jsonl\n?? .beads/dolt/HEAD\n",
+        )
+        from bench.manifest import _git_dirty
+
+        assert _git_dirty() is False
+
+    def test_modified_results_file_returns_false(self, monkeypatch):
+        """Modified (tracked) results/ file should NOT count as dirty."""
+        monkeypatch.setattr(
+            manifest_mod,
+            "_run",
+            lambda cmd: " M results/raw/rk3588-t4_big.csv\n",
+        )
+        from bench.manifest import _git_dirty
+
+        assert _git_dirty() is False
+
+    def test_source_change_returns_true(self, monkeypatch):
+        """Real source change should count as dirty."""
+        monkeypatch.setattr(
+            manifest_mod,
+            "_run",
+            lambda cmd: " M bench/manifest.py\n",
+        )
+        from bench.manifest import _git_dirty
+
+        assert _git_dirty() is True
+
+    def test_source_change_plus_output_returns_true(self, monkeypatch):
+        """Source change + output files → still dirty (source change dominates)."""
+        monkeypatch.setattr(
+            manifest_mod,
+            "_run",
+            lambda cmd: " M bench/manifest.py\n?? results/test.csv\n?? .beads/issues.jsonl\n",
+        )
+        from bench.manifest import _git_dirty
+
+        assert _git_dirty() is True
+
+    def test_mixed_output_only_returns_false(self, monkeypatch):
+        """Multiple output dirs, no source → not dirty."""
+        monkeypatch.setattr(
+            manifest_mod,
+            "_run",
+            lambda cmd: (
+                " M results/raw/jetson-j1.csv\n"
+                "?? results/manifests/new.json\n"
+                "?? .beads/issues.jsonl\n"
+                "?? .beads/dolt/HEAD\n"
+            ),
+        )
+        from bench.manifest import _git_dirty
+
+        assert _git_dirty() is False
+
+    def test_none_on_git_failure(self, monkeypatch):
+        """When _run returns None (git not available), _git_dirty returns None."""
+        monkeypatch.setattr(manifest_mod, "_run", lambda cmd: None)
+        from bench.manifest import _git_dirty
+
+        assert _git_dirty() is None
+
+
+# ---------------------------------------------------------------------------
 # _default_run_id
 # ---------------------------------------------------------------------------
 

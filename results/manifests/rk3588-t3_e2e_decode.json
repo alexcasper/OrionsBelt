@@ -1,10 +1,11 @@
 {
   "caller": {},
   "git": {
-    "dirty": true,
+    "dirty": false,
+    "dirty_corrected": "was true due to bench/manifest.py bug counting output files; fixed in 30daf9c9. WARNING: SHA is orphaned (not in any local/remote ref)",
     "sha": "179a9c8f0f9801cbf71d2473eff0a9c991ca6377",
-    "sha_resolved": "796296853f518f78f1dde0cbb6e254f958673105",
-    "sha_note": "Original SHA from t3 pre-rebase branch; equivalent commit: t3: e2e decode bench 4B optimized GEMV (ob-mrd.8)"
+    "sha_note": "Original SHA from t3 pre-rebase branch; equivalent commit: t3: e2e decode bench 4B optimized GEMV (ob-mrd.8)",
+    "sha_resolved": "796296853f518f78f1dde0cbb6e254f958673105"
   },
   "host": {
     "core_count": 8,

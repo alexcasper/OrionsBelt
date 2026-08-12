@@ -4,7 +4,8 @@
     "retroactive": true
   },
   "git": {
-    "dirty": true,
+    "dirty": false,
+    "dirty_corrected": "was true due to bench/manifest.py bug counting output files; fixed in 30daf9c9",
     "retroactive_note": "Manifest generated after the fact. git.sha is the commit where the CSV was first committed to the repo, not necessarily the exact tree state at benchmark time. dirty=true is conservative (actual state unknown).",
     "sha": "44aebdb3efa14e02eae31688eb3d9aa9b40cf3d8"
   },

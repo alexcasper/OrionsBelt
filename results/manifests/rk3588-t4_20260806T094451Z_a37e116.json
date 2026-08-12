@@ -9,7 +9,8 @@
     "quantization": "fp32"
   },
   "git": {
-    "dirty": true,
+    "dirty": false,
+    "dirty_corrected": "was true due to bench/manifest.py bug counting output files; fixed in 30daf9c9",
     "sha": "a37e1163a0149fc33fdcf0198f0e11c65d958cd4"
   },
   "host": {

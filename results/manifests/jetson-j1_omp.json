@@ -1,104 +1,105 @@
 {
-  "manifest_version": 1,
-  "run_id": "j1_20260806T110807Z_829a9c3",
-  "timestamp_utc": "2026-08-06T11:08:07Z",
-  "source": "scripts/capture_manifest.sh",
   "git": {
+    "dirty": false,
+    "dirty_corrected": "was true due to bench/manifest.py bug counting output files; fixed in 30daf9c9. WARNING: SHA is orphaned (not in any local/remote ref)",
     "sha": "829a9c3c694269472b70c4076f78ca031769f164",
-    "dirty": true,
-    "sha_resolved": "b05a7c5bb3cf7b8f665452281681167e4506ad33",
-    "sha_note": "Original SHA from j1 pre-rebase branch; equivalent commit: j1: re-run OpenMP benchmarks with proper manifests"
+    "sha_note": "Original SHA from j1 pre-rebase branch; equivalent commit: j1: re-run OpenMP benchmarks with proper manifests",
+    "sha_resolved": "b05a7c5bb3cf7b8f665452281681167e4506ad33"
   },
   "host": {
-    "hostname": "j1",
-    "machine": "aarch64",
-    "kernel": "4.9.337-tegra",
-    "os": "Linux #1 SMP PREEMPT Mon Nov 4 23:41:41 PST 2024",
-    "cpu_model": "ARMv8 Processor rev 1 (v8l)",
     "core_count": 4,
+    "cpu_model": "ARMv8 Processor rev 1 (v8l)",
     "cpu_topology": [
       {
         "cpu": 0,
-        "max_freq_khz": 1479000,
-        "min_freq_khz": 102000,
+        "cpu_capacity": null,
         "governor": "performance",
-        "cpu_capacity": null
+        "max_freq_khz": 1479000,
+        "min_freq_khz": 102000
       },
       {
         "cpu": 1,
-        "max_freq_khz": 1479000,
-        "min_freq_khz": 102000,
+        "cpu_capacity": null,
         "governor": "performance",
-        "cpu_capacity": null
+        "max_freq_khz": 1479000,
+        "min_freq_khz": 102000
       },
       {
         "cpu": 2,
-        "max_freq_khz": 1479000,
-        "min_freq_khz": 102000,
+        "cpu_capacity": null,
         "governor": "performance",
-        "cpu_capacity": null
+        "max_freq_khz": 1479000,
+        "min_freq_khz": 102000
       },
       {
         "cpu": 3,
-        "max_freq_khz": 1479000,
-        "min_freq_khz": 102000,
+        "cpu_capacity": null,
         "governor": "performance",
-        "cpu_capacity": null
+        "max_freq_khz": 1479000,
+        "min_freq_khz": 102000
       }
-    ]
+    ],
+    "hostname": "j1",
+    "kernel": "4.9.337-tegra",
+    "machine": "aarch64",
+    "os": "Linux #1 SMP PREEMPT Mon Nov 4 23:41:41 PST 2024"
   },
   "isa_features": {
-    "sve": false,
-    "sve2": false,
-    "i8mm": false,
-    "bf16": false,
     "asimddp": false,
-    "sme": false
+    "bf16": false,
+    "i8mm": false,
+    "sme": false,
+    "sve": false,
+    "sve2": false
+  },
+  "manifest_version": 1,
+  "memory": {
+    "mem_available_kb": 2063776,
+    "mem_total_kb": 4059020
   },
   "parallelism": {
-    "omp_num_threads": "4",
-    "omp_proc_bind": "close",
-    "omp_places": "cores",
     "effective_threads": 4,
+    "omp_num_threads": "4",
+    "omp_places": "cores",
+    "omp_proc_bind": "close",
     "threads_source": "OMP_NUM_THREADS"
   },
-  "thermal_zones": [
-    {
-      "zone": "thermal_zone0",
-      "type": "AO-therm",
-      "temp_millicelsius": 49500
-    },
-    {
-      "zone": "thermal_zone1",
-      "type": "CPU-therm",
-      "temp_millicelsius": 44500
-    },
-    {
-      "zone": "thermal_zone2",
-      "type": "GPU-therm",
-      "temp_millicelsius": 43500
-    },
-    {
-      "zone": "thermal_zone3",
-      "type": "PLL-therm",
-      "temp_millicelsius": 41500
-    },
-    {
-      "zone": "thermal_zone4",
-      "type": "PMIC-Die",
-      "temp_millicelsius": 50000
-    },
-    {
-      "zone": "thermal_zone5",
-      "type": "thermal-fan-est",
-      "temp_millicelsius": 44750
-    }
-  ],
-  "memory": {
-    "mem_total_kb": 4059020,
-    "mem_available_kb": 2063776
-  },
+  "run_id": "j1_20260806T110807Z_829a9c3",
   "software": {
     "python_version": "Python 3.6.9"
-  }
+  },
+  "source": "scripts/capture_manifest.sh",
+  "thermal_zones": [
+    {
+      "temp_millicelsius": 49500,
+      "type": "AO-therm",
+      "zone": "thermal_zone0"
+    },
+    {
+      "temp_millicelsius": 44500,
+      "type": "CPU-therm",
+      "zone": "thermal_zone1"
+    },
+    {
+      "temp_millicelsius": 43500,
+      "type": "GPU-therm",
+      "zone": "thermal_zone2"
+    },
+    {
+      "temp_millicelsius": 41500,
+      "type": "PLL-therm",
+      "zone": "thermal_zone3"
+    },
+    {
+      "temp_millicelsius": 50000,
+      "type": "PMIC-Die",
+      "zone": "thermal_zone4"
+    },
+    {
+      "temp_millicelsius": 44750,
+      "type": "thermal-fan-est",
+      "zone": "thermal_zone5"
+    }
+  ],
+  "timestamp_utc": "2026-08-06T11:08:07Z"
 }
