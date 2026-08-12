@@ -108,8 +108,20 @@ def _git_dirty() -> bool | None:
     output reports ``git.dirty=true``, which per PLAN.md §9 invalidates the
     result for no real reason.
     """
-    status = _safe(_run, ["git", "status", "--porcelain"])
-    if status is None:
+    # NOTE: we must NOT use _run() here because it calls .strip() on the
+    # output, which removes the leading space from git status --porcelain
+    # lines (format: "XY path"). That leading space is what the _OUTPUT_RE
+    # regex below matches on to filter out results/ and .beads/ changes.
+    try:
+        result = subprocess.run(  # noqa: S603 -- fixed argv, no shell, no user input
+            ["git", "status", "--porcelain"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            timeout=5,
+            check=True,
+        )
+        status = result.stdout.decode("utf-8", errors="replace")
+    except Exception:
         return None
     # Filter lines that are only output dirs (results/ or .beads/).
     # git status --porcelain format: "XY path" where X/Y are status codes.
