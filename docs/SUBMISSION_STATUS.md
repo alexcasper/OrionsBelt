@@ -318,6 +318,7 @@ cutoff has passed with no board; any future arrival is additive bonus per ADR 00
 | #319 | t3 | Restore 6 ablation manifests deleted by loop flush (fef1567) — validate_results.py MISSING warnings → 0 | MERGED |
 | #321 | t3 | Cross-validate boundary-crossing cost ARM blob vs RustiCL/Panfrost (ob-t3b.10) — 14× lower dispatch overhead on blob, 0.7% vs 10.1% crossing tax | MERGED |
 | #322 | t3 | Fix stale README counts 227→228 CSVs, 214→215 manifests | MERGED |
+| #320 | t4 | RK3588-t4 device bench (ob-8ms.3, superseded by later PRs) + ablation manifest fix (reverted an initial flawed approach after j2-review; adopted t3's per-run manifests) + cross-doc consistency fixes | MERGED |
 
 > **PRs #190, #198, #207, #229, #235, #245, #289:** closed (not merged). #282's proposed provenance content was rejected but its PR itself shows MERGED on GitHub (content replaced during review — see row above). No gaps in numbering.
 
