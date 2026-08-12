@@ -2355,7 +2355,7 @@ memory bandwidth.
   GDN-1's 2.04µs (1.29×), not identical. The extra stream adds ~29% at decode.
   Still far below the 2.7× prefill penalty, confirming decode is overhead-dominated.
 - **The bandwidth ratio between GDN-1 and GDN-2 is now closer to the theoretical
-  5/3 = 1.67×** (7.14 vs 11.94 GiB/s = 1.67×), confirming the kernel is genuinely
+  5/3 = 1.67×** (7.14 vs 11.90 GiB/s = 1.67×), confirming the kernel is genuinely
   bandwidth-bound at prefill.
 
 **Fleet-wide note:** All existing fleet CSVs initially contained inflated GDN-2
@@ -3046,7 +3046,7 @@ t4 is stable: ~4% coefficient of variation across runs.
 | Metric | t3 | t4 | Ratio |
 |--------|----|----|-------|
 | **Single-core clean** (gated_scan 4B) | 2.91 GiB/s (30% spread) | 5.27 GiB/s (6% spread) | **1.81×** |
-| **Multi-core big** (gated_scan 4B) | 10.33 GiB/s (8% spread) | 11.94 GiB/s (7% spread) | **1.16×** |
+| **Multi-core big** (gated_scan 4B) | 10.33 GiB/s (8% spread) | 11.90 GiB/s (9% spread) | **1.15×** |
 
 The multi-core numbers agree within 12%, consistent with same-silicon
 expectations. The single-core discrepancy is entirely due to t3's
@@ -3099,7 +3099,7 @@ prior workloads), not a kernel or measurement methodology problem.
 >
 > The 8-thread vs 8-thread comparison (`rk3588-t3-clean.csv` vs
 > `rk3588-t4_big.csv`, both `effective_threads=8`) shows the boards agree within
-> ~12% (cumdecay 21.39 vs 21.46), consistent with t4's higher 2400 MHz clock.
+> ~12% (cumdecay 21.39 vs 23.91), consistent with t4's higher 2400 MHz clock.
 >
 > See `comparison_table.md` §1a for the corrected like-for-like analysis.
 
@@ -3209,12 +3209,12 @@ The **equal-thread-count** comparison removes the confound. Both boards at
 
 | Kernel (4B, seq=64) | t4 8-thread GiB/s | t3 8-thread GiB/s | t4÷t3 |
 |---|---:|---:|---:|
-| gdn_cumdecay | 21.46 | 21.39 | 1.00× |
-| gdn_gated_scan | 11.94 | 10.56 | 1.13× |
-| gdn_causal_dwconv1d | 19.35 | 20.59 | 0.94× |
+| gdn_cumdecay | 23.91 | 21.39 | 1.12× |
+| gdn_gated_scan | 11.90 | 10.56 | 1.13× |
+| gdn_causal_dwconv1d | 20.77 | 20.59 | 1.01× |
 
 At equal thread count the two boards agree to within ~12% on all three kernels
-and the direction of who is faster flips per kernel — within the documented
+(t4 consistently slightly faster, consistent with its ~4% higher clock) — within the documented
 run-to-run variance (ob-bf7: up to 1.68× between sessions). The genuine
 single-thread comparison (above) confirms that cumdecay is identical but
 gated_scan shows a real ~1.87× board-level difference — the
@@ -5685,7 +5685,7 @@ purely memory-bound and both boards share the same LPDDR4X subsystem.
 
 | Kernel (big cores, fp32) | Model | T4 GiB/s | T3 GiB/s | Δ |
 |--------------------------|-------|----------|----------|------|
-| gdn_gated_scan | 4B (4096ch) | 11.94 | 10.33 | +15.6% |
+| gdn_gated_scan | 4B (4096ch) | 11.90 | 10.33 | +15.2% |
 | gdn_gated_scan | 0.8B (2048ch) | 11.28 | 15.42 | -26.9% |
 | gdn2_gated_scan | 4B (4096ch) | 7.14 | 9.04 | -21.0% |
 | gdn2_gated_scan | 0.8B (2048ch) | 8.26 | 10.35 | -20.2% |
@@ -5708,7 +5708,7 @@ not single points. Memory-bound kernels (f16 cumdecay) are reproducible to
 
 | Device | Commit | Manifest |
 |--------|--------|----------|
-| rk3588-t4 | `79d1b47` | `results/manifests/rk3588-t4.json` |
+| rk3588-t4 | `82f4833` | `results/manifests/rk3588-t4.json` |
 | rk3588-t3 | `47efdf8` | `results/manifests/rk3588-t3.json` |
 
 ### SDOT context-length scaling on t4: O(1) GDN decode confirmed (ob-8ms.3)
