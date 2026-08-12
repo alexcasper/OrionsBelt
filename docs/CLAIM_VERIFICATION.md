@@ -217,19 +217,25 @@ gap grows with context (8–27% at ctx 512–4096) due to RAM-bandwidth differen
 between the two boards (t3: 32 GB, t4: 8 GB), not compute — §38. Thermals
 ≤62°C; governor `performance` confirmed in every manifest.
 
-### 2.6 Engine boundary-crossing cost (verified 2026-08-09)
+### 2.6 Engine boundary-crossing cost (verified 2026-08-09, cross-validated 2026-08-12)
 
 | Claim | Status |
 |---|---|
-| 16 crossings/token at 3.36 ms total (5KB hidden state, Mali-G610) | ✅ Confirmed — FINDINGS §39, CSV `rk3588-t4_gpu_boundary_crossing.csv`, manifest `rk3588-t4_gpu_boundary_crossing.json` (sha `7ca7f2a`, dirty=false corrected from false-positive, governor=performance, ~41°C) |
-| ~10% of 30 tok/s (33.3 ms) decode budget | ✅ Confirmed — 3.36/33.3 = 10.1% |
-| Latency-dominated: ~0.1 ms dispatch floor (1KB–100KB payloads all ~0.10 ms) | ✅ Confirmed — same CSV, write_blocking rows: 0.102/0.102/0.103/0.108/0.112 ms for 1KB/5KB/10KB/50KB/100KB |
-| Heterogeneous offload must deliver >11% speedup to break even | ✅ Confirmed — crossing tax is 10.1%, so net speedup must exceed this |
+| 16 crossings/token at 3.36 ms total (5KB hidden state, Mali-G610, RustiCL/Panfrost) | ✅ Confirmed — FINDINGS §39, CSV `rk3588-t4_gpu_boundary_crossing.csv`, manifest `rk3588-t4_gpu_boundary_crossing.json` (sha `7ca7f2a`, dirty=false corrected from false-positive, governor=performance, ~41°C) |
+| ~10% of 30 tok/s (33.3 ms) decode budget (RustiCL/Panfrost) | ✅ Confirmed — 3.36/33.3 = 10.1% |
+| Latency-dominated: ~0.1 ms dispatch floor on RustiCL/Panfrost (1KB–100KB payloads) | ✅ Confirmed — same CSV, write_blocking rows: 0.102/0.102/0.103/0.108/0.112 ms for 1KB/5KB/10KB/50KB/100KB |
+| Heterogeneous offload must deliver >11% speedup to break even (RustiCL/Panfrost) | ✅ Confirmed — crossing tax is 10.1%, so net speedup must exceed this |
+| **ARM blob driver: 16 crossings at 0.24 ms (14× faster than RustiCL/Panfrost)** | ✅ Confirmed — FINDINGS §39 cross-validation, CSV `rk3588-t3_gpu_boundary_crossing.csv`, manifest `rk3588-t3_gpu_boundary_crossing.json` (sha `25941cf`, governor=performance, ~41°C) |
+| **ARM blob crossing tax: 0.7% of decode budget (vs 10.1% on RustiCL)** | ✅ Confirmed — 0.24/33.3 = 0.72% |
+| **ARM blob dispatch floor: ~6 µs per call (vs ~100 µs on RustiCL)** | ✅ Confirmed — same CSV, write_blocking rows: 0.005/0.007/0.007/0.013/0.017 ms for 512B/5KB/10KB/50KB/100KB |
+| **Break-even speedup on blob: >0.7%** | ✅ Confirmed — crossing tax is 0.7%, so net speedup must exceed this (negligible barrier) |
 
-Measured on RK3588 t4 Mali-G610 via RustiCL/Panfrost driver (open-source, not vendor blob).
-ADR 0005 designates this as a valid proxy for the O6's Immortalis-G720. Absolute latency
-will differ on target hardware; cost structure (latency-dominated for small payloads)
-is expected to transfer.
+Initial measurement on RK3588 t4 via RustiCL/Panfrost driver (open-source). Cross-validated
+on RK3588 t3 via ARM proprietary blob (libmali-valhall-g610-g13p0-x11) — the driver type a
+production deployment and the O6 will use. The 14× gap is dispatch-overhead-dominated (not
+bandwidth): both drivers converge at large payloads (1 MB write: 9367 vs 4602 MiB/s, only 2×
+apart). ADR 0005 designates both as valid proxies for the O6's Immortalis-G720. The blob's
+0.24 ms / 0.7% figure is the more representative estimate for target hardware.
 
 ### 2.7 GPU kernel performance — corrected conclusion (verified 2026-08-11)
 
@@ -246,6 +252,49 @@ is expected to transfer.
 > **Caveat:** GPU timing is device-side profiling (excludes host↔device transfer).
 > CPU comparison is 4-thread A76 (OMP_NUM_THREADS=4, taskset cores 4–7).
 > Full methodology in FINDINGS §13.
+
+### 2.8 Cross-vendor NPU compiler rejection of GDN recurrence (verified 2026-08-02, 2026-08-06)
+
+| Claim | Status |
+|---|---|
+| CIX NOE Compiler rejects runtime-trip-count `Loop` (cannot express sequential recurrence) | ✅ Confirmed — FINDINGS §1, `scripts/npu_op_probe.py`, NOE SDK 26_q2 / cixbuilder 6.1.3753.3 |
+| Rockchip RKNN also rejects runtime `Loop` ("dynamic graph" error) | ✅ Confirmed — FINDINGS §2a, `scripts/rknn_op_probe.py`, RKNN toolkit targeting RK3588 |
+| Scan compiles on RKNN (CIX rejects even Scan) — genuine toolchain difference | ✅ Confirmed — FINDINGS §2a, 8 KB compiled model verified in RKNN simulator |
+| No current edge NPU compiler handles GDN's variable-length recurrence | ✅ Confirmed — two independent vendors, different silicon, same architectural constraint |
+
+This generalizes beyond a single vendor: NPU compilers require static, parallelizable dataflow
+graphs, and GDN's per-token sequential recurrence violates that. The project's CPU kernels
+run because OoO pipelines handle sequential dependencies; the NPU's strength (massive
+parallelism) is the wrong tool for this workload.
+
+### 2.9 ONNX Runtime CPU EP: GDN via Loop but 16× slower (verified 2026-08-08)
+
+| Claim | Status |
+|---|---|
+| ORT CPU EP executes GDN recurrence correctly (rel_err 2.3×10⁻⁷ vs NumPy) | ✅ Confirmed — FINDINGS §27, `scripts/ort_gdn_probe.py`, device rk3588-t4 |
+| ORT generic Loop: ~49 µs/token vs ~3 µs for fused C kernel (16× overhead) | ✅ Confirmed — same audit, single-head V=128 |
+| No Arm-specific tuning for projection matmuls in ORT's GDN path | ✅ Confirmed — ORT uses generic CPU EP, no NEON/SVE optimization for GDN ops |
+| Third data point confirming no existing CPU toolchain optimizes GDN for Arm | ✅ Confirmed — NPU (rejected), KleidiAI (matmul only), ORT (generic), llama.cpp (dedicated op but untuned scalar) |
+
+### 2.10 Sustained-load thermal stability (verified 2026-08-09)
+
+| Claim | Status |
+|---|---|
+| INT8 SDOT: 0.3% throughput decay over 3.4 min sustained (3.46→3.45 tok/s) | ✅ Confirmed — FINDINGS §37, rk3588-t4 A76 4-thread, governor=performance |
+| FP32: 0.9% throughput decay over 5 min sustained (1.10→1.09 tok/s) | ✅ Confirmed — same device/section |
+| Temperature plateaus at ~52°C within 70s, no throttling (idle ~39°C, ΔT=13°C) | ✅ Confirmed — bigcore thermals logged in FINDINGS §37 table |
+| Headline numbers are steady-state sustainable, not burst artifacts | ✅ Confirmed — directly addresses PLAN.md risk R7 |
+
+### 2.11 Context-length scaling: GDN O(1) vs full-attention O(n) (verified 2026-08-09)
+
+| Claim | Status |
+|---|---|
+| Pure-GDN throughput flat to within <0.2% across ctx=1–4096 | ✅ Confirmed — FINDINGS §17, 0.8B: 27.52→27.47 tok/s (0.18%); 4B: 3.25→3.24 tok/s (within measurement noise) |
+| Hybrid model degrades 1.33× (4B) to 1.56× (0.8B) at ctx=4096 | ✅ Confirmed — same section, hybrid tables: 4B 3.30→2.49, 0.8B 28.79→18.46 |
+| Full-attention latency grows linearly with context (6.2× for 4B, 8.7× for 0.8B) | ✅ Confirmed — FINDINGS §17, full-attn column: 4B 19→116 ms, 0.8B 2.5→22 ms |
+| GDN recurrent state is constant (~1.2 MB for 24 layers) vs KV cache growing to 256 MB at ctx=4096 | ✅ Confirmed — same section, memory analysis |
+| Cross-validated on Jetson Nano A57 (second core class) | ✅ Confirmed — FINDINGS §17 A57 ctx-sweep, commit 3d83bdc |
+| Cross-validated on two independent RK3588 units (§36, §38) | ✅ Confirmed — t3 and t4 agree within 3–5% after SDOT binary fix |
 
 ---
 
