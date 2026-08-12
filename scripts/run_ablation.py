@@ -10,7 +10,9 @@ then generates the master comparison table from the collected CSVs.
 
 With the synthetic backend this proves the pipeline end-to-end. When real
 backends land, the same script produces actual numbers — the grid structure
-and table format are unchanged.
+and table format are unchanged. CLI runs use deterministic per-token delays
+(ob-mrd.30) so the generated table is reproducible across runs; tests pass
+zero delays for speed.
 
 Usage::
 
@@ -119,8 +121,17 @@ def run_ablation(
     decode_length: int = 20,
     output_dir: str = "results/raw/ablation",
     manifest_dir: str = "results/manifests",
+    *,
+    prefill_ns_per_token: int = 0,
+    decode_ns_per_step: int = 0,
 ) -> list[str]:
-    """Run the full ablation grid. Returns list of CSV paths written."""
+    """Run the full ablation grid. Returns list of CSV paths written.
+
+    ``prefill_ns_per_token`` and ``decode_ns_per_step`` are forwarded to
+    :class:`SyntheticBackend`.  The CLI (:func:`main`) sets deterministic
+    non-zero defaults (ob-mrd.30) so the generated table is reproducible;
+    tests pass 0 for speed.
+    """
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
 
@@ -130,7 +141,11 @@ def run_ablation(
         name = entry["name"]
         print(f"\n  Running ablation: {name} ...")
 
-        backend = SyntheticBackend(QWEN35_4B)
+        backend = SyntheticBackend(
+            QWEN35_4B,
+            prefill_ns_per_token=prefill_ns_per_token,
+            decode_ns_per_step=decode_ns_per_step,
+        )
         config = SweepConfig(
             context_lengths=context_lengths,
             warmup_count=warmup,
@@ -183,10 +198,29 @@ def main(argv: list[str] | None = None) -> int:
         default="results/manifests",
         help="Directory for provenance manifests (default: results/manifests)",
     )
+    parser.add_argument(
+        "--prefill-ns",
+        type=int,
+        default=51_000,
+        help="Per-token prefill delay in ns for SyntheticBackend (ob-mrd.30, default: 51000)",
+    )
+    parser.add_argument(
+        "--decode-ns",
+        type=int,
+        default=2_000_000,
+        help="Per-step decode delay in ns for SyntheticBackend (ob-mrd.30, default: 2000000)",
+    )
     args = parser.parse_args(argv)
 
     context_lengths = [int(x) for x in args.context.split(",")]
 
+    # Deterministic timing delays (ob-mrd.30): with zero delays the
+    # wall-clock durations are near-zero, producing non-deterministic
+    # tokens_per_sec (millions of tok/s from dividing by microseconds of
+    # jitter).  Non-zero values produce stable, plausible-looking numbers
+    # (~500 tok/s decode, ~19.6K tok/s prefill) that are reproducible across
+    # runs — matching the "deterministic analytical model" claim in the
+    # generated table disclaimer.  Tests pass 0 for speed.
     csv_paths = run_ablation(
         context_lengths,
         warmup=args.warmup,
@@ -194,6 +228,8 @@ def main(argv: list[str] | None = None) -> int:
         decode_length=args.decode_length,
         output_dir=args.output_dir,
         manifest_dir=args.manifest_dir,
+        prefill_ns_per_token=args.prefill_ns,
+        decode_ns_per_step=args.decode_ns,
     )
 
     # Generate the comparison table

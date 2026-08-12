@@ -107,9 +107,16 @@ def load_and_summarize(csv_paths: Sequence[str]) -> list[dict]:
 
 def _fmt_value(metric: str, value: float) -> str:
     if metric.endswith("_per_sec"):
+        # Round to integer for large values: sub-decimal precision on
+        # thousands of tok/s is noise from timing jitter, not signal.
+        if abs(value) >= 1000:
+            return f"{value:.0f}"
         return f"{value:.1f}"
     if metric == "ttft_seconds":
-        return f"{value * 1000:.1f}ms"
+        ms = value * 1000
+        if ms >= 1000:
+            return f"{ms:.0f}ms"
+        return f"{ms:.1f}ms"
     if metric == "peak_memory_bytes":
         for unit in ("B", "KiB", "MiB", "GiB"):
             if abs(value) < 1024:
