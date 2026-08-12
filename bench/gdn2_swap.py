@@ -375,9 +375,11 @@ def capture_manifest():
         sha = subprocess.check_output(
             ["git", "rev-parse", "HEAD"], stderr=subprocess.DEVNULL, text=True
         ).strip()
+        # NOTE: do NOT .strip() — the leading space in porcelain lines
+        # (" M results/...") is what the _OUTPUT_RE regex matches on.
         _status = subprocess.check_output(
             ["git", "status", "--porcelain"], stderr=subprocess.DEVNULL, text=True
-        ).strip()
+        )
         # Exclude results/ and .beads/ — output data, not source changes.
         import re
 

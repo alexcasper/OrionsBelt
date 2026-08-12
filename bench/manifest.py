@@ -108,7 +108,11 @@ def _git_dirty() -> bool | None:
     output reports ``git.dirty=true``, which per PLAN.md §9 invalidates the
     result for no real reason.
     """
-    status = _safe(_run, ["git", "status", "--porcelain"])
+    # NOTE: _run() calls .strip() which removes the leading space from git
+    # status --porcelain lines (format: "XY path"). That leading space is what
+    # the _OUTPUT_RE regex matches on to filter out results/ and .beads/
+    # changes.  So we use _git_porcelain() which preserves leading whitespace.
+    status = _git_porcelain()
     if status is None:
         return None
     # Filter lines that are only output dirs (results/ or .beads/).
@@ -116,6 +120,26 @@ def _git_dirty() -> bool | None:
     _OUTPUT_RE = re.compile(r"^[ ?][M?] (results/|\.beads/)")
     filtered = [line for line in status.splitlines() if not _OUTPUT_RE.match(line)]
     return len(filtered) > 0
+
+
+def _git_porcelain() -> str | None:
+    """Return raw ``git status --porcelain`` output (leading whitespace preserved).
+
+    Unlike :func:`_run`, this does **not** call ``.strip()`` so that the
+    leading space in lines like ``" M results/..."`` is preserved for the
+    :func:`_git_dirty` regex to match on.
+    """
+    try:
+        result = subprocess.run(  # noqa: S603 -- fixed argv, no shell, no user input
+            ["git", "status", "--porcelain"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            timeout=5,
+            check=True,
+        )
+        return result.stdout.decode("utf-8", errors="replace")
+    except Exception:
+        return None
 
 
 def _default_run_id() -> str:
