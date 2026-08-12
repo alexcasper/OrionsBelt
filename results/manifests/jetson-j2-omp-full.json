@@ -1,84 +1,85 @@
 {
-  "manifest_version": 1,
-  "run_id": "jetson-j2-omp-full_reconstructed",
-  "timestamp_utc": "2026-08-03T17:50:28Z",
-  "source": "dist/bench_gdn_jetson_a57 (OpenMP 4-thread, full optimization flags)",
-  "reconstructed": true,
-  "reconstruction_note": "Reconstructed from git history: committed at a085417 by j2. Original manifest not captured at run time. Device info from jetson-j2-clean.json (same hardware). Used by fleet_analysis.py as J2_OPTIMIZED_CSV for OpenMP scaling comparison.",
   "git": {
-    "sha": "a08541742da4d664da1ca2511e04d1b4f9b8d5cd",
-    "dirty": true
+    "dirty": false,
+    "dirty_corrected": "was true due to bench/manifest.py bug counting output files; fixed in 30daf9c9",
+    "sha": "a08541742da4d664da1ca2511e04d1b4f9b8d5cd"
   },
   "host": {
-    "hostname": "j2",
-    "machine": "aarch64",
-    "kernel": "4.9.337-tegra",
-    "os": "Linux #1 SMP PREEMPT Mon Nov 4 23:41:41 PST 2024",
-    "cpu_model": "ARMv8 Processor rev 1 (v8l)",
     "core_count": 4,
+    "cpu_model": "ARMv8 Processor rev 1 (v8l)",
     "cpu_topology": [
       {
         "cpu": 0,
-        "max_freq_khz": 1479000,
-        "min_freq_khz": 102000,
+        "cpu_capacity": null,
         "governor": "performance",
-        "cpu_capacity": null
+        "max_freq_khz": 1479000,
+        "min_freq_khz": 102000
       },
       {
         "cpu": 1,
-        "max_freq_khz": 1479000,
-        "min_freq_khz": 102000,
+        "cpu_capacity": null,
         "governor": "performance",
-        "cpu_capacity": null
+        "max_freq_khz": 1479000,
+        "min_freq_khz": 102000
       },
       {
         "cpu": 2,
-        "max_freq_khz": 1479000,
-        "min_freq_khz": 102000,
+        "cpu_capacity": null,
         "governor": "performance",
-        "cpu_capacity": null
+        "max_freq_khz": 1479000,
+        "min_freq_khz": 102000
       },
       {
         "cpu": 3,
-        "max_freq_khz": 1479000,
-        "min_freq_khz": 102000,
+        "cpu_capacity": null,
         "governor": "performance",
-        "cpu_capacity": null
+        "max_freq_khz": 1479000,
+        "min_freq_khz": 102000
       }
-    ]
+    ],
+    "hostname": "j2",
+    "kernel": "4.9.337-tegra",
+    "machine": "aarch64",
+    "os": "Linux #1 SMP PREEMPT Mon Nov 4 23:41:41 PST 2024"
   },
   "isa_features": {
-    "sve": false,
-    "sve2": false,
-    "i8mm": false,
-    "bf16": false,
     "asimddp": false,
-    "sme": false
+    "bf16": false,
+    "i8mm": false,
+    "sme": false,
+    "sve": false,
+    "sve2": false
+  },
+  "manifest_version": 1,
+  "memory": {
+    "mem_available_kb": null,
+    "mem_total_kb": 4057740
   },
   "parallelism": {
-    "omp_num_threads": "4",
-    "omp_proc_bind": null,
-    "omp_places": null,
     "effective_threads": 4,
+    "omp_num_threads": "4",
+    "omp_places": null,
+    "omp_proc_bind": null,
     "threads_source": "OMP_NUM_THREADS"
   },
-  "thermal_zones": [
-    {
-      "zone": "thermal_zone0",
-      "type": "AO-therm",
-      "temp_millicelsius": null
-    },
-    {
-      "zone": "thermal_zone1",
-      "type": "CPU-therm",
-      "temp_millicelsius": null
-    }
-  ],
-  "memory": {
-    "mem_total_kb": 4057740,
-    "mem_available_kb": null
-  },
+  "reconstructed": true,
+  "reconstruction_note": "Reconstructed from git history: committed at a085417 by j2. Original manifest not captured at run time. Device info from jetson-j2-clean.json (same hardware). Used by fleet_analysis.py as J2_OPTIMIZED_CSV for OpenMP scaling comparison.",
+  "run_id": "jetson-j2-omp-full_reconstructed",
   "software": {
     "python_version": "Python 3.6.9"
-  }
+  },
+  "source": "dist/bench_gdn_jetson_a57 (OpenMP 4-thread, full optimization flags)",
+  "thermal_zones": [
+    {
+      "temp_millicelsius": null,
+      "type": "AO-therm",
+      "zone": "thermal_zone0"
+    },
+    {
+      "temp_millicelsius": null,
+      "type": "CPU-therm",
+      "zone": "thermal_zone1"
+    }
+  ],
+  "timestamp_utc": "2026-08-03T17:50:28Z"
 }
