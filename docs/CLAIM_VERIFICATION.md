@@ -253,6 +253,38 @@ apart). ADR 0005 designates both as valid proxies for the O6's Immortalis-G720. 
 > CPU comparison is 4-thread A76 (OMP_NUM_THREADS=4, taskset cores 4–7).
 > Full methodology in FINDINGS §13.
 
+### 2.8 Cross-vendor NPU compiler rejection of GDN recurrence (verified 2026-08-02, 2026-08-06)
+
+| Claim | Status |
+|---|---|
+| CIX NOE Compiler rejects runtime-trip-count `Loop` (cannot express sequential recurrence) | ✅ Confirmed — FINDINGS §1, `scripts/npu_op_probe.py`, NOE SDK 26_q2 / cixbuilder 6.1.3753.3 |
+| Rockchip RKNN also rejects runtime `Loop` ("dynamic graph" error) | ✅ Confirmed — FINDINGS §2a, `scripts/rknn_op_probe.py`, RKNN toolkit targeting RK3588 |
+| Scan compiles on RKNN (CIX rejects even Scan) — genuine toolchain difference | ✅ Confirmed — FINDINGS §2a, 8 KB compiled model verified in RKNN simulator |
+| No current edge NPU compiler handles GDN's variable-length recurrence | ✅ Confirmed — two independent vendors, different silicon, same architectural constraint |
+
+This generalizes beyond a single vendor: NPU compilers require static, parallelizable dataflow
+graphs, and GDN's per-token sequential recurrence violates that. The project's CPU kernels
+run because OoO pipelines handle sequential dependencies; the NPU's strength (massive
+parallelism) is the wrong tool for this workload.
+
+### 2.9 ONNX Runtime CPU EP: GDN via Loop but 16× slower (verified 2026-08-08)
+
+| Claim | Status |
+|---|---|
+| ORT CPU EP executes GDN recurrence correctly (rel_err 2.3×10⁻⁷ vs NumPy) | ✅ Confirmed — FINDINGS §27, `scripts/ort_gdn_probe.py`, device rk3588-t4 |
+| ORT generic Loop: ~49 µs/token vs ~3 µs for fused C kernel (16× overhead) | ✅ Confirmed — same audit, single-head V=128 |
+| No Arm-specific tuning for projection matmuls in ORT's GDN path | ✅ Confirmed — ORT uses generic CPU EP, no NEON/SVE optimization for GDN ops |
+| Third data point confirming no existing CPU toolchain optimizes GDN for Arm | ✅ Confirmed — NPU (rejected), KleidiAI (matmul only), ORT (generic), llama.cpp (dedicated op but untuned scalar) |
+
+### 2.10 Sustained-load thermal stability (verified 2026-08-09)
+
+| Claim | Status |
+|---|---|
+| INT8 SDOT: 0.3% throughput decay over 3.4 min sustained (3.46→3.45 tok/s) | ✅ Confirmed — FINDINGS §37, rk3588-t4 A76 4-thread, governor=performance |
+| FP32: 0.9% throughput decay over 5 min sustained (1.10→1.09 tok/s) | ✅ Confirmed — same device/section |
+| Temperature plateaus at ~52°C within 70s, no throttling (idle ~39°C, ΔT=13°C) | ✅ Confirmed — bigcore thermals logged in FINDINGS §37 table |
+| Headline numbers are steady-state sustainable, not burst artifacts | ✅ Confirmed — directly addresses PLAN.md risk R7 |
+
 ---
 
 ## 3. Finding that changes the technical thesis 🔴
