@@ -93,6 +93,7 @@ class TestRunAblationMinimal:
             repeats=5,
             decode_length=6,
             output_dir=str(tmp_path / "ablation"),
+            manifest_dir=str(tmp_path / "manifests"),
         )
         assert len(csv_paths) == 6
         for p in csv_paths:
@@ -105,6 +106,7 @@ class TestRunAblationMinimal:
             repeats=5,
             decode_length=6,
             output_dir=str(tmp_path / "ablation"),
+            manifest_dir=str(tmp_path / "manifests"),
         )
         # Each CSV is named ablation_<config_name>.csv
         for entry, path in zip(ABLATION_GRID, csv_paths, strict=True):
@@ -118,6 +120,7 @@ class TestRunAblationMinimal:
             repeats=5,
             decode_length=6,
             output_dir=str(tmp_path / "ablation"),
+            manifest_dir=str(tmp_path / "manifests"),
         )
         for path in csv_paths:
             rows = read_csv(path)
@@ -132,6 +135,7 @@ class TestRunAblationMinimal:
             repeats=5,
             decode_length=6,
             output_dir=str(tmp_path / "a1"),
+            manifest_dir=str(tmp_path / "manifests"),
         )
         two = run_ablation(
             context_lengths=[64, 128],
@@ -139,6 +143,7 @@ class TestRunAblationMinimal:
             repeats=5,
             decode_length=6,
             output_dir=str(tmp_path / "a2"),
+            manifest_dir=str(tmp_path / "manifests"),
         )
         total_one = sum(len(read_csv(p)) for p in one)
         total_two = sum(len(read_csv(p)) for p in two)
@@ -152,6 +157,7 @@ class TestRunAblationMinimal:
             repeats=5,
             decode_length=6,
             output_dir=str(tmp_path / "ablation"),
+            manifest_dir=str(tmp_path / "manifests"),
         )
         for entry, path in zip(ABLATION_GRID, csv_paths, strict=True):
             rows = read_csv(path)
@@ -167,6 +173,7 @@ class TestRunAblationMinimal:
             repeats=5,
             decode_length=6,
             output_dir=str(tmp_path / "ablation"),
+            manifest_dir=str(tmp_path / "manifests"),
         )
         for entry, path in zip(ABLATION_GRID, csv_paths, strict=True):
             rows = read_csv(path)
@@ -182,6 +189,7 @@ class TestRunAblationMinimal:
             repeats=5,
             decode_length=6,
             output_dir=str(tmp_path / "ablation"),
+            manifest_dir=str(tmp_path / "manifests"),
         )
         path = csv_paths[0]
         rows = read_csv(path)
