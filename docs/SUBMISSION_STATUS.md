@@ -311,6 +311,7 @@ cutoff has passed with no board; any future arrival is additive bonus per ADR 00
 | #312 | t3 | PR table backfill #310 (MERGED) + #311 (OPEN→MERGED) + stale bead-ID refs | MERGED |
 | #313 | t4 | Device bench rk3588-t4 big+little clusters + manifest fix (ob-8ms.3); root cause: manifest.py _git_dirty stripped porcelain leading-space, breaking results/ exclusion regex | MERGED |
 | #314 | t3 | Dirty-tree check for validate_bench_csvs.sh (catches provenance gaps like PR #313) | MERGED |
+| #315 | t3 | Regenerate stale fleet_bandwidth_scaling.md (t4 clean re-run data: 11.90→11.42 GiB/s scan) | OPEN |
 
 > **PRs #190, #198, #207, #229, #235, #245, #289:** closed (not merged). #282's proposed provenance content was rejected but its PR itself shows MERGED on GitHub (content replaced during review — see row above). No gaps in numbering.
 
