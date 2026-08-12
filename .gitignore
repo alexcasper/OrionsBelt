@@ -4,6 +4,13 @@
 *.db
 .beads-credential-key
 .beads/proxieddb/
+# Transient bd lock at the REPO ROOT, not under .beads/. It has to be ignored
+# here because the dirty-tree filters in scripts/fleet_sweep.sh and
+# scripts/capture_manifest.sh exclude '.beads/' with a trailing slash, which
+# does not match this path — so a lock left by an in-flight bd command makes
+# fleet_sweep.sh refuse to run and stamps dirty=true on every manifest
+# captured meanwhile (the ob-8ms.3 / ob-bf7 failure mode).
+.beads.gate.lock
 
 # Python build artifacts
 *.egg-info/
