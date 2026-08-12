@@ -118,6 +118,7 @@ def run_ablation(
     repeats: int = 5,
     decode_length: int = 20,
     output_dir: str = "results/raw/ablation",
+    manifest_dir: str = "results/manifests",
 ) -> list[str]:
     """Run the full ablation grid. Returns list of CSV paths written."""
     output_path = Path(output_dir)
@@ -150,7 +151,7 @@ def run_ablation(
         print(f"    {len(rows)} rows → {csv_file}")
 
         # Capture provenance manifest (ob-20t: previously missing)
-        mpath = _write_manifest_for_rows(rows, config)
+        mpath = _write_manifest_for_rows(rows, config, manifest_dir=manifest_dir)
         if mpath:
             print(f"    manifest → {mpath}")
 
@@ -177,6 +178,11 @@ def main(argv: list[str] | None = None) -> int:
         default="results/raw/ablation",
         help="Directory for ablation CSVs (default: results/raw/ablation)",
     )
+    parser.add_argument(
+        "--manifest-dir",
+        default="results/manifests",
+        help="Directory for provenance manifests (default: results/manifests)",
+    )
     args = parser.parse_args(argv)
 
     context_lengths = [int(x) for x in args.context.split(",")]
@@ -187,6 +193,7 @@ def main(argv: list[str] | None = None) -> int:
         repeats=args.repeats,
         decode_length=args.decode_length,
         output_dir=args.output_dir,
+        manifest_dir=args.manifest_dir,
     )
 
     # Generate the comparison table
