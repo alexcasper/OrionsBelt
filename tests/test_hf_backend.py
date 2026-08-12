@@ -545,6 +545,107 @@ class TestVerifyMemory:
 
 
 # ---------------------------------------------------------------------------
+# _available_memory_bytes / _check_memory (pure Python, no torch needed)
+# ---------------------------------------------------------------------------
+
+
+class TestAvailableMemoryBytes:
+    """Test _available_memory_bytes static method."""
+
+    def test_returns_positive_on_linux(self):
+        """On a real Linux system, returns a positive byte count."""
+        result = HFTorchBackend._available_memory_bytes()
+        # /proc/meminfo exists on this device; result should be positive
+        assert result > 0
+        # Sanity: should be in a reasonable range (at least 1 MiB)
+        assert result > 1024 * 1024
+
+    def test_returns_zero_on_oserror(self):
+        """Returns 0 when /proc/meminfo cannot be opened."""
+        with patch("builtins.open", side_effect=OSError("no file")):
+            result = HFTorchBackend._available_memory_bytes()
+        assert result == 0
+
+    def test_returns_zero_on_malformed_value(self):
+        """Returns 0 when MemAvailable value is not an integer."""
+        from io import StringIO
+
+        fake_meminfo = StringIO("MemTotal:       16384000 kB\nMemAvailable:   not_a_number kB\n")
+        with patch("builtins.open", return_value=fake_meminfo):
+            result = HFTorchBackend._available_memory_bytes()
+        assert result == 0
+
+    def test_returns_zero_when_memavailable_missing(self):
+        """Returns 0 when MemAvailable line is absent from /proc/meminfo."""
+        from io import StringIO
+
+        fake_meminfo = StringIO("MemTotal:       16384000 kB\nSwapTotal:      0 kB\n")
+        with patch("builtins.open", return_value=fake_meminfo):
+            result = HFTorchBackend._available_memory_bytes()
+        assert result == 0
+
+    def test_converts_kib_to_bytes(self):
+        """MemAvailable value is in KiB and gets multiplied by 1024."""
+        from io import StringIO
+
+        fake_meminfo = StringIO("MemAvailable:   8000000 kB\n")
+        with patch("builtins.open", return_value=fake_meminfo):
+            result = HFTorchBackend._available_memory_bytes()
+        assert result == 8000000 * 1024
+
+
+class TestCheckMemory:
+    """Test _check_memory pre-flight OOM guard."""
+
+    def test_raises_memory_error_when_insufficient(self):
+        """Raises MemoryError when available RAM < 1.5× weight estimate."""
+        backend = make_backend_with_mock()
+        with (
+            patch.object(HFTorchBackend, "_available_memory_bytes", return_value=1_000_000),
+            pytest.raises(MemoryError, match="Insufficient memory"),
+        ):
+            backend._check_memory()
+
+    def test_no_error_when_sufficient(self):
+        """Returns None when available RAM exceeds requirement."""
+        backend = make_backend_with_mock()
+        with patch.object(HFTorchBackend, "_available_memory_bytes", return_value=100_000_000_000):
+            result = backend._check_memory()
+        assert result is None
+
+    def test_no_error_when_cannot_check(self):
+        """Returns None (skip check) when _available_memory_bytes returns 0."""
+        backend = make_backend_with_mock()
+        with patch.object(HFTorchBackend, "_available_memory_bytes", return_value=0):
+            result = backend._check_memory()
+        assert result is None
+
+    def test_memory_error_mentions_ob3lq(self):
+        """Error message references the OOM-killer mitigation bead."""
+        backend = make_backend_with_mock()
+        with (
+            patch.object(HFTorchBackend, "_available_memory_bytes", return_value=1_000),
+            pytest.raises(MemoryError, match="ob-3lq"),
+        ):
+            backend._check_memory()
+
+    def test_0_8b_model_threshold(self):
+        """0.8B model uses ~3 GB weight estimate → requires ~4.5 GB."""
+        from bench.harness import QWEN35_08B
+
+        backend = make_backend_with_mock(config=QWEN35_08B)
+        # 4.0 GB available < 4.5 GB required → should raise
+        with (
+            patch.object(HFTorchBackend, "_available_memory_bytes", return_value=4_000_000_000),
+            pytest.raises(MemoryError),
+        ):
+            backend._check_memory()
+        # 5.0 GB available > 4.5 GB required → should pass
+        with patch.object(HFTorchBackend, "_available_memory_bytes", return_value=5_000_000_000):
+            assert backend._check_memory() is None
+
+
+# ---------------------------------------------------------------------------
 # Integration: backend conforms to harness Backend ABC
 # ---------------------------------------------------------------------------
 
