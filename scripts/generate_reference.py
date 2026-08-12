@@ -51,7 +51,7 @@ from pathlib import Path
 
 # Ensure repo root is importable
 _ROOT = str(Path(__file__).resolve().parent.parent)
-if _ROOT not in sys.path:
+if _ROOT not in sys.path:  # pragma: no cover
     sys.path.insert(0, _ROOT)
 
 # ---------------------------------------------------------------------------
@@ -60,10 +60,10 @@ if _ROOT not in sys.path:
 
 try:
     import torch
-    from transformers import AutoModelForCausalLM, AutoTokenizer
+    from transformers import AutoModelForCausalLM, AutoTokenizer  # pragma: no cover
 
-    _TORCH_AVAILABLE = True
-    _IMPORT_ERROR = ""
+    _TORCH_AVAILABLE = True  # pragma: no cover
+    _IMPORT_ERROR = ""  # pragma: no cover
 except ImportError as e:  # pragma: no cover
     _TORCH_AVAILABLE = False
     _IMPORT_ERROR = str(e)

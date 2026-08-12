@@ -441,7 +441,7 @@ def generate_niah_multikey(
         prefix = MULTIKEY_KEY_PREFIXES[i % len(MULTIKEY_KEY_PREFIXES)]
         key_idx = i
         key = f"{prefix}_{key_idx:04d}"
-        while key in used_keys:
+        while key in used_keys:  # pragma: no cover (unreachable: key includes unique idx)
             key_idx += 1
             key = f"{prefix}_{key_idx:04d}"
         used_keys.add(key)
@@ -474,7 +474,7 @@ def generate_niah_multikey(
 
     for stmt in kv_statements:
         insert_pos = cursor + segment_size
-        if insert_pos > len(haystack):
+        if insert_pos > len(haystack):  # pragma: no cover (unreachable: segment math guarantees insert_pos ≤ len)
             insert_pos = len(haystack)
         parts.append(haystack[cursor:insert_pos])
         parts.append(" " + stmt + " ")

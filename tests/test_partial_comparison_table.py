@@ -150,6 +150,15 @@ class TestLoadSustained:
         assert count > 0
         assert isinstance(med, float)
 
+    def test_returns_none_for_empty_csv(self, tmp_path, monkeypatch):
+        """CSV with header but no data rows → None."""
+        import scripts.partial_comparison_table as pct
+
+        monkeypatch.setattr(pct, "RAW", str(tmp_path))
+        (tmp_path / "empty_sustained.csv").write_text("throughput_gibs\n")
+        result = load_sustained("empty_sustained.csv")
+        assert result is None
+
 
 # ---------------------------------------------------------------------------
 # gib — convenience GiB/s lookup

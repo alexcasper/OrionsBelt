@@ -904,7 +904,7 @@ def main(argv: list[str] | None = None) -> int:
             backend = HFTorchBackend(model_cfg, quantization=args.quantization)
         except ImportError as exc:
             parser.error(f"--backend hf needs torch + transformers installed: {exc}")
-    else:
+    else:  # pragma: no cover (unreachable: argparse choices restricts to synthetic|hf)
         parser.error(f"unknown backend: {args.backend}")
         return 1  # pragma: no cover (unreachable: parser.error calls sys.exit)
 

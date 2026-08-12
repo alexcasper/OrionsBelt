@@ -86,7 +86,7 @@ def classify(returncode: int, log: str) -> tuple[str, str]:
         for ln in lines:
             if marker in ln.lower():
                 return ln[:300]
-        return ""
+        return ""  # pragma: no cover (unreachable: marker confirmed in full-text low)
 
     if hit:
         return "UNSUPPORTED_OP", find(hit)

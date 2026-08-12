@@ -523,6 +523,23 @@ class TestProvenanceAudit:
         finally:
             fa.MANIFEST_DIR = original_dir
 
+    def test_big_little_suffix_manifest_mapping(self, tmp_path, monkeypatch):
+        """_big/_little suffix CSVs map to the base device manifest."""
+        manifest_dir = tmp_path / "manifests"
+        manifest_dir.mkdir(parents=True, exist_ok=True)
+        # Create manifest for base device name (without _big suffix)
+        write_manifest(str(manifest_dir / "test-board.json"), dirty=False)
+
+        monkeypatch.setattr(fa, "REPLICATES", [
+            ("Test", [("a", "fake/test-board_big.csv")]),
+        ])
+        monkeypatch.setattr(fa, "MANIFEST_DIR", str(manifest_dir))
+
+        lines = fa._provenance_audit_lines()
+        text = "\n".join(lines)
+        # Should NOT report missing — _big suffix maps to test-board.json
+        assert "no manifest" not in text.lower()
+
 
 # ---------------------------------------------------------------------------
 # generate_report
@@ -645,6 +662,45 @@ class TestGenerateReport:
 
         assert "Optimization impact" in report
         assert "OpenMP" in report or "single-thread" in report.lower()
+
+    def test_report_spread_note_no_manifest(self, tmp_path, monkeypatch):
+        """When replicate runs lack manifests, spread note says 'no manifest'."""
+        setup_fleet_data(tmp_path)
+        # Delete manifests for one replicate group
+        for f in ("rk3588-t3-clean.json", "rk3588-t4-clean.json"):
+            p = tmp_path / "results" / "manifests" / f
+            if p.exists():
+                p.unlink()
+        monkeypatch.chdir(tmp_path)
+        report = fa.generate_report(str(tmp_path / "report.md"))
+        assert "no manifest" in report.lower()
+
+    def test_report_spread_note_all_dirty(self, tmp_path, monkeypatch):
+        """When all replicate manifests are dirty with same SHA, note warns."""
+        setup_fleet_data(tmp_path)
+        manifests_dir = tmp_path / "results" / "manifests"
+        for base in ("rk3588-t3-clean", "rk3588-t4-clean",
+                      "rk3588-t3-little-clean", "rk3588-t4-little-clean"):
+            write_manifest(str(manifests_dir / (base + ".json")), dirty=True, sha="same123abc")
+        monkeypatch.chdir(tmp_path)
+        report = fa.generate_report(str(tmp_path / "report.md"))
+        assert "all dirty" in report.lower()
+
+    def test_report_pi5_beats_jetson_all_kernels(self, tmp_path, monkeypatch):
+        """When Pi 5 beats Jetson on all kernels beyond spread, report says so."""
+        setup_fleet_data(tmp_path)
+        # Overwrite Pi5 to dominate Jetson on ALL kernels
+        write_device_csv(str(tmp_path / "results" / "raw" / "pi5-r5.csv"),
+                         gib_overrides={"gdn_cumdecay": 10.0, "gdn_gated_scan": 10.0,
+                                        "gdn_causal_dwconv1d": 10.0})
+        # Keep Jetson low
+        for jc in ("jetson-j1-clean.csv", "jetson-j2-clean.csv"):
+            write_device_csv(str(tmp_path / "results" / "raw" / jc),
+                             gib_overrides={"gdn_cumdecay": 1.0, "gdn_gated_scan": 1.0,
+                                            "gdn_causal_dwconv1d": 1.0})
+        monkeypatch.chdir(tmp_path)
+        report = fa.generate_report(str(tmp_path / "report.md"))
+        assert "beats the Jetson on all three kernels" in report
 
 
 # ---------------------------------------------------------------------------

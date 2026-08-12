@@ -525,6 +525,12 @@ class TestListRepoFiles:
         ):
             fetch_weights._list_repo_files("Qwen/Qwen3.5-4B")
 
+    def test_hub_api_success(self):
+        """When huggingface_hub is available, use list_repo_files directly."""
+        with patch("huggingface_hub.list_repo_files", return_value=["model.safetensors", "config.json"]):
+            result = fetch_weights._list_repo_files("Qwen/Qwen3.5-4B")
+        assert result == ["config.json", "model.safetensors"]
+
 
 # ---------------------------------------------------------------------------
 # _download_file (urllib fallback path)
@@ -585,6 +591,18 @@ class TestDownloadFile:
                 "bad.safetensors",
                 dest,
             )
+
+    def test_hub_api_download_success(self, tmp_path):
+        """When huggingface_hub is available, use hf_hub_download."""
+        dest = tmp_path / "weights.safetensors"
+        dest.write_bytes(b"\x00" * 2048)
+        with patch("huggingface_hub.hf_hub_download", return_value=str(dest)):
+            result = fetch_weights._download_file(
+                "Qwen/Qwen3.5-4B",
+                "weights.safetensors",
+                dest,
+            )
+        assert result == 2048
 
 
 # ---------------------------------------------------------------------------

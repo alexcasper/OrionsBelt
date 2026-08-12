@@ -345,7 +345,7 @@ def main(argv: list[str] | None = None) -> int:
 
         matplotlib.use("Agg")  # non-interactive backend
         import matplotlib.pyplot as plt
-    except ImportError:
+    except ImportError:  # pragma: no cover
         print(
             "\nWARNING: matplotlib not available — generating table only.\n"
             "Install with: pip install matplotlib",
