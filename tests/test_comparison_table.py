@@ -242,6 +242,25 @@ class TestFmtValue:
         result = _fmt_value("energy_joules", 3.14159)
         assert "3.142" in result
 
+    # -- ob-mrd.30: large-value rounding for deterministic output -----------
+
+    def test_tokens_per_sec_large_rounds_to_integer(self):
+        """Values >= 1000 round to integer to avoid jitter-induced diffs."""
+        assert _fmt_value("prefill_tokens_per_sec", 19999.8) == "20000"
+        assert _fmt_value("prefill_tokens_per_sec", 19999.9) == "20000"
+
+    def test_tokens_per_sec_small_keeps_decimal(self):
+        assert _fmt_value("decode_tokens_per_sec", 499.8) == "499.8"
+
+    def test_ttft_seconds_large_rounds_to_integer_ms(self):
+        """ttft >= 1000ms rounds to integer ms."""
+        result = _fmt_value("ttft_seconds", 1.6424)
+        assert "1642ms" in result
+
+    def test_ttft_seconds_small_keeps_decimal_ms(self):
+        result = _fmt_value("ttft_seconds", 0.2053)
+        assert "205.3ms" in result
+
 
 # ---------------------------------------------------------------------------
 # generate_markdown_table

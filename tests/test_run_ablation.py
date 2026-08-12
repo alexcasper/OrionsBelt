@@ -133,6 +133,37 @@ class TestRunAblation:
 
 
 # ---------------------------------------------------------------------------
+# Deterministic timing (ob-mrd.30)
+# ---------------------------------------------------------------------------
+
+
+class TestDeterministicTiming:
+    """Verify that non-zero SyntheticBackend delays produce plausible tokens/sec."""
+
+    def test_nonzero_delays_produce_finite_tps(self, tmp_path):
+        """With deterministic delays, tokens/sec should be finite and reasonable."""
+        csv_paths = run_ablation(
+            [64],
+            warmup=1,
+            repeats=5,
+            decode_length=5,
+            output_dir=str(tmp_path / "ablation"),
+            manifest_dir=str(tmp_path / "manifests"),
+            prefill_ns_per_token=50_000,
+            decode_ns_per_step=2_000_000,
+        )
+        from bench.schema import read_csv
+
+        rows = read_csv(csv_paths[0])
+        tps_rows = [r for r in rows if r.metric_name == "decode_tokens_per_sec"]
+        assert len(tps_rows) > 0
+        for r in tps_rows:
+            val = float(r.value)
+            # ~500 tok/s, not millions (the pre-fix bug)
+            assert 100 < val < 1000, f"decode_tokens_per_sec={val} outside plausible range"
+
+
+# ---------------------------------------------------------------------------
 # main() — CLI entry point
 # ---------------------------------------------------------------------------
 
@@ -155,6 +186,10 @@ class TestMain:
                 "5",
                 "--decode-length",
                 "5",
+                "--prefill-ns",
+                "0",
+                "--decode-ns",
+                "0",
                 "--output-dir",
                 str(tmp_path / "ablation"),
                 "--manifest-dir",
@@ -175,6 +210,10 @@ class TestMain:
                 "1",
                 "--repeats",
                 "5",
+                "--prefill-ns",
+                "0",
+                "--decode-ns",
+                "0",
                 "--output-dir",
                 str(tmp_path / "ablation"),
                 "--manifest-dir",
@@ -196,6 +235,10 @@ class TestMain:
                 "1",
                 "--repeats",
                 "5",
+                "--prefill-ns",
+                "0",
+                "--decode-ns",
+                "0",
                 "--output-dir",
                 str(tmp_path / "ablation"),
                 "--manifest-dir",
@@ -243,6 +286,10 @@ class TestMainEntryRunpy:
                 "1",
                 "--repeats",
                 "5",
+                "--prefill-ns",
+                "0",
+                "--decode-ns",
+                "0",
                 "--output-dir",
                 str(tmp_path / "ablation"),
                 "--manifest-dir",
