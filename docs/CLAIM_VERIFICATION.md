@@ -285,6 +285,17 @@ parallelism) is the wrong tool for this workload.
 | Temperature plateaus at ~52°C within 70s, no throttling (idle ~39°C, ΔT=13°C) | ✅ Confirmed — bigcore thermals logged in FINDINGS §37 table |
 | Headline numbers are steady-state sustainable, not burst artifacts | ✅ Confirmed — directly addresses PLAN.md risk R7 |
 
+### 2.11 Context-length scaling: GDN O(1) vs full-attention O(n) (verified 2026-08-09)
+
+| Claim | Status |
+|---|---|
+| Pure-GDN throughput flat to within <0.2% across ctx=1–4096 | ✅ Confirmed — FINDINGS §17, 0.8B: 27.52→27.47 tok/s (0.18%); 4B: 3.25→3.24 tok/s (within measurement noise) |
+| Hybrid model degrades 1.33× (4B) to 1.56× (0.8B) at ctx=4096 | ✅ Confirmed — same section, hybrid tables: 4B 3.30→2.49, 0.8B 28.79→18.46 |
+| Full-attention latency grows linearly with context (6.2× for 4B, 8.7× for 0.8B) | ✅ Confirmed — FINDINGS §17, full-attn column: 4B 19→116 ms, 0.8B 2.5→22 ms |
+| GDN recurrent state is constant (~1.2 MB for 24 layers) vs KV cache growing to 256 MB at ctx=4096 | ✅ Confirmed — same section, memory analysis |
+| Cross-validated on Jetson Nano A57 (second core class) | ✅ Confirmed — FINDINGS §17 A57 ctx-sweep, commit 3d83bdc |
+| Cross-validated on two independent RK3588 units (§36, §38) | ✅ Confirmed — t3 and t4 agree within 3–5% after SDOT binary fix |
+
 ---
 
 ## 3. Finding that changes the technical thesis 🔴
