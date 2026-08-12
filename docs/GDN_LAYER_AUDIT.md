@@ -78,7 +78,7 @@ conv_dim = key_dim * 2 + value_dim  # = num_k_heads * d_k * 2 + num_v_heads * d_
 
 | Checkpoint | conv_dim | kernel_size | Conv state (fp32) per layer | Across GDN layers |
 |---|---:|---:|---:|---:|
-| 4B | 12,288 | 4 | 49,152 floats = 192 KiB | 4.5 MiB |
+| 4B | 8,192 | 4 | 32,768 floats = 128 KiB | 3.0 MiB |
 | 0.8B | 6,144 | 4 | 24,576 floats = 96 KiB | 1.7 MiB |
 
 This is a small, fixed cost per layer — not context-dependent. It adds to the recurrent state in the total "GDN decode footprint" but is O(1) like the recurrent state.
@@ -164,12 +164,12 @@ Per GDN layer, the projections are:
 
 | Projection | Shape (4B) | Shape (0.8B) | Purpose |
 |---|---|---|---|
-| `in_proj_qkv` | 2560 → 12,288 | 1024 → 6,144 | Q, K, V combined |
+| `in_proj_qkv` | 2560 → 8,192 | 1024 → 6,144 | Q, K, V combined |
 | `in_proj_z` | 2560 → 4,096 | 1024 → 2,048 | Gate for RMSNorm |
 | `in_proj_b` | 2560 → 32 | 1024 → 16 | Write gate (beta) |
 | `in_proj_a` | 2560 → 32 | 1024 → 16 | Decay gate (alpha) |
 | `out_proj` | 4,096 → 2560 | 2,048 → 1024 | Output projection |
-| `conv1d` weight | 12,288 × 1 × 4 | 6,144 × 1 × 4 | Depthwise Conv1D |
+| `conv1d` weight | 8,192 × 1 × 4 | 6,144 × 1 × 4 | Depthwise Conv1D |
 | `A_log` | 32 | 16 | Learnable decay |
 | `dt_bias` | 32 | 16 | Learnable bias |
 | `norm` weight | 128 | 128 | RMSNorm scale |
