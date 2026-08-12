@@ -115,7 +115,9 @@ def load_ctxsweep_data():
         if "schema" in name:
             continue
         info = classify(name)
-        if info is None:
+        if (
+            info is None
+        ):  # pragma: no cover (unreachable: glob pre-filters to *ctxsweep*.csv, schema check above)
             continue
         device, cluster, model, quant, arch = info
 

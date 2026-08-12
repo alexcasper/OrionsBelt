@@ -351,3 +351,185 @@ class TestGenerateMarkdown:
         md = generate_markdown(datasets, sources)
         assert "## 1." in md
         assert "## 2." in md
+
+
+# ---------------------------------------------------------------------------
+# classify — non-.csv extension (line 73)
+# ---------------------------------------------------------------------------
+
+
+class TestClassifyEdgeCases:
+    def test_rejects_non_csv_extension(self):
+        """A file with ctxsweep in name but not .csv extension returns None."""
+        assert classify("rk3588-t4_e2e_ctxsweep_raw.txt") is None
+
+    def test_rejects_non_csv_extension_raw(self):
+        """Even _raw suffix doesn't help if not .csv."""
+        assert classify("rk3588-t4_e2e_ctxsweep_raw.json") is None
+
+
+# ---------------------------------------------------------------------------
+# load_ctxsweep_data — schema skip, non-ctxsweep skip, key collision (lines 116, 119, 136)
+# ---------------------------------------------------------------------------
+
+
+class TestLoadCtxsweepSkipBranches:
+    def test_schema_file_in_dir_skipped(self, tmp_path, monkeypatch):
+        """Schema files in the directory are skipped."""
+        import gen_ctxsweep_comparison as mod
+
+        header = "ctx_len,tok_per_sec,kv_cache_mb,total_us"
+        (tmp_path / "rk3588-t4_e2e_ctxsweep_4t_fair.csv").write_text(f"{header}\n1,3.0,0,333333\n")
+        (tmp_path / "rk3588-t4_ctxsweep_schema.csv").write_text(f"{header}\n")
+        monkeypatch.setattr(mod, "RAW_DIR", tmp_path)
+        datasets, sources = mod.load_ctxsweep_data()
+        assert len(datasets) == 1  # schema file skipped
+
+    def test_non_ctxsweep_file_in_dir_skipped(self, tmp_path, monkeypatch):
+        """Non-ctxsweep CSVs are skipped by classify()."""
+        import gen_ctxsweep_comparison as mod
+
+        header = "ctx_len,tok_per_sec,kv_cache_mb,total_us"
+        (tmp_path / "rk3588-t4_e2e_ctxsweep_4t_fair.csv").write_text(f"{header}\n1,3.0,0,333333\n")
+        (tmp_path / "rk3588-t4_big.csv").write_text(f"{header}\n1,2.0,0,500000\n")
+        monkeypatch.setattr(mod, "RAW_DIR", tmp_path)
+        datasets, sources = mod.load_ctxsweep_data()
+        assert len(datasets) == 1  # non-ctxsweep file skipped
+
+    def test_key_collision_non_4t_fair_skipped(self, tmp_path, monkeypatch):
+        """When a second file with the same key is not _4t_fair, it is skipped."""
+        import gen_ctxsweep_comparison as mod
+
+        header = "ctx_len,tok_per_sec,kv_cache_mb,total_us"
+        # Both files classify to the same key; sorted order means aaa comes first.
+        # aaa sets the key; bbb (not _4t_fair) should be skipped via continue.
+        (tmp_path / "rk3588-t4_e2e_ctxsweep_aaa.csv").write_text(f"{header}\n1,3.0,0,333333\n")
+        (tmp_path / "rk3588-t4_e2e_ctxsweep_bbb.csv").write_text(f"{header}\n1,4.5,0,222222\n")
+        monkeypatch.setattr(mod, "RAW_DIR", tmp_path)
+        datasets, sources = mod.load_ctxsweep_data()
+        assert len(datasets) == 1  # bbb skipped, aaa wins
+        key = ("rk3588-t4", "big", "Qwen3.5-4B", "FP32", "hybrid")
+        # aaa was processed first and wins
+        assert sources[key]["csv"] == "rk3588-t4_e2e_ctxsweep_aaa.csv"
+
+
+# ---------------------------------------------------------------------------
+# generate_markdown — malformed row exception handlers (lines 236-237, 260-261, 285-286, 327-328)
+# ---------------------------------------------------------------------------
+
+
+class TestGenerateMarkdownMalformedRows:
+    def test_malformed_ctx_len_handled(self):
+        """Malformed ctx_len rows are gracefully skipped in all table sections."""
+        key = ("rk3588-t4", "big", "Qwen3.5-4B", "FP32", "hybrid")
+        datasets = {
+            key: [
+                {"ctx_len": "bad", "tok_per_sec": "3.0", "kv_cache_mb": "10", "total_us": "333333"},
+                {"ctx_len": "1", "tok_per_sec": "4.0", "kv_cache_mb": "20", "total_us": "250000"},
+            ]
+        }
+        sources = {key: {"csv": "test_ctxsweep_4t_fair.csv"}}
+        md = generate_markdown(datasets, sources)
+        # Should not crash, and should produce valid markdown
+        assert "### Throughput" in md
+        assert "### KV cache" in md
+        assert "### Per-token latency" in md
+
+    def test_malformed_tok_per_sec_handled(self):
+        """Malformed tok_per_sec is skipped without crashing."""
+        key = ("rk3588-t4", "big", "Qwen3.5-4B", "FP32", "hybrid")
+        datasets = {
+            key: [
+                {"ctx_len": "1", "tok_per_sec": "bad", "kv_cache_mb": "10", "total_us": "333333"},
+                {
+                    "ctx_len": "4096",
+                    "tok_per_sec": "3.0",
+                    "kv_cache_mb": "50",
+                    "total_us": "333333",
+                },
+            ]
+        }
+        sources = {key: {"csv": "test_ctxsweep_4t_fair.csv"}}
+        md = generate_markdown(datasets, sources)
+        assert "### Throughput" in md
+
+    def test_malformed_total_us_handled(self):
+        """Malformed total_us in latency table is skipped without crashing."""
+        key = ("rk3588-t4", "big", "Qwen3.5-4B", "FP32", "hybrid")
+        datasets = {
+            key: [
+                {"ctx_len": "1", "tok_per_sec": "3.0", "kv_cache_mb": "10", "total_us": "bad"},
+                {
+                    "ctx_len": "4096",
+                    "tok_per_sec": "3.0",
+                    "kv_cache_mb": "50",
+                    "total_us": "400000",
+                },
+            ]
+        }
+        sources = {key: {"csv": "test_ctxsweep_4t_fair.csv"}}
+        md = generate_markdown(datasets, sources)
+        assert "### Per-token latency" in md
+
+    def test_retention_note_malformed_data(self):
+        """Retention note with malformed tok_per_sec is skipped via except."""
+        key_h = ("rk3588-t4", "big", "Qwen3.5-4B", "FP32", "hybrid")
+        key_p = ("rk3588-t4", "big", "Qwen3.5-4B", "FP32", "puregdn")
+        datasets = {
+            key_h: [
+                {"ctx_len": "1", "tok_per_sec": "bad", "kv_cache_mb": "10", "total_us": "333333"},
+                {
+                    "ctx_len": "4096",
+                    "tok_per_sec": "bad",
+                    "kv_cache_mb": "50",
+                    "total_us": "333333",
+                },
+            ],
+            key_p: [
+                {"ctx_len": "1", "tok_per_sec": "4.0", "kv_cache_mb": "0", "total_us": "250000"},
+                {"ctx_len": "4096", "tok_per_sec": "3.0", "kv_cache_mb": "0", "total_us": "333333"},
+            ],
+        }
+        sources = {
+            key_h: {"csv": "test_ctxsweep_4t_fair.csv"},
+            key_p: {"csv": "test_ctxsweep_puregdn_4t.csv"},
+        }
+        md = generate_markdown(datasets, sources)
+        # Should not crash; retention note may be absent due to malformed data
+        assert "## Data sources" in md
+
+
+# ---------------------------------------------------------------------------
+# main() — both paths (lines 345-354)
+# ---------------------------------------------------------------------------
+
+
+class TestMainFunction:
+    def test_main_no_datasets_returns_1(self, tmp_path, monkeypatch, capsys):
+        """main() with no ctxsweep CSVs prints message and returns 1."""
+        import gen_ctxsweep_comparison as mod
+
+        monkeypatch.setattr(mod, "RAW_DIR", tmp_path)
+        monkeypatch.setattr(mod, "OUT_PATH", tmp_path / "out.md")
+        result = mod.main()
+        assert result == 1
+        captured = capsys.readouterr()
+        assert "No ctxsweep CSVs found" in captured.out
+
+    def test_main_with_data_returns_0(self, tmp_path, monkeypatch, capsys):
+        """main() with valid data writes output and returns 0."""
+        import gen_ctxsweep_comparison as mod
+
+        header = "ctx_len,tok_per_sec,kv_cache_mb,total_us"
+        (tmp_path / "raw" / "rk3588-t4_e2e_ctxsweep_4t_fair.csv").parent.mkdir(parents=True)
+        (tmp_path / "raw" / "rk3588-t4_e2e_ctxsweep_4t_fair.csv").write_text(
+            f"{header}\n1,3.0,0,333333\n4096,2.5,50,400000\n"
+        )
+        out_path = tmp_path / "out.md"
+        monkeypatch.setattr(mod, "RAW_DIR", tmp_path / "raw")
+        monkeypatch.setattr(mod, "OUT_PATH", out_path)
+        result = mod.main()
+        assert result == 0
+        captured = capsys.readouterr()
+        assert "Wrote" in captured.out
+        assert out_path.exists()
