@@ -1366,8 +1366,8 @@ pinning, 30 repeats, 3 warmups).
    consistent with the OpenMP work distribution reducing per-iteration
    variance.
 
-4. **cumdecay approaches bandwidth saturation**: 21.5 GiB/s on the A76 big cluster
-   reaches 86% of the RK3588's **practical** DRAM bandwidth ceiling (~25 GiB/s
+4. **cumdecay approaches bandwidth saturation**: 23.9 GiB/s on the A76 big cluster
+   reaches 96% of the RK3588's **practical** DRAM bandwidth ceiling (~25 GiB/s
    measured on t3, vs 33.8 GB/s theoretical at 2112 MHz — 64% STREAM
    efficiency). The theoretical spec is higher, but
    sustained workload bandwidth saturates well below it. Measurement:
@@ -1381,10 +1381,10 @@ were at the unoptimized baseline. Manifest:
 `results/manifests/rk3588-t4_optimized.json` (SHA 8f8be11, governor=performance,
 thermals 37–41 °C pre/post).
 
-> **⚠ PROVENANCE NOTE (ob-dsb, 2026-08-11; updated 2026-08-11 t3):** Big-cluster
+> **⚠ PROVENANCE NOTE (ob-dsb, 2026-08-11; updated 2026-08-12 t3):** Big-cluster
 > "New" values in the table above are current measurements from
-> `rk3588-t4_big.csv` (multi-thread, dirty=true — t4 manifests are habitually
-> dirty from active kernel development), cross-validated on t3
+> `rk3588-t4_big.csv` (multi-thread, dirty=false — re-run clean in PR #293
+> at commit `82f4833`), cross-validated on t3
 > (21.39/10.56/20.59 GiB/s, dirty=false). The original optimization run was at
 > commit `8f8be11` (also dirty tree); its inflated values (24.3/11.5/21.0) have
 > been replaced with values from the more recent re-run. Little-cluster values remain from the
