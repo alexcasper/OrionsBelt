@@ -66,6 +66,7 @@ class TestRunAblation:
             repeats=5,
             decode_length=5,
             output_dir=str(tmp_path / "ablation"),
+            manifest_dir=str(tmp_path / "manifests"),
         )
 
     def test_returns_one_csv_per_config(self, csv_paths):
@@ -124,7 +125,9 @@ class TestRunAblation:
 
     def test_output_dir_created_if_missing(self, tmp_path):
         d = tmp_path / "deep" / "nested" / "ablation"
-        result = run_ablation([4096], warmup=1, repeats=5, output_dir=str(d))
+        result = run_ablation(
+            [4096], warmup=1, repeats=5, output_dir=str(d), manifest_dir=str(tmp_path / "manifests")
+        )
         assert len(result) == 6
         assert d.exists()
 
