@@ -644,6 +644,22 @@ class TestCheckMemory:
         with patch.object(HFTorchBackend, "_available_memory_bytes", return_value=5_000_000_000):
             assert backend._check_memory() is None
 
+    def test_unrecognized_model_uses_conservative_default(self):
+        """Model name without 0.8B/4B uses 4 GB conservative default → 6 GB threshold."""
+        from dataclasses import replace
+
+        custom = replace(QWEN35_4B, name="Custom-1B")
+        backend = make_backend_with_mock(config=custom)
+        # 5.0 GB available < 6.0 GB required (4 GB × 1.5) → should raise
+        with (
+            patch.object(HFTorchBackend, "_available_memory_bytes", return_value=5_000_000_000),
+            pytest.raises(MemoryError),
+        ):
+            backend._check_memory()
+        # 7.0 GB available > 6.0 GB required → should pass
+        with patch.object(HFTorchBackend, "_available_memory_bytes", return_value=7_000_000_000):
+            assert backend._check_memory() is None
+
 
 # ---------------------------------------------------------------------------
 # Integration: backend conforms to harness Backend ABC
