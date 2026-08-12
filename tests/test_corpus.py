@@ -167,6 +167,59 @@ class TestNiahMultikey:
         assert item_32k.metadata["num_keys"] > item_4k.metadata["num_keys"]
 
 
+class TestCollisionDetection:
+    """Tests for the defensive uniqueness guards in generate_niah_multikey.
+
+    Lines 445-446 and 452 of corpus.py implement while-loops that retry key
+    and value generation on collision.  The key guard is structurally
+    unreachable (key_idx = i is always unique), but the value guard fires
+    when the RNG produces a duplicate adjective-noun-number combo.
+    """
+
+    @staticmethod
+    def _extract_values(prompt):
+        """Extract all values from KV statements in the prompt text."""
+        import re
+
+        return re.findall(r'the value of "[^"]+" is "([^"]+)"', prompt)
+
+    def test_value_collision_detected_and_retried(self):
+        """When _generate_value returns a duplicate, the guard retries."""
+        from unittest.mock import patch
+
+        call_count = [0]
+
+        def mock_generate_value(rng):
+            call_count[0] += 1
+            # First two calls return the same value (collision on 2nd pair);
+            # subsequent calls return unique values.
+            if call_count[0] <= 2:
+                return "azure-onyx-500"
+            return f"unique-val-{call_count[0]}"
+
+        with patch("corpus._generate_value", side_effect=mock_generate_value):
+            item = generate_niah_multikey(512, num_keys=5, seed=42)
+
+        values = self._extract_values(item.prompt)
+        assert len(values) == len(set(values)), "Duplicate values in output"
+        assert len(values) == 5
+
+    def test_keys_unique_with_prefix_cycling(self):
+        """When num_keys exceeds the prefix list, prefixes cycle but keys stay unique."""
+        item = generate_niah_multikey(4096, num_keys=50, seed=999)
+        keys = item.metadata["all_keys"]
+        assert len(keys) == 50
+        assert len(set(keys)) == 50, "Key collision despite prefix cycling"
+
+    def test_many_pairs_no_duplicates(self):
+        """Generate a large batch and verify no duplicate keys or values."""
+        item = generate_niah_multikey(8192, num_keys=30, seed=7)
+        keys = item.metadata["all_keys"]
+        values = self._extract_values(item.prompt)
+        assert len(set(keys)) == len(keys)
+        assert len(set(values)) == len(values)
+
+
 # ---------------------------------------------------------------------------
 # Corpus batch generation
 # ---------------------------------------------------------------------------
