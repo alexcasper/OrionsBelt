@@ -314,6 +314,8 @@ cutoff has passed with no board; any future arrival is additive bonus per ADR 00
 | #315 | t3 | Regenerate stale fleet_bandwidth_scaling.md (t4 clean re-run data: 11.90→11.42 GiB/s scan) | MERGED |
 | #316 | t4 | Fix stale numbers + SHA in submission docs (82f4833→aa61e20, ±20-30%→±0-9%); ratio arithmetic fix | MERGED |
 | #317 | t3 | Fix stale t4_big cascade across 6 files after PR #313 (DEVPOST_SUBMISSION, FINDINGS ×6, SUBMISSION_STATUS, DEVPOST_WRITEUP, fleet_analysis.py generator); j2-review fixed 2 overshot ~0%/~8% mislabels | MERGED |
+| #318 | t4 | Fix stale 0.8B optimization table in FINDINGS.md (missed by PR #317) | MERGED |
+| #319 | t3 | Restore 6 ablation manifests deleted by loop flush (fef1567) — validate_results.py MISSING warnings → 0 | MERGED |
 
 > **PRs #190, #198, #207, #229, #235, #245, #289:** closed (not merged). #282's proposed provenance content was rejected but its PR itself shows MERGED on GitHub (content replaced during review — see row above). No gaps in numbering.
 
