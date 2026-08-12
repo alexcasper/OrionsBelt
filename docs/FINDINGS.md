@@ -1385,7 +1385,7 @@ thermals 37–41 °C pre/post).
 > **⚠ PROVENANCE NOTE (ob-dsb, 2026-08-11; updated 2026-08-12 t3):** Big-cluster
 > "New" values in the table above are current measurements from
 > `rk3588-t4_big.csv` (multi-thread, dirty=false — re-run clean in PR #293
-> at commit `82f4833`), cross-validated on t3
+> at commit `aa61e20`), cross-validated on t3
 > (21.39/10.56/20.59 GiB/s, dirty=false). The original optimization run was at
 > commit `8f8be11` (also dirty tree); its inflated values (24.3/11.5/21.0) have
 > been replaced with values from the more recent re-run. Little-cluster values remain from the
@@ -2356,7 +2356,7 @@ memory bandwidth.
   GDN-1's 2.04µs (1.29×), not identical. The extra stream adds ~29% at decode.
   Still far below the 2.7× prefill penalty, confirming decode is overhead-dominated.
 - **The bandwidth ratio between GDN-1 and GDN-2 is now closer to the theoretical
-  5/3 = 1.67×** (7.14 vs 11.90 GiB/s = 1.67×), confirming the kernel is genuinely
+  5/3 = 1.67×** (7.04 vs 11.42 GiB/s = 1.62×), confirming the kernel is genuinely
   bandwidth-bound at prefill.
 
 **Fleet-wide note:** All existing fleet CSVs initially contained inflated GDN-2
@@ -3047,9 +3047,9 @@ t4 is stable: ~4% coefficient of variation across runs.
 | Metric | t3 | t4 | Ratio |
 |--------|----|----|-------|
 | **Single-core clean** (gated_scan 4B) | 2.91 GiB/s (30% spread) | 5.27 GiB/s (6% spread) | **1.81×** |
-| **Multi-core big** (gated_scan 4B) | 10.33 GiB/s (8% spread) | 11.90 GiB/s (9% spread) | **1.15×** |
+| **Multi-core big** (gated_scan 4B) | 10.33 GiB/s (8% spread) | 11.42 GiB/s (7% spread) | **1.11×** |
 
-The multi-core numbers agree within 12%, consistent with same-silicon
+The multi-core numbers agree within 10%, consistent with same-silicon
 expectations. The single-core discrepancy is entirely due to t3's
 anomalous clean sweep (likely wrong governor or background load).
 
@@ -3100,7 +3100,7 @@ prior workloads), not a kernel or measurement methodology problem.
 >
 > The 8-thread vs 8-thread comparison (`rk3588-t3-clean.csv` vs
 > `rk3588-t4_big.csv`, both `effective_threads=8`) shows the boards agree within
-> ~12% (cumdecay 21.39 vs 23.91), consistent with t4's higher 2400 MHz clock.
+> ~1% (cumdecay 21.39 vs 21.67), consistent with t4's higher 2400 MHz clock.
 >
 > See `comparison_table.md` §1a for the corrected like-for-like analysis.
 
@@ -3210,11 +3210,11 @@ The **equal-thread-count** comparison removes the confound. Both boards at
 
 | Kernel (4B, seq=64) | t4 8-thread GiB/s | t3 8-thread GiB/s | t4÷t3 |
 |---|---:|---:|---:|
-| gdn_cumdecay | 23.91 | 21.39 | 1.12× |
-| gdn_gated_scan | 11.90 | 10.56 | 1.13× |
-| gdn_causal_dwconv1d | 20.77 | 20.59 | 1.01× |
+| gdn_cumdecay | 21.67 | 21.39 | 1.01× |
+| gdn_gated_scan | 11.42 | 10.56 | 1.08× |
+| gdn_causal_dwconv1d | 20.71 | 20.59 | 1.01× |
 
-At equal thread count the two boards agree to within ~12% on all three kernels
+At equal thread count the two boards agree to within ~8% on all three kernels
 (t4 consistently slightly faster, consistent with its ~4% higher clock) — within the documented
 run-to-run variance (ob-bf7: up to 1.68× between sessions). The genuine
 single-thread comparison (above) confirms that cumdecay is identical but
@@ -5678,39 +5678,40 @@ Full end-to-end fine-tuning is needed for a fair comparison.
 Both boards are RK3588 (Cortex-A76 big @ cores 4-7, Cortex-A55 little @ cores 0-3).
 Governor = performance, --repeats 30, manifest provenance on both runs.
 
-**DRAM-bandwidth ceiling is identical across units.** gdn_cumdecay_f16 on big
-cores gives exactly 36.13 GiB/s (40.544 µs) on both t3 and t4 — the kernel is
-purely memory-bound and both boards share the same LPDDR4X subsystem.
+**DRAM-bandwidth ceiling is consistent across units.** gdn_cumdecay_f16 on big
+cores gives 38.04 GiB/s (t4) vs 35.12 GiB/s (t3) — within ~8%, consistent with
+t4's higher clock (2400 vs 2304 MHz). The kernel is purely memory-bound and
+both boards share the same LPDDR4X subsystem.
 
-**Compute-bound scan kernels diverge ±20-30%, asymmetrically by model size:**
+**Compute-bound scan kernels agree within ±0-9% across units:**
 
 | Kernel (big cores, fp32) | Model | T4 GiB/s | T3 GiB/s | Δ |
 |--------------------------|-------|----------|----------|------|
-| gdn_gated_scan | 4B (4096ch) | 11.90 | 10.33 | +15.2% |
-| gdn_gated_scan | 0.8B (2048ch) | 11.28 | 15.42 | -26.9% |
-| gdn2_gated_scan | 4B (4096ch) | 7.14 | 9.04 | -21.0% |
-| gdn2_gated_scan | 0.8B (2048ch) | 8.26 | 10.35 | -20.2% |
+| gdn_gated_scan | 4B (4096ch) | 11.42 | 10.56 | +8.1% |
+| gdn_gated_scan | 0.8B (2048ch) | 11.25 | 11.53 | -2.4% |
+| gdn2_gated_scan | 4B (4096ch) | 7.04 | 6.46 | +9.0% |
+| gdn2_gated_scan | 0.8B (2048ch) | 7.65 | 7.62 | +0.4% |
 
-T4 is faster on the larger working set (4096ch) but slower on the smaller one
-(2048ch). The 0.8B scan timings on t3 are suspiciously uniform across
-precisions (~96 µs for fp32/f16/bf16), suggesting the kernel is L2-resident on
-t3 at that size. T4 shows more precision sensitivity (~129-131 µs).
+T4 is consistently faster on the larger working set (4B, +8-9%) and about even
+on the smaller one (0.8B, ±0-2%). The previous ±20-30% asymmetry was an
+artefact of pre-aliasing-fix data on t3; with corrected CSVs both boards agree
+within single-digit percentages on all scan kernels.
 
 **Little-core scans: t4 generally faster, t3 showed thermal instability.**
-T3's gdn_gated_scan on little cores had 40.9% p50/p95 spread (vs t4's 18.0%),
+T3's gdn_gated_scan on little cores had 40.9% p50/p95 spread (vs t4's 17.0%),
 indicating throttling or background interference during t3's run.
 
-**Implication for fleet methodology:** single-device numbers carry ±20-30%
+**Implication for fleet methodology:** single-device numbers carry ±0-9%
 unit-to-unit noise on compute-bound kernels. Report ranges across the fleet,
 not single points. Memory-bound kernels (f16 cumdecay) are reproducible to
-<1%.
+~8% (clock-scaled).
 
 ### Provenance (cross-check)
 
 | Device | Commit | Manifest |
 |--------|--------|----------|
-| rk3588-t4 | `82f4833` | `results/manifests/rk3588-t4.json` |
-| rk3588-t3 | `47efdf8` | `results/manifests/rk3588-t3.json` |
+| rk3588-t4 | `aa61e20` | `results/manifests/rk3588-t4.json` |
+| rk3588-t3 | `854c6f1` | `results/manifests/rk3588-t3.json` |
 
 ### SDOT context-length scaling on t4: O(1) GDN decode confirmed (ob-8ms.3)
 
