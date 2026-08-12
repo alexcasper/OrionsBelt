@@ -11,6 +11,7 @@
 #   2. The CSV has the expected kernel variants (fp32, bf16, fp16)
 #   3. The CSV has both prefill (seq=64) and decode (seq=1) configs
 #   4. The manifest git_sha is not from a known stale commit
+#   5. The manifest git.dirty is false (benchmark must run on a clean tree)
 #
 # Usage: ./scripts/validate_bench_csvs.sh
 # Exit code: 0 if all pass, 1 if any issues found
@@ -110,6 +111,22 @@ except: print('')
                     fi
                 done
                 echo "    manifest: $sha"
+            fi
+            # Check for dirty tree — benchmark must run on a clean git tree
+            # so the SHA fully describes the code state (RESULTS DISCIPLINE).
+            dirty=$(python3 -c "
+import json
+try:
+    d=json.load(open('$m'))
+    g=d.get('git',{})
+    if isinstance(g,dict) and g.get('dirty'): print('true')
+    else: print('false')
+except: print('')
+" 2>/dev/null || echo "")
+            if [ "$dirty" = "true" ]; then
+                echo "    ⚠ WARNING: manifest git.dirty=true — benchmark run on uncommitted tree"
+                echo "    → Clean tree (git stash/commit), rebuild, re-run, capture fresh manifest"
+                ISSUES=$((ISSUES + 1))
             fi
             break
         fi
