@@ -423,6 +423,30 @@ class TestMain:
         rc = main()
         assert rc == 0
 
+    def test_main_warn_on_mismatch(self, monkeypatch, capsys):
+        """main() prints WARN (not FAIL) when ORT results differ from reference."""
+        import onnxruntime as ort
+
+        monkeypatch.setattr(
+            "sys.argv",
+            ["ort_gdn_probe.py", "--tokens", "4", "--dim", "8"],
+        )
+
+        class FakeSession:
+            def run(self, output_names, feeds):
+                seq_len = int(feeds["trip_count"])
+                state0 = feeds["state0"]
+                V = state0.shape[0]
+                # Return wildly wrong attention to trigger rel_err > 1e-4
+                attn = np.ones((seq_len, V), dtype=np.float32) * 100.0
+                return [state0.copy(), attn]
+
+        monkeypatch.setattr(ort, "InferenceSession", lambda *a, **kw: FakeSession())
+        rc = main()
+        assert rc == 0
+        captured = capsys.readouterr()
+        assert "WARN" in captured.out
+
 
 class TestMainErrorPaths:
     """Cover error-handling branches in main()."""
