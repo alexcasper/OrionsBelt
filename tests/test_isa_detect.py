@@ -169,6 +169,12 @@ class TestParseCpuinfo:
         """Empty string returns empty dict."""
         assert _parse_cpuinfo("") == {}
 
+    def test_leading_blank_lines(self):
+        """Blank lines before any key-value pairs are skipped (continue path)."""
+        text = "\n\n\nprocessor : 0\n"
+        result = _parse_cpuinfo(text)
+        assert result.get("processor") == "0"
+
     def test_strips_whitespace(self):
         """Values are stripped."""
         text = "CPU part\t:  0xd0b \n"
@@ -205,6 +211,32 @@ class TestDetectFeaturesEmpty:
         assert fs.recommended_binary == "scalar"
         assert fs.core_count == 1
         assert fs.features == []
+
+
+class TestMainGuard:
+    """Cover the if __name__ == '__main__' guard."""
+
+    def test_main_guard_executes(self):
+        """Running the module file directly invokes main() and exits 0."""
+        import subprocess
+
+        module = os.path.join(
+            os.path.dirname(__file__),
+            "..",
+            "src",
+            "orionsbelt",
+            "engines",
+            "cpu",
+            "isa_detect.py",
+        )
+        result = subprocess.run(
+            [sys.executable, module],
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0
+        parsed = _json.loads(result.stdout)
+        assert "machine" in parsed
 
 
 class TestMainCLI:
