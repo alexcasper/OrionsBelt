@@ -62,7 +62,7 @@ Qwen3.5-4B, prefill (seq=64), fp32 baseline, 8-thread (big cluster). Two indepen
 | Kernel | GiB/s (t3) | Spread | GiB/s (t4) | Spread | t3÷t4 |
 |---|---:|---:|---:|---:|---:|
 | Cumulative decay | 21.39 | 7.3% | 21.67 | 12.9% | 0.99× |
-| Gated delta-rule scan | 10.56 | 6.3% | 11.42 | 6.6% | 0.93× |
+| Gated delta-rule scan | 10.56 | 6.3% | 11.42 | 6.6% | 0.92× |
 | Causal Conv1D | 20.59 | 3.5% | 20.71 | 4.4% | 0.99× |
 
 > t3 manifest git_sha `854c6f1`, dirty=false; t4 manifest git_sha `aa61e20`,
