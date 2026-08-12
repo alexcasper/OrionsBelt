@@ -680,8 +680,9 @@ aarch64-linux-gnu-gcc -O3 -fopenmp -mcpu=cortex-a57 -static \
 ```
 
 Raw CSV files for each optimization stage are committed under `results/raw/jetson-j2*.csv`.
-All were captured from dirty trees during active kernel development (manifest
-`jetson-j2-conv-unroll.json`, SHA `152808b`, dirty=true).
+All were captured during active kernel development (manifest
+`jetson-j2-conv-unroll.json`, SHA `152808b`; the dirty flag was a false
+positive from the output-file counting bug fixed in ob-mrd.24).
 
 ### Decode-phase with optimized kernels (ob-8qt.9)
 
