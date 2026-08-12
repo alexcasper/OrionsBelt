@@ -3019,7 +3019,7 @@ hardware is available.
 **Date:** 2026-08-07
 **Device:** rk3588-t4 (RK3588, A76)
 **Bead:** ob-bf7
-**Data:** `results/raw/rk3588-t4_clean_stability_check.csv`
+**Data:** `results/raw/rk3588-t4_clean_stability_check.txt`
 
 ### Problem
 
@@ -5739,6 +5739,27 @@ indicating throttling or background interference during t3's run.
 unit-to-unit noise on compute-bound kernels. Report ranges across the fleet,
 not single points. Memory-bound kernels (f16 cumdecay) are reproducible to
 ~8% (clock-scaled).
+
+### Fleet note: t3 and t4 are different SKUs (2026-08-12)
+
+The two boards are not identical units. Manifest comparison reveals:
+
+| Property | t3 | t4 |
+|----------|----|----|
+| Memory | 32 GB (32,550 MB) | 8 GB (8,120 MB) |
+| Big cluster max freq | 2304 MHz | 2400 MHz |
+| Big cluster min freq | 408 MHz | 1200 MHz |
+| Little cluster cpu_capacity | 414 | 397 |
+| Little cluster min freq | 1800 MHz (locked) | 1008 MHz |
+
+The 32 GB vs 8 GB difference means different DRAM chip density (and possibly
+channel population), though both use LPDDR4X at the same interface speed. The
+different OPP tables (cpu_capacity, frequency floors) indicate different device
+tree blobs or board revisions. Despite these differences, the cross-check above
+shows agreement within ~8% on memory-bound kernels and ±0–9% on compute-bound
+kernels, so the SKU difference does not invalidate fleet comparisons — but it
+does provide a concrete hardware basis for the residual inter-board variance
+previously attributed to unspecified "silicon binning."
 
 ### Provenance (cross-check)
 
