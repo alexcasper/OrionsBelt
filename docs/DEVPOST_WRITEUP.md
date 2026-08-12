@@ -82,21 +82,21 @@ to devices but was never previously tested in the correctness suite).
 
 | Kernel | Cluster | Before (GiB/s) | After (GiB/s) | Speedup |
 |--------|---------|---------------:|--------------:|--------:|
-| gdn_cumdecay | A76 big | 4.25 | **23.9** | 5.6× |
-| gdn_gated_scan | A76 big | 3.29 | **11.9** | 3.6× |
-| gdn_causal_dwconv1d | A76 big | 4.52 | **20.8** | 4.6× |
+| gdn_cumdecay | A76 big | 4.25 | **21.67** | 5.1× |
+| gdn_gated_scan | A76 big | 3.29 | **11.42** | 3.5× |
+| gdn_causal_dwconv1d | A76 big | 4.52 | **20.71** | 4.6× |
 | gdn_cumdecay | A55 little | 0.97 | **5.87** | 6.0× |
 | gdn_gated_scan | A55 little | 0.55 | **3.91** | 7.1× |
 | gdn_causal_dwconv1d | A55 little | 0.71 | **5.30** | 7.4× |
 
-> **cumdecay at 23.9 GiB/s reaches 96% of the RK3588's measured DRAM bandwidth
+> **cumdecay at 21.67 GiB/s reaches 87% of the RK3588's measured DRAM bandwidth
 > ceiling (~25 GiB/s, 71% of the 33.8 GB/s theoretical spec at 2112 MHz).**
 > The kernel is memory-bound — the optimization has taken it close to what the
 > hardware allows.
 >
 > **Provenance:** Big-cluster "After" values are current measurements from
 > rk3588-t4 (`rk3588-t4_big.csv`, multi-thread, dirty=false — re-run clean in
-> PR #293 at commit `aa61e20`), independently cross-validated
+> PR #313 at commit `aa61e20`), independently cross-validated
 > on rk3588-t3 (21.39/10.56/20.59 GiB/s, dirty=false). Little-cluster
 > values are from the initial optimization run (commit `8f8be11`, 4-thread OpenMP);
 > clean single-thread little-cluster data is 1.19/0.55/1.12 GiB/s. Pre-optimization

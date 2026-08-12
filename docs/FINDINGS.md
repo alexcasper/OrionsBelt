@@ -889,7 +889,7 @@ narrow only for prefill chunk boundaries.
 > `rk3588-t4-clean.json` records `effective_threads: 1`. The "1.98×
 > genuine hardware effect" conclusion is **not supported**; the gap is
 > primarily an 8-thread-vs-1-thread confound. The like-for-like comparison
-> (both 8-thread) shows the boards agree within ~12%. See the full
+> (both 8-thread) shows the boards agree within ~8%. See the full
 > correction at [§ob-mrd.12](#correction-ob-mrd12-2026-08-07--the-single-thread-claim-is-false-the-gap-is-a-thread-count-artifact)
 > below. The `fleet_bandwidth_scaling.md` report has been regenerated with
 > matching warnings.
@@ -1337,9 +1337,9 @@ pinning, 30 repeats, 3 warmups).
 
 | Kernel | Cluster | Old p50 (µs) | Old GiB/s | New p50 (µs) | New GiB/s | Speedup |
 |--------|---------|-------------:|----------:|-------------:|----------:|--------:|
-| gdn_cumdecay | A76 big | 459.4 | 4.25 | 91.0 | 21.5 | 5.0× |
-| gdn_gated_scan | A76 big | 899.0 | 3.29 | 247.9 | 11.9 | 3.6× |
-| gdn_causal_dwconv1d | A76 big | 456.2 | 4.52 | 106.5 | 19.4 | 4.3× |
+| gdn_cumdecay | A76 big | 459.4 | 4.25 | 90.1 | 21.67 | 5.1× |
+| gdn_gated_scan | A76 big | 899.0 | 3.29 | 259.3 | 11.42 | 3.5× |
+| gdn_causal_dwconv1d | A76 big | 456.2 | 4.52 | 99.5 | 20.71 | 4.6× |
 | gdn_cumdecay | A55 little | 2008.3 | 0.97 | 332.8 | 5.87 | 6.0× |
 | gdn_gated_scan | A55 little | 5395.6 | 0.55 | 757.2 | 3.91 | 7.1× |
 | gdn_causal_dwconv1d | A55 little | 2892.1 | 0.71 | 388.8 | 5.30 | 7.4× |
@@ -1367,8 +1367,8 @@ pinning, 30 repeats, 3 warmups).
    consistent with the OpenMP work distribution reducing per-iteration
    variance.
 
-4. **cumdecay approaches bandwidth saturation**: 23.9 GiB/s on the A76 big cluster
-   reaches 96% of the RK3588's **practical** DRAM bandwidth ceiling (~25 GiB/s
+4. **cumdecay approaches bandwidth saturation**: 21.67 GiB/s on the A76 big cluster
+   reaches 87% of the RK3588's **practical** DRAM bandwidth ceiling (~25 GiB/s
    measured on t3, vs 33.8 GB/s theoretical at 2112 MHz — 64% STREAM
    efficiency). The theoretical spec is higher, but
    sustained workload bandwidth saturates well below it. Measurement:
@@ -1384,7 +1384,7 @@ thermals 37–41 °C pre/post).
 
 > **⚠ PROVENANCE NOTE (ob-dsb, 2026-08-11; updated 2026-08-12 t3):** Big-cluster
 > "New" values in the table above are current measurements from
-> `rk3588-t4_big.csv` (multi-thread, dirty=false — re-run clean in PR #293
+> `rk3588-t4_big.csv` (multi-thread, dirty=false — re-run clean in PR #313
 > at commit `aa61e20`), cross-validated on t3
 > (21.39/10.56/20.59 GiB/s, dirty=false). The original optimization run was at
 > commit `8f8be11` (also dirty tree); its inflated values (24.3/11.5/21.0) have
@@ -3047,9 +3047,9 @@ t4 is stable: ~4% coefficient of variation across runs.
 | Metric | t3 | t4 | Ratio |
 |--------|----|----|-------|
 | **Single-core clean** (gated_scan 4B) | 2.91 GiB/s (30% spread) | 5.27 GiB/s (6% spread) | **1.81×** |
-| **Multi-core big** (gated_scan 4B) | 10.33 GiB/s (8% spread) | 11.42 GiB/s (7% spread) | **1.11×** |
+| **Multi-core big** (gated_scan 4B) | 10.33 GiB/s (8% spread) | 11.42 GiB/s (6.6% spread) | **1.11×** |
 
-The multi-core numbers agree within 10%, consistent with same-silicon
+The multi-core numbers agree within ~10%, consistent with same-silicon
 expectations. The single-core discrepancy is entirely due to t3's
 anomalous clean sweep (likely wrong governor or background load).
 
@@ -3166,7 +3166,7 @@ kernels. Both boards are RK3588 (4×A55 + 4×A76) but **different board vendors*
 - **⚠ The t3/t4 performance gap was NOT real — it was a thread-count artifact.**
   The original analysis below assumed both boards were single-thread; in fact t3
   ran 8-thread (effective_threads=8). At matched thread counts the boards agree
-  within ~12% (8-thread) or within noise for cumdecay (1-thread). See ob-mrd.12,
+  within ~8% (8-thread) or within noise for cumdecay (1-thread). See ob-mrd.12,
   ob-mrd.13, and comparison_table.md §1a for the corrected analysis.
 - The original ob-bf7 spread concern remains RESOLVED for stale data (both
   boards now have clean post-optimization CSVs with <8% spread).
