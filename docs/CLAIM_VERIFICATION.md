@@ -174,7 +174,7 @@ Source: our own measurements on Jetson Nano A57 (Cortex-A57, 4×1.48 GHz, govern
 |---|---|
 | Q8_0 decode: 5.12 tok/s on 0.8B model (A57) | ✅ Confirmed — FINDINGS §29, CSV `jetson-j1_q80_vs_int8_vs_fp32_08b.csv`, manifest `jetson-j1_q80_a57.json` (sha `d223c19`) |
 | 2.97× speedup over FP32 decode (1.72 tok/s → 5.12 tok/s) | ✅ Confirmed — same CSV, same commit, A/B comparison |
-| 94% of llama.cpp Q8_0 throughput on the same hardware | ✅ Confirmed — llama.cpp Q8_0 baseline: 5.40 tok/s (FINDINGS §28, CSV `jetson-j1_llamacpp_vs_orionsbelt_08b.csv`) |
+| 95% of llama.cpp Q8_0 throughput on the same hardware | ✅ Confirmed — llama.cpp Q8_0 baseline: 5.40 tok/s; 5.12/5.40 = 94.8% (FINDINGS §28, §29; CSV `jetson-j1_llamacpp_vs_orionsbelt_08b.csv`) |
 | Q8_0 cosine similarity 1.000000 vs FP32 across all 11 weight matrices | ✅ Confirmed — FINDINGS §30, CSV `jetson-j1_quant_accuracy_08b_4b.csv` (66 rows), manifest sha `c643e34`. Method: per-matmul GEMV with fixed-seed random weights, `--verify-quant` mode |
 | INT8 also achieves cos_sim 1.000000 but no speed gain on A57 | ✅ Confirmed — same accuracy CSV; INT8 decode throughput 1.72 tok/s (§29 CSV) |
 | INT4 degrades to cos_sim ≈ 0.99998, no speed advantage | ✅ Confirmed — same accuracy CSV; INT4 throughput 1.64 tok/s (§29 CSV) |
