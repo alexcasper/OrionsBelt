@@ -305,9 +305,9 @@ cutoff has passed with no board; any future arrival is additive bonus per ADR 00
 | #306 | t4 | Lazy torch imports in gdn2_swap.py + hf_backend memory check tests (ob-mrd.28 + ob-mrd.29) | MERGED |
 | #307 | t3 | CI test count 2332→2352 + ruff format fix + PR table backfill #304/#305 | MERGED |
 | #308 | t3 | Deterministic ablation timing — fix non-deterministic ablation_comparison.md (ob-mrd.30) | MERGED |
-| #309 | t4 | Corpus collision detection tests for multikey (ob-mrd.30) | MERGED |
-| #310 | t3 | CI test count 2352→2370 across README/DEVPOST/SUBMISSION_STATUS + PR table backfill #306–#309 (ob-mrd.31) | MERGED |
-| #311 | t4 | Add 6 missing ablation manifests (ob-mrd.31) | OPEN |
+| #309 | t4 | Corpus collision detection tests for multikey (ob-mrd.31; renamed from ob-mrd.30 to resolve a disconnected-Dolt-sync ID collision) | MERGED |
+| #310 | t3 | CI test count 2352→2370 across README/DEVPOST/SUBMISSION_STATUS + PR table backfill #306–#309 (ob-mrd.32; renamed from ob-mrd.31 to resolve a disconnected-Dolt-sync ID collision) | MERGED |
+| #311 | t4 | Add 6 missing ablation manifests (ob-mrd.33; renamed from ob-mrd.31 to resolve a disconnected-Dolt-sync ID collision) | MERGED |
 
 > **PRs #190, #198, #207, #229, #235, #245, #289:** closed (not merged). #282's proposed provenance content was rejected but its PR itself shows MERGED on GitHub (content replaced during review — see row above). No gaps in numbering.
 
