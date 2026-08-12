@@ -26,7 +26,9 @@ See per-device tables (`*_table.md`) for full kernel-level detail._
 > `rk3588-t4_big.csv`, both `effective_threads=8`) gives cumdecay 21.39 vs 21.67,
 > gated scan 10.56 vs 11.42, Conv1D 20.59 vs 20.71 — boards agree within ~8%,
 > consistent with t4's higher 2400 MHz clock. Both CSVs are clean-tree
-> (dirty=false); t4 re-run at `82f4833` to replace a prior dirty-manifest run.
+> (dirty=false); t4 re-run at `aa61e20` after the manifest.py dirty-check
+> porcelain-stripping fix (ob-8ms.3, PR #313), which replaced a prior
+> dirty-manifest run.
 >
 > t3 is an unknown RK3588 board (kernel 5.10, CFS, 32 GB); t4 is a Turing
 > Machines RK1 (kernel 6.11, EEVDF, 8 GB). Both use Cortex-A76 big cores at
@@ -68,7 +70,8 @@ Qwen3.5-4B, prefill (seq=64), fp32. ⚠ t3 was 8-thread (threads_source=core_cou
 > 8-thread vs 8-thread comparison (`rk3588-t3-clean.csv` vs `rk3588-t4_big.csv`,
 > both effective_threads=8) gives cumdecay 21.39 vs 21.67, gated scan 10.56 vs 11.42,
 > Conv1D 20.59 vs 20.71 — boards agree within ~8%. Both CSVs re-run clean
-> (dirty=false): t3 at `854c6f1`, t4 at `82f4833`, each replacing a prior
+> (dirty=false): t3 at `854c6f1`, t4 at `aa61e20` (after the manifest.py
+> dirty-check fix, ob-8ms.3/PR #313), each replacing a prior
 > dirty-manifest run. Non-GDN-2 numbers are within the documented run-to-run
 > variance (ob-bf7).
 > See §8 for OpenMP scaling analysis.
