@@ -7,6 +7,11 @@ This document maps section-by-section to the Devpost submission requirements
 judging criteria: Arm-specific optimization (40 pts), WOW factor (25 pts),
 Potential impact (20 pts), Developer experience (15 pts).
 
+> **⚠️ Before submitting:** The repo is currently **private**. All
+> `github.com/alexcasper/OrionsBelt/blob/main/…` links and images require the
+> repo to be **public** — or upload images to Devpost's gallery directly (see
+> `DEVPOST_UPLOAD_NOTE` comments).
+
 ---
 
 ## Project Overview
@@ -184,7 +189,8 @@ on dotprod-capable cores) and progressively optimizing it yields a
 > pure-GDN kernel agreement is 3–5% (§38). See
 > the headline table above for the full cross-device comparison.
 
-![Decode optimization stack on RK3588 Cortex-A76](https://raw.githubusercontent.com/alexcasper/OrionsBelt/main/results/figures/optimization_stack.png)
+<!-- DEVPOST_UPLOAD_NOTE: When pasting into Devpost, upload results/figures/optimization_stack.png to the Devpost image gallery — the repo is private so raw.githubusercontent URLs return 404. -->
+![Decode optimization stack on RK3588 Cortex-A76](../results/figures/optimization_stack.png)
 
 The optimization stack is pure memory-system engineering — no algorithmic
 changes to the model. GDN's novel recurrent kernels (conv, decay, scan)

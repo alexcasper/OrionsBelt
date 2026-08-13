@@ -16,6 +16,7 @@
 #   7. No credentials / secrets in tracked files
 #   8. Results CSVs validated
 #   9. README result counts match actual file counts
+#  10. No credential files tracked on ANY remote branch (ob-3i5)
 #
 # Exit code 0 = all checks pass, 1 = at least one failure.
 
@@ -48,7 +49,7 @@ PY_OK=$(( PY_MAJOR * 100 + PY_MINOR >= 307 ))
 # -------------------------------------------------------------------
 # 1. Tests
 # -------------------------------------------------------------------
-echo "[1/9] Python test suite"
+echo "[1/10] Python test suite"
 if [ "$PY_OK" -ne 1 ]; then
     skip "Python 3.7+ required (have ${PY_MAJOR}.${PY_MINOR}); run on CI or an x86 host"
 else
@@ -63,7 +64,7 @@ fi
 # -------------------------------------------------------------------
 # 2. Lint
 # -------------------------------------------------------------------
-echo "[2/9] Ruff lint"
+echo "[2/10] Ruff lint"
 if ruff check . > /dev/null 2>&1; then
     ok "Ruff lint clean"
 else
@@ -73,7 +74,7 @@ fi
 # -------------------------------------------------------------------
 # 3. Format
 # -------------------------------------------------------------------
-echo "[3/9] Ruff format"
+echo "[3/10] Ruff format"
 if ruff format --check . > /dev/null 2>&1; then
     ok "Ruff format clean"
 else
@@ -83,7 +84,7 @@ fi
 # -------------------------------------------------------------------
 # 4. Memory plots regenerable
 # -------------------------------------------------------------------
-echo "[4/9] Memory scaling plots"
+echo "[4/10] Memory scaling plots"
 if [ "$PY_OK" -ne 1 ]; then
     skip "Python 3.7+ required (have ${PY_MAJOR}.${PY_MINOR}); run on CI or an x86 host"
 else
@@ -104,7 +105,7 @@ fi
 # -------------------------------------------------------------------
 # 5. Fleet analysis
 # -------------------------------------------------------------------
-echo "[5/9] Fleet analysis"
+echo "[5/10] Fleet analysis"
 # Use a temp dir so the check doesn't clobber the committed PNG with a
 # device-local render (cross-device freetype nondeterminism, bead ob-6ay).
 if python3 bench/fleet_analysis.py --output-dir "$(mktemp -d)" > /dev/null 2>&1; then
@@ -116,7 +117,7 @@ fi
 # -------------------------------------------------------------------
 # 6. Key deliverable files
 # -------------------------------------------------------------------
-echo "[6/9] Key deliverable files"
+echo "[6/10] Key deliverable files"
 for f in \
     README.md \
     docs/archive/PLAN.md \
@@ -138,7 +139,7 @@ done
 # -------------------------------------------------------------------
 # 7. Credential scan (tracked files only)
 # -------------------------------------------------------------------
-echo "[7/9] Credential scan"
+echo "[7/10] Credential scan"
 # Check for actual credential assignments, not the word "password" in docs
 SECRETS=$(git grep -n -E '(password|passwd|secret|api[_-]?key|access[_-]?token|auth[_-]?token)\s*[=:]\s*["\x27][^"\x27]{4,}' -- '*.py' '*.sh' '*.yaml' '*.json' 2>/dev/null \
     | grep -v '.beads/' \
@@ -154,7 +155,7 @@ fi
 # -------------------------------------------------------------------
 # 8. Results validation
 # -------------------------------------------------------------------
-echo "[8/9] Results CSV validation"
+echo "[8/10] Results CSV validation"
 VALOUT=$(python3 scripts/validate_results.py 2>&1 || true)
 if echo "$VALOUT" | grep -q "CSV(s) checked"; then
     ISSUES=$(echo "$VALOUT" | grep -c "WARNING" || true)
@@ -170,15 +171,31 @@ fi
 # -------------------------------------------------------------------
 # 9. README count verification
 # -------------------------------------------------------------------
-echo "[9/9] README result counts vs actual files"
+echo "[9/10] README result counts vs actual files"
 if python3 scripts/update_readme_counts.py --dry-run > /dev/null 2>&1; then
     ok "README counts match actual file counts"
 else
     fail "README counts are stale — run: python3 scripts/update_readme_counts.py"
 fi
+
 # -------------------------------------------------------------------
-echo ""
-echo "=== Summary ==="
+# 10. Cross-branch credential file scan (ob-3i5)
+# -------------------------------------------------------------------
+echo "[10/10] Cross-branch credential file scan"
+# Known credential-containing files that must not be tracked on ANY branch.
+# If the repo is made public, these are immediately exposed (ob-3i5).
+CRED_BRANCHES=""
+for branch in $(git branch -r --format='%(refname:short)' 2>/dev/null | grep -v HEAD); do
+    tracked=$(git ls-tree "$branch" -- .goose-task.md .goose-loop.log 2>/dev/null || true)
+    if [ -n "$tracked" ]; then
+        CRED_BRANCHES="$CRED_BRANCHES $branch"
+    fi
+done
+if [ -z "$CRED_BRANCHES" ]; then
+    ok "No credential files tracked on any remote branch"
+else
+    fail "Credential files (.goose-task.md/.goose-loop.log) tracked on:$CRED_BRANCHES — clean before making repo public (ob-3i5)"
+fi
 echo "  Passed: $PASS"
 echo "  Failed: $FAIL"
 echo "  Warnings: $WARN"
