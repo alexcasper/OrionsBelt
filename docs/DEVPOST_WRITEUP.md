@@ -190,7 +190,7 @@ on dotprod-capable cores) and progressively optimizing it yields a
 > the headline table above for the full cross-device comparison.
 
 <!-- DEVPOST_UPLOAD_NOTE: When pasting into Devpost, upload results/figures/optimization_stack.png to the Devpost image gallery — the repo is private so raw.githubusercontent URLs return 404. -->
-![Decode optimization stack on RK3588 Cortex-A76](./results/figures/optimization_stack.png)
+![Decode optimization stack on RK3588 Cortex-A76](../results/figures/optimization_stack.png)
 
 The optimization stack is pure memory-system engineering — no algorithmic
 changes to the model. GDN's novel recurrent kernels (conv, decay, scan)
