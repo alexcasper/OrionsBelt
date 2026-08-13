@@ -363,6 +363,9 @@ cutoff has passed with no board; any future arrival is additive bonus per ADR 00
 | #364 | t3 | Mark PR #363 MERGED in submission table | MERGED |
 | #365 | t4 | README count-drift gate in submission readiness check (ob-9t0.17); PR table backfill #362–#364 | MERGED |
 | #366 | t4 | PR table backfill #365 MERGED + deep submission audit | MERGED |
+| #367 | t4 | PR table backfill #366 MERGED; synced bench/t4 onto latest main | MERGED |
+| #368 | t3 | Safety-restore tracked ablation manifests in goose-loop before each session | MERGED |
+| #369 | t4 | Readiness count drift fix 15/15→16/16 + t4 local 2446→2461; T-1 holding audit | OPEN |
 
 > **PR #353:** closed (superseded — #352 included the same #351 backfill row; rebase auto-dropped t3's identical commit).
 >
