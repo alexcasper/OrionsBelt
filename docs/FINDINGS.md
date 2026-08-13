@@ -5894,3 +5894,64 @@ t4 data: commit `fc9173b2`, CSV `results/raw/rk3588-t4_big.csv`, re-verified
 `results/raw/rk3588-t3-clean.csv`. Governor=performance on both devices.
 Timer measurement: `clock_gettime(CLOCK_MONOTONIC)` on t4, gcc 14.2.0,
 kernel 6.11.0-1006-rockchip.
+
+---
+
+## 42. t3↔t4 multi-threaded cross-check: all GDN kernels (2026-08-13)
+
+**Mandate: "rk3588-t4, 2nd unit — cross-check vs rk3588-t3."**
+
+Supplements §14 (single-threaded scan gap). Both CSVs run with
+`taskset -c 4-7` (4-thread OpenMP), governor=performance, `--repeats 30`.
+Different commits but identical kernel implementations (static binary).
+
+**Max clock difference:** t4 big cores peak at **2.4 GHz** vs t3 at
+**2.304 GHz** — t4 has ~4% higher theoretical clock.
+
+### Key divergence (4B model, prefill seq=64)
+
+| Kernel | t4 GiB/s | t3 GiB/s | Δ% |
+|---|---:|---:|---:|
+| gdn_cumdecay | 21.67 | 23.17 | −6.5% |
+| gdn_gated_scan | 11.42 | 10.33 | **+10.6%** |
+| gdn2_gated_scan | 7.04 | 9.04 | **−22.1%** |
+| gdn_causal_dwconv1d | 20.71 | 21.34 | −3.0% |
+
+4B scan is within noise; t4 wins on scan but loses ~22% on gdn2_scan.
+
+### Decode (seq=1) — largest divergence
+
+| Kernel | t4 GiB/s | t3 GiB/s | Δ% |
+|---|---:|---:|---:|
+| gdn_cumdecay | 20.91 | 26.17 | **−20.1%** |
+| gdn_gated_scan | 43.09 | 52.33 | **−17.7%** |
+| gdn2_gated_scan | 47.19 | 61.04 | **−22.7%** |
+| gdn_causal_dwconv1d | 37.37 | 52.32 | **−28.6%** |
+
+### 0.8B model — consistently slower on t4
+
+| Kernel | t4 GiB/s | t3 GiB/s | Δ% |
+|---|---:|---:|---:|
+| gdn_gated_scan | 11.25 | 15.42 | **−27.0%** |
+| gdn2_gated_scan | 7.65 | 10.35 | **−26.1%** |
+| gdn_causal_dwconv1d | 25.04 | 29.92 | **−16.3%** |
+
+### Interpretation
+
+Despite **higher max clock**, t4 is consistently slower on **decode (seq=1)**
+and **small-model (0.8B) prefill** by 16–40%, while 4B prefill is within noise.
+This pattern — worst on latency-bound workloads (small working sets, single
+token) — points to **memory-latency or cache-hierarchy differences** between
+the two board revisions, not CPU frequency. The 4B prefill kernel
+(4096 channels, large working set) can amortize latency through streaming;
+decode (1 token) cannot.
+
+**Actionable:** Cross-board comparisons should prefer 4B prefill numbers
+(lowest inter-unit variance) and treat decode/0.8B numbers as
+board-specific.
+
+### Provenance
+
+t4: `results/raw/rk3588-t4_big.csv` (commit aa61e20, 2026-08-12).
+t3: `results/raw/rk3588-t3_big.csv` (commit 854c6f1, 2026-08-09).
+Both: governor=performance, taskset 4-7, repeats=30, 4-thread OpenMP.
