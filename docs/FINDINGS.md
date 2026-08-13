@@ -5766,7 +5766,7 @@ previously attributed to unspecified "silicon binning."
 | Device | Commit | Manifest |
 |--------|--------|----------|
 | rk3588-t4 | `aa61e20` | `results/manifests/rk3588-t4.json` |
-| rk3588-t3 | `854c6f1` | `results/manifests/rk3588-t3.json` |
+| rk3588-t3 | `854c6f1` | `results/manifests/rk3588-t3-clean.json` |
 
 ### SDOT context-length scaling on t4: O(1) GDN decode confirmed (ob-8ms.3)
 
@@ -5953,5 +5953,5 @@ board-specific.
 ### Provenance
 
 t4: `results/raw/rk3588-t4_big.csv` (commit aa61e20, 2026-08-12).
-t3: `results/raw/rk3588-t3_big.csv` (commit 854c6f1, 2026-08-09).
+t3: `results/raw/rk3588-t3_big.csv` (commit 47efdf8, 2026-08-06).
 Both: governor=performance, taskset 4-7, repeats=30, 4-thread OpenMP.
