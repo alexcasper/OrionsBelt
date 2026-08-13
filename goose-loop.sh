@@ -84,6 +84,13 @@ while true; do
     ! -name "generic_aarch64_20260812T041311Z_a877f9a.json" \
     ! -name "generic_aarch64_20260812T041325Z_a877f9a.json" \
     -mmin +30 -delete 2>/dev/null
+  # Safety restore: the 7 tracked ablation provenance manifests (.gitignore
+  # exceptions, lines 48-54) are repeatedly physically deleted between
+  # iterations by an unknown mechanism (find exclusions verified correct,
+  # no other rm/git-clean found). Restore them before each session so the
+  # agent never starts with a dirty tree. See PRs #319/#327/#348.
+  git checkout -- 'results/manifests/generic_aarch64_20260812T*' 2>/dev/null
+  git checkout -- 'results/manifests/generic_aarch64_20260806T*' 2>/dev/null
   # self-heal: if the last run tripped the bloat-stall signature, force a fresh session
   if tail -40 "$LOG" 2>/dev/null | grep -q "create a new session"; then
     rm -f "$HOME/OrionsBelt/.goose-session-created"; echo "[self-heal: fresh session]" >>"$LOG"
