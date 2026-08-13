@@ -73,9 +73,16 @@ while true; do
   # Clean stale auto-generated manifests (prevent disk fill, ob-502 fleet pattern).
   # generic_aarch64_* manifests accumulate from bench/manifest.py runs; they're
   # gitignored so git add -A never collects them, but they pile up on disk.
-  # Keep the tracked provenance exception + anything <30 min old (may be in use).
+  # Keep the tracked provenance exceptions (see .gitignore lines 48-54) +
+  # anything <30 min old (may be in use).
   find results/manifests -maxdepth 1 -name "generic_aarch64_*.json" \
     ! -name "generic_aarch64_20260806T145501Z_23550d6.json" \
+    ! -name "generic_aarch64_20260812T041216Z_a877f9a.json" \
+    ! -name "generic_aarch64_20260812T041230Z_a877f9a.json" \
+    ! -name "generic_aarch64_20260812T041244Z_a877f9a.json" \
+    ! -name "generic_aarch64_20260812T041258Z_a877f9a.json" \
+    ! -name "generic_aarch64_20260812T041311Z_a877f9a.json" \
+    ! -name "generic_aarch64_20260812T041325Z_a877f9a.json" \
     -mmin +30 -delete 2>/dev/null
   # self-heal: if the last run tripped the bloat-stall signature, force a fresh session
   if tail -40 "$LOG" 2>/dev/null | grep -q "create a new session"; then
