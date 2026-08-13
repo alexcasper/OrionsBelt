@@ -228,6 +228,19 @@ Specifically:
 
 ---
 
+## Built With
+
+*(Paste into the Devpost "Built With" field)*
+
+**Languages:** C (NEON intrinsics), Python 3, Bash
+**Arm technologies:** Cortex-A76/A55/A57 NEON, SDOT dot-product instruction (`vdotq_lane_s32`), Mali-G610 OpenCL, KleidiAI micro-kernels (`kai_matmul_clamp_6x8x4_neon_mla`). SVE2 code path written for O6 (Cortex-A720) but unexercised — hardware did not arrive.
+**Tools:** GCC (static cross-compilation), OpenMP, OpenCL, pytest, ruff, ONNX Runtime, HuggingFace Hub
+**Target model:** Qwen3.5 4B / 0.8B (GDN hybrid architecture)
+**NPU toolchains audited:** CIX NOE compiler, Rockchip RKNN-Toolkit2
+**Hardware fleet (5 devices):** 2× RK3588 (Cortex-A76 big + A55 little), Raspberry Pi 5 (Cortex-A76), 2× Jetson Nano (Cortex-A57)
+
+---
+
 ## Links
 
 - **Repository:** https://github.com/alexcasper/OrionsBelt
