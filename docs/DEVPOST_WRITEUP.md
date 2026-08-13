@@ -7,6 +7,11 @@ This document maps section-by-section to the Devpost submission requirements
 judging criteria: Arm-specific optimization (40 pts), WOW factor (25 pts),
 Potential impact (20 pts), Developer experience (15 pts).
 
+> **⚠️ Before submitting:** The repo is currently **private**. All
+> `github.com/alexcasper/OrionsBelt/blob/main/…` links and images require the
+> repo to be **public** — or upload images to Devpost's gallery directly (see
+> `DEVPOST_UPLOAD_NOTE` comments).
+
 ---
 
 ## Project Overview
