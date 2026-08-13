@@ -4,6 +4,11 @@ _Edge AI track (ADR 0007). Map each section to the judging rubric._
 _Copy this into the Devpost submission form. Keep the honest framing — judges
 respect negative results stated plainly more than inflated claims._
 
+> **⚠️ Before submitting:** The repo is currently **private**. All
+> `github.com/alexcasper/OrionsBelt/blob/main/…` links and the image at line 118
+> require the repo to be **public** — or upload the image to Devpost's gallery
+> directly (see `DEVPOST_UPLOAD_NOTE` comments).
+
 ---
 
 ## Project title
@@ -115,7 +120,8 @@ On dotprod-capable cores (A76, A720), the Arm `vdotq_lane_s32` instruction compu
 
 > SDOT nearly doubles 4B throughput (83% of the ~4.2 tok/s theoretical ceiling) and triples 0.8B throughput. The speedup is larger for 0.8B because its smaller weight set (~0.41 GiB INT8) partially fits in the A76 cluster's shared L3, making it more compute-bound — where SDOT's 5× instruction reduction has the most leverage. **INT4+SDOT** pushes further by halving weight memory traffic (4-bit packing with on-the-fly nibble unpack into SDOT's int8 pipeline), adding 1.30× on A76 big cores for 4B (1.19× for 0.8B) — but is slightly slower on A55 little cores where the unpack overhead exceeds the bandwidth savings. Cross-validated on two independent RK3588 nodes (t3, t4): INT4+SDOT agrees within 4–8% (4B: 4.21 vs 4.52; 0.8B: 35.05 vs 36.36); INT8+SDOT agrees within 3–5% on both devices (§38 — an initial wider gap was traced to t3 running a pre-SDOT binary, not hardware). Table values are t4. Full analysis: [FINDINGS §33, §34](https://github.com/alexcasper/OrionsBelt/blob/main/docs/FINDINGS.md), data: `results/raw/rk3588-t4_sdot_*.csv`, `results/raw/rk3588-t4_int4sdot_*.csv`.
 
-![Decode optimization stack — RK3588 Cortex-A76](https://raw.githubusercontent.com/alexcasper/OrionsBelt/main/results/figures/optimization_stack.png)
+<!-- DEVPOST_UPLOAD_NOTE: When pasting into Devpost, upload results/figures/optimization_stack.png to the Devpost image gallery — the repo is private so raw.githubusercontent URLs return 404. -->
+![Decode optimization stack — RK3588 Cortex-A76](./results/figures/optimization_stack.png)
 
 ### Memory: the architectural advantage
 
