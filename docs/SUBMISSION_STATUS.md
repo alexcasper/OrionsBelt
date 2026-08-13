@@ -359,7 +359,7 @@ cutoff has passed with no board; any future arrival is additive bonus per ADR 00
 | #360 | t4 | PR table backfill #359 MERGED; holding pattern reconfirmed | MERGED |
 | #361 | t3 | Convert 41 Devpost doc relative links to absolute GitHub URLs (copy-paste safety for submission form) | MERGED |
 | #362 | t4 | PR table backfill #360 + #361 MERGED; synced bench/t4 to main 10f61227 | MERGED |
-| #363 | t3 | Fix provenance SHA mismatches in FINDINGS §40 (manifest ref) + §42 (commit+date) (ob-7fs) | OPEN |
+| #363 | t3 | Fix provenance SHA mismatches in FINDINGS §40 (manifest ref) + §42 (commit+date) (ob-7fs) | MERGED |
 
 > **PR #353:** closed (superseded — #352 included the same #351 backfill row; rebase auto-dropped t3's identical commit).
 >
