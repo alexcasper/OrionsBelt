@@ -135,7 +135,7 @@ All figures above are verified against primary sources (Radxa product page and d
 
 ## Status
 
-**This is an in-progress research repository as of 2026-08-08.** The project has committed to the **Edge AI track** ([ADR 0007](./docs/adr/0007-commit-to-edge-ai-track.md)) after the Orion O6 board did not arrive by its last-useful-arrival date. All work continues on the portable aarch64 device fleet.
+**This is an in-progress research repository as of 2026-08-13 (T-1 to deadline).** The project has committed to the **Edge AI track** ([ADR 0007](./docs/adr/0007-commit-to-edge-ai-track.md)) after the Orion O6 board did not arrive by its last-useful-arrival date. All work continues on the portable aarch64 device fleet.
 
 **Device-fleet microbenchmarks are complete across five Arm devices.** Three GDN CPU kernels (gated cumulative decay, gated delta-rule scan, causal depthwise Conv1D) have been measured at verified Qwen3.5-4B and 0.8B shapes on the full fleet: Jetson Nano (Cortex-A57, NEON), Raspberry Pi 5 (Cortex-A76), and RK3588 (Cortex-A76 big + Cortex-A55 little clusters). The optimization stack (OpenMP parallelization + NEON unrolling + fp16 state) delivers 3.5–5.1× on A76 silicon and 2.6–3.1× on A57. The key cross-device finding — that these kernels are **instruction-overhead-bound, not DRAM-bandwidth-bound** at seq=64 working-set sizes — is documented in the [fleet bandwidth-scaling analysis](./results/figures/fleet_bandwidth_scaling.md).
 
