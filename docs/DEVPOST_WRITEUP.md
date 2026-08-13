@@ -1,6 +1,6 @@
 # Devpost Submission Write-Up
 
-**Bead:** `ob-f7k` · **Track:** Edge AI ([ADR 0007](./adr/0007-commit-to-edge-ai-track.md))
+**Bead:** `ob-f7k` · **Track:** Edge AI ([ADR 0007](https://github.com/alexcasper/OrionsBelt/blob/main/docs/adr/0007-commit-to-edge-ai-track.md))
 
 This document maps section-by-section to the Devpost submission requirements
 (project overview, functionality/output, setup instructions) and the four
@@ -53,7 +53,7 @@ OrionsBelt fills that gap with:
 
 The Radxa Orion O6 (CIX P1: Cortex-A720 + Immortalis G720 + 28.8 TOPS NPU)
 has not arrived since project start (externally gated procurement). Per
-[ADR 0007](./adr/0007-commit-to-edge-ai-track.md), we committed to the Edge
+[ADR 0007](https://github.com/alexcasper/OrionsBelt/blob/main/docs/adr/0007-commit-to-edge-ai-track.md), we committed to the Edge
 AI track on the RK3588 — a legitimate prize category — because the GDN
 memory-scaling story is fully demonstrable on any aarch64 device, and the
 hedge work already produces real results. If the O6 arrives before the
@@ -184,14 +184,14 @@ on dotprod-capable cores) and progressively optimizing it yields a
 > pure-GDN kernel agreement is 3–5% (§38). See
 > the headline table above for the full cross-device comparison.
 
-![Decode optimization stack on RK3588 Cortex-A76](../results/figures/optimization_stack.png)
+![Decode optimization stack on RK3588 Cortex-A76](https://raw.githubusercontent.com/alexcasper/OrionsBelt/main/results/figures/optimization_stack.png)
 
 The optimization stack is pure memory-system engineering — no algorithmic
 changes to the model. GDN's novel recurrent kernels (conv, decay, scan)
 remain <1% of decode time; the bottleneck is weight-loading matmuls (FFN
 54–72%), exactly as the bandwidth analysis predicts. See
-[FINDINGS.md §15–16](./FINDINGS.md) and the
-[e2e fleet comparison](../results/figures/e2e_fleet_comparison.md).
+[FINDINGS.md §15–16](https://github.com/alexcasper/OrionsBelt/blob/main/docs/FINDINGS.md) and the
+[e2e fleet comparison](https://github.com/alexcasper/OrionsBelt/blob/main/results/figures/e2e_fleet_comparison.md).
 
 **Context-length scaling: GDN is O(1), full-attention is O(n) — measured on silicon.**
 
@@ -225,7 +225,7 @@ not microarchitectural. (FINDINGS.md §17.)
 > **Full comparison table:** the complete multi-device, multi-quant
 > context-sweep — throughput, KV cache growth, and per-token latency
 > across all 36 datasets — is in
-> [`results/figures/ctxsweep_comparison.md`](../results/figures/ctxsweep_comparison.md).
+> [`results/figures/ctxsweep_comparison.md`](https://github.com/alexcasper/OrionsBelt/blob/main/results/figures/ctxsweep_comparison.md).
 > Pure-GDN retention holds at 99–100% across every configuration tested.
 
 **INT8 KV cache quantization: the counter-argument, measured.**
@@ -282,10 +282,10 @@ into channel-wise operations rather than tying them through a single scalar.
 The microbenchmark shows the compute cost is comparable. We then attempted
 the retrieval-quality test directly: swapping GDN-1's layer-0 for a GDN-2
 module in a live Qwen3.5-0.8B checkpoint and running 30-step isolated MSE
-distillation (see [`gdn2_swap_findings.md`](./gdn2_swap_findings.md)).
+distillation (see [`gdn2_swap_findings.md`](https://github.com/alexcasper/OrionsBelt/blob/main/docs/gdn2_swap_findings.md)).
 MSE dropped 84%, but cross-entropy loss recovered only 17% of the gap
 (matched hyperparameters). A 10-prompt RULER multi-key retrieval evaluation
-([`gdn2_ruler_findings.md`](./gdn2_ruler_findings.md)) showed GDN-2 at 20%
+([`gdn2_ruler_findings.md`](https://github.com/alexcasper/OrionsBelt/blob/main/docs/gdn2_ruler_findings.md)) showed GDN-2 at 20%
 accuracy vs GDN-1's 30% (at the 20% random baseline), with ~5× worse
 log-probabilities.
 
@@ -335,7 +335,7 @@ alongside every headline number — is a template for honest edge benchmarking.
 
 We followed our own README on a fresh RK3588 clone (commit b3b6536) — build,
 benchmark, verify, manifest, commit — and rewrote the README and setup guide
-to match exactly what works. See [`docs/SETUP_PORTABLE.md`](./SETUP_PORTABLE.md)
+to match exactly what works. See [`docs/SETUP_PORTABLE.md`](https://github.com/alexcasper/OrionsBelt/blob/main/docs/SETUP_PORTABLE.md)
 for the step-by-step path for any aarch64 device.
 
 **Every number has provenance:**
@@ -363,7 +363,7 @@ for the step-by-step path for any aarch64 device.
 ### Prerequisites
 
 Any aarch64 Linux device (RK3588, Pi 5, Jetson Nano, or O6 when available)
-with gcc and Python 3.10+. Full setup in [`docs/SETUP_PORTABLE.md`](./SETUP_PORTABLE.md).
+with gcc and Python 3.10+. Full setup in [`docs/SETUP_PORTABLE.md`](https://github.com/alexcasper/OrionsBelt/blob/main/docs/SETUP_PORTABLE.md).
 
 ### Quick path
 
@@ -411,15 +411,15 @@ ORIONS_FORCE_FP32=1 python3 bench/harness.py \
 
 | Document | What it contains |
 |----------|-----------------|
-| [`README.md`](../README.md) | Project overview, claims, status table |
-| [`PLAN.md`](./archive/PLAN.md) | Implementation plan, rubric mapping, risk register |
-| [`docs/FINDINGS.md`](./FINDINGS.md) | All measured results with analysis (56 sections) |
-| [`docs/SETUP_PORTABLE.md`](./SETUP_PORTABLE.md) | Step-by-step device setup |
-| [`docs/adr/`](./adr/) | 8 architecture decision records |
-| [`docs/CLAIM_VERIFICATION.md`](./CLAIM_VERIFICATION.md) | Every quantitative claim traced to primary source |
-| [`docs/NPU_OFFLOAD_DESIGN.md`](./NPU_OFFLOAD_DESIGN.md) | Complete NPU offload design (designed, not executed — board-gated) |
-| [`results/raw/`](../results/raw/) | Committed benchmark CSVs |
-| [`results/manifests/`](../results/manifests/) | Provenance manifests |
+| [`README.md`](https://github.com/alexcasper/OrionsBelt/blob/main/README.md) | Project overview, claims, status table |
+| [`PLAN.md`](https://github.com/alexcasper/OrionsBelt/blob/main/docs/archive/PLAN.md) | Implementation plan, rubric mapping, risk register |
+| [`docs/FINDINGS.md`](https://github.com/alexcasper/OrionsBelt/blob/main/docs/FINDINGS.md) | All measured results with analysis (56 sections) |
+| [`docs/SETUP_PORTABLE.md`](https://github.com/alexcasper/OrionsBelt/blob/main/docs/SETUP_PORTABLE.md) | Step-by-step device setup |
+| [`docs/adr/`](https://github.com/alexcasper/OrionsBelt/blob/main/docs/adr/) | 8 architecture decision records |
+| [`docs/CLAIM_VERIFICATION.md`](https://github.com/alexcasper/OrionsBelt/blob/main/docs/CLAIM_VERIFICATION.md) | Every quantitative claim traced to primary source |
+| [`docs/NPU_OFFLOAD_DESIGN.md`](https://github.com/alexcasper/OrionsBelt/blob/main/docs/NPU_OFFLOAD_DESIGN.md) | Complete NPU offload design (designed, not executed — board-gated) |
+| [`results/raw/`](https://github.com/alexcasper/OrionsBelt/blob/main/results/raw/) | Committed benchmark CSVs |
+| [`results/manifests/`](https://github.com/alexcasper/OrionsBelt/blob/main/results/manifests/) | Provenance manifests |
 
 ---
 
@@ -473,7 +473,7 @@ ORIONS_FORCE_FP32=1 python3 bench/harness.py \
   FINDINGS §13), but O6-class GPU performance remains unmeasured. The complete
   NPU offload design — operator-level mapping, subgraph boundaries,
   phase-dependent routing, and quantization policy — is documented in
-  [`NPU_OFFLOAD_DESIGN.md`](./NPU_OFFLOAD_DESIGN.md).
+  [`NPU_OFFLOAD_DESIGN.md`](https://github.com/alexcasper/OrionsBelt/blob/main/docs/NPU_OFFLOAD_DESIGN.md).
 - **Decode throughput optimized ~65× from naive baseline:** the naive FP32 C
   GEMV (column-sweep, 0.17% cache-line utilization) ran at 0.68 tok/s (0.8B)
   and 0.07 tok/s (4B). Our C decode loop with
@@ -492,17 +492,17 @@ ORIONS_FORCE_FP32=1 python3 bench/harness.py \
   each confirm a ~20% structural CE ceiling — isolated-layer distillation
   cannot compensate for downstream amplification. RULER retrieval: 20% vs
   30% baseline (at random) — insufficient adaptation, not architectural
-  failure. See [`gdn2_swap_findings.md`](./gdn2_swap_findings.md) and
-  [`gdn2_ruler_findings.md`](./gdn2_ruler_findings.md).
+  failure. See [`gdn2_swap_findings.md`](https://github.com/alexcasper/OrionsBelt/blob/main/docs/gdn2_swap_findings.md) and
+  [`gdn2_ruler_findings.md`](https://github.com/alexcasper/OrionsBelt/blob/main/docs/gdn2_ruler_findings.md).
 - **Dynamic heterogeneous dispatcher:** designed but not implemented (requires
   the O6's GPU+NPU for a meaningful test). The phase-dependent routing policy
-  is described in [`NPU_OFFLOAD_DESIGN.md`](./NPU_OFFLOAD_DESIGN.md) §4.4.
+  is described in [`NPU_OFFLOAD_DESIGN.md`](https://github.com/alexcasper/OrionsBelt/blob/main/docs/NPU_OFFLOAD_DESIGN.md) §4.4.
   A proxy measurement on the RK3588 Mali-G610 quantifies the barrier: 16
   engine-boundary crossings per token (in a 3:1 hybrid stack) cost **3.36 ms**
   — ~10% of the 30 tok/s decode budget, before any useful work. Even if the
   NPU could run GDN layers, dispatch overhead alone would need to save more
   than 3.36 ms/token just to break even. See
-  [FINDINGS.md §39](./FINDINGS.md).
+  [FINDINGS.md §39](https://github.com/alexcasper/OrionsBelt/blob/main/docs/FINDINGS.md).
 
 ---
 
@@ -518,5 +518,5 @@ collaboratively via the beads issue tracker.
 ---
 
 *All results in this write-up are traceable to committed CSVs with provenance
-manifests. See [`docs/FINDINGS.md`](./FINDINGS.md) for full analysis and
-[`results/`](../results/) for raw data.*
+manifests. See [`docs/FINDINGS.md`](https://github.com/alexcasper/OrionsBelt/blob/main/docs/FINDINGS.md) for full analysis and
+[`results/`](https://github.com/alexcasper/OrionsBelt/blob/main/results/) for raw data.*
