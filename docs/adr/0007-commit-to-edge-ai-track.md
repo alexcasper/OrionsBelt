@@ -112,7 +112,8 @@ Confirmed by t3 agent on 2026-08-10 (T-4, 4 days to deadline).
 - **T-3 trigger (Aug 11)** is pre-committed by this ADR: Physical AI framing is already dropped;
   the submission is locked to Edge AI. No reversal is expected.
 - The Edge AI submission remains complete and submission-ready (15/15 readiness checks, 2253
-  tests, ruff clean, all numbers provenance-backed).
+  tests, ruff clean, all numbers provenance-backed — figures as of 2026-08-10; see T-1 section
+  below for current state).
 
 **Reversal cost.**
 - **If the board arrives before 2026-08-08**: reversal is cheap. The Edge AI submission is
@@ -122,3 +123,25 @@ Confirmed by t3 agent on 2026-08-10 (T-4, 4 days to deadline).
   if cheap, but do not restructure the submission. The Edge AI framing is locked.
 - **After 2026-08-14 16:00 PT**: reversal cost is infinite. Devpost submissions close at a
   fixed time with no grace period.
+
+## T-1 Trigger Firing (2026-08-13)
+
+Confirmed by t3 agent on 2026-08-13 (T-1, 1 day to deadline).
+
+- `ob-axq` (Source a Radxa Orion O6) is still **OPEN** — no board has materialised at any point
+  in the project. The Edge AI track is locked; this is the final trigger firing.
+- **T-1 trigger fired on schedule.** Per ADR 0004 §T-1, two items are formally cut from this
+  submission cycle:
+  1. **Demo video** (`ob-jui`): optional per Devpost rules, never started (blocked by
+     `ob-7a9` dynamic dispatcher, which is hardware-gated).
+  2. **262K context data point** (top of the context sweep, R4): never measured — context
+     sweep CSVs max at `ctx_len=4096`. The 262K figures in README/DEVPOST are **theoretical
+     memory-scaling calculations** (GDN O(1) state vs attention O(n) KV cache), not measured
+     benchmark data points. They remain valid as architecture-level arguments.
+- Follow-up bead **`ob-9t0.18`** is the formal record, referencing ADR 0004 §T-1 and this ADR.
+- **T-2 trigger (Aug 12)** was handled through ADR 0008 (GDN-2 benchmark-only comparison) and
+  the closure of `ob-68l` / `ob-zak` with partial results — no separate filing bead needed.
+- The Edge AI submission remains complete and submission-ready: **16/16 readiness checks** pass
+  (ob-9t0.17 added a README count-drift gate as the 16th check), **2433 CI-authoritative tests**
+  (2501 local on t3, 1 skip), ruff clean, KleidiAI 14/14 tests pass, all headline numbers
+  provenance-backed.
