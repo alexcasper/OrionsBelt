@@ -340,11 +340,12 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    update_readme(dry_run=args.dry_run)
-    update_findings_sections(dry_run=args.dry_run)
+    changes = update_readme(dry_run=args.dry_run)
+    changes += update_findings_sections(dry_run=args.dry_run)
     if args.test_count is not None:
-        update_test_count(args.test_count, dry_run=args.dry_run)
-    return 0
+        changes += update_test_count(args.test_count, dry_run=args.dry_run)
+    # In dry-run mode, return non-zero if counts are stale (CI / submission gate).
+    return changes if args.dry_run else 0
 
 
 if __name__ == "__main__":  # pragma: no cover
