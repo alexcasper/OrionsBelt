@@ -14,10 +14,13 @@ The Edge AI submission is **ready today**. Every claim in
 has not arrived; per [ADR 0007](adr/0007-commit-to-edge-ai-track.md),
 the project committed to the Edge AI track effective **2026-08-06**.
 The Aug 8 last-useful-arrival cutoff (ADR 0004) has passed with no
-board. **T-4 (Aug 10) has fired** — `ob-axq` still OPEN, follow-up
-`ob-9t0.10` filed (NPU on-device execution: designed, not executed).
-T-3 (Aug 11) is pre-committed per ADR 0007 — the submission framing is
-locked to Edge AI.
+board. **All descope triggers (T-4 → T-1) have fired** — see ADR 0007
+for the full record. `ob-axq` (O6 acquisition) remains OPEN; all
+hardware-dependent work is formally descoped per ADR 0004. Two T-1
+cuts (ADR 0004 §T-1): demo video (optional, hardware-gated) and the
+262K context data point (theoretical memory-scaling figures in
+README/DEVPOST remain valid as architecture-level arguments).
+The submission framing is locked to Edge AI.
 
 ---
 
@@ -376,9 +379,10 @@ cutoff has passed with no board; any future arrival is additive bonus per ADR 00
 
 ## 6. Framing status
 
-ADR 0007 committed to the Edge AI track on **2026-08-06**, so the T-4/T-3
-descope triggers fire as a formality — the submission is already locked
-to Edge AI. The submission clears docs/archive/PLAN.md §8's
+ADR 0007 committed to the Edge AI track on **2026-08-06**. All four
+descope triggers (T-4 through T-1) have now fired — see ADR 0007 for
+the T-4 and T-1 sections. The submission is finalized on Edge AI.
+The submission clears docs/archive/PLAN.md §8's
 minimum-viable bar with real measured numbers — not the "credible plan"
 ADR 0004 described on Aug 2 when zero benchmark numbers existed.
 
