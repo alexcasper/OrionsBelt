@@ -54,9 +54,9 @@ The submission framing is locked to Edge AI.
 | Claim (DEVPOST_SUBMISSION.md) | Source CSV | Match? |
 |---|---|---|
 | Cumulative decay 21.39 GiB/s (t3) | rk3588-t3-clean.csv | ✓ |
-| Cumulative decay 21.67 GiB/s (t4) | rk3588-t4_big.csv | ✓ |
-| Gated scan 10.56 / 11.42 GiB/s | same CSVs | ✓ |
-| Causal Conv1D 20.59 / 20.71 GiB/s | same CSVs | ✓ |
+| Cumulative decay 27.33 GiB/s (t4, 2026-08-14; 21.67 prior session — session variance §43) | rk3588-t4_big.csv | ✓ |
+| Gated scan 10.56 / 11.45 GiB/s | same CSVs | ✓ |
+| Causal Conv1D 20.59 / 21.93 GiB/s | same CSVs | ✓ |
 | fp16 decay 35.12 GiB/s (1.64×) | rk3588-t3-clean.csv | ✓ |
 | 4B INT8: 1.84 tok/s (t3) | e2e_fleet_comparison.md | ✓ |
 | 0.8B INT8: 10.61 tok/s (t3) | same | ✓ |

@@ -87,21 +87,23 @@ to devices but was never previously tested in the correctness suite).
 
 | Kernel | Cluster | Before (GiB/s) | After (GiB/s) | Speedup |
 |--------|---------|---------------:|--------------:|--------:|
-| gdn_cumdecay | A76 big | 4.25 | **21.67** | 5.1× |
-| gdn_gated_scan | A76 big | 3.29 | **11.42** | 3.5× |
-| gdn_causal_dwconv1d | A76 big | 4.52 | **20.71** | 4.6× |
+| gdn_cumdecay | A76 big | 4.25 | **27.33** | 6.4× |
+| gdn_gated_scan | A76 big | 3.29 | **11.45** | 3.5× |
+| gdn_causal_dwconv1d | A76 big | 4.52 | **21.93** | 4.9× |
 | gdn_cumdecay | A55 little | 0.97 | **5.87** | 6.0× |
 | gdn_gated_scan | A55 little | 0.55 | **3.91** | 7.1× |
 | gdn_causal_dwconv1d | A55 little | 0.71 | **5.30** | 7.4× |
 
-> **cumdecay at 21.67 GiB/s reaches 87% of the RK3588's measured DRAM bandwidth
-> ceiling (~25 GiB/s, 79% of the 31.7 GiB/s theoretical spec at 2112 MHz).**
-> The kernel is memory-bound — the optimization has taken it close to what the
-> hardware allows.
+> **cumdecay reaches the RK3588's measured DRAM bandwidth ceiling (~25 GiB/s
+> practical, 68–86% of the 31.7 GiB/s theoretical spec at 2112 MHz) —
+> 21.67–27.33 GiB/s across two clean sessions.**
+> The kernel is memory-bound — the optimization has taken it to what the
+> hardware allows. The ±25% session-to-session spread on this kernel is
+> documented in FINDINGS §43; quote a range, not a single p50.
 >
 > **Provenance:** Big-cluster "After" values are current measurements from
-> rk3588-t4 (`rk3588-t4_big.csv`, multi-thread, dirty=false — re-run clean in
-> PR #313 at commit `aa61e20`), independently cross-validated
+> rk3588-t4 (`rk3588-t4_big.csv`, multi-thread, dirty=false — re-run clean
+> 2026-08-14 at commit `a5595ab8`, manifest SHA `4169648`), independently cross-validated
 > on rk3588-t3 (21.39/10.56/20.59 GiB/s, dirty=false). Little-cluster
 > values are from the initial optimization run (commit `8f8be11`, 4-thread OpenMP);
 > clean single-thread little-cluster data is 1.19/0.55/1.12 GiB/s. Pre-optimization
@@ -110,9 +112,9 @@ to devices but was never previously tested in the correctness suite).
 
 The OpenMP parallelization across 4 cores accounts for ~4×; NEON double-width
 unrolling adds further gains. The little cluster (A55) benefits more
-(6.0–7.4×) than the big cluster (3.5–5.1×) because the A55's weaker
+(6.0–7.4×) than the big cluster (3.5–6.4×) because the A55's weaker
 single-thread throughput makes it more reliant on multi-thread parallelization
-— the optimization closes the big/little gap from ~4:1 to ~2.5:1.
+— the optimization closes the big/little gap from ~4:1 to ~2.9–4.7:1.
 
 **big.LITTLE affinity policy:**
 
@@ -419,7 +421,7 @@ ORIONS_FORCE_FP32=1 python3 bench/harness.py \
 |----------|-----------------|
 | [`README.md`](https://github.com/alexcasper/OrionsBelt/blob/main/README.md) | Project overview, claims, status table |
 | [`PLAN.md`](https://github.com/alexcasper/OrionsBelt/blob/main/docs/archive/PLAN.md) | Implementation plan, rubric mapping, risk register |
-| [`docs/FINDINGS.md`](https://github.com/alexcasper/OrionsBelt/blob/main/docs/FINDINGS.md) | All measured results with analysis (56 sections) |
+| [`docs/FINDINGS.md`](https://github.com/alexcasper/OrionsBelt/blob/main/docs/FINDINGS.md) | All measured results with analysis (57 sections) |
 | [`docs/SETUP_PORTABLE.md`](https://github.com/alexcasper/OrionsBelt/blob/main/docs/SETUP_PORTABLE.md) | Step-by-step device setup |
 | [`docs/adr/`](https://github.com/alexcasper/OrionsBelt/blob/main/docs/adr/) | 8 architecture decision records |
 | [`docs/CLAIM_VERIFICATION.md`](https://github.com/alexcasper/OrionsBelt/blob/main/docs/CLAIM_VERIFICATION.md) | Every quantitative claim traced to primary source |

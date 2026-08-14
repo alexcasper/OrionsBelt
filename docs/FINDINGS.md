@@ -1337,45 +1337,54 @@ pinning, 30 repeats, 3 warmups).
 
 | Kernel | Cluster | Old p50 (µs) | Old GiB/s | New p50 (µs) | New GiB/s | Speedup |
 |--------|---------|-------------:|----------:|-------------:|----------:|--------:|
-| gdn_cumdecay | A76 big | 459.4 | 4.25 | 90.1 | 21.67 | 5.1× |
-| gdn_gated_scan | A76 big | 899.0 | 3.29 | 259.3 | 11.42 | 3.5× |
-| gdn_causal_dwconv1d | A76 big | 456.2 | 4.52 | 99.5 | 20.71 | 4.6× |
-| gdn_cumdecay | A55 little | 2008.3 | 0.97 | 332.8 | 5.87 | 6.0× |
-| gdn_gated_scan | A55 little | 5395.6 | 0.55 | 757.2 | 3.91 | 7.1× |
-| gdn_causal_dwconv1d | A55 little | 2892.1 | 0.71 | 388.8 | 5.30 | 7.4× |
+| gdn_cumdecay | A76 big | 459.4 | 4.25 | 71.5 | 27.33 | 6.4× |
+| gdn_gated_scan | A76 big | 899.0 | 3.29 | 258.4 | 11.45 | 3.5× |
+| gdn_causal_dwconv1d | A76 big | 456.2 | 4.52 | 93.9 | 21.93 | 4.9× |
+| gdn_cumdecay | A55 little | 2008.3 | 0.97 | 329.6 | 5.93 | 6.1× |
+| gdn_gated_scan | A55 little | 5395.6 | 0.55 | 755.5 | 3.92 | 7.1× |
+| gdn_causal_dwconv1d | A55 little | 2892.1 | 0.71 | 397.0 | 5.19 | 7.3× |
 
 **Qwen3.5-0.8B model config (seq=64, channels=2048, 18 GDN layers), big cluster:**
 
 | Kernel | Old p50 (µs) | Old GiB/s | New p50 (µs) | New GiB/s | Speedup |
 |--------|-------------:|----------:|-------------:|----------:|--------:|
-| gdn_cumdecay | 195.1 | 5.00 | 38.2 | 25.56 | 5.1× |
-| gdn_gated_scan | 309.2 | 4.79 | 131.6 | 11.25 | 2.3× |
-| gdn_causal_dwconv1d | 171.8 | 6.00 | 41.1 | 25.04 | 4.2× |
+| gdn_cumdecay | 195.1 | 5.00 | 39.7 | 24.62 | 4.9× |
+| gdn_gated_scan | 309.2 | 4.79 | 128.6 | 11.51 | 2.4× |
+| gdn_causal_dwconv1d | 171.8 | 6.00 | 40.0 | 25.77 | 4.3× |
+
+> "New" columns are the 2026-08-14 clean re-run (commit a5595ab8). The
+> 2026-08-12 run (fc9173b2) measured cumdecay at 21.67/5.86/25.56 GiB/s —
+> see §43 for the cumdecay session-to-session variance; the other kernels
+> agree between the two runs within ±6%.
 
 **Key observations:**
 
-1. **2.3×–7.4× speedup** across all kernels and clusters. The OpenMP
+1. **2.4×–7.3× speedup** across all kernels and clusters. The OpenMP
    parallelization across 4 cores accounts for ~4×, with NEON unrolling adding
    further gains on the sequential-scan kernels.
 
-2. **Little cluster (A55) benefits more** (6.0–7.4×) than big (A76) (2.3–5.1×).
+2. **Little cluster (A55) benefits more** (6.1–7.3×) than big (A76) (2.4–6.4×).
    The A55's weaker single-thread NEON throughput makes it more reliant on
    multi-thread parallelization — the optimization closes the big/little gap
-   from ~4:1 to ~2.5:1 on bandwidth.
+   from ~4:1 to ~2.9–4.6:1 on bandwidth (scan closes most; cumdecay/conv1d,
+   both near the bandwidth ceiling on big cores, close least).
 
 3. **Spread tightened**: gated_scan big cluster went from 17.4% → 7.5% spread,
    consistent with the OpenMP work distribution reducing per-iteration
    variance.
 
-4. **cumdecay approaches bandwidth saturation**: 21.67 GiB/s on the A76 big cluster
-   reaches 87% of the RK3588's **practical** DRAM bandwidth ceiling (~25 GiB/s
-   measured on t3, vs 33.8 GB/s theoretical at 2112 MHz — 64% STREAM
-   efficiency). The theoretical spec is higher, but
+4. **cumdecay approaches bandwidth saturation**: 27.33 GiB/s on the A76 big cluster
+   (2026-08-14 re-run) is at or slightly above the RK3588's **practical** DRAM
+   bandwidth ceiling (~25 GiB/s measured on t3, vs 33.8 GB/s theoretical at
+   2112 MHz — 64% STREAM efficiency). The theoretical spec is higher, but
    sustained workload bandwidth saturates well below it. Measurement:
    2026-08-07 on t3 (Turing RK1), DMC at 2112 MHz / performance governor,
    `scripts/mem_bw_probe.c` (4-thread sequential read: 25.0 GiB/s peak).
    This confirms the kernel is now memory-bound rather than
-   instruction-overhead-bound.
+   instruction-overhead-bound. ⚠ The 2026-08-12 run measured 21.67 GiB/s
+   (87% of the practical ceiling); the ±25% session-to-session swing on this
+   kernel is documented in §43 — quote a range, not a single p50, for
+   cumdecay near the ceiling.
 
 This re-run addresses ob-bf7's "cross-code-version" concern: the prior t4 CSVs
 were at the unoptimized baseline. Manifest:
@@ -2356,7 +2365,7 @@ memory bandwidth.
   GDN-1's 2.04µs (1.29×), not identical. The extra stream adds ~29% at decode.
   Still far below the 2.7× prefill penalty, confirming decode is overhead-dominated.
 - **The bandwidth ratio between GDN-1 and GDN-2 is now closer to the theoretical
-  5/3 = 1.67×** (7.04 vs 11.42 GiB/s = 1.62×), confirming the kernel is genuinely
+  5/3 = 1.67×** (6.91 vs 11.45 GiB/s = 1.66×), confirming the kernel is genuinely
   bandwidth-bound at prefill.
 
 **Fleet-wide note:** All existing fleet CSVs initially contained inflated GDN-2
@@ -3047,7 +3056,7 @@ t4 is stable: ~4% coefficient of variation across runs.
 | Metric | t3 | t4 | Ratio |
 |--------|----|----|-------|
 | **Single-core clean** (gated_scan 4B) | 2.91 GiB/s (30% spread) | 5.27 GiB/s (6% spread) | **1.81×** |
-| **Multi-core big** (gated_scan 4B) | 10.33 GiB/s (8% spread) | 11.42 GiB/s (6.6% spread) | **1.11×** |
+| **Multi-core big** (gated_scan 4B) | 10.33 GiB/s (8% spread) | 11.45 GiB/s (7.9% spread) | **1.11×** |
 
 The multi-core numbers agree within ~10%, consistent with same-silicon
 expectations. The single-core discrepancy is entirely due to t3's
@@ -3099,8 +3108,11 @@ prior workloads), not a kernel or measurement methodology problem.
 > faster), likely due to a board-level memory-subsystem difference.
 >
 > The 8-thread vs 8-thread comparison (`rk3588-t3-clean.csv` vs
-> `rk3588-t4_big.csv`, both `effective_threads=8`) shows the boards agree within
-> ~1% (cumdecay 21.39 vs 21.67), consistent with t4's higher 2400 MHz clock.
+> `rk3588-t4_big.csv`, both `effective_threads=8`) shows the boards agree
+> within ~1% on scan (10.56 vs 11.45) and Conv1D (20.59 vs 21.93); the
+> 2026-08-12 t4 run also agreed on cumdecay (21.39 vs 21.67, ~1%), but the
+> 2026-08-14 re-run reads 27.33 — cumdecay has ±25% session-to-session
+> variance on t4 (§43), so scan/Conv1D are the stable comparison kernels.
 >
 > See `comparison_table.md` §1a for the corrected like-for-like analysis.
 
@@ -3210,13 +3222,17 @@ The **equal-thread-count** comparison removes the confound. Both boards at
 
 | Kernel (4B, seq=64) | t4 8-thread GiB/s | t3 8-thread GiB/s | t4÷t3 |
 |---|---:|---:|---:|
-| gdn_cumdecay | 21.67 | 21.39 | 1.01× |
-| gdn_gated_scan | 11.42 | 10.56 | 1.08× |
-| gdn_causal_dwconv1d | 20.71 | 20.59 | 1.01× |
+| gdn_cumdecay | 27.33 | 21.39 | 1.28× |
+| gdn_gated_scan | 11.45 | 10.56 | 1.08× |
+| gdn_causal_dwconv1d | 21.93 | 20.59 | 1.07× |
 
-At equal thread count the two boards agree to within ~8% on all three kernels
-(t4 consistently slightly faster, consistent with its ~4% higher clock) — within the documented
-run-to-run variance (ob-bf7: up to 1.68× between sessions). The genuine
+At equal thread count, scan and Conv1D agree to within ~8% (t4 consistently
+slightly faster, consistent with its ~4% higher clock) — within the documented
+run-to-run variance (ob-bf7: up to 1.68× between sessions). Cumdecay now reads
++28% on the 2026-08-14 t4 re-run, but this is dominated by cumdecay's
+session-to-session variance on t4 (§43: three same-day runs spanned 26.3–27.3
+vs 21.67 the session before, unchanged binary) — the Aug-12 pair had agreed
+within 1%. The genuine
 single-thread comparison (above) confirms that cumdecay is identical but
 gated_scan shows a real ~1.87× board-level difference — the
 "gap is a thread-count artifact" conclusion holds for cumdecay but not for
@@ -5713,7 +5729,7 @@ Both boards are RK3588 (Cortex-A76 big @ cores 4-7, Cortex-A55 little @ cores 0-
 Governor = performance, --repeats 30, manifest provenance on both runs.
 
 **DRAM-bandwidth ceiling is consistent across units.** gdn_cumdecay_f16 on big
-cores gives 38.04 GiB/s (t4) vs 35.12 GiB/s (t3) — within ~8%, consistent with
+cores gives 36.39 GiB/s (t4) vs 35.12 GiB/s (t3) — within ~4%, consistent with
 t4's higher clock (2400 vs 2304 MHz). The kernel is purely memory-bound and
 both boards share the same LPDDR4X subsystem.
 
@@ -5721,10 +5737,10 @@ both boards share the same LPDDR4X subsystem.
 
 | Kernel (big cores, fp32) | Model | T4 GiB/s | T3 GiB/s | Δ |
 |--------------------------|-------|----------|----------|------|
-| gdn_gated_scan | 4B (4096ch) | 11.42 | 10.56 | +8.1% |
-| gdn_gated_scan | 0.8B (2048ch) | 11.25 | 11.53 | -2.4% |
-| gdn2_gated_scan | 4B (4096ch) | 7.04 | 6.46 | +9.0% |
-| gdn2_gated_scan | 0.8B (2048ch) | 7.65 | 7.62 | +0.4% |
+| gdn_gated_scan | 4B (4096ch) | 11.45 | 10.56 | +8.4% |
+| gdn_gated_scan | 0.8B (2048ch) | 11.51 | 11.53 | -0.2% |
+| gdn2_gated_scan | 4B (4096ch) | 6.91 | 6.46 | +7.0% |
+| gdn2_gated_scan | 0.8B (2048ch) | 7.66 | 7.62 | +0.5% |
 
 T4 is consistently faster on the larger working set (4B, +8-9%) and about even
 on the smaller one (0.8B, ±0-2%). The previous ±20-30% asymmetry was an
@@ -5816,27 +5832,32 @@ separate discrepancy in the **raw microbenchmark** CSVs
 Same binary (no C source changes between commits `b58071aa` [t3] and `fc9173b2`
 [t4]), same governor (performance), cool thermals (~40 °C on both).
 
-**Prefill (seq=64, 4B model) — within 10%:**
+**Prefill (seq=64, 4B model) — scan/conv within 10%; cumdecay swings (§43):**
 
 | Kernel | t4 GiB/s | t3 GiB/s | Δ |
 |--------|----------|----------|---|
-| gdn_cumdecay | 21.67 | 21.39 | +1.3% |
-| gdn_gated_scan | 11.42 | 10.56 | +8.1% |
-| gdn_causal_dwconv1d | 20.71 | 20.59 | +0.6% |
-| gdn2_gated_scan | 7.04 | 6.46 | +9.0% |
+| gdn_cumdecay | 27.33 | 21.39 | +27.7% |
+| gdn_gated_scan | 11.45 | 10.56 | +8.4% |
+| gdn_causal_dwconv1d | 21.93 | 20.59 | +6.5% |
+| gdn2_gated_scan | 6.91 | 6.46 | +7.0% |
+
+(t4 = 2026-08-14 re-run. The 2026-08-12 t4 run read cumdecay 21.67, +1.3% vs
+t3 — the +27.7% here is cumdecay's documented session-to-session variance on
+t4, §43, not a board difference; scan/conv1d/gdn2 reproduce within ±2% of the
+Aug-12 t4 run.)
 
 **Decode (seq=1, 0.8B model) — t4 ~30% slower:**
 
 | Kernel | t4 p50 (µs) | t3 p50 (µs) | Δ (µs) | Δ GiB/s |
 |--------|-------------|-------------|--------|---------|
-| gdn_cumdecay | 1.409 | 0.881 | +0.528 | −37.5% |
-| gdn_gated_scan | 1.526 | 1.015 | +0.511 | −33.4% |
-| gdn_cumdecay_f16 | 1.458 | 0.895 | +0.563 | −38.6% |
-| gdn_gated_scan_f16 | 1.569 | 1.091 | +0.478 | −30.5% |
-| gdn_cumdecay_bf16 | 1.561 | 1.076 | +0.485 | −31.0% |
-| gdn2_gated_scan | 1.616 | 1.158 | +0.458 | −28.3% |
+| gdn_cumdecay | 1.406 | 0.881 | +0.525 | −37.4% |
+| gdn_gated_scan | 1.517 | 1.015 | +0.502 | −33.1% |
+| gdn_cumdecay_f16 | 1.456 | 0.895 | +0.561 | −38.5% |
+| gdn_gated_scan_f16 | 1.561 | 1.091 | +0.470 | −30.1% |
+| gdn_cumdecay_bf16 | 1.555 | 1.076 | +0.479 | −30.8% |
+| gdn2_gated_scan | 1.584 | 1.158 | +0.426 | −26.9% |
 
-The **per-call time difference is a consistent ~450–560 ns** across all
+The **per-call time difference is a consistent ~425–560 ns** across all
 kernels — a fixed overhead, not a proportional slowdown.
 
 ### Root cause analysis
@@ -5889,8 +5910,10 @@ e2e agreement despite the raw microbenchmark discrepancy.
 
 ### Provenance
 
-t4 data: commit `fc9173b2`, CSV `results/raw/rk3588-t4_big.csv`, re-verified
-2026-08-12 (numbers reproduced within 1%). t3 data: commit `b58071aa`, CSV
+t4 data: commit `a5595ab8` (2026-08-14 re-run), CSV `results/raw/rk3588-t4_big.csv`
+(prior run `fc9173b2` 2026-08-12, re-verified within 1% same-day; scan/conv1d
+reproduce within ±2% across the two sessions, cumdecay is session-variable — §43).
+t3 data: commit `b58071aa`, CSV
 `results/raw/rk3588-t3-clean.csv`. Governor=performance on both devices.
 Timer measurement: `clock_gettime(CLOCK_MONOTONIC)` on t4, gcc 14.2.0,
 kernel 6.11.0-1006-rockchip.
@@ -5912,34 +5935,36 @@ Different commits but identical kernel implementations (static binary).
 
 | Kernel | t4 GiB/s | t3 GiB/s | Δ% |
 |---|---:|---:|---:|
-| gdn_cumdecay | 21.67 | 23.17 | −6.5% |
-| gdn_gated_scan | 11.42 | 10.33 | **+10.6%** |
-| gdn2_gated_scan | 7.04 | 9.04 | **−22.1%** |
-| gdn_causal_dwconv1d | 20.71 | 21.34 | −3.0% |
+| gdn_cumdecay | 27.33 | 23.17 | **+17.9%** |
+| gdn_gated_scan | 11.45 | 10.33 | **+10.8%** |
+| gdn2_gated_scan | 6.91 | 9.04 | **−23.6%** |
+| gdn_causal_dwconv1d | 21.93 | 21.34 | +2.8% |
 
-4B scan is within noise; t4 wins on scan but loses ~22% on gdn2_scan.
+4B scan and conv1d are within ~11%; t4 wins on scan but loses ~24% on
+gdn2_scan. The cumdecay +17.9% is dominated by cumdecay's session-to-session
+variance on t4 (§43) — the 2026-08-12 run read −6.5% against this same t3 run.
 
 ### Decode (seq=1) — largest divergence
 
 | Kernel | t4 GiB/s | t3 GiB/s | Δ% |
 |---|---:|---:|---:|
-| gdn_cumdecay | 20.91 | 26.17 | **−20.1%** |
-| gdn_gated_scan | 43.09 | 52.33 | **−17.7%** |
-| gdn2_gated_scan | 47.19 | 61.04 | **−22.7%** |
-| gdn_causal_dwconv1d | 37.37 | 52.32 | **−28.6%** |
+| gdn_cumdecay | 20.92 | 26.17 | **−20.1%** |
+| gdn_gated_scan | 43.16 | 52.33 | **−17.5%** |
+| gdn2_gated_scan | 47.31 | 61.04 | **−22.5%** |
+| gdn_causal_dwconv1d | 39.60 | 52.32 | **−24.3%** |
 
 ### 0.8B model — consistently slower on t4
 
 | Kernel | t4 GiB/s | t3 GiB/s | Δ% |
 |---|---:|---:|---:|
-| gdn_gated_scan | 11.25 | 15.42 | **−27.0%** |
-| gdn2_gated_scan | 7.65 | 10.35 | **−26.1%** |
-| gdn_causal_dwconv1d | 25.04 | 29.92 | **−16.3%** |
+| gdn_gated_scan | 11.51 | 15.42 | **−25.4%** |
+| gdn2_gated_scan | 7.66 | 10.35 | **−26.0%** |
+| gdn_causal_dwconv1d | 25.77 | 29.92 | **−13.9%** |
 
 ### Interpretation
 
 Despite **higher max clock**, t4 is consistently slower on **decode (seq=1)**
-and **small-model (0.8B) prefill** by 16–40%, while 4B prefill is within noise.
+and **small-model (0.8B) prefill** by 14–29%, while 4B prefill is within noise.
 This pattern — worst on latency-bound workloads (small working sets, single
 token) — points to **memory-latency or cache-hierarchy differences** between
 the two board revisions, not CPU frequency. The 4B prefill kernel
@@ -5952,6 +5977,64 @@ board-specific.
 
 ### Provenance
 
-t4: `results/raw/rk3588-t4_big.csv` (commit aa61e20, 2026-08-12).
+t4: `results/raw/rk3588-t4_big.csv` (commit a5595ab8, 2026-08-14 re-run;
+prior run at aa61e20/fc9173b2, 2026-08-12).
 t3: `results/raw/rk3588-t3_big.csv` (commit 47efdf8, 2026-08-06).
 Both: governor=performance, taskset 4-7, repeats=30, 4-thread OpenMP.
+
+---
+
+## 43. gdn_cumdecay p50 on t4 swings ±25% between sessions — single-run cumdecay is not a unit-comparison statistic (2026-08-14)
+
+The 2026-08-14 device-fleet re-run (ob-8ms.3; manifest SHA `4169648`,
+dirty=false, governor=performance, thermals 39.8–40.7 °C before *and* after)
+reproduced every kernel on the A76 big cluster within ±6% of the 2026-08-12
+run — **except `gdn_cumdecay` (4B, seq=64), which jumped from 21.67 to
+27.33 GiB/s (+26%)**:
+
+| Kernel (4B big, seq=64) | 2026-08-12 (fc9173b2) | 2026-08-14 (a5595ab8) | Δ |
+|---|---:|---:|---:|
+| gdn_cumdecay | 21.67 GiB/s (90.1 µs, 12.9% spread) | 27.33 GiB/s (71.5 µs, 25.3% spread) | **+26%** |
+| gdn_gated_scan | 11.42 GiB/s | 11.45 GiB/s | +0.3% |
+| gdn_causal_dwconv1d | 20.71 GiB/s | 21.93 GiB/s | +5.9% |
+| gdn_cumdecay_f16 | 38.04 GiB/s | 36.39 GiB/s | −4.3% |
+| gdn_cumdecay_bf16 | 26.86 GiB/s | 26.86 GiB/s | 0.0% |
+| gdn2_gated_scan | 7.04 GiB/s | 6.91 GiB/s | −1.8% |
+
+Ruled out: binary (`bench_gdn.c` byte-identical between the two commits),
+governor (performance, explicitly set, in both manifests), thermals
+(39.8–40.7 °C both sessions, far below the 52 °C throttle point of §18/§37),
+memory pressure (6.0 vs 6.3 GiB available).
+
+Three independent runs on 2026-08-14 all landed ≥26 GiB/s — 26.78 (9.6%
+spread), 27.33 (25.3%), 26.26 (32.5%) — so the shift is real for that day,
+not a single noisy run. The tell is the **intra-run spread**: cumdecay's p95
+(89.5–98.6 µs) brackets the Aug-12 p50 (90.1 µs), i.e. the per-run
+distribution is bimodal and the p50 lands on whichever mode dominates. Every
+other kernel shows 0.5–8% spread. Little-cluster numbers reproduced within
+±7% (cumdecay 5.86→5.93, scan 3.66→3.92, conv 5.23→5.19).
+
+**Reading:** cumdecay is the one kernel pinned at the DRAM bandwidth ceiling
+(§ob-bf7 obs. 4), and it is exactly the one whose p50 is unstable across
+sessions — consistent with a board-level memory-subsystem state (DMC/DDR
+refresh or arbitration phase) that varies between boots/sessions. Notably
+27.33 GiB/s *exceeds* the ~25 GiB/s practical STREAM ceiling measured on t3
+(`scripts/mem_bw_probe.c`, 4-thread sequential read), so either t4's DRAM
+sustains more than t3's probe measured, or cumdecay's access mix does.
+
+**Implications:**
+
+1. The 8v8 t3↔t4 cumdecay agreement of 2026-08-12 (21.39 vs 21.67, ~1%) is
+   **superseded** — on 2026-08-14 data the pair reads 21.39 vs 27.33 (+28%).
+   Scan (+8%) and Conv1D (+7%) agreement is unchanged.
+2. Cross-board or cross-day comparisons of cumdecay should quote the spread
+   across at least two sessions, not a single-run p50.
+3. Downstream docs cite the refreshed CSV; where a qualitative "boards agree"
+   claim was anchored on cumdecay, it now rests on scan/conv1d only.
+
+### Provenance
+
+t4: `results/raw/rk3588-t4_big.csv` (commit a5595ab8, 2026-08-14),
+manifest `results/manifests/rk3588-t4.json` (git SHA 4169648, dirty=false,
+governor=performance, 30 repeats). Prior session: commit fc9173b2
+(2026-08-12), manifest aa61e20.
