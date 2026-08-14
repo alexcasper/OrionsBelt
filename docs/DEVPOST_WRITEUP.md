@@ -419,7 +419,7 @@ ORIONS_FORCE_FP32=1 python3 bench/harness.py \
 |----------|-----------------|
 | [`README.md`](https://github.com/alexcasper/OrionsBelt/blob/main/README.md) | Project overview, claims, status table |
 | [`PLAN.md`](https://github.com/alexcasper/OrionsBelt/blob/main/docs/archive/PLAN.md) | Implementation plan, rubric mapping, risk register |
-| [`docs/FINDINGS.md`](https://github.com/alexcasper/OrionsBelt/blob/main/docs/FINDINGS.md) | All measured results with analysis (56 sections) |
+| [`docs/FINDINGS.md`](https://github.com/alexcasper/OrionsBelt/blob/main/docs/FINDINGS.md) | All measured results with analysis (57 sections) |
 | [`docs/SETUP_PORTABLE.md`](https://github.com/alexcasper/OrionsBelt/blob/main/docs/SETUP_PORTABLE.md) | Step-by-step device setup |
 | [`docs/adr/`](https://github.com/alexcasper/OrionsBelt/blob/main/docs/adr/) | 8 architecture decision records |
 | [`docs/CLAIM_VERIFICATION.md`](https://github.com/alexcasper/OrionsBelt/blob/main/docs/CLAIM_VERIFICATION.md) | Every quantitative claim traced to primary source |
