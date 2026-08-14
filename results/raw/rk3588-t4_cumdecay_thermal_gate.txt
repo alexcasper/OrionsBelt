@@ -1,0 +1,70 @@
+ob-yupd root-cause experiment: is the gdn_cumdecay session variance (FINDINGS 43) DMC/DDR DVFS?
+
+Setup: rk3588-t4, kernel 6.11.0-1006-rockchip, bench_gdn_armv8.2dot @ 056f104d (clean),
+taskset -c 4-7, governor=performance on all 8 CPUs (see manifest
+results/manifests/rk3588-t4_cumdecay_thermal_gate.json, run_id t4_20260814T150859Z_056f104).
+Command: ./dist/bench_gdn_armv8.2dot --sustained N --sustained-kernel cumdecay
+         --sustained-model 4B --sustained-seq 64
+
+FINDING 1 - DDR clock is firmware-pinned and constant:
+  * No dmc devfreq device exists on this kernel (only /sys/class/devfreq/fb000000.gpu).
+  * DDR frequency is owned by secure firmware via SCMI: /sys/kernel/debug/clk/clk_summary
+    entry "scmi_clk_ddr" rate = 2112000000 Hz (2112 MHz, max for RK3588).
+  * Sampled scmi_clk_ddr rate at 5 Hz DURING a 20 s cumdecode sustained run:
+    70/70 samples = 2112000000 Hz. No DVFS movement, in either throughput regime.
+
+FINDING 2 - Effective cumdecay bandwidth is thermally gated, not clock gated:
+  Back-to-back 15 s sustained runs, identical command, only start temperature differs:
+
+    RUN 1 (cold start, max zone 41.6 C):
+      5.0 s   26.50 GiB/s   51.8 C
+      10.0 s  26.49 GiB/s   52.7 C
+      15.0 s  26.52 GiB/s   53.6 C
+      -> start zones: 41615 40692 40692 41615 40692 39769 40692
+      -> end   zones: 52692 54538 56384 54538 50846 49000 50846
+
+    RUN 2 (hot start, max zone 52.7 C, preheated by RUN 1):
+      5.0 s   22.40 GiB/s   53.6 C
+      10.0 s  22.31 GiB/s   53.6 C
+      15.0 s  22.32 GiB/s   53.6 C
+      -> -15.6 % vs RUN 1, flat (no in-run decay; the gate has already tripped)
+
+    RUN 3 (hot start, max zone 53.0 C):
+      5.0 s   23.51 GiB/s   53.6 C
+      10.0 s  23.67 GiB/s   53.6 C
+      15.0 s  23.81 GiB/s   53.6 C
+      -> -11 % vs RUN 1, flat
+
+  Same binary, same taskset, same governor, DDR rate constant 2112 MHz throughout.
+  Earlier same-day observations bracketing the two regimes:
+    20 s sustained from 39.7 C cold: 26.52 / 27.09 / 27.10 / 27.09 GiB/s (fast)
+    20 s sustained immediately after (hot ~50 C): burst 23.10 GiB/s (slow)
+
+FINDING 3 - Gate has lag/hysteresis (explains in-run bimodality of the 30-repeat CSV):
+  A cold-start 20 s run crossed 50 -> 53.6 C mid-run WITHOUT slowing (27.09 GiB/s at
+  53.6 C), yet every hot-start run minutes later sat at 22-24 GiB/s. The derate state
+  trips with a lag (likely DRAM-package temperature lagging the SoC zones, and/or a
+  periodic firmware thermal poll), then persists. In the 30-repeat fleet CSV a cold
+  board therefore produces a mostly-fast p50 with late-run derated iterations
+  (25.3 % spread, p95 bracketing the slow mode); a warm board produces a uniformly
+  slow p50 (2026-08-12: 21.67 GiB/s, 12.9 % spread).
+
+FINDING 4 - Cooldown control (idle ~3.5 min, then 10 s sustained) came back SLOW:
+    start zones: 39769 39769 39769 39769 38846 38846 38846  (colder than fast RUN 1!)
+      5.0 s   23.40 GiB/s   49.0 C
+      10.0 s  23.58 GiB/s   50.8 C
+  So the visible SoC thermal zones do NOT fully determine the regime: 5/6 runs fit
+  "hot SoC = slow", but this cold-start run after the sustained-load block stayed in
+  the slow regime. The controlling state (DRAM package temperature and/or a firmware
+  derate latch) has lag and asymmetric trip/release dynamics that mainline Linux
+  cannot observe; 3.5 min idle was not enough to release it.
+
+CONCLUSION: The 21.67 vs 27.33 GiB/s session swing is an ambient memory-subsystem
+derate, NOT DMC DVFS (DDR rate pinned at 2112 MHz in both regimes) and NOT
+unit-to-unit difference. Two stable, within-run-flat regimes (-11..-16 %) exist on
+the same board minutes apart, selected by prior load/thermal history with lag and
+hysteresis. Consequences for the fleet protocol: quote cumdecay as a range across
+sessions (FINDINGS 43 guidance); cold-boot sessions measure the fast regime
+(the 2026-08-14 27.33 GiB/s); warm sessions measure the slow one (2026-08-12
+21.67 GiB/s). Fully pinning trip/release points would need a longer idle sweep or
+cold-reboot experiments (out of scope pre-deadline).

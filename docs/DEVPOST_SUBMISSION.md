@@ -254,7 +254,7 @@ Specifically:
 
 - **Repository:** https://github.com/alexcasper/OrionsBelt
 - **License:** Apache-2.0
-- **Findings (56 sections, 5971 lines):** [`docs/FINDINGS.md`](https://github.com/alexcasper/OrionsBelt/blob/main/docs/FINDINGS.md)
+- **Findings (57 sections, 6078 lines):** [`docs/FINDINGS.md`](https://github.com/alexcasper/OrionsBelt/blob/main/docs/FINDINGS.md)
 - **Comparison table:** [`results/figures/comparison_table.md`](https://github.com/alexcasper/OrionsBelt/blob/main/results/figures/comparison_table.md)
 - **Fleet bandwidth analysis:** [`results/figures/fleet_bandwidth_scaling.md`](https://github.com/alexcasper/OrionsBelt/blob/main/results/figures/fleet_bandwidth_scaling.md)
 - **Memory scaling figures:** [`results/figures/memory_comparison.md`](https://github.com/alexcasper/OrionsBelt/blob/main/results/figures/memory_comparison.md)
