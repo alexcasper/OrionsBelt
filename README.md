@@ -12,7 +12,7 @@ Licensed under **Apache-2.0** — see [`LICENSE`](./LICENSE).
 
 ## Headline results
 
-Three GDN CPU kernels (gated cumulative decay, gated delta-rule scan, causal depthwise Conv1D), benchmarked on RK3588 Cortex-A76 (big cluster, 8-thread) at verified Qwen3.5-4B shapes:
+Three GDN CPU kernels (gated cumulative decay, gated delta-rule scan, causal depthwise Conv1D), benchmarked on RK3588 Cortex-A76 (big cluster, 4-thread pinned via `taskset -c 4-7`) at verified Qwen3.5-4B shapes:
 
 | Kernel | GiB/s | % of 31.7 GiB/s spec | Spread |
 |---|---:|---:|---:|
