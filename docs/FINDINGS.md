@@ -6022,13 +6022,48 @@ refresh or arbitration phase) that varies between boots/sessions. Notably
 (`scripts/mem_bw_probe.c`, 4-thread sequential read), so either t4's DRAM
 sustains more than t3's probe measured, or cumdecay's access mix does.
 
+**Root cause identified (2026-08-14 15:00 PT, ob-yupd):** the swing is an
+ambient memory-subsystem derate, not DVFS and not unit-to-unit difference.
+On this mainline 6.11 kernel the DDR frequency is owned by secure firmware
+via SCMI (`scmi_clk_ddr`) — there is no dmc devfreq node (only the GPU has
+one) — and sampling the clock at 5 Hz *during* sustained cumdecode runs
+showed **2112 MHz constant in both the fast and slow regime**, ruling out
+DMC scaling. Back-to-back controlled runs (same binary, taskset 4-7,
+governor=performance; full log in
+`results/raw/rk3588-t4_cumdecay_thermal_gate.txt`, manifest
+`results/manifests/rk3588-t4_cumdecay_thermal_gate.json` at 056f104d) show
+two stable, within-run-flat regimes minutes apart on the same board:
+
+| Sustained cumdecode 4B seq=64 | Start state (max zone) | Throughput |
+|---|---|---|
+| cold start | ~41.6 °C | 26.50–26.52 GiB/s |
+| hot start (preheated) | ~52.7 °C | 22.31–22.40 GiB/s (−15.6%) |
+| hot start | ~53.0 °C | 23.51–23.81 GiB/s (−11%) |
+| cold start after 3.5 min idle | ~39.8 °C | 23.40–23.58 GiB/s (still slow) |
+
+The last row is the tell: visible SoC thermal zones fit "hot = slow" in 5/6
+runs but do not fully determine the regime — the controlling state (DRAM
+package temperature and/or a firmware derate latch) lags and releases
+asymmetrically, and 3.5 min idle did not clear it. A cold-start 20 s run
+also crossed 39.7→53.6 °C *without* slowing, so the derate trips with lag;
+this exactly produces the observed bimodal intra-run spread (a 30-repeat
+CSV on a cold board is mostly fast with late-run derated iterations, p95
+bracketing the slow mode — the 2026-08-14 CSV — while a warm board yields a
+uniformly slow p50 — the 2026-08-12 CSV). Net: **cold-boot sessions measure
+the fast regime (27.33 GiB/s), warm sessions the slow one (21.67 GiB/s)**;
+fully pinning trip/release points needs a longer idle sweep or cold-reboot
+experiments (post-deadline).
+
 **Implications:**
 
 1. The 8v8 t3↔t4 cumdecay agreement of 2026-08-12 (21.39 vs 21.67, ~1%) is
    **superseded** — on 2026-08-14 data the pair reads 21.39 vs 27.33 (+28%).
    Scan (+8%) and Conv1D (+7%) agreement is unchanged.
 2. Cross-board or cross-day comparisons of cumdecay should quote the spread
-   across at least two sessions, not a single-run p50.
+   across at least two sessions, not a single-run p50. The fast/slow regime
+   span on a *single* t4 board is 22–27 GiB/s, so any cumdecay delta under
+   ~20% between boards or days is within ambient variance; treat cold-boot
+   p50s as the comparable statistic.
 3. Downstream docs cite the refreshed CSV; where a qualitative "boards agree"
    claim was anchored on cumdecay, it now rests on scan/conv1d only.
 
@@ -6037,4 +6072,7 @@ sustains more than t3's probe measured, or cumdecay's access mix does.
 t4: `results/raw/rk3588-t4_big.csv` (commit a5595ab8, 2026-08-14),
 manifest `results/manifests/rk3588-t4.json` (git SHA 4169648, dirty=false,
 governor=performance, 30 repeats). Prior session: commit fc9173b2
-(2026-08-12), manifest aa61e20.
+(2026-08-12), manifest aa61e20. Root-cause experiment (ob-yupd):
+`results/raw/rk3588-t4_cumdecay_thermal_gate.txt` + manifest
+`results/manifests/rk3588-t4_cumdecay_thermal_gate.json`
+(t4_20260814T150859Z_056f104, 056f104d, dirty=false).
