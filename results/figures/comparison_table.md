@@ -7,23 +7,31 @@ See per-device tables (`*_table.md`) for full kernel-level detail._
 
 | Device | CSV | Git SHA | Dirty | Governor | Threads | Manifest |
 |---|---|---|---|---|---|---|
-| rk3588-t3 (big, **8-thread**) | `rk3588-t3-clean.csv` | `854c6f1` | **false** | performance | 8 | `rk3588-t3-clean.json` |
+| rk3588-t3 (big, **4-thread**) | `rk3588-t3-clean.csv` | `854c6f1` | **false** | performance | 4 (manifest says 8 — bug) | `rk3588-t3-clean.json` |
 | rk3588-t3 (big, **1-thread**) | `rk3588-t3-clean-singlethread.csv` | `d72eaa1` | **false** | performance | 1 | `rk3588-t3-clean-singlethread.json` |
 | rk3588-t4 (big, 1-thread) | `rk3588-t4-clean.csv` | `1ca4d6d` | **false** | performance | 1 | `rk3588-t4-clean.json` |
 
-> **⚠ Correction (ob-mrd.12, ob-mrd.13):** The original provenance note claimed
+> **⚠ Correction (ob-mrd.12, ob-mrd.13, ob-mrd.36):** The original provenance note claimed
 > both boards were "single-thread." This was **false for t3**: manifests show
 > `rk3588-t3-clean.csv` ran with `effective_threads=8` (thread count defaulted to
 > core count). t4's `rk3588-t4-clean.csv` was genuinely 1-thread
 > (`OMP_NUM_THREADS=1`). They are therefore **not directly comparable**.
+>
+> **Further correction (ob-mrd.36, commit 55a9f2f):** The manifest's
+> `effective_threads=8` was itself a bug — `os.cpu_count()` ignores `taskset`
+> CPU affinity masks. The benchmark was run with `taskset -c 4-7`, so libgomp
+> auto-detected 4 available CPUs. The actual thread count was **4**, not 8.
+> FINDINGS.md §"Thread-count sensitivity" confirms: `default_pinbig` (auto,
+> taskset 4-7) = 4 threads.
 >
 > A genuine 1-thread t3 run was captured for ob-mrd.13
 > (`rk3588-t3-clean-singlethread.csv`, `OMP_NUM_THREADS=1`, taskset-pinned to
 > one A76 core, commit `d72eaa1`). The like-for-like 1-thread comparison is in
 > §1a below.
 >
-> The equal-thread-count 8v8 comparison (`rk3588-t3-clean.csv` vs
-> `rk3588-t4_big.csv`, both `effective_threads=8`) gives cumdecay 21.39 vs 21.67,
+> The equal-thread-count 4v4 comparison (`rk3588-t3-clean.csv` vs
+> `rk3588-t4_big.csv`, both actually 4-thread despite manifests saying `effective_threads=8`
+> due to the `os.cpu_count()` bug) gives cumdecay 21.39 vs 21.67,
 > gated scan 10.56 vs 11.42, Conv1D 20.59 vs 20.71 — boards agree within ~8%,
 > consistent with t4's higher 2400 MHz clock. Both CSVs are clean-tree
 > (dirty=false); t4 re-run at `aa61e20` after the manifest.py dirty-check
@@ -34,7 +42,7 @@ See per-device tables (`*_table.md`) for full kernel-level detail._
 > Machines RK1 (kernel 6.11, EEVDF, 8 GB). Both use Cortex-A76 big cores at
 > ~2.3 GHz (t4: 2400 MHz; t3: 2304 MHz).
 
-## 1. GDN kernel bandwidth — RK3588 Cortex-A76 (big, 8-thread vs 1-thread)
+## 1. GDN kernel bandwidth — RK3588 Cortex-A76 (big, 4-thread vs 1-thread)
 
 ### 1a. Like-for-like single-thread comparison (ob-mrd.13)
 
@@ -56,19 +64,20 @@ Qwen3.5-4B, prefill (seq=64), fp32. Both devices `OMP_NUM_THREADS=1`, one A76 co
 > `rk3588-t4-clean.csv` (commit `1ca4d6d`). Different commits, but both
 > clean-tree post-NEON-optimization with identical kernel code.
 
-### 1b. 8-thread (t3) vs 1-thread (t4) — confounded, kept for historical reference
+### 1b. 4-thread (t3) vs 1-thread (t4) — confounded, kept for historical reference
 
-Qwen3.5-4B, prefill (seq=64), fp32. ⚠ t3 was 8-thread (threads_source=core_count_default); t4 was 1-thread. **Not comparable** — see §1a for the valid comparison.
+Qwen3.5-4B, prefill (seq=64), fp32. ⚠ t3 was 4-thread (manifest's threads_source=core_count_default was a bug — actual 4 threads from `taskset` affinity); t4 was 1-thread. **Not comparable** — see §1a for the valid comparison.
 
-| Kernel | t3 GiB/s (8T) | t4 GiB/s (1T) | t3÷t4 ratio |
+| Kernel | t3 GiB/s (4T) | t4 GiB/s (1T) | t3÷t4 ratio |
 |---|---:|---:|---:|
 | gdn_cumdecay | 21.39 | 7.40 | 2.89× |
 | gdn_gated_scan | 10.56 | 5.67 | 1.86× |
 | gdn_causal_dwconv1d | 20.59 | 7.04 | 2.93× |
 
-> The 8-thread t3 numbers reflect OpenMP scaling across 4 big cores. The
-> 8-thread vs 8-thread comparison (`rk3588-t3-clean.csv` vs `rk3588-t4_big.csv`,
-> both effective_threads=8) gives cumdecay 21.39 vs 21.67, gated scan 10.56 vs 11.42,
+> The 4-thread t3 numbers reflect OpenMP scaling across 4 big cores. The
+> 4-thread vs 4-thread comparison (`rk3588-t3-clean.csv` vs `rk3588-t4_big.csv`,
+> both actually 4-thread despite manifests saying effective_threads=8 due to the
+> os.cpu_count() affinity bug) gives cumdecay 21.39 vs 21.67, gated scan 10.56 vs 11.42,
 > Conv1D 20.59 vs 20.71 — boards agree within ~8%. Both CSVs re-run clean
 > (dirty=false): t3 at `854c6f1`, t4 at `aa61e20` (after the manifest.py
 > dirty-check fix, ob-8ms.3/PR #313), each replacing a prior
@@ -76,7 +85,7 @@ Qwen3.5-4B, prefill (seq=64), fp32. ⚠ t3 was 8-thread (threads_source=core_cou
 > variance (ob-bf7).
 > See §8 for OpenMP scaling analysis.
 
-### 1c. 0.8B model (t3 8-thread, t4 1-thread — also confounded)
+### 1c. 0.8B model (t3 4-thread, t4 1-thread — also confounded)
 
 Qwen3.5-0.8B, prefill (seq=64), fp32 baseline (t3 only; t4 shows similar ratios):
 

@@ -35,7 +35,7 @@ DEVICES = [
     # Fleet comparison uses single-threaded data for fair cross-device comparison.
     # Fleet sweep (ob-bf7): RK3588, Jetson j1, and Jetson j2 were re-run at the
     # post-optimization commits with clean trees, governor=performance, single-thread
-    # (OMP_NUM_THREADS=1) for t4. ⚠ t3-clean was actually 8-thread — see ob-mrd.12/14.
+    # (OMP_NUM_THREADS=1) for t4. ⚠ t3-clean was actually 4-thread — see ob-mrd.12/14/36.
     # Pi 5 was not part of the fleet sweep, so its data is
     # from a different commit — noted in the provenance audit below.
     (
@@ -420,7 +420,8 @@ def _provenance_audit_lines():
     out.append(
         "Since all runs are post-optimization and clean-tree, the RK3588 inter-board "
         "gap **would** reflect hardware heterogeneity — **but see the thread-count "
-        "confound warning above (ob-mrd.12/14)**: t3-clean ran 8-thread while t4-clean "
+        "confound warning above (ob-mrd.12/14/36)**: t3-clean ran 4-thread (manifest's "
+        "effective_threads=8 was a bug — os.cpu_count() ignored taskset affinity) while t4-clean "
         "ran 1-thread, so the raw gap overstates any real difference. Additionally, "
         "manifest comparison reveals the two boards are **different SKUs** (t3: 32 GB "
         "RAM, big-cluster max 2304 MHz, little-cluster cpu_capacity 414; t4: 8 GB RAM, "
@@ -470,8 +471,10 @@ def generate_report(output_path):
     lines.append("")
     lines.append("RK3588 (t4-clean), Jetson j1, and Jetson j2 are from the fleet sweep (ob-bf7):")
     lines.append("post-optimization commits, clean tree. The RK3588 entry uses t4-clean")
-    lines.append("(1-thread, `OMP_NUM_THREADS=1`). ⚠ t3-clean was 8-thread — see the replicate")
-    lines.append("spread section below and the ob-mrd.12/14 correction.")
+    lines.append(
+        "(1-thread, `OMP_NUM_THREADS=1`). ⚠ t3-clean was 4-thread (manifest bug — see ob-mrd.12/14/36)."
+    )
+    lines.append("See the replicate spread section below.")
     lines.append("Pi 5 was not part of the fleet sweep — its data is from an earlier commit.")
     lines.append("See the optimization-impact section below for multi-threaded results.")
     lines.append("")
@@ -627,7 +630,7 @@ def generate_report(output_path):
         lines.append("")
         worst = max(spread_ratios)
         # Check thread counts for RK3588 big-cluster replicates to avoid the
-        # false "single-threaded" claim (ob-mrd.12/14: t3-clean was 8-thread).
+        # false "single-threaded" claim (ob-mrd.12/14/36: t3-clean was 4-thread).
         rk_t3_t, rk_t4_t = None, None
         for _cls, runs in REPLICATES:
             if _cls == "RK3588 big":
@@ -640,11 +643,12 @@ def generate_report(output_path):
         thread_mismatch = rk_t3_t is not None and rk_t4_t is not None and rk_t3_t != rk_t4_t
         if thread_mismatch:
             lines.append(
-                "⚠ **Thread-count confound (ob-mrd.12/14):** the RK3588 replicates were "
-                f"**not** all single-threaded. t3-clean ran at **{rk_t3_t} threads** "
+                "⚠ **Thread-count confound (ob-mrd.12/14/36):** the RK3588 replicates were "
+                f"**not** all single-threaded. t3-clean ran at **{rk_t3_t} threads** (manifest value; "
+                "actual was 4 due to os.cpu_count() ignoring taskset — see ob-mrd.36) "
                 f"while t4-clean ran at **{rk_t4_t} thread**. The "
                 f"{worst:.2f}x spread is dominated by this thread-count difference, not "
-                "by a hardware effect. The like-for-like comparison (both at 8 threads) "
+                "by a hardware effect. The like-for-like comparison (both at 4 threads) "
                 "shows the boards agree within ~8%. See FINDINGS.md §ob-mrd.12 correction."
             )
         else:
@@ -848,8 +852,9 @@ def generate_report(output_path):
         "The historical provenance issue is resolved: the fleet sweep re-ran all devices "
         "at post-optimization commits with clean trees, governor=performance. RK3588 is "
         "now **included** in the cross-device table above using the clean sweep data. "
-        "⚠ However, t3-clean ran **8-thread** (OMP_NUM_THREADS unset) while t4-clean ran "
-        "**1-thread** (OMP_NUM_THREADS=1) — see ob-mrd.12/14. The cross-device table uses "
+        "⚠ However, t3-clean ran **4-thread** (manifest said 8 due to os.cpu_count() bug, "
+        "actual was 4 from taskset affinity — see ob-mrd.12/14/36) while t4-clean ran "
+        "**1-thread** (OMP_NUM_THREADS=1). The cross-device table uses "
         "t4-clean (1-thread); the replicate comparison is flagged accordingly."
     )
     lines.append("")

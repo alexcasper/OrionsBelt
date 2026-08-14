@@ -888,8 +888,8 @@ narrow only for prefill chunk boundaries.
 > (`threads_source: core_count_default` — `OMP_NUM_THREADS` was unset).
 > `rk3588-t4-clean.json` records `effective_threads: 1`. The "1.98×
 > genuine hardware effect" conclusion is **not supported**; the gap is
-> primarily an 8-thread-vs-1-thread confound. The like-for-like comparison
-> (both 8-thread) shows the boards agree within ~8%. See the full
+> primarily an 4-thread-vs-1-thread confound. The like-for-like comparison
+> (both 4-thread) shows the boards agree within ~8%. See the full
 > correction at [§ob-mrd.12](#correction-ob-mrd12-2026-08-07--the-single-thread-claim-is-false-the-gap-is-a-thread-count-artifact)
 > below. The `fleet_bandwidth_scaling.md` report has been regenerated with
 > matching warnings.
@@ -905,8 +905,8 @@ This resolves the provenance question that dominated earlier analysis:
 | Jetson | j1 **1.14** vs j2 **1.09** | **1.05×** | j1 updated post-sweep (batched-timing fix, `414b622`); j2 at fleet sweep `234807d` |
 
 > ⚠ **The following conclusion is superseded by the correction above.** The
-> "genuine hardware effect" claim is not supported because t3 ran 8-thread
-> while t4 ran 1-thread. See ob-mrd.12/14.
+> "genuine hardware effect" claim is not supported because t3 ran 4-thread
+> while t4 ran 1-thread. See ob-mrd.12/14/36.
 
 **The RK3588 inter-board gap is a genuine hardware effect.** Even fully
 commit-matched and clean-tree, the two RK3588 boards disagree by 1.98× on the
@@ -2332,7 +2332,7 @@ memory is UB).
 | 4B decode | 45.78 | 40.69 | 1.13× |
 | 0.8B decode | 30.52 | 30.52 | 1.00× |
 
-**Corrected t3 numbers (A76 big, 8-thread OpenMP, taskset 4-7, governor=performance, commit `854c6f1`):**
+**Corrected t3 numbers (A76 big, 4-thread OpenMP auto-detected from `taskset -c 4-7`, governor=performance, commit `854c6f1`):**
 
 | Config | Old GiB/s | New GiB/s | Inflation |
 |---|---|---|---|
@@ -2343,9 +2343,9 @@ memory is UB).
 
 Cross-device agreement on corrected numbers: 4B prefill 6.46 vs 6.84 (t3 is 94%
 of t4), 0.8B prefill 7.62 vs 8.15 (93%). The decode numbers diverge more (57.22
-vs 40.69 for 4B) because t3 uses 8-thread OpenMP while t4 uses fewer threads;
-at decode the working set is cache-resident so thread count matters more than
-memory bandwidth.
+vs 40.69 for 4B) because t3 uses 4-thread OpenMP (auto-detected from `taskset -c 4-7`)
+while t4 uses fewer threads; at decode the working set is cache-resident so thread
+count matters more than memory bandwidth.
 
 **Impact on §10 findings:**
 
@@ -3087,10 +3087,15 @@ prior workloads), not a kernel or measurement methodology problem.
 
 ## Cross-Board Gap: t4 (Turing Machines RK1) vs t3 — Fresh Data at Current HEAD
 
-> **⚠ CORRECTION (ob-mrd.12, ob-mrd.13):** The headline table below compares t3
-> **8-thread** data (`rk3588-t3-clean.csv`, `effective_threads=8`) against t4
-> **1-thread** data (`rk3588-t4-clean.csv`, `OMP_NUM_THREADS=1`). The "gap" of
-> 1.25–4.87× is a **thread-count artifact**, not a hardware difference.
+> **⚠ CORRECTION (ob-mrd.12, ob-mrd.13, ob-mrd.36):** The headline table below compares t3
+> data (`rk3588-t3-clean.csv`) against t4 **1-thread** data (`rk3588-t4-clean.csv`,
+> `OMP_NUM_THREADS=1`). The "gap" of 1.25–4.87× is a **thread-count artifact**,
+> not a hardware difference. Note: the t3-clean manifest records `effective_threads=8`,
+> but this was a provenance bug (`os.cpu_count()` ignored `taskset` affinity, fixed in
+> commit 55a9f2f / ob-mrd.36). The actual run was 4-thread (taskset-pinned to A76 cores
+> 4-7, libgomp auto-detected 4 available CPUs). The t4 "big" data (`rk3588-t4_big.csv`)
+> had the same manifest bug — its cumdecay of 21.67 GiB/s is ~3× the confirmed 1-thread
+> number (7.40), consistent with 4 threads.
 >
 > A genuine 1-thread t3 run was captured (ob-mrd.13, `OMP_NUM_THREADS=1`,
 > taskset-pinned to one A76 core, commit `d72eaa1`). The like-for-like 1-thread
@@ -3098,8 +3103,8 @@ prior workloads), not a kernel or measurement methodology problem.
 > GiB/s, 0.95×). Only gated_scan retains a gap (t3 3.07 vs t4 5.67, t4 is 1.87×
 > faster), likely due to a board-level memory-subsystem difference.
 >
-> The 8-thread vs 8-thread comparison (`rk3588-t3-clean.csv` vs
-> `rk3588-t4_big.csv`, both `effective_threads=8`) shows the boards agree within
+> The equal-thread-count comparison (`rk3588-t3-clean.csv` vs `rk3588-t4_big.csv`,
+> both actually 4-thread despite manifests saying 8) shows the boards agree within
 > ~1% (cumdecay 21.39 vs 21.67), consistent with t4's higher 2400 MHz clock.
 >
 > See `comparison_table.md` §1a for the corrected like-for-like analysis.
@@ -3125,7 +3130,7 @@ kernels. Both boards are RK3588 (4×A55 + 4×A76) but **different board vendors*
 | GCC | unknown | 14.2.0 |
 | OS | Ubuntu 22.04 | Ubuntu 24.04 |
 
-### Headline Numbers (⚠ t3=8-thread, t4=1-thread — confounded, see correction above)
+### Headline Numbers (⚠ t3=4-thread, t4=1-thread — confounded, see correction above)
 
 | Kernel | Model | Seq | t4 GiB/s | t3 GiB/s | Ratio |
 |--------|-------|-----|----------|----------|-------|
@@ -3165,9 +3170,10 @@ kernels. Both boards are RK3588 (4×A55 + 4×A76) but **different board vendors*
 
 - **⚠ The t3/t4 performance gap was NOT real — it was a thread-count artifact.**
   The original analysis below assumed both boards were single-thread; in fact t3
-  ran 8-thread (effective_threads=8). At matched thread counts the boards agree
-  within ~8% (8-thread) or within noise for cumdecay (1-thread). See ob-mrd.12,
-  ob-mrd.13, and comparison_table.md §1a for the corrected analysis.
+  ran 4-thread (manifest's `effective_threads=8` was a provenance bug — `os.cpu_count()`
+  ignored `taskset` affinity; fixed in 55a9f2f / ob-mrd.36). At matched thread counts
+  the boards agree within ~8% (4-thread) or within noise for cumdecay (1-thread). See
+  ob-mrd.12, ob-mrd.13, ob-mrd.36, and comparison_table.md §1a for the corrected analysis.
 - The original ob-bf7 spread concern remains RESOLVED for stale data (both
   boards now have clean post-optimization CSVs with <8% spread).
 - The residual gated_scan gap at 1-thread (t3 0.54× of t4) may indicate a
@@ -3179,13 +3185,19 @@ kernels. Both boards are RK3588 (4×A55 + 4×A76) but **different board vendors*
 The headline table and analysis above rest on the assumption that both boards
 ran **single-thread**. The committed manifests contradict this:
 
-| Run | Manifest | `effective_threads` | `threads_source` |
-|---|---|---:|---|
-| t3-clean | `rk3588-t3-clean.json` | **8** | `core_count_default` (OMP_NUM_THREADS unset → 8 cores) |
-| t4-clean | `rk3588-t4-clean.json` | **1** | `OMP_NUM_THREADS` (explicitly `=1`) |
+| Run | Manifest | `effective_threads` (manifest) | Actual threads | `threads_source` |
+|---|---|---:|---:|---|
+| t3-clean | `rk3588-t3-clean.json` | **8** ⚠ | **4** | `core_count_default` (bug: `os.cpu_count()` ignored `taskset` affinity) |
+| t4-clean | `rk3588-t4-clean.json` | **1** | **1** | `OMP_NUM_THREADS` (explicitly `=1`) |
 
-`t3-clean` is an **8-thread** run; `t4-clean` is genuinely **1-thread**. The
-1.25–4.87× "gap" is therefore primarily an **8-thread-vs-1-thread** confound,
+> **Provenance bug (ob-mrd.36, fixed in 55a9f2f):** The manifest recorded
+> `effective_threads=8` because `os.cpu_count()` returns total system cores,
+> ignoring the `taskset -c 4-7` affinity mask. libgomp respects the mask and
+> auto-spawned 4 threads. FINDINGS.md §"Thread-count sensitivity" confirms:
+> `default_pinbig` (auto, taskset 4-7) = 4 threads, matching `omp4_pinbig`.
+
+`t3-clean` is actually a **4-thread** run (manifest's 8 was a bug); `t4-clean` is genuinely **1-thread**. The
+1.25–4.87× "gap" is therefore primarily a **4-thread-vs-1-thread** confound,
 not evidence of a hardware difference.
 
 **Update (ob-mrd.13, 2026-08-07):** A genuine single-thread t3 run was captured
@@ -3206,9 +3218,11 @@ interconnect difference that the scan's sequential recurrence pattern exposes
 but the cumulative-decay pattern does not.
 
 The **equal-thread-count** comparison removes the confound. Both boards at
-8-thread (`rk3588-t4_big.csv` / `rk3588-t4.json` vs `rk3588-t3-clean.csv`):
+4-thread — `rk3588-t4_big.csv` / `rk3588-t4.json` vs `rk3588-t3-clean.csv`
+(both manifests say `effective_threads=8` due to the same `os.cpu_count()` bug;
+actual thread count was 4 from `taskset` affinity):
 
-| Kernel (4B, seq=64) | t4 8-thread GiB/s | t3 8-thread GiB/s | t4÷t3 |
+| Kernel (4B, seq=64) | t4 4-thread GiB/s | t3 4-thread GiB/s | t4÷t3 |
 |---|---:|---:|---:|
 | gdn_cumdecay | 21.67 | 21.39 | 1.01× |
 | gdn_gated_scan | 11.42 | 10.56 | 1.08× |
