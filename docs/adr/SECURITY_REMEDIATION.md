@@ -2,7 +2,21 @@
 
 **Bead:** `ob-3i5`
 **Date:** 2026-08-07
-**Severity:** LOW (repo is private — see §1)
+**Severity:** ~~LOW (repo is private — see §1)~~
+
+> **ADDENDUM 2026-08-14T23:09Z (t4): severity is now CRITICAL.** The precondition this
+> document relied on has inverted: `gh repo view` reports `visibility: PUBLIC`
+> (verified 23:07Z; PRIVATE as late as the 17:12Z audit). §1 stated the §4 steps
+> "become **blocking** before that flip" — the repo was made public without them.
+> The credential is **still live**: verified on t4 (sudo governor write succeeds).
+> Tips of all remote branches are clean (cross-branch credential scan passes);
+> exposure is git-history blobs only, now reachable by anyone who can clone.
+> Required human actions, in order: **§4a coordinated rotation on all five
+> devices** (do not rotate unilaterally — it breaks fleet agents' sudo mid-session;
+> distribute the new value out-of-band), then **§4c history purge** via
+> `scripts/purge_password_history.sh` (force-push across `main` + branches —
+> coordinator-only, after open PRs settle). Full detail: `ob-3i5` comment
+> 2026-08-14T23:09Z.
 
 ---
 

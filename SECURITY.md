@@ -2,9 +2,9 @@
 
 ## Known Exposure: Device Sudo Password in Git History
 
-**Severity:** Medium (repo is PRIVATE, but credential is committed)
-**Status:** Tracked as bead `ob-3i5`
-**Discovered:** 2026-08-03
+**Severity:** CRITICAL (repo is **PUBLIC** as of 2026-08-14T23:07Z and the credential is still valid — rotation pending; see the addendum in `docs/adr/SECURITY_REMEDIATION.md` §1 and the 2026-08-14T23:09Z comment on `ob-3i5`)
+**Status:** Tracked as bead `ob-3i5` — human action required (§4a rotation, §4c purge)
+**Discovered:** 2026-08-03 · **Escalated:** 2026-08-14
 
 ### Summary
 
