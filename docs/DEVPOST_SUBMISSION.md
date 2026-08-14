@@ -62,7 +62,7 @@ At 262K context on the 4B checkpoint, that difference is **23.95 GiB of RAM** �
 
 ### Headline: GDN kernel bandwidth on RK3588 Cortex-A76
 
-Qwen3.5-4B, prefill (seq=64), fp32 baseline, 8-thread (big cluster). Two independent RK3588 nodes (t3, t4 Turing Machines RK1). Kernel computation is unchanged between commits — `bench_gdn.c` is byte-identical between 854c6f1 (t3) and 4169648 (t4, current data), so the comparison is exact, not just infrastructure-equivalent.
+Qwen3.5-4B, prefill (seq=64), fp32 baseline, 4-thread (big cluster, pinned via `taskset -c 4-7`; the manifest records `effective_threads=8` due to a since-fixed `os.cpu_count()` affinity bug, `55a9f2f1`/ob-mrd.12). Two independent RK3588 nodes (t3, t4 Turing Machines RK1). Kernel computation is unchanged between commits — `bench_gdn.c` is byte-identical between 854c6f1 (t3) and a5595ab8 (t4, current data), so the comparison is exact, not just infrastructure-equivalent.
 
 | Kernel | GiB/s (t3) | Spread | GiB/s (t4) | Spread | t3÷t4 |
 |---|---:|---:|---:|---:|---:|
@@ -84,9 +84,12 @@ Qwen3.5-4B, prefill (seq=64), fp32 baseline, 8-thread (big cluster). Two indepen
 > of the ~25 GiB/s practical STREAM ceiling); gated scan
 > runs at a lower fraction because its sequential recurrence is
 > **instruction-overhead-bound, not DRAM-bandwidth-bound**.
-> (An earlier version of this table compared t3 8-thread against t4 1-thread
+> (An earlier version of this table compared t3 against t4 1-thread
 > data, inflating a 2.85× "cross-board gap" that was entirely a thread-count
-> artifact — see FINDINGS §"Cross-Board Gap" and bead ob-mrd.12.)
+> artifact — see FINDINGS §"Cross-Board Gap" and bead ob-mrd.12. A subsequent
+> provenance fix (ob-mrd.36, commit 55a9f2f) showed the manifests' `effective_threads=8`
+> was itself incorrect — `os.cpu_count()` ignored the `taskset` affinity mask.
+> Both boards actually ran 4-thread pinned, not 8-thread.)
 
 ### Optimization impact (fp16 state, t3 A76)
 
@@ -257,7 +260,7 @@ Specifically:
 
 - **Repository:** https://github.com/alexcasper/OrionsBelt
 - **License:** Apache-2.0
-- **Findings (57 sections, 6078 lines):** [`docs/FINDINGS.md`](https://github.com/alexcasper/OrionsBelt/blob/main/docs/FINDINGS.md)
+- **Findings (57 sections, 6095 lines):** [`docs/FINDINGS.md`](https://github.com/alexcasper/OrionsBelt/blob/main/docs/FINDINGS.md)
 - **Comparison table:** [`results/figures/comparison_table.md`](https://github.com/alexcasper/OrionsBelt/blob/main/results/figures/comparison_table.md)
 - **Fleet bandwidth analysis:** [`results/figures/fleet_bandwidth_scaling.md`](https://github.com/alexcasper/OrionsBelt/blob/main/results/figures/fleet_bandwidth_scaling.md)
 - **Memory scaling figures:** [`results/figures/memory_comparison.md`](https://github.com/alexcasper/OrionsBelt/blob/main/results/figures/memory_comparison.md)

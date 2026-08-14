@@ -24,6 +24,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import bench.manifest as manifest_mod
 from bench.manifest import (
+    _affinity_count,
     _core_count,
     _cpu_model,
     _cpufreq_topology,
@@ -397,6 +398,24 @@ class TestCoreCount:
 
 
 # ---------------------------------------------------------------------------
+# _affinity_count — taskset-aware CPU count
+# ---------------------------------------------------------------------------
+
+
+class TestAffinityCount:
+    def test_returns_int_or_none(self):
+        result = _affinity_count()
+        assert result is None or isinstance(result, int)
+
+    def test_respects_affinity_mask(self):
+        """On Linux, _affinity_count should be ≤ _core_count."""
+        aff = _affinity_count()
+        cores = _core_count()
+        if aff is not None and cores is not None:
+            assert aff <= cores
+
+
+# ---------------------------------------------------------------------------
 # _isa_features — non-aarch64 early return
 # ---------------------------------------------------------------------------
 
@@ -448,12 +467,12 @@ class TestOptionalPackageVersions:
 
 class TestParallelism:
     def test_non_numeric_omp_threads(self, monkeypatch):
-        """Non-numeric OMP_NUM_THREADS falls back to core_count."""
+        """Non-numeric OMP_NUM_THREADS falls back to affinity or core count."""
         monkeypatch.setenv("OMP_NUM_THREADS", "not_a_number")
         result = _parallelism()
         assert result["omp_num_threads"] == "not_a_number"
-        # effective_threads should fall back to core count
-        assert result["threads_source"] == "core_count_default"
+        # effective_threads should fall back to affinity mask or core count
+        assert result["threads_source"] in ("affinity_mask", "core_count_default")
 
     def test_valid_omp_threads(self, monkeypatch):
         """Numeric OMP_NUM_THREADS is parsed correctly."""
@@ -464,11 +483,16 @@ class TestParallelism:
         assert result["threads_source"] == "OMP_NUM_THREADS"
 
     def test_unset_omp_threads(self, monkeypatch):
-        """Unset OMP_NUM_THREADS falls back to core count."""
+        """Unset OMP_NUM_THREADS falls back to affinity or core count."""
         monkeypatch.delenv("OMP_NUM_THREADS", raising=False)
         result = _parallelism()
         assert result["omp_num_threads"] is None
-        assert result["threads_source"] == "core_count_default"
+        # On Linux, falls back to affinity mask (respects taskset);
+        # on other platforms, falls back to raw core count.
+        assert result["threads_source"] in ("affinity_mask", "core_count_default")
+        # New transparency fields should always be present
+        assert "affinity_core_count" in result
+        assert "system_core_count" in result
 
 
 # ---------------------------------------------------------------------------

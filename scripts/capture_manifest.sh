@@ -224,9 +224,12 @@ if [ -n "${OMP_NUM_THREADS:-}" ]; then
 else
   OMP_THREADS_JSON="null"
   # libgomp defaults to one thread per available CPU when the var is unset.
+  # nproc respects the CPU affinity mask (taskset), so CORE_COUNT is already
+  # affinity-aware.  nproc --all gives the raw system total for transparency.
   EFFECTIVE_THREADS="$CORE_COUNT"
-  THREADS_SOURCE="core_count_default"
+  THREADS_SOURCE="affinity_mask"
 fi
+SYSTEM_CORE_COUNT=$(nproc --all 2>/dev/null || echo "$CORE_COUNT")
 [ -n "${OMP_PROC_BIND:-}" ] && OMP_BIND_JSON="\"$OMP_PROC_BIND\"" || OMP_BIND_JSON="null"
 [ -n "${OMP_PLACES:-}" ] && OMP_PLACES_JSON="\"$OMP_PLACES\"" || OMP_PLACES_JSON="null"
 
@@ -255,7 +258,9 @@ cat <<JSONEOF
     "omp_proc_bind": $OMP_BIND_JSON,
     "omp_places": $OMP_PLACES_JSON,
     "effective_threads": $EFFECTIVE_THREADS,
-    "threads_source": "$THREADS_SOURCE"
+    "threads_source": "$THREADS_SOURCE",
+    "affinity_core_count": $CORE_COUNT,
+    "system_core_count": $SYSTEM_CORE_COUNT
   },
   "thermal_zones": $THERMAL_JSON,
   "memory": {

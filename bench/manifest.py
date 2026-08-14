@@ -195,6 +195,21 @@ def _core_count() -> int | None:
     return _safe(os.cpu_count)
 
 
+def _affinity_count() -> int | None:
+    """Number of CPUs in this process's scheduling affinity mask.
+
+    On Linux, libgomp respects the CPU affinity mask when ``OMP_NUM_THREADS``
+    is unset, so this is a better predictor of the actual OpenMP thread count
+    than ``os.cpu_count()`` (which ignores ``taskset``).  Returns ``None`` on
+    platforms without ``sched_getaffinity`` (macOS, Windows) or if the call
+    fails — callers fall back to ``_core_count`` in that case.
+    """
+    try:
+        return len(os.sched_getaffinity(0))
+    except (AttributeError, OSError):
+        return None
+
+
 def _read_int_file(path: str) -> int | None:
     text = _safe(_read_text, path)
     if text is None:
@@ -374,6 +389,12 @@ def _parallelism() -> dict[str, Any]:
     ``omp_num_threads`` is the environment variable as set (None if unset, which
     means OpenMP defaults to one thread per core); ``effective_threads`` is the
     best available guess at what actually ran.
+
+    When ``OMP_NUM_THREADS`` is unset, libgomp on Linux respects the process's
+    CPU affinity mask (e.g. set via ``taskset -c 4-7``).  We therefore prefer
+    ``affinity_core_count`` over ``system_core_count`` for the fallback, so a
+    pinned 4-core run is recorded as 4, not 8.  Both raw values are emitted for
+    transparency so downstream tools can detect the discrepancy.
     """
     env = os.environ.get("OMP_NUM_THREADS")
     threads: int | None = None
@@ -382,14 +403,25 @@ def _parallelism() -> dict[str, Any]:
             threads = int(env)
         except ValueError:
             threads = None
+    affinity = _safe(_affinity_count)
+    sys_cores = _safe(_core_count)
+    if threads is not None:
+        effective = threads
+        source = "OMP_NUM_THREADS"
+    elif affinity is not None:
+        effective = affinity
+        source = "affinity_mask"
+    else:
+        effective = sys_cores
+        source = "core_count_default"
     return {
         "omp_num_threads": env,
         "omp_proc_bind": os.environ.get("OMP_PROC_BIND"),
         "omp_places": os.environ.get("OMP_PLACES"),
-        # With OMP_NUM_THREADS unset, libgomp defaults to the number of available
-        # CPUs, so record that as the effective count rather than leaving it null.
-        "effective_threads": threads if threads is not None else _safe(_core_count),
-        "threads_source": "OMP_NUM_THREADS" if threads is not None else "core_count_default",
+        "effective_threads": effective,
+        "threads_source": source,
+        "affinity_core_count": affinity,
+        "system_core_count": sys_cores,
     }
 
 

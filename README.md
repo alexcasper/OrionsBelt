@@ -12,7 +12,7 @@ Licensed under **Apache-2.0** — see [`LICENSE`](./LICENSE).
 
 ## Headline results
 
-Three GDN CPU kernels (gated cumulative decay, gated delta-rule scan, causal depthwise Conv1D), benchmarked on RK3588 Cortex-A76 (big cluster, 8-thread) at verified Qwen3.5-4B shapes:
+Three GDN CPU kernels (gated cumulative decay, gated delta-rule scan, causal depthwise Conv1D), benchmarked on RK3588 Cortex-A76 (big cluster, 4-thread pinned via `taskset -c 4-7`) at verified Qwen3.5-4B shapes:
 
 | Kernel | GiB/s | % of 31.7 GiB/s spec | Spread |
 |---|---:|---:|---:|
@@ -135,7 +135,7 @@ All figures above are verified against primary sources (Radxa product page and d
 
 ## Status
 
-**This is an in-progress research repository as of 2026-08-13 (T-1 to deadline).** The project has committed to the **Edge AI track** ([ADR 0007](./docs/adr/0007-commit-to-edge-ai-track.md)) after the Orion O6 board did not arrive by its last-useful-arrival date. All work continues on the portable aarch64 device fleet.
+**This is a submission-ready research repository as of 2026-08-14 (deadline day).** The project has committed to the **Edge AI track** ([ADR 0007](./docs/adr/0007-commit-to-edge-ai-track.md)) after the Orion O6 board did not arrive by its last-useful-arrival date. All work was completed on the portable aarch64 device fleet.
 
 **Device-fleet microbenchmarks are complete across five Arm devices.** Three GDN CPU kernels (gated cumulative decay, gated delta-rule scan, causal depthwise Conv1D) have been measured at verified Qwen3.5-4B and 0.8B shapes on the full fleet: Jetson Nano (Cortex-A57, NEON), Raspberry Pi 5 (Cortex-A76), and RK3588 (Cortex-A76 big + Cortex-A55 little clusters). The optimization stack (OpenMP parallelization + NEON unrolling + fp16 state) delivers 3.5–5.1× on A76 silicon and 2.6–3.1× on A57. The key cross-device finding — that these kernels are **instruction-overhead-bound, not DRAM-bandwidth-bound** at seq=64 working-set sizes — is documented in the [fleet bandwidth-scaling analysis](./results/figures/fleet_bandwidth_scaling.md).
 
@@ -190,7 +190,7 @@ All figures above are verified against primary sources (Radxa product page and d
 | Per-layer engine mapping (NPU/GPU/CPU) | Hypothesis only — pending measurements |
 | Full inference results (tokens/sec, TTFT, memory) | Done — C decode loop (FP32+INT8+Q8_0), ctx-length scaling (§17–20), quantization accuracy (§30), cross-device (A57+A76), sustained-load thermal stability (§18). [e2e comparison](./results/figures/e2e_fleet_comparison.md) |
 
-> **Results so far:** 228 CSVs from the device fleet, 216 provenance manifests, 90 generated figures/tables, 57 FINDINGS sections.
+> **Results so far:** 228 CSVs from the device fleet, 216 provenance manifests, 92 generated figures/tables, 57 FINDINGS sections.
 > (Counted recursively — `results/raw/` and `results/manifests/` include
 > subdirectories `ablation/`, `affinity/`, and `kleidiai/`, which hold real
 > fleet benchmark data, not scratch files. A non-recursive `ls *.csv` count
