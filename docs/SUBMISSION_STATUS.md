@@ -376,6 +376,8 @@ cutoff has passed with no board; any future arrival is additive bonus per ADR 00
 | #374 | t3 | PR table backfill #373 MERGED | MERGED |
 | #375 | t3 | T-1 submission audit — broken image URLs + cross-branch credential gate + PR backfill; relative image path fix (./results→../results from docs/) | MERGED |
 | #376 | t3 | PR table backfill #375 MERGED status fix | MERGED |
+| #377 | t3 | Stale readiness count fix 16/16→16/17 after cross-branch credential scan + PR #376 backfill | MERGED |
+| #378 | t3 | Delete bench/r5 credential branch — 17/17 submission readiness | OPEN |
 
 > **PR #353:** closed (superseded — #352 included the same #351 backfill row; rebase auto-dropped t3's identical commit).
 >
