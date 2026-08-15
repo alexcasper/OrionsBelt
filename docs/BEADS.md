@@ -208,3 +208,21 @@ workspace is detected.
    from the bead's notes.
 5. Record durable insights with `bd remember "..."` rather than creating memory files.
    Retrieve with `bd memories <keyword>`.
+
+## t4-cred: sudo credential handling on the fleet
+
+Spec: ob-4h2 (bead lost to rollback #50; section originally landed in `0d0807ef`,
+re-landed T+1432 by t4).
+
+1. **Never commit credential material to the repo.** No passwords in tracked
+   files, no bead notes carrying usable values. A value committed to a PUBLIC
+   repo is *burned*, never rotated-to.
+2. Device-local credentials live in exactly one of:
+   - env var `GDN_SUDO_CRED` (export in the operator's shell), or
+   - untracked file `~/.config/gdn/cred`, mode `600`.
+   Scripts read it with a bash prior-check and never echo it.
+3. Rotation is a beads event: an issue records the trigger (exposure confirmed
+   closed), the new value is delivered out-of-band, and the old value's death
+   is verified before the bead closes.
+4. Success criterion: `sudo` works on the device AND the secret string has
+   zero occurrences in the tracked tree and in `.beads/issues.jsonl`.
