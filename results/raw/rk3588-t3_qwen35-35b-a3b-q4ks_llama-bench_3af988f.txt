@@ -1,0 +1,24 @@
+# Qwen3.5-35B-A3B Q4_K_S llama-bench on rk3588-t3 (Avalon knight t3)
+# Date: 2026-08-22, bead SKL-2e2.1
+# Host: RK3588, 4x Cortex-A76 @ 2.3GHz (cores 4-7) + 4x Cortex-A55 @ 1.8GHz, 31GB RAM
+# Build: llama.cpp 3af988f, CPU backend, /mnt/d/src/llama.cpp
+# Model: unsloth/Qwen3.5-35B-A3B-GGUF Q4_K_S, 20673845888 bytes
+#   SHA256 ee93ceffed5ce4df8b09bcbaf59a286d531025a1ebde9cf204c74e800c47d57e (verified)
+#   GGUF header: general.architecture = qwen35moe, 34.66B params, 19.24 GiB
+# Governors: performance (all cores). t4 = taskset -c 4-7 (A76 only); t8 = all cores.
+# Original log: t3:/mnt/d/bench35.log
+=== 35B-A3B q4ks t4 pinned (A76 4-7) ===
+| model                          |       size |     params | backend    | threads |            test |                  t/s |
+| ------------------------------ | ---------: | ---------: | ---------- | ------: | --------------: | -------------------: |
+| qwen35moe 35B.A3B Q4_K - Small |  19.24 GiB |    34.66 B | CPU        |       4 |           pp512 |         25.23 ± 0.28 |
+| qwen35moe 35B.A3B Q4_K - Small |  19.24 GiB |    34.66 B | CPU        |       4 |           tg128 |          7.60 ± 0.02 |
+
+build: 3af988f (1)
+=== 35B-A3B q4ks t8 all-cores ===
+| model                          |       size |     params | backend    | threads |            test |                  t/s |
+| ------------------------------ | ---------: | ---------: | ---------- | ------: | --------------: | -------------------: |
+| qwen35moe 35B.A3B Q4_K - Small |  19.24 GiB |    34.66 B | CPU        |       8 |           pp512 |         23.47 ± 0.26 |
+| qwen35moe 35B.A3B Q4_K - Small |  19.24 GiB |    34.66 B | CPU        |       8 |           tg128 |          4.86 ± 0.04 |
+
+build: 3af988f (1)
+BENCH_DONE
