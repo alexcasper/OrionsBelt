@@ -6093,3 +6093,72 @@ governor=performance, 30 repeats). Prior session: commit fc9173b2
 `results/raw/rk3588-t4_cumdecay_thermal_gate.txt` + manifest
 `results/manifests/rk3588-t4_cumdecay_thermal_gate.json`
 (t4_20260814T150859Z_056f104, 056f104d, dirty=false).
+
+---
+
+## 43. Qwen3.5-35B-A3B MoE on RK3588: activation sparsity makes a 35B model the fastest tested option on 4×A76 (2026-08-22, SKL-2e2.1)
+
+### Motivation
+
+OrionsBelt targets the Qwen 3.5 MoE line on ARM CPUs. Before writing a single
+kernel, the gating question: can an ARM knight run a real Qwen MoE at useful
+speeds under stock llama.cpp — the baseline any OrionsBelt kernel work must beat?
+Run on the strongest knight, t3 (RK3588, 4×A76@2.3GHz + 4×A55@1.8GHz, 31GB RAM).
+
+### Model & verification
+
+- `unsloth/Qwen3.5-35B-A3B-GGUF` Q4_K_S, 20,673,845,888 bytes, SHA256
+  `ee93ceff…7d57e` verified after repair (a parallel ranged download truncated
+  one part; corruption offset binary-searched, tail refetched, full-file hash
+  re-verified — the shipped artifact is byte-identical to upstream).
+- GGUF header confirms `general.architecture = qwen35moe`, 34.66B params,
+  19.24 GiB weights. Genuine MoE.
+- **Caveat — mislabeled public artifact:** `AaryanK/Qwen3.5-9B-GGUF` is
+  marketed as MoE but its GGUF has `arch=qwen35` and **0 expert tensors**
+  (427 tensors): a dense GDN hybrid. Any public "9B MoE" number is actually
+  dense-9B cost. Verify `general.architecture` and expert tensor count before
+  benching anything from HF.
+
+### Method
+
+llama.cpp `3af988f` (CPU build), governor=performance, llama-bench defaults
+(pp512 / tg128, 5 reps). `t4` = `taskset -c 4-7` (the §9 big-cluster pinning
+policy); `t8` = all 8 cores unpinned. Baselines measured same session, same
+build/governor/pinning.
+
+### Results
+
+| Model (Q4) | Params | pp512 t4 | tg128 t4 | tg128 t8 |
+|---|---:|---:|---:|---:|
+| Qwen3.5-4B dense (Q4_K_M) | ~4B | 18.29 | 7.17 | — |
+| "AaryanK 9B MoE" (actually dense GDN hybrid) | ~9B | 9.98 | 3.79 | 2.89 (−24%) |
+| **Qwen3.5-35B-A3B MoE (Q4_K_S)** | **34.66B** | **25.23 ± 0.28** | **7.60 ± 0.02** | 4.86 ± 0.04 (−36%) |
+
+### Interpretation
+
+- **Per-token cost tracks active params (3B), not total (34.66B).** The 35B MoE
+  is the fastest model tested on *both* metrics: pp512 beats even the 4B dense
+  by 38% (25.23 vs 18.29), and decode edges it (7.60 vs 7.17) while carrying
+  ~8.6× the parameters.
+- **§9 pinning policy extends to MoE — and the penalty grows.** All-cores decode
+  loses 36% (vs −24% on the dense 9B). MoE decode touches a sparse expert
+  working set where A55 participation and cross-cluster migration hurt more,
+  not less. Pin MoE decode to 4×A76, always.
+- **RAM gates deployment, not speed.** 19.24 GiB fits t3's 31GB comfortably but
+  rules out small knights (j1/j2-class, 3.9GB). MoE at 4-bit is a big-knight
+  proposition.
+
+### Actionable
+
+- Target the 3.5 MoE line for OrionsBelt ARM kernels: the GDN trunk reuses the
+  dense-line kernels; the MoE FFN adds expert-GEMV where the INT8 SDOT (§33)
+  and INT4+SDOT hybrid (§34) work applies directly.
+- Stock llama.cpp is a strong baseline: 7.6 t/s decode / 25 t/s pp512 on a
+  fanless board. Kernel work must beat that to matter.
+- Never bench a claimed-MoE artifact without checking its GGUF header.
+
+### Provenance
+
+Raw: [`results/raw/rk3588-t3_qwen35-35b-a3b-q4ks_llama-bench_3af988f.txt`](../results/raw/rk3588-t3_qwen35-35b-a3b-q4ks_llama-bench_3af988f.txt).
+4B/9B baselines from the same session (2026-08-21, bead SKL-2e2.1 notes);
+their raw logs were not retained — numbers as recorded in the bead.
